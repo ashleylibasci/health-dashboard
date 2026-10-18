@@ -46,7 +46,9 @@ struct OnboardingView: View {
                     .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
+            // The footer stays put while the page scrolls, so it grows less to leave room for the page.
             footer.padding(.horizontal, 20).padding(.bottom, 12)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
         .background(step == .intro ? Color.lavender : Color.ground)
         .animation(.easeInOut(duration: 0.2), value: step)
@@ -75,14 +77,14 @@ struct OnboardingView: View {
                 Circle().stroke(Color.surface, lineWidth: 12).frame(width: 150, height: 150)
                 Circle().trim(from: 0, to: 0.72).stroke(Color.main, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                     .rotationEffect(.degrees(-90)).frame(width: 150, height: 150)
-                Image(systemName: "moon.stars.fill").font(.system(size: 44)).foregroundStyle(Color.mainText)
+                Image(systemName: "moon.stars.fill").scaledFont(44).foregroundStyle(Color.mainText)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 40)
             .accessibilityHidden(true)
             heading("Your body, explained. ", "Read from your Apple Watch.", size: 38)
             Text("Sleep, recovery, caffeine, your cycle and your exam weeks, read straight from Apple Health. Nothing to export.")
-                .font(.system(size: 17)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(17).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
             privacyNote("Your health data stays on your phone. The app reads it here and never uploads it.")
         }
     }
@@ -90,9 +92,9 @@ struct OnboardingView: View {
     private var namePage: some View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Hi! ", "What’s your name?")
-            Text("So the app knows what to call you.").font(.system(size: 15)).foregroundStyle(Color.muted)
+            Text("So the app knows what to call you.").scaledFont(15).foregroundStyle(Color.muted)
             TextField("First name", text: $name)
-                .font(.system(size: 22, weight: .semibold))
+                .scaledFont(22, .semibold)
                 .textContentType(.givenName)
                 .submitLabel(.next)
                 .padding(16)
@@ -101,15 +103,15 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(isOn: $hasBirthday) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Add your birthday").font(.system(size: 15, weight: .bold))
+                        Text("Add your birthday").scaledFont(15, .bold)
                         Text("Used for fitness age: your heart fitness compared with people your age. Optional.")
-                            .font(.system(size: 13)).foregroundStyle(Color.muted)
+                            .scaledFont(13).foregroundStyle(Color.muted)
                     }
                 }
                 .tint(.main)
                 if hasBirthday {
                     DatePicker("Birthday", selection: $birthday, in: ...Date.now, displayedComponents: .date)
-                        .font(.system(size: 15))
+                        .scaledFont(15)
                 }
             }
             .padding(16)
@@ -121,7 +123,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 14) {
             heading("Tell us about ", "your cycle")
             Text("This changes what the app shows you. Every body is different, and you can change it anytime.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             ForEach(CycleMode.allCases) { mode in
                 choice(selected: cycle == mode, dot: dotColor(mode), title: mode.title, detail: mode.detail) { cycle = mode }
             }
@@ -133,13 +135,13 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 14) {
             heading("Which ", "birth control?")
             Text("Each one changes your body differently, so the app adjusts what it shows.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+                .scaledFont(15).foregroundStyle(Color.muted)
+            AdaptiveGrid(columns: 2, spacing: 10) {
                 ForEach(BirthControl.allCases) { m in
                     Button { birthControl = m } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(m.name).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                            Text(m.note).font(.system(size: 12)).foregroundStyle(Color.muted2)
+                            Text(m.name).scaledFont(15, .bold).foregroundStyle(Color.ink)
+                            Text(m.note).scaledFont(12).foregroundStyle(Color.muted2)
                                 .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                             Pill(text: m.ovulationLabel, fill: tagFill(m), ink: tagInk(m))
@@ -161,7 +163,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Make it ", "yours")
             Text("Some things aren’t helpful for everyone. Turn on only what you want to see.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted)
+                .scaledFont(15).foregroundStyle(Color.muted)
             VStack(spacing: 0) {
                 prefRow("Show calories", "Off by default. No targets or food diary either way.", $prefs.showCalories)
                 Divider()
@@ -176,8 +178,8 @@ struct OnboardingView: View {
             .padding(.horizontal, 18)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             VStack(alignment: .leading, spacing: 10) {
-                Text("Your water bottle").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text("Log water in bottles (or a quarter or half of one) instead of glasses.").font(.system(size: 13)).foregroundStyle(Color.muted)
+                Text("Your water bottle").scaledFont(15, .bold).foregroundStyle(Color.ink)
+                Text("Log water in bottles (or a quarter or half of one) instead of glasses.").scaledFont(13).foregroundStyle(Color.muted)
                 FlowLayout {
                     ForEach(bottleSizes, id: \.ml) { b in
                         Chip(text: b.name, selected: bottleMl == b.ml) { bottleMl = b.ml }
@@ -190,8 +192,8 @@ struct OnboardingView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(conditions.isEmpty ? "Add a health condition" : conditions.map(\.name).sorted().joined(separator: ", "))
-                            .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                        Text("PCOS, endometriosis, thyroid and more. Optional.").font(.system(size: 13)).foregroundStyle(Color.muted2)
+                            .scaledFont(15, .bold).foregroundStyle(Color.ink)
+                        Text("PCOS, endometriosis, thyroid and more. Optional.").scaledFont(13).foregroundStyle(Color.muted2)
                     }
                     Spacer()
                     Image(systemName: "chevron.right").foregroundStyle(Color.mainText)
@@ -207,12 +209,12 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Bring in your ", "health history")
             Text("Connect Apple Health and the app reads everything your iPhone and Watch have already recorded: years of sleep, heart rate, workouts, cycle and drinks. Nothing to export or upload.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             Card(fill: .lavender) {
                 switch model.healthState {
                 case .ready:
-                    Label("Connected", systemImage: "checkmark.circle.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(Color.mintInk)
-                    Text(importSummary).font(.system(size: 15)).foregroundStyle(Color.ink)
+                    Label("Connected", systemImage: "checkmark.circle.fill").scaledFont(17, .bold).foregroundStyle(Color.mintInk)
+                    Text(importSummary).scaledFont(15).foregroundStyle(Color.ink)
                     if model.historyLooksShort { ShortHistoryNote() }
                 case .loading:
                     ProgressView("Reading your history…")
@@ -220,7 +222,7 @@ struct OnboardingView: View {
                     Note("Couldn’t read Apple Health: \(message)")
                 default:
                     Text("Apple shows two screens. Turn everything on, and on the second one pick this:")
-                        .font(.system(size: 15)).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+                        .scaledFont(15).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
                     AppleSheetPicture()
                 }
             }
@@ -238,20 +240,20 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Connect ", "Google Calendar")
             Text("The app looks for exams, midterms, finals and quizzes so it can warn you before exam week and compare how you sleep then.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             if model.isCalendarConnected, case .ready = model.calendarState {
                 Card(fill: .mint) {
                     Label("Connected: \(model.exams.count) exam\(model.exams.count == 1 ? "" : "s") found", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.mintInk)
+                        .scaledFont(16, .bold).foregroundStyle(Color.mintInk)
                     if let note = model.calendarNote { Note(note) }
                 }
             } else {
                 Card(fill: .lavender) {
                     Text("If your Google account is signed in on this iPhone (Settings → Calendar → Accounts), one tap is all it takes. iOS will ask to share your calendar.")
-                        .font(.system(size: 15)).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+                        .scaledFont(15).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
                 }
                 Button(showLinkField ? "Hide the link option" : "No Google account on this phone? Use a secret link instead") { showLinkField.toggle() }
-                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.mainText)
+                    .scaledFont(14, .semibold).foregroundStyle(Color.mainText)
                 if showLinkField {
                     VStack(alignment: .leading, spacing: 8) {
                         step(1, "On a computer, open **calendar.google.com** → the gear → **Settings**.")
@@ -277,26 +279,28 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Want a ", "heads-up?")
             Text("Two kinds of reminders, and only these. No streak nagging, no daily pings.")
-                .font(.system(size: 15)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 10) {
                 reminderRow("calendar", .butter, .butterInk, "The night before an exam", "“Midterm tomorrow. Aim to be asleep by 12:15.” Sent at 9pm.")
                 reminderRow("thermometer.medium", .peach, .peachInk, "When your body’s working harder", "If several signals move together, like before a cold. Turn off anytime in Settings.")
             }
             if let allowed = model.notificationsAllowed {
                 Label(allowed ? "Reminders are on" : "Reminders are off. You can turn them on later in Settings.", systemImage: allowed ? "checkmark.circle.fill" : "bell.slash")
-                    .font(.system(size: 15, weight: .bold)).foregroundStyle(allowed ? Color.mintInk : Color.muted)
+                    .scaledFont(15, .bold).foregroundStyle(allowed ? Color.mintInk : Color.muted)
             }
             privacyNote("Reminders are made on your phone; nothing is sent to a server.")
         }
     }
 
     private func reminderRow(_ icon: String, _ fill: Color, _ ink: Color, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ink)
-                .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text(detail).font(.system(size: 13)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 0) {
+            AdaptiveStack(alignment: .top, spacing: 12) {
+                Image(systemName: icon).scaledFont(18).foregroundStyle(ink).limitedTextGrowth()
+                    .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).scaledFont(15, .bold).foregroundStyle(Color.ink)
+                    Text(detail).scaledFont(13).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -306,24 +310,24 @@ struct OnboardingView: View {
 
     private var donePage: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Image(systemName: "sun.horizon.fill").font(.system(size: 56)).foregroundStyle(Color.main)
+            Image(systemName: "sun.horizon.fill").scaledFont(56).foregroundStyle(Color.main)
                 .frame(maxWidth: .infinity).padding(.top, 48).accessibilityHidden(true)
             heading(trimmedName.isEmpty ? "You’re " : "You’re all set, ", trimmedName.isEmpty ? "all set." : "\(trimmedName).")
             if let r = model.recoveryToday {
-                HStack(spacing: 16) {
+                AdaptiveStack(spacing: 16) {
                     Ring(value: r.score, size: 88)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Recovery today: \(r.label)").font(.number(20)).foregroundStyle(Color.ink)
-                        Text(r.reason).font(.system(size: 14)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+                        Text("Recovery today: \(r.label)").numberFont(20).foregroundStyle(Color.ink)
+                        Text(r.reason).scaledFont(14).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(18)
                 .background(Color.lavender, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 Text("Your history came in, so your scores are ready now: \(importSummary.prefix(1).lowercased() + importSummary.dropFirst())")
-                    .font(.system(size: 16)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+                    .scaledFont(16).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Scores like recovery and sleep regularity fill in over your first two weeks as your Watch records nights. Everything can be changed later from the circle with your initial on the Today screen.")
-                    .font(.system(size: 16)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+                    .scaledFont(16).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -336,7 +340,8 @@ struct OnboardingView: View {
                 Group {
                     if connecting { ProgressView().tint(Color.onSolid) } else { Text(primaryLabel) }
                 }
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .scaledFont(18, .bold, design: .rounded)
+                .multilineTextAlignment(.center).padding(.horizontal, 20).padding(.vertical, 8)
                 .frame(maxWidth: .infinity, minHeight: 56)
                 .foregroundStyle(Color.onSolid)
                 .background(canContinue ? Color.solid : Color.muted.opacity(0.5), in: Capsule())
@@ -344,11 +349,11 @@ struct OnboardingView: View {
             .disabled(!canContinue || connecting)
             HStack {
                 if step != .intro && step != .done {
-                    Button("Back", action: back).font(.system(size: 15, weight: .semibold)).frame(minHeight: 44)
+                    Button("Back", action: back).scaledFont(15, .semibold).frame(minHeight: 44)
                 }
                 Spacer()
                 if let skip = skipLabel {
-                    Button(skip, action: advance).font(.system(size: 15, weight: .semibold)).frame(minHeight: 44)
+                    Button(skip, action: advance).scaledFont(15, .semibold).frame(minHeight: 44)
                 }
             }
             .foregroundStyle(Color.mainText)
@@ -449,7 +454,7 @@ struct OnboardingView: View {
 
     private func heading(_ plain: String, _ accent: String, size: CGFloat = 32) -> some View {
         (Text(plain) + Text(accent).italic().foregroundColor(.mainText))
-            .font(.serifTitle(size)).foregroundStyle(Color.ink)
+            .serifTitleFont(size).foregroundStyle(Color.ink)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
     }
@@ -457,7 +462,7 @@ struct OnboardingView: View {
     private func privacyNote(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lock.shield.fill").foregroundStyle(Color.mainText)
-            Text(text).font(.system(size: 13)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            Text(text).scaledFont(13).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -466,8 +471,8 @@ struct OnboardingView: View {
             HStack(alignment: .top, spacing: 14) {
                 Circle().fill(dot).frame(width: 16, height: 16).padding(.top, 3)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.ink)
-                    Text(detail).font(.system(size: 14)).foregroundStyle(Color.muted2)
+                    Text(title).scaledFont(16, .bold).foregroundStyle(Color.ink)
+                    Text(detail).scaledFont(14).foregroundStyle(Color.muted2)
                         .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -483,8 +488,8 @@ struct OnboardingView: View {
     private func prefRow(_ title: String, _ detail: String, _ on: Binding<Bool>) -> some View {
         Toggle(isOn: on) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text(detail).font(.system(size: 13)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                Text(title).scaledFont(15, .bold).foregroundStyle(Color.ink)
+                Text(detail).scaledFont(13).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             }
         }
         .tint(.main)
@@ -493,9 +498,9 @@ struct OnboardingView: View {
 
     private func step(_ n: Int, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Text("\(n)").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.mainText)
+            Text("\(n)").scaledFont(13, .bold).foregroundStyle(Color.mainText).limitedTextGrowth()
                 .frame(width: 24, height: 24).background(Color.lavender, in: Circle())
-            Text(text).font(.system(size: 14)).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+            Text(text).scaledFont(14).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -544,12 +549,12 @@ struct OnboardingView: View {
 struct AppleSheetPicture: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("How much data would you like to share?").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
+            Text("How much data would you like to share?").scaledFont(13, .bold).foregroundStyle(Color.ink)
             option("Past 30 Days and Future Data", picked: false)
             option("All Recorded Data and Future Data", picked: true)
             HStack(spacing: 6) {
                 Image(systemName: "hand.point.up.left.fill").foregroundStyle(Color.mainText)
-                Text("Pick this one, then tap Allow").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.mainText)
+                Text("Pick this one, then tap Allow").scaledFont(12, .bold).foregroundStyle(Color.mainText)
             }
             .padding(.leading, 4)
         }
@@ -560,7 +565,7 @@ struct AppleSheetPicture: View {
     }
 
     private func option(_ text: String, picked: Bool) -> some View {
-        Text(text).font(.system(size: 13, weight: picked ? .bold : .regular)).foregroundStyle(picked ? Color.ink : Color.muted)
+        Text(text).scaledFont(13, picked ? .bold : .regular).foregroundStyle(picked ? Color.ink : Color.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(Color.track, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -572,9 +577,9 @@ struct AppleSheetPicture: View {
 struct ShortHistoryNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Only about a month came in", systemImage: "exclamationmark.triangle.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.peachInk)
+            Label("Only about a month came in", systemImage: "exclamationmark.triangle.fill").scaledFont(15, .bold).foregroundStyle(Color.peachInk)
             Text("If you’ve had your Watch longer than that, Apple’s screen was probably set to “Past 30 Days.” To bring in the rest, open the Settings app → Health → Data Access & Devices → Health Dashboard and look for the option to share all past data.")
-                .font(.system(size: 14)).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+                .scaledFont(14).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .background(Color.peach, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

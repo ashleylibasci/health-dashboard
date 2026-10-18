@@ -6,15 +6,15 @@ struct ExamsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Exams").font(.serifTitle(34)).foregroundStyle(Color.ink)
+            Text("Exams").serifTitleFont(34).foregroundStyle(Color.ink)
             switch model.calendarState {
             case .notConnected:
                 Card {
                     CardLabel("Connect Google Calendar")
                     Text("Connect the Google Calendar on this iPhone once, and the app checks for exams every time it opens and every 30 minutes while it’s open.")
-                        .font(.system(size: 15)).foregroundStyle(Color.ink)
+                        .scaledFont(15).foregroundStyle(Color.ink)
                     Button("Use Google Calendar on this iPhone") { Task { await model.connectDeviceCalendar() } }
-                        .font(.system(size: 16, weight: .bold))
+                        .scaledFont(16, .bold)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .foregroundStyle(Color.onSolid)
                         .background(Color.solid, in: Capsule())
@@ -46,12 +46,12 @@ struct ExamsView: View {
             ForEach(Array(model.upcomingExams.prefix(6).enumerated()), id: \.offset) { i, e in
                 if i > 0 { Divider() }
                 let d = Day.between(Day.key(.now), e.date)
-                HStack {
+                AdaptiveStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(e.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.ink)
-                        Text(Day.short(e.date) + (e.minutes.map { " · " + clockOfDay($0) } ?? "")).font(.system(size: 13)).foregroundStyle(Color.muted)
+                        Text(e.title).scaledFont(15, .semibold).foregroundStyle(Color.ink)
+                        Text(Day.short(e.date) + (e.minutes.map { " · " + clockOfDay($0) } ?? "")).scaledFont(13).foregroundStyle(Color.muted)
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
                     Pill(text: d == 0 ? "Today" : d == 1 ? "Tomorrow" : "In \(d) days", fill: d <= 3 ? .peach : .lavender, ink: d <= 3 ? .peachInk : .mainText)
                 }
             }
@@ -62,18 +62,32 @@ struct ExamsView: View {
         if let l = model.examLens {
             Card(fill: .lavender) {
                 CardLabel("Exam weeks vs. normal weeks")
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    GridRow {
-                        Text("")
-                        Text("Exam weeks").fontWeight(.bold).foregroundStyle(Color.muted)
-                        Text("Normal").fontWeight(.bold).foregroundStyle(Color.muted)
+                let rows = [("Sleep", hoursMinutes(l.examWeeks.asleepMinutes), hoursMinutes(l.normalWeeks.asleepMinutes)),
+                            ("Asleep at", clockTime(l.examWeeks.bedtime), clockTime(l.normalWeeks.bedtime)),
+                            ("Resting HR", value(l.examWeeks.restingHr, " bpm"), value(l.normalWeeks.restingHr, " bpm")),
+                            ("HRV", value(l.examWeeks.hrv, " ms"), value(l.normalWeeks.hrv, " ms"))]
+                // The three-column table when it fits; otherwise one block per row.
+                ViewThatFits(in: .horizontal) {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                        GridRow {
+                            Text("")
+                            Text("Exam weeks").fontWeight(.bold).foregroundStyle(Color.muted)
+                            Text("Normal").fontWeight(.bold).foregroundStyle(Color.muted)
+                        }
+                        ForEach(rows, id: \.0) { lensRow($0.0, $0.1, $0.2) }
                     }
-                    lensRow("Sleep", hoursMinutes(l.examWeeks.asleepMinutes), hoursMinutes(l.normalWeeks.asleepMinutes))
-                    lensRow("Asleep at", clockTime(l.examWeeks.bedtime), clockTime(l.normalWeeks.bedtime))
-                    lensRow("Resting HR", value(l.examWeeks.restingHr, " bpm"), value(l.normalWeeks.restingHr, " bpm"))
-                    lensRow("HRV", value(l.examWeeks.hrv, " ms"), value(l.normalWeeks.hrv, " ms"))
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(rows, id: \.0) { row in
+                            if row.0 != "Sleep" { Divider() }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.0).fontWeight(.bold).foregroundStyle(Color.ink)
+                                Text("Exam weeks \(row.1)").foregroundStyle(Color.ink)
+                                Text("Normal \(row.2)").foregroundStyle(Color.ink)
+                            }
+                        }
+                    }
                 }
-                .font(.system(size: 14))
+                .scaledFont(14)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

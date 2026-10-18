@@ -6,7 +6,7 @@ struct BodyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Body").font(.serifTitle(34)).foregroundStyle(Color.ink).padding(.top, 8)
+            Text("Body").serifTitleFont(34).foregroundStyle(Color.ink).padding(.top, 8)
             link(RecoveryView(), "heart.fill", "Recovery", model.recoveryToday.map { "\($0.score) today · \($0.label)" } ?? "Fills in over your first 14 days")
             link(StressView(), "face.smiling", "Stress", model.stress.map { "\($0.label) right now · \($0.weekLabel.lowercased()) this week" } ?? "From your heart rate during the day", .peach, .peachInk)
             link(EnergyView(), "battery.75percent", "Energy and effort", "Energy left, load, steps, sleep debt, water", .mint, .mintInk)

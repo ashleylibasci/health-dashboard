@@ -5,14 +5,18 @@ struct Ring: View {
     var value: Int?
     var size: CGFloat = 96
     var track: Color = .surface
+    /// The ring grows with the text size so the number inside stays readable.
+    @ScaledMetric(relativeTo: .title) private var scale = 1.0
 
     var body: some View {
+        let size = size * min(scale, 1.6)
         ZStack {
             Circle().stroke(track, lineWidth: size * 0.115)
             Circle().trim(from: 0, to: CGFloat(value ?? 0) / 100)
                 .stroke(Color.main, style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text(value.map(String.init) ?? "–").font(.number(size * 0.3)).foregroundStyle(Color.ink)
+            Text(value.map(String.init) ?? "–").numberFont(self.size * 0.3).foregroundStyle(Color.ink)
+                .lineLimit(1).minimumScaleFactor(0.5).padding(size * 0.16)
         }
         .frame(width: size, height: size)
         .accessibilityElement()
@@ -68,17 +72,21 @@ struct LinkCard: View {
     var fill: Color = .surface
     var iconFill: Color = .lavender
     var iconInk: Color = .mainText
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 18)).foregroundStyle(iconInk)
-                .frame(width: 40, height: 40).background(iconFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text(detail).font(.system(size: 13)).foregroundStyle(Color.muted).lineLimit(2).multilineTextAlignment(.leading)
+            // At the accessibility sizes the icon sits above the words so they get the full width.
+            AdaptiveStack(spacing: 12) {
+                Image(systemName: icon).scaledFont(18).foregroundStyle(iconInk).limitedTextGrowth()
+                    .frame(width: 40, height: 40).background(iconFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).scaledFont(15, .bold).foregroundStyle(Color.ink)
+                    Text(detail).scaledFont(13).foregroundStyle(Color.muted).lineLimit(typeSize.isAccessibilitySize ? nil : 2).multilineTextAlignment(.leading)
+                }
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.muted)
+            Image(systemName: "chevron.right").scaledFont(13, .bold).foregroundStyle(Color.muted).limitedTextGrowth()
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(fill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -96,7 +104,7 @@ struct Chip: View {
 
     var body: some View {
         Button(action: action) {
-            Text(text).font(.system(size: 14, weight: selected ? .bold : .semibold)).foregroundStyle(Color.ink)
+            Text(text).scaledFont(14, selected ? .bold : .semibold).foregroundStyle(Color.ink)
                 .padding(.horizontal, 14).frame(minHeight: 40)
                 .background(selected ? selectedFill : fill, in: Capsule())
         }
@@ -114,7 +122,7 @@ struct Bullet: View {
             Text("·").fontWeight(.bold)
             Text(text).fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: 15)).foregroundStyle(Color.ink)
+        .scaledFont(15).foregroundStyle(Color.ink)
     }
 }
 
@@ -124,12 +132,12 @@ struct ValueRow: View {
     var value: String
     var valueColor: Color = .ink
     var body: some View {
-        HStack {
+        AdaptiveStack(spacing: 2) {
             Text(label).foregroundStyle(Color.ink)
-            Spacer()
+            Spacer(minLength: 8)
             Text(value).fontWeight(.bold).foregroundStyle(valueColor)
         }
-        .font(.system(size: 15))
+        .scaledFont(15)
     }
 }
 
@@ -140,7 +148,7 @@ struct PageTitle: View {
     var after: String = ""
     var body: some View {
         (Text(plain) + Text(accent).italic().foregroundColor(.mainText) + Text(after))
-            .font(.serifTitle(34)).foregroundStyle(Color.ink)
+            .serifTitleFont(34).foregroundStyle(Color.ink)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
     }
@@ -152,7 +160,7 @@ struct PrimaryButton: View {
     var action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(title).font(.system(size: 16, weight: .bold))
+            Text(title).scaledFont(16, .bold)
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .foregroundStyle(Color.onSolid).background(Color.solid, in: Capsule())
         }
@@ -196,7 +204,7 @@ struct CaffeinePicker: View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(caffeineGroups, id: \.title) { group in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(group.title).font(.system(size: 13, weight: .bold)).foregroundStyle(Color.butterInk)
+                    Text(group.title).scaledFont(13, .bold).foregroundStyle(Color.butterInk)
                     FlowLayout {
                         ForEach(group.drinks, id: \.self) { d in
                             Chip(text: "\(d.name) · \(Int(d.mg))", fill: .butter) { log(d) }

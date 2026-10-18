@@ -16,7 +16,7 @@ struct TodayView: View {
             case .notConnected:
                 Card(fill: .lavender) {
                     CardLabel("Apple Health isn’t connected")
-                    Text("Connect it to see your sleep, recovery and everything else here.").font(.system(size: 15)).foregroundStyle(Color.ink)
+                    Text("Connect it to see your sleep, recovery and everything else here.").scaledFont(15).foregroundStyle(Color.ink)
                     PrimaryButton(title: "Connect Apple Health") { Task { await model.connectHealth() } }
                 }
             default:
@@ -41,10 +41,10 @@ struct TodayView: View {
     private var header: some View {
         HStack {
             Text(Date.now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.muted)
+                .scaledFont(15, .semibold).foregroundStyle(Color.muted)
             Spacer()
             Button { showSettings = true } label: {
-                Text(model.profile?.initial ?? "•").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(Color.ink)
+                Text(model.profile?.initial ?? "•").scaledFont(17, .bold, design: .rounded).foregroundStyle(Color.ink).limitedTextGrowth()
                     .frame(width: 44, height: 44).background(Color.peach, in: Circle())
             }
             .accessibilityLabel("Profile and settings")
@@ -56,7 +56,7 @@ struct TodayView: View {
         let hour = Calendar.current.component(.hour, from: .now)
         let part = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"
         return (Text("Good \(part), \(model.profile?.firstName ?? "there"). ") + Text(advice).italic().foregroundColor(.mainText))
-            .font(.serifTitle(30)).foregroundStyle(Color.ink).lineSpacing(2)
+            .serifTitleFont(30).foregroundStyle(Color.ink).lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -88,15 +88,17 @@ struct TodayView: View {
         if model.sick != nil {
             NavigationLink { SickView() } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "thermometer.medium").font(.system(size: 20)).foregroundStyle(Color.peachInk)
-                        .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Your body’s working harder than usual").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                        Text("Could be a bug coming on, or just stress. A guess, not a diagnosis. Tap to log how you feel.")
-                            .font(.system(size: 13)).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                    AdaptiveStack(spacing: 12) {
+                        Image(systemName: "thermometer.medium").scaledFont(20).foregroundStyle(Color.peachInk).limitedTextGrowth()
+                            .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Your body’s working harder than usual").scaledFont(15, .bold).foregroundStyle(Color.ink)
+                            Text("Could be a bug coming on, or just stress. A guess, not a diagnosis. Tap to log how you feel.")
+                                .scaledFont(13).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                        }
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.muted)
+                    Image(systemName: "chevron.right").scaledFont(13, .bold).foregroundStyle(Color.muted).limitedTextGrowth()
                 }
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .background(Color.peach, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -106,7 +108,8 @@ struct TodayView: View {
         if isOffDay && !model.reasons.isEmpty {
             NavigationLink { WhyOffView() } label: {
                 Label("Why do I feel off today?", systemImage: "magnifyingglass")
-                    .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.onSolid)
+                    .scaledFont(16, .bold).foregroundStyle(Color.onSolid)
+                    .padding(.horizontal, 20).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, minHeight: 52).background(Color.solid, in: Capsule())
             }
             .buttonStyle(.plain)
@@ -116,14 +119,14 @@ struct TodayView: View {
     private var recoveryCard: some View {
         NavigationLink { RecoveryView() } label: {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
+                AdaptiveStack(spacing: 8) {
                     CardLabel("Recovery")
-                    Spacer()
+                    Spacer(minLength: 0)
                     if let r = model.recoveryToday { Pill(text: r.label, fill: .surface, ink: .ink) }
                 }
-                HStack(spacing: 16) {
+                AdaptiveStack(spacing: 16) {
                     Ring(value: model.recoveryToday?.score)
-                    VStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 8) {
                         MetricRow(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded())) bpm" },
                                   change: model.recoveryToday?.restingHrChange.map { d in
                                       let n = Int(d.rounded()); return n == 0 ? "your normal" : "\(abs(n)) bpm \(n > 0 ? "above" : "below") normal"
@@ -153,14 +156,14 @@ struct TodayView: View {
         if let c = model.cycle {
             NavigationLink { CycleView() } label: {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        HStack(spacing: 8) {
+                    AdaptiveStack(spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Circle().fill(c.phase.color).frame(width: 12, height: 12)
                             Text(model.profile?.cycle == .irregular ? "Day \(c.day) since your last period" : "Cycle day \(c.day) · \(c.phase.rawValue)")
-                                .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+                                .scaledFont(15, .bold).foregroundStyle(Color.ink)
                         }
-                        Spacer()
-                        if let next = c.nextStart { Text("Period ~\(Day.short(next).split(separator: ",").last!.trimmingCharacters(in: .whitespaces))").font(.system(size: 13)).foregroundStyle(Color.muted) }
+                        Spacer(minLength: 0)
+                        if let next = c.nextStart { Text("Period ~\(Day.short(next).split(separator: ",").last!.trimmingCharacters(in: .whitespaces))").scaledFont(13).foregroundStyle(Color.muted) }
                     }
                     if model.profile?.cycle == .natural {
                         HStack(spacing: 2) {
@@ -172,7 +175,7 @@ struct TodayView: View {
                         .frame(height: 22)
                         .accessibilityHidden(true)
                     }
-                    Text(cycleNote(c)).font(.system(size: 14)).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                    Text(cycleNote(c)).scaledFont(14).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
                 }
                 .padding(16)
                 .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -203,7 +206,7 @@ struct TodayView: View {
     }
 
     private var tiles: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
+        AdaptiveGrid(columns: 2, spacing: 12) {
             NavigationLink { SleepView() } label: {
                 SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText)
             }
@@ -226,14 +229,16 @@ struct TodayView: View {
     private func examBanner(_ exam: CalendarEvent) -> some View {
         let d = Day.between(model.today, exam.date)
         return HStack(spacing: 12) {
-            Image(systemName: "calendar").font(.system(size: 20)).foregroundStyle(Color.butterInk)
-                .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(exam.title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text(d == 0 ? "Today" : d == 1 ? "Tomorrow · protect tonight’s sleep" : "\(Day.weekdayName(exam.date, long: true)) · protect sleep the nights before")
-                    .font(.system(size: 14)).foregroundStyle(Color.muted)
+            AdaptiveStack(spacing: 12) {
+                Image(systemName: "calendar").scaledFont(20).foregroundStyle(Color.butterInk).limitedTextGrowth()
+                    .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(exam.title).scaledFont(15, .bold).foregroundStyle(Color.ink)
+                    Text(d == 0 ? "Today" : d == 1 ? "Tomorrow · protect tonight’s sleep" : "\(Day.weekdayName(exam.date, long: true)) · protect sleep the nights before")
+                        .scaledFont(14).foregroundStyle(Color.muted)
+                }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(Color.butter, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -266,10 +271,10 @@ struct SmallTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ink)
+            Image(systemName: icon).scaledFont(18).foregroundStyle(ink).limitedTextGrowth()
                 .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            Text(label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.muted)
-            Text(value).font(.number(26)).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
+            Text(label).scaledFont(13, .semibold).foregroundStyle(Color.muted)
+            Text(value).numberFont(26).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -284,15 +289,16 @@ struct MetricRow: View {
     var value: String?
     var change: String?
     var worse = false
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).font(.system(size: 15)).foregroundStyle(Color.ink)
-            Spacer()
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(value ?? "–").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+        AdaptiveStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(label).scaledFont(15).foregroundStyle(Color.ink)
+            Spacer(minLength: 0)
+            VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 0) {
+                Text(value ?? "–").scaledFont(15, .bold).foregroundStyle(Color.ink)
                 if let change {
-                    Text(change).font(.system(size: 12, weight: worse ? .bold : .regular)).foregroundStyle(worse ? Color.peachInk : Color.muted)
+                    Text(change).scaledFont(12, worse ? .bold : .regular).foregroundStyle(worse ? Color.peachInk : Color.muted)
                 }
             }
         }
