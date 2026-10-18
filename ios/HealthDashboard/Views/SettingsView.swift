@@ -34,6 +34,7 @@ struct SettingsView: View {
                         Toggle("Body-working-harder alerts", isOn: Binding(get: { profile.prefs.sickAlerts }, set: { model.profile?.prefs.sickAlerts = $0 }))
                         Toggle("Drinks tracking", isOn: Binding(get: { profile.prefs.drinksTracking }, set: { model.profile?.prefs.drinksTracking = $0 }))
                         Toggle("Streaks", isOn: Binding(get: { profile.prefs.streaks }, set: { model.profile?.prefs.streaks = $0 }))
+                        Toggle("Night version after 8pm", isOn: Binding(get: { profile.prefs.nightMode }, set: { model.profile?.prefs.nightMode = $0 }))
                         Toggle("Dark Watch screens at night", isOn: Binding(get: { profile.prefs.darkWatchAtNight }, set: { model.profile?.prefs.darkWatchAtNight = $0 }))
                         Button("Run the welcome setup again") {
                             model.profile = nil
@@ -47,29 +48,56 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    SecureField("Paste the secret address", text: $link)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button("Save calendar link") {
-                        Task {
-                            await model.setCalendarURL(link)
-                            dismiss()
-                        }
+                    if model.usesDeviceCalendar {
+                        Label("Using the Google Calendar on this iPhone", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
+                        if let note = model.calendarNote { Text(note).font(.footnote).foregroundStyle(.secondary) }
+                    } else {
+                        Button("Use Google Calendar on this iPhone") { Task { await model.connectDeviceCalendar() } }
                     }
-                    .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if model.calendarURL != nil {
-                        Button("Remove calendar link", role: .destructive) {
+                    if case .failed(let message) = model.calendarState { Text(message).font(.footnote).foregroundStyle(Color.peachInk) }
+                    DisclosureGroup("Or use a secret link") {
+                        SecureField("Paste the secret address", text: $link)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Button("Save calendar link") {
+                            Task {
+                                await model.setCalendarURL(link)
+                                dismiss()
+                            }
+                        }
+                        .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
+                        Text("On a computer: calendar.google.com → the gear → Settings → your calendar → “Secret address in iCal format.” Treat it like a password; it’s kept in your phone’s Keychain.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if model.isCalendarConnected {
+                        Button("Disconnect calendar", role: .destructive) {
                             link = ""
-                            Task { await model.setCalendarURL(nil) }
+                            Task { await model.disconnectCalendar() }
                         }
                     }
                 } header: {
                     Text("Google Calendar")
                 } footer: {
-                    Text("On a computer, open calendar.google.com → the gear → Settings. Click the calendar your exams are in, scroll to “Secret address in iCal format,” and copy it. Send it to your phone (AirDrop or Notes) and paste it here. Treat it like a password: anyone with it can read that calendar. It’s kept in your phone’s Keychain.")
+                    Text("One tap works when your Google account is signed in on this iPhone (Settings app → Calendar → Accounts). Events are read on your phone and never uploaded.")
                 }
 
                 Section {
+                    switch model.notificationsAllowed {
+                    case true?: Label("Reminders are on", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
+                    case false?:
+                        Button("Reminders are off: open Settings to turn them on") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                    case nil: Button("Turn on reminders") { Task { await model.requestNotifications() } }
+                    }
+                } header: {
+                    Text("Reminders")
+                } footer: {
+                    Text("Only two kinds: the night before an exam, and when your body’s working harder than usual.")
+                }
+
+                Section {
+                    if model.historyLooksShort { ShortHistoryNote() }
                     Text("The app reads sleep, resting heart rate, HRV and caffeine from Apple Health each time you open it. To change what it can read: Settings app → Health → Data Access & Devices → Health Dashboard.")
                         .font(.footnote).foregroundStyle(.secondary)
                 } header: {
@@ -102,6 +130,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .onAppear { link = model.calendarURL ?? "" }
+            .task { await model.checkNotifications() }
         }
     }
 }

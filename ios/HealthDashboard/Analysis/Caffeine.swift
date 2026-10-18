@@ -5,6 +5,15 @@ let caffeineHalfLifeHours = 5.0
 /// Under this much at bedtime is the goal; more tends to delay sleep.
 let bedtimeCaffeineGoal = 25.0
 
+/// The FDA's general guide: up to about 400 mg a day is not usually linked to harm in healthy adults.
+let dailyCaffeineGuide = 400.0
+
+/// A calm, specific note once today's total passes the daily guide.
+func caffeineLimitNote(_ mg: Double) -> String? {
+    guard mg > dailyCaffeineGuide else { return nil }
+    return "That’s \(Int(mg)) mg today, past the 400 mg the FDA treats as a general daily guide for healthy adults. More can mean jitters, a racing heart and worse sleep tonight."
+}
+
 /// Milligrams still in the body at `time`, from every log before it.
 func caffeineLeft(_ logs: [Reading], at time: Date) -> Double {
     logs.filter { $0.date <= time }.reduce(0) { total, log in

@@ -101,9 +101,9 @@ struct MonthGrid: View {
         let phase: CyclePhase? = cycleDay >= 1 && cycleDay <= cycle.typicalLength ? cycle.phase(on: cycleDay) : nil
         Text("\(day)")
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(isToday ? .white : expected && !logged ? Color.peachInk : phase == .ovulation ? .white : Color.ink)
+            .foregroundStyle(isToday ? Color.onSolid : expected && !logged ? Color.peachInk : phase == .ovulation ? .white : Color.ink)
             .frame(maxWidth: .infinity, minHeight: 40)
-            .background(RoundedRectangle(cornerRadius: 14).fill(isToday ? Color.ink : logged ? Color(hex: 0xFFE3D3) : expected ? Color.surface : phase.map { $0 == .ovulation ? Color(hex: 0x5B6BE8) : $0 == .luteal ? Color(hex: 0xE4E7FF) : $0 == .period ? Color(hex: 0xFFE3D3) : Color(hex: 0xFFF1EA) } ?? Color.track))
+            .background(RoundedRectangle(cornerRadius: 14).fill(isToday ? Color.solid : logged ? Color.rose : expected ? Color.surface : phase.map { $0 == .ovulation ? Color(hex: 0x5B6BE8) : $0 == .luteal ? Color.periwinkle : $0 == .period ? Color.rose : Color.blush } ?? Color.track))
             .overlay(expected && !logged ? RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) : nil)
             .accessibilityLabel("\(day)\(logged ? ", period logged" : expected ? ", expected period" : phase.map { ", \($0.rawValue)" } ?? "")")
     }
@@ -171,7 +171,7 @@ struct IrregularCycleView: View {
         VStack(alignment: .leading, spacing: 16) {
             PageTitle(plain: "Your cycle, ", accent: "your way")
             if let c = model.cycle {
-                Card(fill: Color(hex: 0xFFF1EA)) {
+                Card(fill: Color.blush) {
                     CardLabel("Day \(c.day) since your last period", color: .peachInk)
                     Text("No countdown here. When cycles vary a lot, a predicted date would be wrong more often than right.").font(.system(size: 15)).foregroundStyle(Color.ink)
                 }
@@ -226,7 +226,7 @@ struct PillCycleView: View {
                 Card {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 8) {
                         ForEach(1...28, id: \.self) { d in
-                            Capsule().fill(d == p.day ? Color.mainText : d <= 21 ? (d < p.day ? Color(hex: 0x9AA6FA) : Color(hex: 0xE4E7FF)) : Color.peach)
+                            Capsule().fill(d == p.day ? Color.mainText : d <= 21 ? (d < p.day ? Color(hex: 0x9AA6FA) : Color.periwinkle) : Color.peach)
                                 .overlay(d > 21 ? Capsule().stroke(Color.peachBar, lineWidth: 2) : nil)
                                 .frame(height: 32)
                         }
@@ -235,7 +235,7 @@ struct PillCycleView: View {
                     HStack {
                         Label("Active", systemImage: "circle.fill").foregroundStyle(Color(hex: 0x9AA6FA))
                         Spacer()
-                        Text("Break week · bleed ~\(Day.short(p.nextBleed))").foregroundStyle(Color(hex: 0x4A4F6E))
+                        Text("Break week · bleed ~\(Day.short(p.nextBleed))").foregroundStyle(Color.muted2)
                     }.font(.system(size: 13))
                     if method == .combinedPill {
                         let taken = model.profile?.pillsTaken.contains(model.today) == true
@@ -260,7 +260,7 @@ struct PillCycleView: View {
                 Card(fill: .track) {
                     CardLabel("Doesn’t apply to you*", color: .muted)
                     ForEach(["Ovulation estimate", "Fertile window", "Luteal heart-rate bump", "Phase-based predictions"], id: \.self) { o in
-                        Text(o).strikethrough().font(.system(size: 15)).foregroundStyle(Color(hex: 0x6B6F86))
+                        Text(o).strikethrough().font(.system(size: 15)).foregroundStyle(Color.muted)
                     }
                     Note("*\(method?.name ?? "Your method") \(method?.ovulation == .stops ? "pauses" : "can pause") ovulation, so these natural-cycle changes don’t happen the same way.")
                 }
@@ -286,7 +286,7 @@ struct BirthControlView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Pill(text: "Your method", fill: Color(hex: 0xE4E7FF), ink: .mainText)
+            Pill(text: "Your method", fill: Color.periwinkle, ink: .mainText)
             PageTitle(plain: "How the ", accent: method.name.lowercased(), after: " works in your body")
             Card {
                 CardLabel("Your cycle", color: .muted)
@@ -309,7 +309,7 @@ struct BirthControlView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Never change your birth control because of this app").font(.system(size: 15, weight: .bold))
-                Text("Talk to your doctor or nurse before starting, stopping or switching. This app is not birth control.").font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E))
+                Text("Talk to your doctor or nurse before starting, stopping or switching. This app is not birth control.").font(.system(size: 14)).foregroundStyle(Color.muted2)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -407,7 +407,7 @@ struct PCOSView: View {
         VStack(alignment: .leading, spacing: 16) {
             PageTitle(plain: "Living with ", accent: "PCOS")
             Text("Polycystic ovary syndrome is a common hormone condition. Ovulation can happen late, irregularly, or not every cycle, so periods can be far apart or unpredictable.")
-                .font(.system(size: 15)).foregroundStyle(Color(hex: 0x4A4F6E)).fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 15)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
             Card {
                 CardLabel("How it can show up in your data", color: .muted)
                 Bullet("Long or uneven gaps between periods.")

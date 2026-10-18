@@ -23,7 +23,9 @@ struct RecoveryDay: Equatable {
             ("lower HRV than usual", min(0, (hrvChange ?? 0) * 80)),
             ("a higher resting heart rate", min(0, -(restingHrChange ?? 0) * 2.5)),
         ]
-        if let worst = parts.min(by: { $0.1 < $1.1 }), worst.1 <= -3 { return "Mostly \(worst.0)." }
+        if let worst = parts.min(by: { $0.1 < $1.1 }), worst.1 <= -3 {
+            return score >= 75 ? "Close to your normal, with \(worst.0) pulling it down a little." : "Mostly \(worst.0)."
+        }
         return score >= 80 ? "Your heart and sleep both look like your normal or better." : "Nothing big stands out; a few small dips added up."
     }
 }

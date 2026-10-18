@@ -20,11 +20,13 @@ struct TodayView: View {
                     PrimaryButton(title: "Connect Apple Health") { Task { await model.connectHealth() } }
                 }
             default:
-                alerts
                 recoveryCard
+                alerts
                 cycleCard
                 tiles
-                if let exam = model.upcomingExams.first { NavigationLink { ExamsView() } label: { examBanner(exam) }.buttonStyle(.plain) }
+                if let exam = model.upcomingExams.first, !greetingIsAbout(exam) {
+                    NavigationLink { ExamsView() } label: { examBanner(exam) }.buttonStyle(.plain)
+                }
                 more
             }
         }
@@ -58,15 +60,26 @@ struct TodayView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    /// A rough day: the getting-sick signals are on, or recovery is low.
+    private var isOffDay: Bool { model.sick != nil || (model.recoveryToday?.score ?? 100) < 60 }
+
+    /// The exam the greeting is talking about, so the banner doesn't repeat it.
+    private var greetingExam: CalendarEvent? {
+        guard !isOffDay else { return nil }
+        return model.upcomingExams.first { Day.between(model.today, $0.date) <= 3 }
+    }
+
+    private func greetingIsAbout(_ exam: CalendarEvent) -> Bool { greetingExam == exam }
+
     private var advice: String {
         let today = model.today
-        if let exam = model.upcomingExams.first(where: { Day.between(today, $0.date) <= 3 }) {
+        // On a rough day the cards below carry the detail; keep the greeting short.
+        if isOffDay { return "Go easy today." }
+        if let exam = greetingExam {
             let d = Day.between(today, exam.date)
             let when = d == 0 ? "today" : d == 1 ? "tomorrow" : Day.weekdayName(exam.date, long: true)
             return "\(exam.title) is \(when), so protect your sleep before it."
         }
-        if model.sick != nil { return "Go easy today, and be asleep by \(clockTime(Double(model.bedtimeTarget)))." }
-        if let r = model.recoveryToday, r.score < 60 { return "Go easy today, and be asleep by \(clockTime(Double(model.bedtimeTarget)))." }
         if model.weekend != nil { return "Aim to be asleep by \(clockTime(Double(model.bedtimeTarget))) tonight." }
         return "Here’s what your Watch has been noticing."
     }
@@ -90,11 +103,11 @@ struct TodayView: View {
             }
             .buttonStyle(.plain)
         }
-        if !model.reasons.isEmpty {
+        if isOffDay && !model.reasons.isEmpty {
             NavigationLink { WhyOffView() } label: {
                 Label("Why do I feel off today?", systemImage: "magnifyingglass")
-                    .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 52).background(Color.ink, in: Capsule())
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.onSolid)
+                    .frame(maxWidth: .infinity, minHeight: 52).background(Color.solid, in: Capsule())
             }
             .buttonStyle(.plain)
         }
@@ -110,10 +123,19 @@ struct TodayView: View {
                 }
                 HStack(spacing: 16) {
                     Ring(value: model.recoveryToday?.score)
-                    VStack(spacing: 6) {
-                        ValueRow(label: "Resting HR", value: metric(model.health.restingHr[model.today], model.recoveryToday?.restingHrChange.map { signed($0, "") }))
-                        ValueRow(label: "HRV", value: metric(model.health.hrv[model.today], model.recoveryToday?.hrvChange.map { "\(signed($0 * 100, ""))%" }))
-                        ValueRow(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) } ?? "–")
+                    VStack(spacing: 8) {
+                        MetricRow(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded())) bpm" },
+                                  change: model.recoveryToday?.restingHrChange.map { d in
+                                      let n = Int(d.rounded()); return n == 0 ? "your normal" : "\(abs(n)) bpm \(n > 0 ? "above" : "below") normal"
+                                  }, worse: (model.recoveryToday?.restingHrChange ?? 0) >= 3)
+                        MetricRow(label: "HRV", value: model.health.hrv[model.today].map { "\(Int($0.rounded())) ms" },
+                                  change: model.recoveryToday?.hrvChange.map { d in
+                                      let n = Int((d * 100).rounded()); return n == 0 ? "your normal" : "\(abs(n))% \(n > 0 ? "above" : "below") normal"
+                                  }, worse: (model.recoveryToday?.hrvChange ?? 0) <= -0.1)
+                        MetricRow(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) },
+                                  change: model.recoveryToday?.sleepChange.map { d in
+                                      abs(d) < 15 ? "a typical night" : "\(hoursMinutes(abs(d))) \(d > 0 ? "more" : "less") than usual"
+                                  }, worse: (model.recoveryToday?.sleepChange ?? 0) <= -45)
                     }
                 }
                 if model.recoveryToday == nil {
@@ -126,10 +148,6 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
-    private func metric(_ value: Double?, _ change: String?) -> String {
-        guard let value else { return "–" }
-        return "\(Int(value.rounded()))" + (change.map { " · \($0)" } ?? "")
-    }
 
     @ViewBuilder private var cycleCard: some View {
         if let c = model.cycle {
@@ -164,7 +182,7 @@ struct TodayView: View {
         } else if let p = model.pack {
             NavigationLink { CycleView() } label: {
                 LinkCard(icon: "pills.fill", title: "Pack day \(p.day)\(p.isBreakWeek ? " · break week" : "")",
-                         detail: model.profile?.pillsTaken.contains(model.today) == true ? "Today’s pill taken ✓" : "Tap to mark today’s pill", iconFill: Color(hex: 0xE4E7FF))
+                         detail: model.profile?.pillsTaken.contains(model.today) == true ? "Today’s pill taken ✓" : "Tap to mark today’s pill", iconFill: Color.periwinkle)
             }
             .buttonStyle(.plain)
         } else if model.profile?.cycle == .hormonal {
@@ -190,7 +208,10 @@ struct TodayView: View {
                 SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText)
             }
             NavigationLink { CaffeineView() } label: {
-                SmallTile(icon: "cup.and.saucer.fill", label: "Caffeine today", value: "\(Int(model.caffeineToday.reduce(0) { $0 + $1.value })) mg", fill: .butter, ink: .butterInk)
+                let mg = model.caffeineToday.reduce(0) { $0 + $1.value }
+                SmallTile(icon: mg > dailyCaffeineGuide ? "exclamationmark.triangle.fill" : "cup.and.saucer.fill",
+                          label: mg > dailyCaffeineGuide ? "Caffeine · over 400" : "Caffeine today", value: "\(Int(mg)) mg",
+                          fill: mg > dailyCaffeineGuide ? .peach : .butter, ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk)
             }
             NavigationLink { FitnessView() } label: {
                 SmallTile(icon: "bolt.fill", label: "Fitness age", value: model.fitness.map { "\($0.fitnessAge)" } ?? "–", fill: .mint, ink: .mintInk)
@@ -225,7 +246,7 @@ struct TodayView: View {
         }.buttonStyle(.plain)
         if prefs.showCalories {
             NavigationLink { CaloriesView() } label: {
-                LinkCard(icon: "flame.fill", title: "Calories burned", detail: "\(Int((model.health.activeKcal[model.today] ?? 0) + (model.health.restingKcal[model.today] ?? 0))) kcal so far today", iconFill: Color(hex: 0xFFF1EA), iconInk: .peachInk)
+                LinkCard(icon: "flame.fill", title: "Calories burned", detail: "\(Int((model.health.activeKcal[model.today] ?? 0) + (model.health.restingKcal[model.today] ?? 0))) kcal so far today", iconFill: Color.blush, iconInk: .peachInk)
             }.buttonStyle(.plain)
         }
         if prefs.streaks {
@@ -254,5 +275,27 @@ struct SmallTile: View {
         .padding(16)
         .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
+    }
+}
+
+/// One line of the recovery card: the number, and what it means compared with normal.
+struct MetricRow: View {
+    var label: String
+    var value: String?
+    var change: String?
+    var worse = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label).font(.system(size: 15)).foregroundStyle(Color.ink)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(value ?? "–").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+                if let change {
+                    Text(change).font(.system(size: 12, weight: worse ? .bold : .regular)).foregroundStyle(worse ? Color.peachInk : Color.muted)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }

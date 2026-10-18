@@ -168,7 +168,8 @@ extension AppModel {
     func scheduleNotifications() async {
         guard !isDemoMode else { return }
         let center = UNUserNotificationCenter.current()
-        guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+        // Never prompt from here; the welcome flow and Settings ask, with the reason shown.
+        guard await center.notificationSettings().authorizationStatus == .authorized else { return }
         let oldExams = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix("exam-") }
         center.removePendingNotificationRequests(withIdentifiers: oldExams)
         for exam in upcomingExams where Day.between(today, exam.date) >= 1 {

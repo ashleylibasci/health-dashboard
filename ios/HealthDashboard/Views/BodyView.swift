@@ -13,15 +13,15 @@ struct BodyView: View {
             link(FitnessView(), "bolt.fill", "Fitness age", model.fitness.map { "Fitness age \($0.fitnessAge) · VO₂ max \(String(format: "%.1f", $0.latest))" } ?? "Needs a VO₂ max reading from your Watch", .mint, .mintInk)
             link(CaffeineView(), "cup.and.saucer.fill", "Caffeine", "Today’s caffeine and your cutoff test", .butter, .butterInk)
             if model.profile?.prefs.drinksTracking ?? true {
-                link(DrinksView(), "wineglass.fill", "Drinks and your body", "What the morning after looks like in your data", Color(hex: 0xF3E9FF), Color(hex: 0x7A3FC2))
+                link(DrinksView(), "wineglass.fill", "Drinks and your body", "What the morning after looks like in your data", Color.lilac, Color.lilacInk)
             }
             link(LateNightView(), "moon.zzz.fill", "Late-night cost", "What a 2am night costs you")
             link(ExamsView(), "calendar", "Exams", model.upcomingExams.first.map { "Next: \($0.title)" } ?? "From your Google Calendar", .butter, .butterInk)
             if model.profile?.tracksCycle ?? false {
-                link(CycleView(), "circle.dashed", "Cycle", model.cycle.map { "Day \($0.day) · \($0.phase.rawValue)" } ?? model.pack.map { "Pack day \($0.day)" } ?? "Your cycle and how it affects you", Color(hex: 0xFFE6E2), .peachInk)
+                link(CycleView(), "circle.dashed", "Cycle", model.cycle.map { "Day \($0.day) · \($0.phase.rawValue)" } ?? model.pack.map { "Pack day \($0.day)" } ?? "Your cycle and how it affects you", Color.rose, .peachInk)
             }
             if model.profile?.prefs.showCalories ?? false {
-                link(CaloriesView(), "flame.fill", "Calories burned", "Resting and active", Color(hex: 0xFFF1EA), .peachInk)
+                link(CaloriesView(), "flame.fill", "Calories burned", "Resting and active", Color.blush, .peachInk)
             }
             if model.profile?.prefs.streaks ?? false {
                 link(StreaksView(), "star.fill", "Streaks and wins", "Small goals and badges", .butter, .butterInk)

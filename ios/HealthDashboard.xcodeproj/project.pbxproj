@@ -522,6 +522,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Health Dashboard looks for exams on your Google Calendar so it can warn you before exam week and compare how you sleep then. Events stay on your phone.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Health Dashboard saves what you log in the app: lattes and other drinks, water, period days and how you feel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -548,6 +549,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Health Dashboard looks for exams on your Google Calendar so it can warn you before exam week and compare how you sleep then. Events stay on your phone.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Health Dashboard saves what you log in the app: lattes and other drinks, water, period days and how you feel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -91,7 +91,7 @@ struct Chip: View {
     var text: String
     var selected = false
     var fill: Color = .surface
-    var selectedFill: Color = Color(hex: 0xC9CFFF)
+    var selectedFill: Color = .lavenderStrong
     var action: () -> Void
 
     var body: some View {
@@ -154,7 +154,7 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title).font(.system(size: 16, weight: .bold))
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .foregroundStyle(.white).background(Color.ink, in: Capsule())
+                .foregroundStyle(Color.onSolid).background(Color.solid, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -181,9 +181,9 @@ extension CyclePhase {
     }
     var tint: Color {
         switch self {
-        case .period: Color(hex: 0xFFE6E2)
-        case .follicular: Color(hex: 0xFFF1EA)
-        case .ovulation: Color(hex: 0xE4E7FF)
+        case .period: Color.rose
+        case .follicular: Color.blush
+        case .ovulation: Color.periwinkle
         case .luteal: Color.lavender
         }
     }

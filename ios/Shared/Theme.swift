@@ -1,27 +1,52 @@
 import SwiftUI
 
-/// The Morning light palette from the "Health Dashboard Layouts" canvas.
+/// The Morning light palette from the "Health Dashboard Layouts" canvas, with a warm dark
+/// "night" version (after 8pm) built from the canvas's dark Watch screen.
 extension Color {
     init(hex: UInt32) {
         self.init(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
     }
 
-    static let ground = Color(hex: 0xFAFAF7)
-    static let surface = Color.white
-    static let ink = Color(hex: 0x1D2142)
-    static let muted = Color(hex: 0x5A5F7A)
+    /// A color that switches with light and dark appearance.
+    init(light: UInt32, dark: UInt32) {
+        #if os(iOS)
+        self.init(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        })
+        #else
+        // The Watch draws its own day and night looks, so it always uses the light values.
+        self.init(hex: light)
+        #endif
+    }
+
+    static let ground = Color(light: 0xFAFAF7, dark: 0x111325)
+    static let surface = Color(light: 0xFFFFFF, dark: 0x1C1F36)
+    static let ink = Color(light: 0x1D2142, dark: 0xF1F2FA)
+    static let muted = Color(light: 0x5A5F7A, dark: 0xB4B7CF)
+    /// Secondary text on tinted cards.
+    static let muted2 = Color(light: 0x4A4F6E, dark: 0xC8CBE0)
     static let main = Color(hex: 0x7C8CF8)
-    static let mainText = Color(hex: 0x4453C9)
-    static let line = Color(hex: 0xECECF2)
-    static let track = Color(hex: 0xF3F3F7)
-    static let lavender = Color(hex: 0xECEEFF)
-    static let peach = Color(hex: 0xFFE8DE)
-    static let peachInk = Color(hex: 0xB04A2E)
+    static let mainText = Color(light: 0x4453C9, dark: 0xA3AEFF)
+    static let line = Color(light: 0xECECF2, dark: 0x2C3050)
+    static let track = Color(light: 0xF3F3F7, dark: 0x2A2D48)
+    static let lavender = Color(light: 0xECEEFF, dark: 0x252A52)
+    static let periwinkle = Color(light: 0xE4E7FF, dark: 0x2B3160)
+    static let lavenderStrong = Color(light: 0xC9CFFF, dark: 0x3B4384)
+    static let peach = Color(light: 0xFFE8DE, dark: 0x3D2721)
+    static let peachInk = Color(light: 0xB04A2E, dark: 0xFFB59A)
     static let peachBar = Color(hex: 0xFFB59A)
-    static let butter = Color(hex: 0xFFF4CC)
-    static let butterInk = Color(hex: 0x7A5A00)
-    static let mint = Color(hex: 0xDDF5EA)
-    static let mintInk = Color(hex: 0x1F7A55)
+    static let blush = Color(light: 0xFFF1EA, dark: 0x382A25)
+    static let rose = Color(light: 0xFFE6E2, dark: 0x3F2629)
+    static let butter = Color(light: 0xFFF4CC, dark: 0x3A3220)
+    static let butterInk = Color(light: 0x7A5A00, dark: 0xFFD966)
+    static let mint = Color(light: 0xDDF5EA, dark: 0x1B3B2F)
+    static let mintInk = Color(light: 0x1F7A55, dark: 0x7FD9AE)
+    static let lilac = Color(light: 0xF3E9FF, dark: 0x30264A)
+    static let lilacInk = Color(light: 0x7A3FC2, dark: 0xCFA9FF)
+    /// The dark pill buttons, which turn light at night.
+    static let solid = Color(light: 0x1D2142, dark: 0xE6E8FF)
+    static let onSolid = Color(light: 0xFFFFFF, dark: 0x15172B)
 }
 
 /// The design pairs Fraunces (headlines), Bricolage Grotesque (numbers) and Instrument Sans (text).

@@ -109,8 +109,8 @@ struct SleepStagesView: View {
                     StageBars(stages: s)
                 }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
-                    Tile(label: "Deep", value: hoursMinutes(Double(s.deep)), caption: usual.map { "usual \(hoursMinutes(Double($0.deep)))" }, fill: Color(hex: 0xE4E7FF), ink: .mainText)
-                    Tile(label: "REM", value: hoursMinutes(Double(s.rem)), caption: usual.map { "usual \(hoursMinutes(Double($0.rem)))" }, fill: Color(hex: 0xF3E9FF), ink: Color(hex: 0x7A3FC2))
+                    Tile(label: "Deep", value: hoursMinutes(Double(s.deep)), caption: usual.map { "usual \(hoursMinutes(Double($0.deep)))" }, fill: Color.periwinkle, ink: .mainText)
+                    Tile(label: "REM", value: hoursMinutes(Double(s.rem)), caption: usual.map { "usual \(hoursMinutes(Double($0.rem)))" }, fill: Color.lilac, ink: Color.lilacInk)
                     Tile(label: "Core", value: hoursMinutes(Double(s.core)), caption: usual.map { "usual \(hoursMinutes(Double($0.core)))" }, fill: .lavender, ink: .mainText)
                     Tile(label: "Awake", value: "\(s.awake)m", caption: "\(s.wakeUps) wake-ups", fill: .peach, ink: .peachInk)
                 }

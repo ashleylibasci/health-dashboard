@@ -11,13 +11,13 @@ struct ExamsView: View {
             case .notConnected:
                 Card {
                     CardLabel("Connect Google Calendar")
-                    Text("Add your calendar’s private link once, and the app checks for exams every time it opens and every 30 minutes while it’s open.")
+                    Text("Connect the Google Calendar on this iPhone once, and the app checks for exams every time it opens and every 30 minutes while it’s open.")
                         .font(.system(size: 15)).foregroundStyle(Color.ink)
-                    Button("Add calendar link") { showSettings = true }
+                    Button("Use Google Calendar on this iPhone") { Task { await model.connectDeviceCalendar() } }
                         .font(.system(size: 16, weight: .bold))
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .foregroundStyle(.white)
-                        .background(Color.ink, in: Capsule())
+                        .foregroundStyle(Color.onSolid)
+                        .background(Color.solid, in: Capsule())
                 }
             case .loading:
                 Card { ProgressView("Checking your calendar…").frame(maxWidth: .infinity) }

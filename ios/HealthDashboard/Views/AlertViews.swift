@@ -14,7 +14,7 @@ struct SickView: View {
             (Text("Your body’s working ") + Text("harder than usual").italic().foregroundColor(.peachInk))
                 .font(.serifTitle(34)).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
             Text("For two mornings, several signals moved together. That can happen a day or two before a cold. It can also be stress, a late night, or nothing at all.")
-                .font(.system(size: 16)).foregroundStyle(Color(hex: 0x4A4F6E)).fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 16)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
             if let s = model.sick {
                 Card {
                     HStack { CardLabel("What we noticed", color: .muted); Spacer(); Pill(text: s.confidence, fill: .peach, ink: .peachInk) }
@@ -24,7 +24,7 @@ struct SickView: View {
                     if let v = s.breathing { ValueRow(label: "Breathing rate", value: "\(signed(v, "")) / min", valueColor: .peachInk) }
                     if model.cycle?.phase == .luteal {
                         Label("Already adjusted for your luteal phase, which raises temperature on its own.", systemImage: "circle.fill")
-                            .font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E)).padding(10)
+                            .font(.system(size: 14)).foregroundStyle(Color.muted2).padding(10)
                             .background(Color.lavender, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                 }
@@ -54,7 +54,7 @@ struct SickView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("When to see a doctor").font(.system(size: 15, weight: .bold))
-                Text("Fever over 100.4°F, trouble breathing, or feeling worse after 3 days: contact McKinley Health Center or your doctor.").font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E))
+                Text("Fever over 100.4°F, trouble breathing, or feeling worse after 3 days: contact McKinley Health Center or your doctor.").font(.system(size: 14)).foregroundStyle(Color.muted2)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -83,7 +83,7 @@ struct WhyOffView: View {
                         .frame(width: 40, height: 40).background(fill(r.kind), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(r.title).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.ink)
-                        Text(r.detail).font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E)).fixedSize(horizontal: false, vertical: true)
+                        Text(r.detail).font(.system(size: 14)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                 }
@@ -117,10 +117,10 @@ struct WhyOffView: View {
     }
 
     private func fill(_ k: OffReason.Kind) -> Color {
-        switch k { case .body, .lateNight: .peach; case .caffeine, .exam: .butter; case .cycle: Color(hex: 0xE4E7FF); case .drinks: Color(hex: 0xF3E9FF); default: .lavender }
+        switch k { case .body, .lateNight: .peach; case .caffeine, .exam: .butter; case .cycle: Color.periwinkle; case .drinks: Color.lilac; default: .lavender }
     }
     private func ink(_ k: OffReason.Kind) -> Color {
-        switch k { case .body, .lateNight: .peachInk; case .caffeine, .exam: .butterInk; case .drinks: Color(hex: 0x7A3FC2); default: .mainText }
+        switch k { case .body, .lateNight: .peachInk; case .caffeine, .exam: .butterInk; case .drinks: Color.lilacInk; default: .mainText }
     }
 }
 
@@ -142,9 +142,9 @@ struct StreaksView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 14) {
                     ForEach(all) { b in
                         VStack(spacing: 6) {
-                            Image(systemName: b.symbol).font(.system(size: 24)).foregroundStyle(b.earned ? Color.mainText : Color(hex: 0xA3A6B8))
+                            Image(systemName: b.symbol).font(.system(size: 24)).foregroundStyle(b.earned ? Color.mainText : Color.muted)
                                 .frame(width: 60, height: 60).background(b.earned ? Color.lavender : Color.track, in: Circle())
-                            Text(b.name).font(.system(size: 12, weight: .bold)).foregroundStyle(b.earned ? Color.ink : Color(hex: 0x7A7E95)).multilineTextAlignment(.center)
+                            Text(b.name).font(.system(size: 12, weight: .bold)).foregroundStyle(b.earned ? Color.ink : Color.muted).multilineTextAlignment(.center)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(b.name), \(b.earned ? "earned" : "not yet: \(b.detail)")")

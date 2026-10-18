@@ -41,6 +41,11 @@ struct FitnessAndCaffeineTests {
         #expect(fitnessAge(vo2Max: 60) == 18)
     }
 
+    @Test func caffeineNoteOnlyAppearsPast400() {
+        #expect(caffeineLimitNote(400) == nil)
+        #expect(caffeineLimitNote(500)?.contains("500 mg") == true)
+    }
+
     @Test func caffeineHalvesEveryFiveHours() {
         let morning = Date(timeIntervalSince1970: 1_800_000_000)
         let logs = [Reading(date: morning, value: 130)]

@@ -9,7 +9,8 @@ struct HealthDashboardWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchRootView().environment(store)
+            // The Watch screens draw their own light and night looks, so keep the light palette here.
+            WatchRootView().environment(store).environment(\.colorScheme, .light)
         }
     }
 }

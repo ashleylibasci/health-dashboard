@@ -5,6 +5,18 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
+    @State private var now = Date.now
+    private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+
+    /// The warm dark night version from 8pm to 6am (test builds can force it with `-night`).
+    private var isNight: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-night") { return true }
+        #endif
+        guard model.profile?.prefs.nightMode ?? true else { return false }
+        let hour = Calendar.current.component(.hour, from: now)
+        return hour >= 20 || hour < 6
+    }
 
     /// While the app is open, look at the calendar again every 30 minutes.
     private let calendarTimer = Timer.publish(every: 30 * 60, on: .main, in: .common).autoconnect()
@@ -22,7 +34,8 @@ struct RootView: View {
             }
         }
         .tint(.mainText)
-        .preferredColorScheme(.light)
+        .preferredColorScheme(isNight ? .dark : .light)
+        .onReceive(minuteTimer) { now = $0 }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }
             Task {

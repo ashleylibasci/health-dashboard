@@ -12,7 +12,7 @@ struct RecoveryView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(r.label).font(.number(24)).foregroundStyle(Color.ink)
                         Text((model.usualRecovery.map { r.score < $0 ? "Below your usual \($0). " : "At or above your usual \($0). " } ?? "") + r.reason)
-                            .font(.system(size: 15)).foregroundStyle(Color(hex: 0x4A4F6E)).fixedSize(horizontal: false, vertical: true)
+                            .font(.system(size: 15)).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(20)
@@ -55,13 +55,13 @@ struct StressView: View {
                         Text(s.label).font(.number(30)).foregroundStyle(Color.ink)
                         if let p = s.percentile {
                             Text(p >= 0.5 ? "Higher than \(Int(p * 100))% of your \(s.partOfDay)" : "Lower than \(Int((1 - p) * 100))% of your \(s.partOfDay)")
-                                .font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E))
+                                .font(.system(size: 14)).foregroundStyle(Color.muted2)
                         }
                     }
                     Spacer()
                     Button("Breathe 1 min") { breathing = true }
-                        .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
-                        .padding(.horizontal, 18).frame(minHeight: 48).background(Color.ink, in: Capsule())
+                        .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.onSolid)
+                        .padding(.horizontal, 18).frame(minHeight: 48).background(Color.solid, in: Capsule())
                 }
                 .padding(.horizontal, 20).padding(.vertical, 18)
                 .background(Color.peach, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -165,7 +165,7 @@ struct EnergyView: View {
             if let r = model.recoveryToday {
                 let e = energyNow(recovery: r.score, activeKcal: model.health.activeKcal[model.today] ?? 0, stressedHours: model.stress?.stressedHours ?? 0)
                 Card(fill: .mint) {
-                    HStack { CardLabel("Energy left", color: .mintInk); Spacer(); Text(Date.now.formatted(date: .omitted, time: .shortened)).font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E)) }
+                    HStack { CardLabel("Energy left", color: .mintInk); Spacer(); Text(Date.now.formatted(date: .omitted, time: .shortened)).font(.system(size: 14)).foregroundStyle(Color.muted2) }
                     HStack(spacing: 12) {
                         Meter(value: Double(e.left) / 100, color: Color(hex: 0x5CC79A), track: .surface, height: 26)
                         Text("\(e.left)%").font(.number(30)).foregroundStyle(Color.ink)
@@ -241,9 +241,9 @@ struct WaterCard: View {
             HStack(spacing: 8) {
                 ForEach([(0.25, "+ ¼"), (0.5, "+ ½"), (1.0, "+ 1 bottle")], id: \.0) { amount, label in
                     Button { Task { await model.logWater(bottles: amount) } } label: {
-                        Text(label).font(.system(size: 15, weight: .bold)).foregroundStyle(amount == 1 ? .white : Color.ink)
+                        Text(label).font(.system(size: 15, weight: .bold)).foregroundStyle(amount == 1 ? Color.onSolid : Color.ink)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(amount == 1 ? Color.ink : Color.surface, in: Capsule())
+                            .background(amount == 1 ? Color.solid : Color.surface, in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add \(amount == 1 ? "a full" : amount == 0.5 ? "half a" : "a quarter") bottle")
@@ -355,8 +355,8 @@ struct CaffeineView: View {
                         VStack(alignment: .leading) { Text("+ Latte").font(.system(size: 16, weight: .bold)); Text("130 mg").font(.system(size: 12)) }
                         Spacer(minLength: 0)
                     }
-                    .foregroundStyle(.white).padding(.horizontal, 14).frame(maxWidth: .infinity, minHeight: 64)
-                    .background(Color.ink, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .foregroundStyle(Color.onSolid).padding(.horizontal, 14).frame(maxWidth: .infinity, minHeight: 64)
+                    .background(Color.solid, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 Button { showOther.toggle() } label: {
                     Text("+ Other drink").font(.system(size: 16, weight: .bold)).foregroundStyle(Color.ink)
@@ -376,6 +376,10 @@ struct CaffeineView: View {
                 }
                 let atBed = caffeineLeft(model.health.caffeineLogs, at: model.tonightBedtime)
                 CaffeineCurve(logs: model.health.caffeineLogs, bedtime: model.tonightBedtime).frame(height: 86)
+                if let warn = caffeineLimitNote(logs.reduce(0) { $0 + $1.value }) {
+                    Label(warn, systemImage: "exclamationmark.triangle.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.peachInk)
+                        .padding(12).background(Color.peach, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
                 Note(logs.isEmpty ? "Nothing logged today." : "About \(Int(atBed.rounded())) mg left at your usual bedtime (\(model.tonightBedtime.formatted(date: .omitted, time: .shortened))). Under \(Int(bedtimeCaffeineGoal)) is the goal.")
             }
             let test = cutoffTest(model.health.caffeineLogs, nights: model.health.nights)
@@ -440,7 +444,7 @@ struct DrinksView: View {
             PageTitle(plain: "Drinks ", accent: "and your body")
             Text("No judgment, just what your own data shows the morning after.").font(.system(size: 15)).foregroundStyle(Color.muted)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
-                ForEach(Array(zip(alcoholDrinks, [Color(hex: 0xF3E9FF), .butter, .mint, .peach, .lavender])), id: \.0) { name, fill in
+                ForEach(Array(zip(alcoholDrinks, [Color.lilac, .butter, .mint, .peach, .lavender])), id: \.0) { name, fill in
                     Button { Task { await model.logDrink() } } label: {
                         Text(name).font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
                             .frame(maxWidth: .infinity, minHeight: 64).background(fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -486,11 +490,11 @@ struct CaloriesView: View {
         VStack(alignment: .leading, spacing: 16) {
             PageTitle(plain: "Calories ", accent: "burned")
             let rest = model.health.restingKcal[model.today] ?? 0, active = model.health.activeKcal[model.today] ?? 0
-            Card(fill: Color(hex: 0xFFF1EA)) {
+            Card(fill: Color.blush) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(Int(rest + active).formatted()).font(.number(40)).foregroundStyle(Color.ink)
                     Spacer()
-                    Text("kcal so far today").font(.system(size: 14)).foregroundStyle(Color(hex: 0x4A4F6E))
+                    Text("kcal so far today").font(.system(size: 14)).foregroundStyle(Color.muted2)
                 }
                 GeometryReader { geo in
                     HStack(spacing: 0) {

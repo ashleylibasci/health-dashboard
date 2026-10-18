@@ -38,7 +38,7 @@ struct LogView: View {
             section("Drinks & water") {
                 HStack(spacing: 8) {
                     if model.profile?.prefs.drinksTracking ?? true {
-                        ForEach(Array(zip(["Wine", "Beer", "Cocktail", "Shot"], [Color(hex: 0xF3E9FF), .butter, .peach, .lavender])), id: \.0) { name, fill in
+                        ForEach(Array(zip(["Wine", "Beer", "Cocktail", "Shot"], [Color.lilac, .butter, .peach, .lavender])), id: \.0) { name, fill in
                             quick(name, fill) { log("\(name) saved") { await model.logDrink() } }
                         }
                     }
@@ -98,6 +98,10 @@ struct LogView: View {
             PrimaryButton(title: "Save") { saveSelections() }
                 .disabled(stress == nil && flow == nil && symptoms.isEmpty)
                 .opacity(stress == nil && flow == nil && symptoms.isEmpty ? 0.4 : 1)
+            if let warn = caffeineLimitNote(model.caffeineToday.reduce(0) { $0 + $1.value }) {
+                Label(warn, systemImage: "exclamationmark.triangle.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.peachInk)
+                    .padding(12).background(Color.peach, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
             if let toast { Label(toast, systemImage: "checkmark.circle.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.mintInk) }
             if let err = model.lastLogError { Note("Couldn’t save to Apple Health: \(err)") }
         }

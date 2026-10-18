@@ -157,6 +157,24 @@ struct Preferences: Codable, Equatable {
     var drinksTracking = true
     var streaks = false
     var darkWatchAtNight = true
+    /// Switch the phone to the dark night version from 8pm to 6am.
+    var nightMode = true
+
+    init(showCalories: Bool = false, sickAlerts: Bool = true, drinksTracking: Bool = true, streaks: Bool = false, darkWatchAtNight: Bool = true, nightMode: Bool = true) {
+        self.showCalories = showCalories; self.sickAlerts = sickAlerts; self.drinksTracking = drinksTracking
+        self.streaks = streaks; self.darkWatchAtNight = darkWatchAtNight; self.nightMode = nightMode
+    }
+
+    /// Settings added later fall back to their defaults, so older saved profiles still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        showCalories = (try? c.decodeIfPresent(Bool.self, forKey: .showCalories)) ?? false
+        sickAlerts = (try? c.decodeIfPresent(Bool.self, forKey: .sickAlerts)) ?? true
+        drinksTracking = (try? c.decodeIfPresent(Bool.self, forKey: .drinksTracking)) ?? true
+        streaks = (try? c.decodeIfPresent(Bool.self, forKey: .streaks)) ?? false
+        darkWatchAtNight = (try? c.decodeIfPresent(Bool.self, forKey: .darkWatchAtNight)) ?? true
+        nightMode = (try? c.decodeIfPresent(Bool.self, forKey: .nightMode)) ?? true
+    }
 }
 
 enum ProfileStore {
