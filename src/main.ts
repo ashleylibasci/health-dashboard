@@ -1,12 +1,13 @@
 import './style.css'
 import HealthWorker from './health/worker.ts?worker'
-import type { Summary, WorkerMessage } from './health/worker.ts'
-import { clockTime, type Night } from './analysis/sleep.ts'
+import type { WorkerMessage } from './health/worker.ts'
+import { clearProfile, loadProfile, saveProfile, summarize, type HealthData, type Summary } from './health/profile.ts'
+import { clockTime, daysBetween, type Night } from './analysis/sleep.ts'
 import type { DayEffect } from './analysis/lateNight.ts'
+import { examWeekLens } from './analysis/examWeek.ts'
+import { isExam, parseIcs, type CalendarEvent } from './calendar/ics.ts'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
-
-const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 
 const icon = {
   cup: '<path d="M4 8h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"></path><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17v-2h1.5a.5.5 0 0 0 0-1H17z"></path>',
@@ -19,33 +20,56 @@ const svg = (paths: string, size = 22) =>
 
 app.innerHTML = `
   <header class="top">
-    <span class="date">${today}</span>
+    <span class="date" id="date"></span>
     <span class="avatar" aria-hidden="true">A</span>
   </header>
   <h1 class="lede" id="lede">Your body, explained. <em>Read from your Apple Watch.</em></h1>
+  <input type="file" id="file" class="visually-hidden" accept=".zip" />
   <section class="welcome" id="welcome">
-    <label class="drop" id="drop">
-      <input type="file" id="file" accept=".zip" />
+    <label class="drop" id="drop" for="file">
       <span class="drop-button">${svg(icon.upload, 20)}Choose your Health export</span>
       <span class="muted">or drop <code>export.zip</code> anywhere on this box</span>
       <small class="muted">iPhone → Health → your photo → Export All Health Data → AirDrop to this Mac</small>
     </label>
     <div class="privacy">
       <span class="privacy-icon">${svg(icon.shield)}</span>
-      <span><strong>Your data never leaves this Mac.</strong> It’s read right here in the browser and nothing is uploaded.</span>
+      <span><strong>Your data never leaves this Mac.</strong> It’s read right here in the browser and nothing is uploaded. The dashboard remembers it until you choose Forget.</span>
     </div>
   </section>
+  <div class="profile-bar" id="profile-bar" hidden>
+    <span id="profile-text" class="muted"></span>
+    <span class="profile-actions">
+      <label class="chip" for="file">${svg(icon.upload, 16)}Update from a new export</label>
+      <button type="button" class="chip quiet" id="forget">Forget my data</button>
+    </span>
+  </div>
   <div id="status" class="status muted" aria-live="polite"></div>
   <main id="cards"></main>
 `
 
 const lede = document.querySelector<HTMLHeadingElement>('#lede')!
+const dateLine = document.querySelector<HTMLSpanElement>('#date')!
+const welcome = document.querySelector<HTMLElement>('#welcome')!
 const drop = document.querySelector<HTMLLabelElement>('#drop')!
 const input = document.querySelector<HTMLInputElement>('#file')!
+const profileBar = document.querySelector<HTMLDivElement>('#profile-bar')!
+const profileText = document.querySelector<HTMLSpanElement>('#profile-text')!
 const status = document.querySelector<HTMLDivElement>('#status')!
 const cards = document.querySelector<HTMLElement>('#cards')!
 
-input.addEventListener('change', () => input.files?.[0] && load(input.files[0]))
+type CalendarState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; events: CalendarEvent[]; checkedAt: Date }
+  | { kind: 'not-configured' }
+  | { kind: 'error'; message: string }
+
+let health: HealthData | undefined = loadProfile()
+let calendar: CalendarState = { kind: 'loading' }
+
+input.addEventListener('change', () => {
+  if (input.files?.[0]) load(input.files[0])
+  input.value = ''
+})
 drop.addEventListener('dragover', (e) => {
   e.preventDefault()
   drop.classList.add('over')
@@ -57,9 +81,15 @@ drop.addEventListener('drop', (e) => {
   const file = e.dataTransfer?.files[0]
   if (file) load(file)
 })
+document.querySelector('#forget')!.addEventListener('click', () => {
+  if (!confirm('Forget the health data saved in this browser? Your export file isn’t touched.')) return
+  clearProfile()
+  health = undefined
+  status.textContent = 'Forgotten. Choose an export to start again.'
+  render()
+})
 
 function load(file: File) {
-  cards.innerHTML = ''
   status.textContent = 'Reading…'
   const worker = new HealthWorker()
   worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
@@ -68,8 +98,12 @@ function load(file: File) {
       const pct = Math.round((m.progress.bytesRead / m.progress.totalBytes) * 100)
       status.textContent = `Reading… ${pct}% · ${m.progress.records.toLocaleString()} records`
     } else if (m.kind === 'done') {
-      status.textContent = `Read in ${m.seconds.toFixed(1)}s · choose another export above to refresh`
-      render(m.summary)
+      health = m.data
+      const saved = saveProfile(m.data)
+      status.textContent = saved
+        ? `Read in ${m.seconds.toFixed(1)}s and saved. Next time it opens straight to your dashboard.`
+        : `Read in ${m.seconds.toFixed(1)}s, but this browser wouldn’t save it, so you’ll need to choose it again next time.`
+      render()
       worker.terminate()
     } else {
       status.textContent = m.message
@@ -79,18 +113,125 @@ function load(file: File) {
   worker.postMessage(file)
 }
 
-function render(s: Summary) {
-  lede.innerHTML = greeting(s)
-  cards.innerHTML = [sleepCard(s), weekendCard(s), lateNightCard(s), caffeineCard(s), dataCard(s)].join('')
+/** Fetches the calendar through the local dev server (see vite.config.ts). */
+async function refreshCalendar() {
+  try {
+    const r = await fetch('/api/calendar', { cache: 'no-store' })
+    const body = await r.text()
+    if (r.status === 404 && body === 'not-configured') calendar = { kind: 'not-configured' }
+    else if (!r.ok) calendar = { kind: 'error', message: 'Google didn’t accept the calendar address. Check the link in .env.local.' }
+    else calendar = { kind: 'ready', events: parseIcs(body), checkedAt: new Date() }
+  } catch {
+    calendar = { kind: 'error', message: 'Couldn’t reach the dashboard’s server. Is npm run dev still running?' }
+  }
+  render()
+}
+
+function localToday(): string {
+  const t = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`
+}
+
+function exams(): CalendarEvent[] {
+  return calendar.kind === 'ready' ? calendar.events.filter((e) => isExam(e.title)) : []
+}
+
+function render() {
+  dateLine.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  welcome.hidden = !!health
+  profileBar.hidden = !health
+  if (health) {
+    const when = new Date(health.importedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    profileText.textContent = `Health data through ${health.nights.length ? shortDate(health.nights[health.nights.length - 1].date) : '—'}, from the export you added ${when}.`
+  }
+  const s = health ? summarize(health) : undefined
+  lede.innerHTML = s ? greeting(s) : 'Your body, explained. <em>Read from your Apple Watch.</em>'
+  cards.innerHTML = [
+    s ? sleepCard(s) : '',
+    calendarCard(),
+    s ? weekendCard(s) : '',
+    s ? lateNightCard(s) : '',
+    s ? caffeineCard(s) : '',
+    s ? dataCard(s) : '',
+  ].join('')
 }
 
 function greeting({ weekendShift: w }: Summary): string {
   const hour = new Date().getHours()
   const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
-  const advice = w
+  const today = localToday()
+  const soon = exams().find((e) => {
+    const d = daysBetween(today, e.date)
+    return d >= 0 && d <= 3
+  })
+  let advice = w
     ? `On school nights you’re usually asleep by ${clockTime(w.schoolNights.bedtime)}.`
     : 'Here’s what your Watch has been noticing.'
+  if (soon) {
+    const d = daysBetween(today, soon.date)
+    const when = d === 0 ? 'today' : d === 1 ? 'tomorrow' : weekdayLong(soon.date)
+    advice = `${escapeHtml(soon.title)} is ${when}, so protect your sleep before it.`
+  }
   return `Good ${part}, Ashley. <em>${advice}</em>`
+}
+
+function calendarCard(): string {
+  if (calendar.kind === 'loading') return card('Exams', 'white', '<p class="muted">Checking your calendar…</p>')
+  if (calendar.kind === 'not-configured') {
+    return card(
+      'Connect your calendar',
+      'white',
+      `<p>Paste your calendar’s private link into the dashboard once, and it checks for exams every time it opens and every 30 minutes after that. No sign-in needed.</p>
+       <ol class="steps">
+         <li>Open <strong>calendar.google.com</strong> on this Mac → the gear → <strong>Settings</strong>.</li>
+         <li>On the left, click the calendar your exams are in, then scroll to <strong>Secret address in iCal format</strong> and copy it.</li>
+         <li>In the <code>health-dashboard</code> folder, make a file named <code>.env.local</code> with one line:<br /><code>CALENDAR_ICS_URL=</code> followed by the link.</li>
+         <li>Stop <code>npm run dev</code> (Control-C) and start it again.</li>
+       </ol>
+       <p class="note">Treat that link like a password: anyone with it can read the calendar. <code>.env.local</code> is kept out of git, and the link stays on this Mac.</p>`,
+    )
+  }
+  if (calendar.kind === 'error') return card('Exams', 'white', `<p>${calendar.message}</p>`)
+
+  const today = localToday()
+  const upcoming = exams().filter((e) => {
+    const d = daysBetween(today, e.date)
+    return d >= 0 && d <= 21
+  })
+  const list = upcoming.length
+    ? `<ul class="list">${upcoming
+        .slice(0, 5)
+        .map((e) => {
+          const d = daysBetween(today, e.date)
+          const tag = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : `In ${d} days`
+          return `<li><span>${escapeHtml(e.title)}<br /><span class="muted">${shortDate(e.date)}${e.minutes !== undefined ? ` · ${clockOfDay(e.minutes)}` : ''}</span></span><span class="pill ${d <= 3 ? 'peach' : 'blue'}">${tag}</span></li>`
+        })
+        .join('')}</ul>`
+    : '<p class="muted">No exams in the next 3 weeks.</p>'
+
+  const lens = health
+    ? examWeekLens(health.nights, new Map(health.restingHr), new Map(health.hrv), exams().map((e) => e.date))
+    : undefined
+  const lensBody = lens
+    ? `<h4>Exam weeks vs. normal weeks</h4>
+       <table>
+         <tr><th></th><th>Exam weeks</th><th>Normal</th></tr>
+         <tr><td>Sleep</td><td>${hm(lens.examWeeks.asleepMinutes)}</td><td>${hm(lens.normalWeeks.asleepMinutes)}</td></tr>
+         <tr><td>Asleep at</td><td>${clockTime(lens.examWeeks.bedtime)}</td><td>${clockTime(lens.normalWeeks.bedtime)}</td></tr>
+         <tr><td>Resting HR</td><td>${num(lens.examWeeks.restingHr, ' bpm')}</td><td>${num(lens.normalWeeks.restingHr, ' bpm')}</td></tr>
+         <tr><td>HRV</td><td>${num(lens.examWeeks.hrv, ' ms')}</td><td>${num(lens.normalWeeks.hrv, ' ms')}</td></tr>
+       </table>
+       <p class="note">“Exam week” means the 6 nights before each exam. Based on ${lens.exams} exams on your calendar in the last year, ${lens.examWeeks.nights} exam-week nights vs. ${lens.normalWeeks.nights} other nights.</p>`
+    : health
+      ? '<p class="note">The exam-week comparison appears once your calendar has past exams that overlap your Health data (at least 5 nights in exam weeks).</p>'
+      : ''
+  const checked = calendar.checkedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return card(
+    'Exams',
+    'white',
+    `${list}${lensBody}<p class="note">Calendar checked at ${checked}. Events with exam, midterm, final or quiz in the title count.</p>`,
+  )
 }
 
 const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m`
@@ -190,12 +331,30 @@ function dataCard(s: Summary): string {
     'Your data',
     'white',
     `<p><strong>${s.nights.toLocaleString()} nights</strong> of sleep, ${s.firstNight ? shortDate(s.firstNight) : '—'} to ${s.lastNight ? shortDate(s.lastNight) : '—'}.</p>
-     <div class="next"><span class="badge butter">${svg(icon.calendar)}</span><span><strong>Coming next: exam-week lens</strong><br /><span class="muted">Connect your calendar to compare exam weeks with normal weeks.</span></span></div>`,
+     <p class="note">Saved in this browser on this Mac. Add a new export any time to bring it up to date.</p>`,
   )
 }
 
 function tile(label: string, value: string, tone: string): string {
   return `<div class="tile ${tone}"><span class="tile-label">${label}</span><span class="tile-value">${value}</span></div>`
+}
+
+function num(v: number | undefined, unit: string): string {
+  return v === undefined ? '<span class="muted">no data</span>' : `${Math.round(v)}${unit}`
+}
+
+function clockOfDay(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(minutes % 60).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`
+}
+
+function weekdayLong(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
 
 function signed(v: number | undefined, unit: string): string {
@@ -207,3 +366,15 @@ function signed(v: number | undefined, unit: string): string {
 function card(title: string, tone: string, body: string): string {
   return `<section class="card ${tone}"><h2>${title}</h2>${body}</section>`
 }
+
+// Start-up runs last, once every helper above is defined.
+const CALENDAR_EVERY_MS = 30 * 60_000
+setInterval(refreshCalendar, CALENDAR_EVERY_MS)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return
+  const last = calendar.kind === 'ready' ? calendar.checkedAt.getTime() : 0
+  if (Date.now() - last > 5 * 60_000) refreshCalendar()
+  else render() // the date line may have rolled over
+})
+render()
+refreshCalendar()

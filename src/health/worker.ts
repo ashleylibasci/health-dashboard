@@ -1,27 +1,12 @@
 /// <reference lib="webworker" />
 import { readHealthExport, type ReadProgress } from './readExport.ts'
-import { buildNights, type Night } from '../analysis/sleep.ts'
+import { buildNights } from '../analysis/sleep.ts'
 import { dailyAverage } from '../analysis/stats.ts'
-import { weekendShift, type WeekendShift } from '../analysis/weekendShift.ts'
-import { lateNightCost, LATE_BEDTIME, type LateNightCost } from '../analysis/lateNight.ts'
-
-export interface Summary {
-  nights: number
-  firstNight?: string
-  lastNight?: string
-  caffeineLogs: number
-  lastCaffeine?: string
-  weekendShift?: WeekendShift
-  lateNightCost?: LateNightCost
-  /** The most recent 7 nights, oldest first. */
-  lastWeek: Night[]
-  /** The 3 most recent nights asleep after 2am, newest first. */
-  recentLate: Night[]
-}
+import type { HealthData } from './profile.ts'
 
 export type WorkerMessage =
   | { kind: 'progress'; progress: ReadProgress }
-  | { kind: 'done'; summary: Summary; seconds: number }
+  | { kind: 'done'; data: HealthData; seconds: number }
   | { kind: 'error'; message: string }
 
 const post = (m: WorkerMessage) => self.postMessage(m)
@@ -38,27 +23,21 @@ self.onmessage = async (e: MessageEvent<File>) => {
       }
     })
 
-    const nights = buildNights(records)
-    const restingHr = dailyAverage(records, 'HKQuantityTypeIdentifierRestingHeartRate')
-    const hrv = dailyAverage(records, 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN')
-    const caffeine = records
-      .filter((r) => r.type === 'HKQuantityTypeIdentifierDietaryCaffeine')
-      .map((r) => r.start.local.date)
-      .sort()
+    const round = (m: Map<string, number>): [string, number][] =>
+      [...m].map(([day, v]) => [day, Math.round(v * 10) / 10])
 
     post({
       kind: 'done',
       seconds: (performance.now() - started) / 1000,
-      summary: {
-        nights: nights.length,
-        firstNight: nights[0]?.date,
-        lastNight: nights[nights.length - 1]?.date,
-        caffeineLogs: caffeine.length,
-        lastCaffeine: caffeine[caffeine.length - 1],
-        weekendShift: weekendShift(nights),
-        lateNightCost: lateNightCost(nights, restingHr, hrv),
-        lastWeek: nights.slice(-7),
-        recentLate: nights.filter((n) => n.bedtime >= LATE_BEDTIME).slice(-3).reverse(),
+      data: {
+        nights: buildNights(records),
+        restingHr: round(dailyAverage(records, 'HKQuantityTypeIdentifierRestingHeartRate')),
+        hrv: round(dailyAverage(records, 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN')),
+        caffeine: records
+          .filter((r) => r.type === 'HKQuantityTypeIdentifierDietaryCaffeine')
+          .map((r) => r.start.local.date)
+          .sort(),
+        importedAt: new Date().toISOString(),
       },
     })
   } catch (err) {
