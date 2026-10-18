@@ -74,19 +74,23 @@ final class AppModel {
             try await HealthReader.requestAccess()
             UserDefaults.standard.set(true, forKey: Self.connectedKey)
             await refreshHealth()
+            BackgroundHealth.shared.start(self)
         } catch {
             healthState = .failed(error.localizedDescription)
         }
     }
 
-    func refreshHealth() async {
+    /// `quiet` is for background wake-ups: Health can't be read while the phone is locked,
+    /// so a failed background read keeps the last numbers instead of showing an error.
+    func refreshHealth(quiet: Bool = false) async {
         guard !isDemo, healthState != .unavailable, UserDefaults.standard.bool(forKey: Self.connectedKey) else { return }
-        if health.nights.isEmpty { healthState = .loading }
+        if health.nights.isEmpty && !quiet { healthState = .loading }
         do {
             health = try await HealthReader.read()
             healthState = .ready
+            if !quiet { BackgroundHealth.shared.noteRefreshed() }
         } catch {
-            healthState = .failed(error.localizedDescription)
+            if !quiet || health.nights.isEmpty { healthState = quiet ? healthState : .failed(error.localizedDescription) }
         }
     }
 

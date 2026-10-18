@@ -16,7 +16,15 @@ final class WatchSync: NSObject, WCSessionDelegate {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated,
               WCSession.default.isPaired, WCSession.default.isWatchAppInstalled, let data = snapshot.encoded else { return }
         try? WCSession.default.updateApplicationContext(["snapshot": data])
+        // Complication updates get a small daily budget (about 50), so send at most every 30 minutes.
+        if WCSession.default.isComplicationEnabled, WCSession.default.remainingComplicationUserInfoTransfers > 0,
+           Date.now.timeIntervalSince(lastComplicationSend) > 1800 {
+            lastComplicationSend = .now
+            WCSession.default.transferCurrentComplicationUserInfo(["snapshot": data])
+        }
     }
+
+    private var lastComplicationSend = Date.distantPast
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
     func sessionDidBecomeInactive(_ session: WCSession) {}

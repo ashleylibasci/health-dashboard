@@ -24,6 +24,11 @@ to export. Exams come from Google Calendar through its secret iCal link.
 - **Apple Watch:** recovery, one-tap logging, tonight's bedtime (dark after
   8pm), cycle ring, the getting-sick heads-up, and watch-face complications.
   The phone sends the Watch a fresh summary each time you open the app.
+- **Stays current on its own:** Apple Health wakes the app when new data arrives
+  (last night's sleep, a morning heart reading, a latte logged anywhere), and it
+  refreshes the widgets and the Watch in the background. iOS decides the timing,
+  usually within minutes to an hour. Health can't be read while the phone is
+  locked, so some updates wait until you next unlock it.
 
 ## Put it on your iPhone
 

@@ -45,6 +45,11 @@ final class WatchStore: NSObject, WCSessionDelegate {
         Task { @MainActor in self.receive(applicationContext) }
     }
 
+    /// Complication updates the phone sends in the background; saving reloads the watch-face complications.
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        Task { @MainActor in self.receive(userInfo) }
+    }
+
     private func receive(_ context: [String: Any]) {
         guard let data = context["snapshot"] as? Data, let snap = WidgetSnapshot.decode(data) else { return }
         // Keep caffeine logged on the Watch today if the phone hasn't caught up yet.
