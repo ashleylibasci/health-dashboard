@@ -1,59 +1,38 @@
 import SwiftUI
 
+/// The Body tab: every deep-dive screen in one place.
 struct BodyView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            (Text("What a ") + Text("2am night").italic().foregroundColor(.mainText) + Text(" costs you"))
-                .font(.serifTitle(34)).foregroundStyle(Color.ink)
-            if let c = model.lateNight {
-                Note("\(c.lateNights) late nights in the last \(c.days) days, compared with your \(c.normalNights) normal nights.")
-                HStack(spacing: 10) {
-                    Tile(label: "That night", value: "−" + hoursMinutes(Double(max(0, c.sleepLost))), caption: "sleep", fill: .peach, ink: .peachInk)
-                    Tile(label: "Next day", value: signed(c.nextDay.restingHr, " bpm"), caption: "HRV " + signed(c.nextDay.hrv, " ms"), fill: .peach, ink: .peachInk)
-                    Tile(label: "Day after", value: signed(c.dayAfter.restingHr, " bpm"), caption: "HRV " + signed(c.dayAfter.hrv, " ms"), fill: .butter, ink: .butterInk)
-                }
-                Note("Higher resting heart rate and lower HRV (heart rate variability, the small changes in time between heartbeats) both mean your body is less recovered.")
-                if !model.recentLate.isEmpty {
-                    Card {
-                        CardLabel("Recent late nights", color: .muted)
-                        ForEach(Array(model.recentLate.enumerated()), id: \.element.date) { i, n in
-                            if i > 0 { Divider() }
-                            HStack {
-                                Text("\(Day.short(n.date)) · \(clockTime(Double(n.bedtime)))").font(.system(size: 15)).foregroundStyle(Color.ink)
-                                Spacer()
-                                if model.exams.contains(where: { (1...2).contains(Day.between(n.date, $0.date)) }) {
-                                    Pill(text: "Before exam", fill: .lavender, ink: .mainText)
-                                } else if n.isWeekend {
-                                    Pill(text: "Weekend", fill: .peach, ink: .peachInk)
-                                } else {
-                                    Pill(text: "School night", fill: .lavender, ink: .mainText)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                Card { Note("Needs at least 3 nights asleep after 2am in the last 6 months.") }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Body").font(.serifTitle(34)).foregroundStyle(Color.ink).padding(.top, 8)
+            link(RecoveryView(), "heart.fill", "Recovery", model.recoveryToday.map { "\($0.score) today · \($0.label)" } ?? "Fills in over your first 14 days")
+            link(StressView(), "face.smiling", "Stress", model.stress.map { "\($0.label) right now · \($0.weekLabel.lowercased()) this week" } ?? "From your heart rate during the day", .peach, .peachInk)
+            link(EnergyView(), "battery.75percent", "Energy and effort", "Energy left, load, steps, sleep debt, water", .mint, .mintInk)
+            link(FitnessView(), "bolt.fill", "Fitness age", model.fitness.map { "Fitness age \($0.fitnessAge) · VO₂ max \(String(format: "%.1f", $0.latest))" } ?? "Needs a VO₂ max reading from your Watch", .mint, .mintInk)
+            link(CaffeineView(), "cup.and.saucer.fill", "Caffeine", "Today’s caffeine and your cutoff test", .butter, .butterInk)
+            if model.profile?.prefs.drinksTracking ?? true {
+                link(DrinksView(), "wineglass.fill", "Drinks and your body", "What the morning after looks like in your data", Color(hex: 0xF3E9FF), Color(hex: 0x7A3FC2))
             }
-            caffeineCard
+            link(LateNightView(), "moon.zzz.fill", "Late-night cost", "What a 2am night costs you")
+            link(ExamsView(), "calendar", "Exams", model.upcomingExams.first.map { "Next: \($0.title)" } ?? "From your Google Calendar", .butter, .butterInk)
+            if model.profile?.tracksCycle ?? false {
+                link(CycleView(), "circle.dashed", "Cycle", model.cycle.map { "Day \($0.day) · \($0.phase.rawValue)" } ?? model.pack.map { "Pack day \($0.day)" } ?? "Your cycle and how it affects you", Color(hex: 0xFFE6E2), .peachInk)
+            }
+            if model.profile?.prefs.showCalories ?? false {
+                link(CaloriesView(), "flame.fill", "Calories burned", "Resting and active", Color(hex: 0xFFF1EA), .peachInk)
+            }
+            if model.profile?.prefs.streaks ?? false {
+                link(StreaksView(), "star.fill", "Streaks and wins", "Small goals and badges", .butter, .butterInk)
+            }
         }
         .page()
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    private var caffeineCard: some View {
-        Card(fill: .butter) {
-            CardLabel("Caffeine", color: .butterInk)
-            if let last = model.health.caffeine.last {
-                Text("\(model.health.caffeine.count) logs").font(.number(30)).foregroundStyle(Color.ink)
-                Text("Latest on \(Day.short(last)). The caffeine cutoff test needs 2–3 weeks of logs to compare your latest coffee with that night’s sleep.")
-                    .font(.system(size: 15)).foregroundStyle(Color.ink)
-            } else {
-                Text("No caffeine logs yet. Tap the Latte shortcut on your Watch (130 mg each) to start the caffeine cutoff test.")
-                    .font(.system(size: 15)).foregroundStyle(Color.ink)
-            }
-        }
+    private func link<V: View>(_ destination: V, _ icon: String, _ title: String, _ detail: String, _ fill: Color = .lavender, _ ink: Color = .mainText) -> some View {
+        NavigationLink { destination } label: { LinkCard(icon: icon, title: title, detail: detail, iconFill: fill, iconInk: ink) }
+            .buttonStyle(.plain)
     }
 }

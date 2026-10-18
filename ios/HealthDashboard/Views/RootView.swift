@@ -11,21 +11,57 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            switch model.healthState {
-            case .notConnected: ConnectView()
-            case .unavailable: UnavailableView()
-            default: tabs
+            if model.healthState == .unavailable {
+                UnavailableView()
+            } else if let screen = debugScreen {
+                NavigationStack { screen }
+            } else if model.profile == nil {
+                OnboardingView()
+            } else {
+                tabs
             }
         }
         .tint(.mainText)
         .preferredColorScheme(.light)
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }
-            Task { await model.refreshHealth() }
-            Task { await model.refreshCalendar() }
+            Task {
+                await model.refreshHealth()
+                await model.refreshCalendar()
+                await model.scheduleNotifications()
+                model.publishWidgetSnapshot()
+            }
         }
         .onReceive(calendarTimer) { _ in Task { await model.refreshCalendar() } }
         .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+
+    /// Test builds only: `-screen cycle` (etc.) opens one screen directly, for checking layouts.
+    private var debugScreen: AnyView? {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-screen"), i + 1 < args.count else { return nil }
+        switch args[i + 1] {
+        case "cycle": return AnyView(CycleView())
+        case "phases": return AnyView(PhasesView())
+        case "stress": return AnyView(StressView())
+        case "energy": return AnyView(EnergyView())
+        case "fitness": return AnyView(FitnessView())
+        case "drinks": return AnyView(DrinksView())
+        case "calories": return AnyView(CaloriesView())
+        case "recovery": return AnyView(RecoveryView())
+        case "sick": return AnyView(SickView())
+        case "streaks": return AnyView(StreaksView())
+        case "stages": return AnyView(SleepStagesView())
+        case "sleep": return AnyView(SleepView())
+        case "log": return AnyView(LogView())
+        case "birthcontrol": return AnyView(BirthControlView(method: .combinedPill))
+        case "conditions": return AnyView(ConditionsView())
+        default: return nil
+        }
+        #else
+        return nil
+        #endif
     }
 
     private var tabs: some View {
@@ -33,56 +69,8 @@ struct RootView: View {
             Tab("Today", systemImage: "house.fill") { NavigationStack { TodayView(showSettings: $showSettings) } }
             Tab("Sleep", systemImage: "moon.fill") { NavigationStack { SleepView() } }
             Tab("Body", systemImage: "heart.fill") { NavigationStack { BodyView() } }
-            Tab("Exams", systemImage: "calendar") { NavigationStack { ExamsView(showSettings: $showSettings) } }
+            Tab("Log", systemImage: "plus") { NavigationStack { LogView() } }
         }
-    }
-}
-
-/// First launch: the Welcome screen from the canvas.
-struct ConnectView: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                ZStack {
-                    Circle().stroke(Color.surface, lineWidth: 12).frame(width: 150, height: 150)
-                    Circle().trim(from: 0, to: 0.72).stroke(Color.main, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                        .rotationEffect(.degrees(-90)).frame(width: 150, height: 150)
-                    Image(systemName: "moon.stars.fill").font(.system(size: 44)).foregroundStyle(Color.mainText)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 32)
-                .accessibilityHidden(true)
-                (Text("Your body, explained. ") + Text("Read from your Apple Watch.").italic().foregroundColor(.mainText))
-                    .font(.serifTitle(36)).foregroundStyle(Color.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Sleep, recovery, caffeine and your exam weeks, read straight from Apple Health. Nothing to export.")
-                    .font(.system(size: 17)).foregroundStyle(Color(hex: 0x4A4F6E))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {
-                    Task { await model.connectHealth() }
-                } label: {
-                    Text("Connect Apple Health").font(.system(size: 18, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .foregroundStyle(.white)
-                        .background(Color.ink, in: Capsule())
-                }
-                .padding(.top, 8)
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "lock.shield.fill").foregroundStyle(Color.mainText)
-                    Text("**Your health data stays on your phone.** The app reads it here and never uploads it.")
-                        .font(.system(size: 14)).foregroundStyle(Color.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
-        }
-        .background(Color.lavender)
     }
 }
 

@@ -9,14 +9,23 @@ struct TodayView: View {
             header
             greeting
             switch model.healthState {
-            case .loading:
+            case .loading where model.health.nights.isEmpty:
                 Card { ProgressView("Reading Apple Health…").frame(maxWidth: .infinity) }
             case .failed(let message):
                 Card { Note("Couldn’t read Apple Health: \(message)") }
+            case .notConnected:
+                Card(fill: .lavender) {
+                    CardLabel("Apple Health isn’t connected")
+                    Text("Connect it to see your sleep, recovery and everything else here.").font(.system(size: 15)).foregroundStyle(Color.ink)
+                    PrimaryButton(title: "Connect Apple Health") { Task { await model.connectHealth() } }
+                }
             default:
-                lastNightCard
-                if let exam = model.upcomingExams.first { examBanner(exam) }
+                alerts
+                recoveryCard
+                cycleCard
                 tiles
+                if let exam = model.upcomingExams.first { NavigationLink { ExamsView() } label: { examBanner(exam) }.buttonStyle(.plain) }
+                more
             }
         }
         .page()
@@ -33,10 +42,10 @@ struct TodayView: View {
                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.muted)
             Spacer()
             Button { showSettings = true } label: {
-                Text("A").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(Color.ink)
+                Text(model.profile?.initial ?? "•").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(Color.ink)
                     .frame(width: 44, height: 44).background(Color.peach, in: Circle())
             }
-            .accessibilityLabel("Settings")
+            .accessibilityLabel("Profile and settings")
         }
         .padding(.top, 8)
     }
@@ -44,71 +53,163 @@ struct TodayView: View {
     private var greeting: some View {
         let hour = Calendar.current.component(.hour, from: .now)
         let part = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"
-        return (Text("Good \(part), Ashley. ") + Text(advice).italic().foregroundColor(.mainText))
+        return (Text("Good \(part), \(model.profile?.firstName ?? "there"). ") + Text(advice).italic().foregroundColor(.mainText))
             .font(.serifTitle(30)).foregroundStyle(Color.ink).lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var advice: String {
-        let today = Day.key(.now)
+        let today = model.today
         if let exam = model.upcomingExams.first(where: { Day.between(today, $0.date) <= 3 }) {
             let d = Day.between(today, exam.date)
             let when = d == 0 ? "today" : d == 1 ? "tomorrow" : Day.weekdayName(exam.date, long: true)
             return "\(exam.title) is \(when), so protect your sleep before it."
         }
-        if let w = model.weekend { return "On school nights you’re usually asleep by \(clockTime(w.schoolNights.bedtime))." }
+        if model.sick != nil { return "Go easy today, and be asleep by \(clockTime(Double(model.bedtimeTarget)))." }
+        if let r = model.recoveryToday, r.score < 60 { return "Go easy today, and be asleep by \(clockTime(Double(model.bedtimeTarget)))." }
+        if model.weekend != nil { return "Aim to be asleep by \(clockTime(Double(model.bedtimeTarget))) tonight." }
         return "Here’s what your Watch has been noticing."
     }
 
-    @ViewBuilder private var lastNightCard: some View {
-        if let n = model.lastNight {
-            Card(fill: .lavender) {
+    @ViewBuilder private var alerts: some View {
+        if model.sick != nil {
+            NavigationLink { SickView() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "thermometer.medium").font(.system(size: 20)).foregroundStyle(Color.peachInk)
+                        .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your body’s working harder than usual").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+                        Text("Could be a bug coming on, or just stress. A guess, not a diagnosis. Tap to log how you feel.")
+                            .font(.system(size: 13)).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.muted)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 14)
+                .background(Color.peach, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        if !model.reasons.isEmpty {
+            NavigationLink { WhyOffView() } label: {
+                Label("Why do I feel off today?", systemImage: "magnifyingglass")
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52).background(Color.ink, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var recoveryCard: some View {
+        NavigationLink { RecoveryView() } label: {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    CardLabel("Last night")
+                    CardLabel("Recovery")
                     Spacer()
-                    Pill(text: Day.short(n.date), fill: .surface, ink: .ink)
+                    if let r = model.recoveryToday { Pill(text: r.label, fill: .surface, ink: .ink) }
                 }
-                Text(hoursMinutes(Double(n.asleepMinutes))).font(.number(34)).foregroundStyle(Color.ink)
-                VStack(spacing: 8) {
-                    row("Asleep", clockTime(Double(n.bedtime)))
-                    row("Awake", clockTime(Double(n.wake)))
-                    row("Resting HR", compare(model.health.restingHr, " bpm"))
-                    row("HRV", compare(model.health.hrv, " ms"))
+                HStack(spacing: 16) {
+                    Ring(value: model.recoveryToday?.score)
+                    VStack(spacing: 6) {
+                        ValueRow(label: "Resting HR", value: metric(model.health.restingHr[model.today], model.recoveryToday?.restingHrChange.map { signed($0, "") }))
+                        ValueRow(label: "HRV", value: metric(model.health.hrv[model.today], model.recoveryToday?.hrvChange.map { "\(signed($0 * 100, ""))%" }))
+                        ValueRow(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) } ?? "–")
+                    }
                 }
-                Note("Resting HR and HRV are this morning’s, against your typical day over the last 4 weeks. Higher resting HR or lower HRV means your body is less recovered.")
+                if model.recoveryToday == nil {
+                    Note("Recovery fills in once there are 7 days of heart data and a night of sleep from your Watch.")
+                }
             }
-        } else {
-            Card(fill: .lavender) {
-                CardLabel("Last night")
-                Note("No sleep in Apple Health yet. Wear your Watch to bed with Sleep Focus on, and your nights show up here the next morning.")
+            .padding(20)
+            .background(Color.lavender, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func metric(_ value: Double?, _ change: String?) -> String {
+        guard let value else { return "–" }
+        return "\(Int(value.rounded()))" + (change.map { " · \($0)" } ?? "")
+    }
+
+    @ViewBuilder private var cycleCard: some View {
+        if let c = model.cycle {
+            NavigationLink { CycleView() } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        HStack(spacing: 8) {
+                            Circle().fill(c.phase.color).frame(width: 12, height: 12)
+                            Text(model.profile?.cycle == .irregular ? "Day \(c.day) since your last period" : "Cycle day \(c.day) · \(c.phase.rawValue)")
+                                .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+                        }
+                        Spacer()
+                        if let next = c.nextStart { Text("Period ~\(Day.short(next).split(separator: ",").last!.trimmingCharacters(in: .whitespaces))").font(.system(size: 13)).foregroundStyle(Color.muted) }
+                    }
+                    if model.profile?.cycle == .natural {
+                        HStack(spacing: 2) {
+                            ForEach(1...max(c.typicalLength, c.day), id: \.self) { d in
+                                RoundedRectangle(cornerRadius: 3).fill(d == c.day ? Color.ink : c.phase(on: d).color)
+                                    .frame(height: d == c.day ? 22 : 10)
+                            }
+                        }
+                        .frame(height: 22)
+                        .accessibilityHidden(true)
+                    }
+                    Text(cycleNote(c)).font(.system(size: 14)).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                }
+                .padding(16)
+                .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
             }
+            .buttonStyle(.plain)
+        } else if let p = model.pack {
+            NavigationLink { CycleView() } label: {
+                LinkCard(icon: "pills.fill", title: "Pack day \(p.day)\(p.isBreakWeek ? " · break week" : "")",
+                         detail: model.profile?.pillsTaken.contains(model.today) == true ? "Today’s pill taken ✓" : "Tap to mark today’s pill", iconFill: Color(hex: 0xE4E7FF))
+            }
+            .buttonStyle(.plain)
+        } else if model.profile?.cycle == .hormonal {
+            NavigationLink { CycleView() } label: {
+                LinkCard(icon: "pills.fill", title: model.profile?.birthControl?.name ?? "Birth control", detail: "How it affects your body and your data")
+            }
+            .buttonStyle(.plain)
         }
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(Color.ink)
-            Spacer()
-            Text(value).fontWeight(.bold).foregroundStyle(Color.ink)
+    private func cycleNote(_ c: CycleStatus) -> String {
+        switch c.phase {
+        case .luteal: "Part of today’s lower HRV and warmer nights is this phase, so recovery already allows for it."
+        case .period: "You often sleep a little more now. Cramps can dip recovery on days 1–2."
+        case .follicular: "Usually your best-recovered stretch. A good week for harder workouts."
+        case .ovulation: "Wrist temperature starts to climb around now."
         }
-        .font(.system(size: 15))
     }
 
-    private func compare(_ series: [String: Double], _ unit: String) -> String {
-        guard let latest = series.keys.max(), Day.between(latest, Day.key(.now)) <= 1, let value = series[latest] else { return "no data today" }
-        let now = "\(Int(value.rounded()))\(unit)"
-        guard let typical = model.typical(series) else { return now }
-        let diff = Int((value - typical).rounded())
-        return diff == 0 ? "\(now), typical" : "\(now) · \(signed(Double(diff), ""))"
+    private var tiles: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
+            NavigationLink { SleepView() } label: {
+                SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText)
+            }
+            NavigationLink { CaffeineView() } label: {
+                SmallTile(icon: "cup.and.saucer.fill", label: "Caffeine today", value: "\(Int(model.caffeineToday.reduce(0) { $0 + $1.value })) mg", fill: .butter, ink: .butterInk)
+            }
+            NavigationLink { FitnessView() } label: {
+                SmallTile(icon: "bolt.fill", label: "Fitness age", value: model.fitness.map { "\($0.fitnessAge)" } ?? "–", fill: .mint, ink: .mintInk)
+            }
+            NavigationLink { StressView() } label: {
+                SmallTile(icon: "face.smiling", label: "Stress this week", value: model.stress?.weekLabel ?? "–", fill: .peach, ink: .peachInk)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func examBanner(_ exam: CalendarEvent) -> some View {
-        let d = Day.between(Day.key(.now), exam.date)
+        let d = Day.between(model.today, exam.date)
         return HStack(spacing: 12) {
             Image(systemName: "calendar").font(.system(size: 20)).foregroundStyle(Color.butterInk)
                 .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(exam.title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
-                Text(d == 0 ? "Today" : d == 1 ? "Tomorrow" : "\(Day.weekdayName(exam.date, long: true)), in \(d) days")
+                Text(d == 0 ? "Today" : d == 1 ? "Tomorrow · protect tonight’s sleep" : "\(Day.weekdayName(exam.date, long: true)) · protect sleep the nights before")
                     .font(.system(size: 14)).foregroundStyle(Color.muted)
             }
             Spacer()
@@ -117,21 +218,25 @@ struct TodayView: View {
         .background(Color.butter, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private var tiles: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
-            if let w = model.weekend {
-                SmallTile(icon: "arrow.left.and.right", label: "Weekend shift", value: hoursMinutes(Double(abs(w.midpointShift))), fill: .peach, ink: .peachInk)
-            }
-            if let c = model.lateNight {
-                SmallTile(icon: "moon.zzz.fill", label: "2am night costs", value: "−" + hoursMinutes(Double(max(0, c.sleepLost))), fill: .lavender, ink: .mainText)
-            }
-            SmallTile(icon: "cup.and.saucer.fill", label: "Caffeine logs", value: "\(model.health.caffeine.count)", fill: .butter, ink: .butterInk)
-            SmallTile(icon: "bed.double.fill", label: "Nights tracked", value: "\(model.health.nights.count)", fill: .mint, ink: .mintInk)
+    @ViewBuilder private var more: some View {
+        let prefs = model.profile?.prefs ?? Preferences()
+        NavigationLink { EnergyView() } label: {
+            LinkCard(icon: "battery.75percent", title: "Energy and effort", detail: "Energy left, steps, sleep debt and water", iconFill: .mint, iconInk: .mintInk)
+        }.buttonStyle(.plain)
+        if prefs.showCalories {
+            NavigationLink { CaloriesView() } label: {
+                LinkCard(icon: "flame.fill", title: "Calories burned", detail: "\(Int((model.health.activeKcal[model.today] ?? 0) + (model.health.restingKcal[model.today] ?? 0))) kcal so far today", iconFill: Color(hex: 0xFFF1EA), iconInk: .peachInk)
+            }.buttonStyle(.plain)
+        }
+        if prefs.streaks {
+            NavigationLink { StreaksView() } label: {
+                LinkCard(icon: "star.fill", title: "Streaks and wins", detail: "\(model.streakInfo.bedtimeNights) nights in bed by \(clockTime(Double(model.bedtimeTarget)))", iconFill: .butter, iconInk: .butterInk)
+            }.buttonStyle(.plain)
         }
     }
 }
 
-private struct SmallTile: View {
+struct SmallTile: View {
     var icon: String
     var label: String
     var value: String
@@ -143,7 +248,7 @@ private struct SmallTile: View {
             Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ink)
                 .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.muted)
-            Text(value).font(.number(26)).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).font(.number(26)).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

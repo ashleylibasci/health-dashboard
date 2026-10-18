@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BD0000000000000000000001 /* HealthDashboardWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* HealthDashboardWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		AA0000000000000000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -14,12 +18,36 @@
 			remoteGlobalIDString = A50000000000000000000001;
 			remoteInfo = HealthDashboard;
 		};
+		BA0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B50000000000000000000001;
+			remoteInfo = HealthDashboardWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BC0000000000000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BD0000000000000000000001 /* HealthDashboardWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000001 /* HealthDashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000002 /* HealthDashboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HealthDashboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000003 /* HealthDashboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthDashboard.entitlements; sourceTree = "<group>"; };
+		B10000000000000000000001 /* HealthDashboardWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HealthDashboardWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000002 /* HealthDashboardWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthDashboardWidgets.entitlements; sourceTree = "<group>"; };
+		B10000000000000000000003 /* HealthDashboardWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "HealthDashboardWidgets-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,9 +61,26 @@
 			path = HealthDashboardTests;
 			sourceTree = "<group>";
 		};
+		B20000000000000000000001 /* HealthDashboardWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = HealthDashboardWidgets;
+			sourceTree = "<group>";
+		};
+		B20000000000000000000002 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A30000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -57,7 +102,11 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000003 /* HealthDashboard.entitlements */,
+				B10000000000000000000002 /* HealthDashboardWidgets.entitlements */,
+				B10000000000000000000003 /* HealthDashboardWidgets-Info.plist */,
 				A20000000000000000000001 /* HealthDashboard */,
+				B20000000000000000000002 /* Shared */,
+				B20000000000000000000001 /* HealthDashboardWidgets */,
 				A20000000000000000000002 /* HealthDashboardTests */,
 				A40000000000000000000002 /* Products */,
 			);
@@ -68,6 +117,7 @@
 			children = (
 				A10000000000000000000001 /* HealthDashboard.app */,
 				A10000000000000000000002 /* HealthDashboardTests.xctest */,
+				B10000000000000000000001 /* HealthDashboardWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,13 +132,16 @@
 				A60000000000000000000001 /* Sources */,
 				A30000000000000000000001 /* Frameworks */,
 				A70000000000000000000001 /* Resources */,
+				BC0000000000000000000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B90000000000000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A20000000000000000000001 /* HealthDashboard */,
+				B20000000000000000000002 /* Shared */,
 			);
 			name = HealthDashboard;
 			packageProductDependencies = (
@@ -120,6 +173,29 @@
 			productReference = A10000000000000000000002 /* HealthDashboardTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		B50000000000000000000001 /* HealthDashboardWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWidgets" */;
+			buildPhases = (
+				B60000000000000000000001 /* Sources */,
+				B30000000000000000000001 /* Frameworks */,
+				B70000000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B20000000000000000000001 /* HealthDashboardWidgets */,
+				B20000000000000000000002 /* Shared */,
+			);
+			name = HealthDashboardWidgets;
+			packageProductDependencies = (
+			);
+			productName = HealthDashboardWidgets;
+			productReference = B10000000000000000000001 /* HealthDashboardWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -136,6 +212,9 @@
 					A50000000000000000000002 = {
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = A50000000000000000000001;
+					};
+					B50000000000000000000001 = {
+						CreatedOnToolsVersion = 27.1;
 					};
 				};
 			};
@@ -155,11 +234,19 @@
 			targets = (
 				A50000000000000000000001 /* HealthDashboard */,
 				A50000000000000000000002 /* HealthDashboardTests */,
+				B50000000000000000000001 /* HealthDashboardWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B70000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A70000000000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -177,6 +264,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A60000000000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -194,6 +288,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B90000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B50000000000000000000001 /* HealthDashboardWidgets */;
+			targetProxy = BA0000000000000000000001 /* PBXContainerItemProxy */;
+		};
 		A90000000000000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A50000000000000000000001 /* HealthDashboard */;
@@ -255,8 +354,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, resting heart rate, HRV and caffeine to explain how your nights and habits affect you. It stays on your phone.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Only used in the simulator, to add sample data for testing.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Health Dashboard saves what you log in the app: lattes and other drinks, water, period days and how you feel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -281,8 +380,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, resting heart rate, HRV and caffeine to explain how your nights and habits affect you. It stays on your phone.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Only used in the simulator, to add sample data for testing.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Health Dashboard saves what you log in the app: lattes and other drinks, water, period days and how you feel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -328,6 +427,56 @@
 			};
 			name = Release;
 		};
+		BB0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HealthDashboardWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Shows your recovery, cycle and streaks on your Home Screen.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves a latte when you tap the widget.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		BB0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HealthDashboardWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Shows your recovery, cycle and streaks on your Home Screen.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves a latte when you tap the widget.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -354,6 +503,15 @@
 			buildConfigurations = (
 				AB0000000000000000000005 /* Debug */,
 				AB0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB0000000000000000000001 /* Debug */,
+				BB0000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

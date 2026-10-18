@@ -1,10 +1,19 @@
 import Foundation
 
-/// One asleep sample from Health, with the time zone it was recorded in.
+/// One sleep sample from Health, with the time zone it was recorded in.
 struct SleepSample {
+    enum Stage { case asleep, core, deep, rem, awake }
+
     var start: Date
     var end: Date
     var timeZone: TimeZone = .current
+    var stage: Stage = .asleep
+}
+
+/// Minutes in each sleep stage for one night, from the Watch's stage tracking.
+struct SleepStages: Codable, Equatable {
+    var deep = 0, rem = 0, core = 0, awake = 0, wakeUps = 0
+    var hasStages: Bool { deep + rem + core > 0 }
 }
 
 struct Night: Codable, Equatable {
@@ -19,6 +28,8 @@ struct Night: Codable, Equatable {
     var asleepMinutes: Int
     /// Local calendar date she woke up on.
     var wakeDate: String
+    /// Stage breakdown, when the Watch recorded stages.
+    var stages: SleepStages? = nil
 
     var isWeekend: Bool { weekday >= 5 }
 }
@@ -36,7 +47,8 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
 
     // Merge overlapping or touching samples into continuous asleep spans.
     var spans: [Span] = []
-    for s in samples.sorted(by: { $0.start < $1.start }) {
+    let sorted = samples.sorted(by: { $0.start < $1.start })
+    for s in sorted where s.stage != .awake {
         if var last = spans.last, s.start <= last.end {
             if s.end > last.end {
                 last.end = s.end
@@ -74,13 +86,35 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
             bedtime: bed.minutesAfter6pm(evening),
             wake: wake.minutesAfter6pm(evening),
             asleepMinutes: Int((asleep / 60).rounded()),
-            wakeDate: wake.date
+            wakeDate: wake.date,
+            stages: stages(in: first.start...last.end, of: sorted)
         )
         // If two qualifying sleeps share an evening, keep the longer one.
         if let existing = byDate[evening], existing.asleepMinutes >= night.asleepMinutes { continue }
         byDate[evening] = night
     }
     return byDate.values.sorted { $0.date < $1.date }
+}
+
+/// Adds up the Watch's stage samples inside one night. Unspecified "asleep" samples (from the
+/// iPhone) don't carry a stage, so they're left out rather than double-counted.
+private func stages(in window: ClosedRange<Date>, of samples: [SleepSample]) -> SleepStages? {
+    var s = SleepStages()
+    var lastAwakeEnd: Date?
+    for sample in samples where sample.end > window.lowerBound && sample.start < window.upperBound {
+        let minutes = Int((min(sample.end, window.upperBound).timeIntervalSince(max(sample.start, window.lowerBound)) / 60).rounded())
+        switch sample.stage {
+        case .deep: s.deep += minutes
+        case .rem: s.rem += minutes
+        case .core: s.core += minutes
+        case .awake:
+            s.awake += minutes
+            if lastAwakeEnd.map({ sample.start.timeIntervalSince($0) > 60 }) ?? true { s.wakeUps += 1 }
+            lastAwakeEnd = sample.end
+        case .asleep: break
+        }
+    }
+    return s.hasStages ? s : nil
 }
 
 /// A wall-clock time where it was recorded, so a 1am bedtime stays 1am wherever she reads it.
@@ -117,5 +151,5 @@ func clockOfDay(_ minutes: Int) -> String {
 /// "7h 10m"
 func hoursMinutes(_ minutes: Double) -> String {
     let m = Int(minutes.rounded())
-    return "\(m / 60)h \(m % 60)m"
+    return m < 60 ? "\(m)m" : "\(m / 60)h \(m % 60)m"
 }

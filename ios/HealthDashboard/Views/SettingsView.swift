@@ -10,6 +10,42 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let profile = model.profile {
+                    Section {
+                        TextField("Name", text: Binding(get: { profile.name }, set: { model.profile?.name = $0 }))
+                        Picker("Cycle", selection: Binding(get: { profile.cycle }, set: { model.profile?.cycle = $0 })) {
+                            ForEach(CycleMode.allCases) { Text($0.title).tag($0) }
+                        }
+                        if profile.cycle == .hormonal {
+                            Picker("Birth control", selection: Binding(get: { profile.birthControl }, set: { model.profile?.birthControl = $0 })) {
+                                Text("Not set").tag(BirthControl?.none)
+                                ForEach(BirthControl.allCases) { Text($0.name).tag(Optional($0)) }
+                            }
+                        }
+                        if profile.cycle == .hormonal, profile.birthControl?.hasPlaceboWeek == true {
+                            DatePicker("Current pack started", selection: Binding(get: { profile.packStart ?? .now }, set: { model.profile?.packStart = $0 }), in: ...Date.now, displayedComponents: .date)
+                        }
+                        NavigationLink("Health conditions\(profile.conditions.isEmpty ? "" : " (\(profile.conditions.count))")") { ConditionsView() }
+                        DatePicker("Birthday", selection: Binding(get: { profile.birthday ?? Calendar.current.date(byAdding: .year, value: -20, to: .now)! }, set: { model.profile?.birthday = $0 }), in: ...Date.now, displayedComponents: .date)
+                        Picker("Water bottle", selection: Binding(get: { profile.bottleMl }, set: { model.profile?.bottleMl = $0 })) {
+                            ForEach(bottleSizes, id: \.ml) { Text($0.name).tag($0.ml) }
+                        }
+                        Toggle("Show calories", isOn: Binding(get: { profile.prefs.showCalories }, set: { model.profile?.prefs.showCalories = $0 }))
+                        Toggle("Body-working-harder alerts", isOn: Binding(get: { profile.prefs.sickAlerts }, set: { model.profile?.prefs.sickAlerts = $0 }))
+                        Toggle("Drinks tracking", isOn: Binding(get: { profile.prefs.drinksTracking }, set: { model.profile?.prefs.drinksTracking = $0 }))
+                        Toggle("Streaks", isOn: Binding(get: { profile.prefs.streaks }, set: { model.profile?.prefs.streaks = $0 }))
+                        Toggle("Dark Watch screens at night", isOn: Binding(get: { profile.prefs.darkWatchAtNight }, set: { model.profile?.prefs.darkWatchAtNight = $0 }))
+                        Button("Run the welcome setup again") {
+                            model.profile = nil
+                            dismiss()
+                        }
+                    } header: {
+                        Text("Your profile")
+                    } footer: {
+                        Text("Kept on your phone only.")
+                    }
+                }
+
                 Section {
                     SecureField("Paste the secret address", text: $link)
                         .textInputAutocapitalization(.never)

@@ -13,10 +13,23 @@ final class AppModel {
     private(set) var calendarState: CalendarState
     private(set) var events: [CalendarEvent] = []
 
+    /// Nil until the welcome flow is finished.
+    var profile: Profile? = ProfileStore.load() {
+        didSet { if !isDemo { ProfileStore.save(profile) } }
+    }
+
     private static let connectedKey = "healthConnected"
     private static let calendarAccount = "calendarICSURL"
 
     init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-resetProfile") {
+            ProfileStore.save(nil)
+            UserDefaults.standard.removeObject(forKey: Self.connectedKey)
+            Keychain.set(nil, for: Self.calendarAccount)
+            profile = nil
+        }
+        #endif
         healthState = !HealthReader.isAvailable ? .unavailable
             : UserDefaults.standard.bool(forKey: Self.connectedKey) ? .loading : .notConnected
         calendarState = Keychain.get(Self.calendarAccount) == nil ? .notConnected : .loading
@@ -26,9 +39,15 @@ final class AppModel {
             healthState = .ready
             events = DemoData.events()
             calendarState = .ready(checkedAt: .now)
+            if profile == nil { profile = DemoData.profile() }
         }
         #endif
     }
+
+    /// Set when saving a log to Health fails, shown on the Log screen.
+    var lastLogError: String?
+
+    var isDemoMode: Bool { isDemo }
 
     private var isDemo: Bool {
         #if DEBUG
@@ -40,7 +59,14 @@ final class AppModel {
 
     // MARK: Health
 
+    var isHealthConnected: Bool { UserDefaults.standard.bool(forKey: Self.connectedKey) }
+
+    /// Asks for Health access (Apple's sheet appears once) and reads the full history.
     func connectHealth() async {
+        if isDemo {
+            healthState = .ready
+            return
+        }
         do {
             try await HealthReader.requestAccess()
             UserDefaults.standard.set(true, forKey: Self.connectedKey)

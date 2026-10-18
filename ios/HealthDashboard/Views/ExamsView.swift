@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ExamsView: View {
     @Environment(AppModel.self) private var model
-    @Binding var showSettings: Bool
+    @State private var showSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -32,9 +32,9 @@ struct ExamsView: View {
                 Note("Calendar checked at \(checkedAt.formatted(date: .omitted, time: .shortened)). Events with exam, midterm, final or quiz in the title count.")
             }
         }
-        .page()
-        .toolbar(.hidden, for: .navigationBar)
+        .detailPage()
         .refreshable { await model.refreshCalendar() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
     }
 
     private var upcoming: some View {
