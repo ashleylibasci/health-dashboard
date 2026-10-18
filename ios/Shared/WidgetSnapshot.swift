@@ -19,9 +19,42 @@ struct WidgetSnapshot: Codable, Equatable {
     var caffeineMg: Double = 0
     var caffeineDay: String = ""
     var updated = Date.distantPast
+    // For the Watch screens.
+    var restingHr: Int?
+    var hrv: Int?
+    var hrUp = false
+    var hrvDown = false
+    var typicalLength: Int?
+    var periodLength: Int?
+    var ovulationDay: Int?
+    var daysToPeriod: Int?
+    var tempDelta: Double?
+    var caffeineAtBed: Double?
+    var examNote: String?
+    var sick = false
+    var sickTonight: String?
+    var darkAtNight = true
+    var bedtimeMinutes: Int?
 
     static let appGroup = "group.com.ashleylibasci.healthdashboard"
     private static let key = "widgetSnapshot.v1"
+
+    /// Fields added later fall back to defaults, so an older snapshot still decodes.
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func v<T: Decodable>(_ k: CodingKeys, _ d: T) -> T { (try? c.decodeIfPresent(T.self, forKey: k)) ?? d }
+        name = v(.name, ""); recovery = v(.recovery, nil); recoveryLabel = v(.recoveryLabel, ""); headline = v(.headline, "Open the app to get started")
+        cycleDay = v(.cycleDay, nil); phase = v(.phase, nil); sleepMinutes = v(.sleepMinutes, nil); bedBy = v(.bedBy, nil); energy = v(.energy, nil)
+        streakNights = v(.streakNights, 0); caffeineMg = v(.caffeineMg, 0); caffeineDay = v(.caffeineDay, ""); updated = v(.updated, .distantPast)
+        restingHr = v(.restingHr, nil); hrv = v(.hrv, nil); hrUp = v(.hrUp, false); hrvDown = v(.hrvDown, false)
+        typicalLength = v(.typicalLength, nil); periodLength = v(.periodLength, nil); ovulationDay = v(.ovulationDay, nil); daysToPeriod = v(.daysToPeriod, nil)
+        tempDelta = v(.tempDelta, nil); caffeineAtBed = v(.caffeineAtBed, nil); examNote = v(.examNote, nil); sick = v(.sick, false)
+        sickTonight = v(.sickTonight, nil); darkAtNight = v(.darkAtNight, true); bedtimeMinutes = v(.bedtimeMinutes, nil)
+    }
+
+    var encoded: Data? { try? JSONEncoder().encode(self) }
+    static func decode(_ data: Data) -> WidgetSnapshot? { try? JSONDecoder().decode(WidgetSnapshot.self, from: data) }
 
     static func load() -> WidgetSnapshot {
         guard let data = UserDefaults(suiteName: appGroup)?.data(forKey: key),

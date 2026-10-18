@@ -19,8 +19,13 @@ struct SnapshotProvider: TimelineProvider {
 }
 
 extension WidgetSnapshot {
-    static let sample = WidgetSnapshot(name: "Ashley", recovery: 72, recoveryLabel: "Moderate", headline: "Go easy today", cycleDay: 22, phase: "Luteal",
-                                       sleepMinutes: 430, bedBy: "12:15am", energy: 58, streakNights: 6, caffeineMg: 130, caffeineDay: "", updated: .now)
+    static var sample: WidgetSnapshot {
+        var s = WidgetSnapshot()
+        s.name = "Ashley"; s.recovery = 72; s.recoveryLabel = "Moderate"; s.headline = "Go easy today"
+        s.cycleDay = 22; s.phase = "Luteal"; s.sleepMinutes = 430; s.bedBy = "12:15am"; s.energy = 58; s.streakNights = 6
+        s.updated = .now
+        return s
+    }
 }
 
 private func hm(_ m: Int) -> String { "\(m / 60)h \(m % 60)m" }

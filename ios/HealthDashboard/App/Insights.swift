@@ -85,7 +85,28 @@ extension AppModel {
         snap.caffeineMg = caffeineToday.reduce(0) { $0 + $1.value }
         snap.caffeineDay = today
         snap.updated = .now
+        snap.restingHr = health.restingHr[today].map { Int($0.rounded()) }
+        snap.hrv = health.hrv[today].map { Int($0.rounded()) }
+        snap.hrUp = (r?.restingHrChange ?? 0) >= 3
+        snap.hrvDown = (r?.hrvChange ?? 0) <= -0.1
+        if let c = cycle {
+            snap.typicalLength = c.typicalLength
+            snap.periodLength = c.periodLength
+            snap.ovulationDay = c.ovulationDay ?? (c.typicalLength - 14)
+            snap.daysToPeriod = c.nextStart.map { Day.between(today, $0) }
+            snap.tempDelta = temperatureDeviation(health.wristTemp, days: 1).last?.value
+        }
+        snap.caffeineAtBed = caffeineLeft(health.caffeineLogs, at: tonightBedtime)
+        if let exam = upcomingExams.first(where: { (1...3).contains(Day.between(today, $0.date)) }) {
+            let d = Day.between(today, exam.date)
+            snap.examNote = "\(exam.title.split(separator: " ").last.map(String.init) ?? "Exam") \(d == 1 ? "tomorrow" : "in \(d) days"). Tonight counts."
+        }
+        snap.sick = sick != nil
+        snap.sickTonight = sick != nil ? "Tonight: bed by \(clockTime(Double(max(240, bedtimeTarget - 45)))), extra water." : nil
+        snap.darkAtNight = p.prefs.darkWatchAtNight
+        snap.bedtimeMinutes = bedtimeTarget
         snap.save()
+        WatchSync.shared.send(snap)
     }
 
     // MARK: Logging to Apple Health

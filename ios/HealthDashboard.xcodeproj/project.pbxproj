@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CD0000000000000000000001 /* HealthDashboardWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* HealthDashboardWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DD0000000000000000000001 /* HealthDashboardWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* HealthDashboardWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BD0000000000000000000001 /* HealthDashboardWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* HealthDashboardWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -25,6 +27,20 @@
 			remoteGlobalIDString = B50000000000000000000001;
 			remoteInfo = HealthDashboardWidgets;
 		};
+		CA0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C50000000000000000000001;
+			remoteInfo = HealthDashboardWatch;
+		};
+		DA0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D50000000000000000000001;
+			remoteInfo = HealthDashboardWatchWidgets;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,6 +55,28 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC0000000000000000000001 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				CD0000000000000000000001 /* HealthDashboardWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DC0000000000000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DD0000000000000000000001 /* HealthDashboardWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +86,10 @@
 		B10000000000000000000001 /* HealthDashboardWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HealthDashboardWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000002 /* HealthDashboardWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthDashboardWidgets.entitlements; sourceTree = "<group>"; };
 		B10000000000000000000003 /* HealthDashboardWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "HealthDashboardWidgets-Info.plist"; sourceTree = "<group>"; };
+		C10000000000000000000001 /* HealthDashboardWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthDashboardWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C10000000000000000000002 /* HealthDashboardWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthDashboardWatch.entitlements; sourceTree = "<group>"; };
+		D10000000000000000000001 /* HealthDashboardWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HealthDashboardWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D10000000000000000000002 /* HealthDashboardWatchWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "HealthDashboardWatchWidgets-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -71,9 +113,33 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		C20000000000000000000001 /* HealthDashboardWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = HealthDashboardWatch;
+			sourceTree = "<group>";
+		};
+		D20000000000000000000001 /* HealthDashboardWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = HealthDashboardWatchWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B30000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -108,6 +174,10 @@
 				B20000000000000000000002 /* Shared */,
 				B20000000000000000000001 /* HealthDashboardWidgets */,
 				A20000000000000000000002 /* HealthDashboardTests */,
+				C10000000000000000000002 /* HealthDashboardWatch.entitlements */,
+				D10000000000000000000002 /* HealthDashboardWatchWidgets-Info.plist */,
+				C20000000000000000000001 /* HealthDashboardWatch */,
+				D20000000000000000000001 /* HealthDashboardWatchWidgets */,
 				A40000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -118,6 +188,8 @@
 				A10000000000000000000001 /* HealthDashboard.app */,
 				A10000000000000000000002 /* HealthDashboardTests.xctest */,
 				B10000000000000000000001 /* HealthDashboardWidgets.appex */,
+				C10000000000000000000001 /* HealthDashboardWatch.app */,
+				D10000000000000000000001 /* HealthDashboardWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -133,11 +205,13 @@
 				A30000000000000000000001 /* Frameworks */,
 				A70000000000000000000001 /* Resources */,
 				BC0000000000000000000001 /* Embed Foundation Extensions */,
+				CC0000000000000000000001 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				B90000000000000000000001 /* PBXTargetDependency */,
+				C90000000000000000000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A20000000000000000000001 /* HealthDashboard */,
@@ -196,6 +270,54 @@
 			productReference = B10000000000000000000001 /* HealthDashboardWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		C50000000000000000000001 /* HealthDashboardWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWatch" */;
+			buildPhases = (
+				C60000000000000000000001 /* Sources */,
+				C30000000000000000000001 /* Frameworks */,
+				C70000000000000000000001 /* Resources */,
+				DC0000000000000000000001 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D90000000000000000000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C20000000000000000000001 /* HealthDashboardWatch */,
+				B20000000000000000000002 /* Shared */,
+			);
+			name = HealthDashboardWatch;
+			packageProductDependencies = (
+			);
+			productName = HealthDashboardWatch;
+			productReference = C10000000000000000000001 /* HealthDashboardWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D50000000000000000000001 /* HealthDashboardWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWatchWidgets" */;
+			buildPhases = (
+				D60000000000000000000001 /* Sources */,
+				D30000000000000000000001 /* Frameworks */,
+				D70000000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D20000000000000000000001 /* HealthDashboardWatchWidgets */,
+				B20000000000000000000002 /* Shared */,
+			);
+			name = HealthDashboardWatchWidgets;
+			packageProductDependencies = (
+			);
+			productName = HealthDashboardWatchWidgets;
+			productReference = D10000000000000000000001 /* HealthDashboardWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -214,6 +336,12 @@
 						TestTargetID = A50000000000000000000001;
 					};
 					B50000000000000000000001 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					C50000000000000000000001 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					D50000000000000000000001 = {
 						CreatedOnToolsVersion = 27.1;
 					};
 				};
@@ -235,11 +363,27 @@
 				A50000000000000000000001 /* HealthDashboard */,
 				A50000000000000000000002 /* HealthDashboardTests */,
 				B50000000000000000000001 /* HealthDashboardWidgets */,
+				C50000000000000000000001 /* HealthDashboardWatch */,
+				D50000000000000000000001 /* HealthDashboardWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C70000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D70000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B70000000000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -264,6 +408,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B60000000000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -288,6 +446,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		C90000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C50000000000000000000001 /* HealthDashboardWatch */;
+			targetProxy = CA0000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		D90000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D50000000000000000000001 /* HealthDashboardWatchWidgets */;
+			targetProxy = DA0000000000000000000001 /* PBXContainerItemProxy */;
+		};
 		B90000000000000000000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B50000000000000000000001 /* HealthDashboardWidgets */;
@@ -477,6 +645,114 @@
 			};
 			name = Release;
 		};
+		CB0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads today’s caffeine so the Watch can show it.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water and drinks you log on your Watch.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		CB0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads today’s caffeine so the Watch can show it.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water and drinks you log on your Watch.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		DB0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HealthDashboardWatchWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves a latte when you tap the complication.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		DB0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "HealthDashboardWatchWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves a latte when you tap the complication.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ashleylibasci.healthdashboard.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -512,6 +788,24 @@
 			buildConfigurations = (
 				BB0000000000000000000001 /* Debug */,
 				BB0000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CB0000000000000000000001 /* Debug */,
+				CB0000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D80000000000000000000001 /* Build configuration list for PBXNativeTarget "HealthDashboardWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DB0000000000000000000001 /* Debug */,
+				DB0000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
