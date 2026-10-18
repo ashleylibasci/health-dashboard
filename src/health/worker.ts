@@ -1,9 +1,9 @@
 /// <reference lib="webworker" />
 import { readHealthExport, type ReadProgress } from './readExport.ts'
-import { buildNights } from '../analysis/sleep.ts'
+import { buildNights, type Night } from '../analysis/sleep.ts'
 import { dailyAverage } from '../analysis/stats.ts'
 import { weekendShift, type WeekendShift } from '../analysis/weekendShift.ts'
-import { lateNightCost, type LateNightCost } from '../analysis/lateNight.ts'
+import { lateNightCost, LATE_BEDTIME, type LateNightCost } from '../analysis/lateNight.ts'
 
 export interface Summary {
   nights: number
@@ -13,6 +13,10 @@ export interface Summary {
   lastCaffeine?: string
   weekendShift?: WeekendShift
   lateNightCost?: LateNightCost
+  /** The most recent 7 nights, oldest first. */
+  lastWeek: Night[]
+  /** The 3 most recent nights asleep after 2am, newest first. */
+  recentLate: Night[]
 }
 
 export type WorkerMessage =
@@ -53,6 +57,8 @@ self.onmessage = async (e: MessageEvent<File>) => {
         lastCaffeine: caffeine[caffeine.length - 1],
         weekendShift: weekendShift(nights),
         lateNightCost: lateNightCost(nights, restingHr, hrv),
+        lastWeek: nights.slice(-7),
+        recentLate: nights.filter((n) => n.bedtime >= LATE_BEDTIME).slice(-3).reverse(),
       },
     })
   } catch (err) {
