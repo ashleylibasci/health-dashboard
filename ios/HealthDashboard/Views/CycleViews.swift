@@ -21,12 +21,12 @@ struct CycleCalendarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             AdaptiveStack(alignment: .firstTextBaseline) {
-                Text(Date.now.formatted(.dateTime.month(.wide))).serifTitleFont(34).foregroundStyle(Color.ink)
+                Text("Your cycle").serifTitleFont(34).foregroundStyle(Color.ink)
                 Spacer(minLength: 0)
-                if let c = model.cycle { Text("Day \(c.day) · \(c.phase.rawValue)").scaledFont(15).foregroundStyle(Color.muted) }
+                if let c = model.cycle { Text(c.phaseKnown ? "Day \(c.day) · \(c.phase.rawValue)" : "Day \(c.day)").scaledFont(15).foregroundStyle(Color.muted) }
             }
             if let c = model.cycle {
-                MonthGrid(cycle: c, flow: model.health.flow)
+                PeriodCalendar(cycle: c)
                 FlowLayout {
                     ForEach(CyclePhase.allCases, id: \.self) { p in
                         HStack(spacing: 6) { Circle().fill(p.color).frame(width: 12, height: 12); Text(p.rawValue).scaledFont(13, .bold) }
@@ -35,8 +35,11 @@ struct CycleCalendarView: View {
                 }
                 Card(fill: .peach) {
                     CardLabel("Next period", color: .peachInk)
-                    if let next = c.nextStart {
-                        Text("\(shortDay(Day.shift(next, -1))) – \(shortDay(Day.shift(next, 3)))").numberFont(28).foregroundStyle(Color.ink)
+                    if let late = c.daysLate {
+                        Text("\(late) day\(late == 1 ? "" : "s") late").numberFont(28).foregroundStyle(Color.ink)
+                        Note("Your period was expected around \(shortDay(c.nextStart!)). A few days either way is common, especially with stress, travel or illness. If you started, tap the day on the calendar to log it.")
+                    } else if let next = c.nextStart {
+                        Text("\(shortDay(next)) – \(shortDay(Day.shift(next, c.periodLength - 1)))").numberFont(28).foregroundStyle(Color.ink)
                     } else {
                         Text("Not predicted").numberFont(24).foregroundStyle(Color.ink)
                     }
@@ -54,7 +57,8 @@ struct CycleCalendarView: View {
                     LinkCard(icon: "chart.bar.fill", title: "How your cycle affects you", detail: "Sleep, heart rate and HRV in each phase")
                 }.buttonStyle(.plain)
             } else {
-                Card { Note("Log your period in the Log tab (or Apple’s Health app) and the calendar fills in from there.") }
+                PeriodCalendar(cycle: nil)
+                Note("Tap a day to log your period. Predictions start after your first period is logged.")
             }
             Note("Not birth control. Predictions are estimates from your own logs and temperature.")
         }
@@ -64,49 +68,132 @@ struct CycleCalendarView: View {
     private func shortDay(_ d: String) -> String { String(Day.short(d).split(separator: ",").last!).trimmingCharacters(in: .whitespaces) }
 }
 
-/// This month's calendar, colored by cycle phase, with logged flow and the expected period.
-struct MonthGrid: View {
-    var cycle: CycleStatus
-    var flow: [String: Int]
+/// A month calendar you can page through and tap: logged bleeding (darker = heavier), spotting as a
+/// dot, a small mark for symptoms, and, depending on the setup, cycle phases and the expected period
+/// (natural cycles) or the break week (pill, ring or patch). Tapping a day opens the day sheet.
+struct PeriodCalendar: View {
+    @Environment(AppModel.self) private var model
+    var cycle: CycleStatus?
+    var breakWeek: Set<String> = []
+    @State private var monthOffset = 0
+    @State private var editingDay: String?
 
     var body: some View {
         let cal = Calendar.current
-        let today = Day.key(.now)
-        let first = cal.date(from: cal.dateComponents([.year, .month], from: .now))!
-        let days = cal.range(of: .day, in: .month, for: .now)!.count
+        let today = model.today
+        let thisMonth = cal.date(from: cal.dateComponents([.year, .month], from: .now))!
+        let first = cal.date(byAdding: .month, value: monthOffset, to: thisMonth)!
+        let days = cal.range(of: .day, in: .month, for: first)!.count
         let lead = cal.component(.weekday, from: first) - 1
-        VStack(spacing: 8) {
-            HStack { ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { Text($0.element).lineLimit(1).minimumScaleFactor(0.5).frame(maxWidth: .infinity) } }
-                .scaledFont(12, .bold).foregroundStyle(Color.muted)
+        VStack(spacing: 10) {
+            HStack {
+                Button { monthOffset -= 1 } label: { Image(systemName: "chevron.left").font(.headline).frame(width: 44, height: 44) }
+                    .accessibilityLabel("Previous month")
+                Spacer()
+                Text(first.formatted(.dateTime.month(.wide).year())).font(.headline).foregroundStyle(Color.ink)
+                Spacer()
+                if monthOffset != 0 {
+                    Button("Today") { monthOffset = 0 }.font(.subheadline.weight(.semibold))
+                }
+                Button { monthOffset += 1 } label: { Image(systemName: "chevron.right").font(.headline).frame(width: 44, height: 44) }
+                    .disabled(monthOffset >= 3)
+                    .accessibilityLabel("Next month")
+            }
+            .foregroundStyle(Color.mainText)
+            HStack { ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { Text($0.element).frame(maxWidth: .infinity) } }
+                .font(.caption.weight(.bold)).foregroundStyle(Color.muted)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
                 ForEach(0..<(lead + days), id: \.self) { i in
                     if i < lead {
-                        Color.clear.frame(height: 40)
+                        Color.clear.frame(height: 44)
                     } else {
-                        let key = Day.key(cal.date(byAdding: .day, value: i - lead, to: first)!)
-                        cell(key, today: today)
+                        cell(Day.key(cal.date(byAdding: .day, value: i - lead, to: first)!), today: today)
                     }
                 }
             }
+            .gesture(DragGesture(minimumDistance: 30).onEnded { v in
+                if v.translation.width < -40, monthOffset < 3 { monthOffset += 1 }
+                if v.translation.width > 40 { monthOffset -= 1 }
+            })
+            legend
         }
         .padding(16)
         .background(Color.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .sheet(item: Binding(get: { editingDay.map { IdentifiedDay(day: $0) } }, set: { editingDay = $0?.day })) { d in
+            DayLogSheet(day: d.day)
+        }
     }
 
     @ViewBuilder private func cell(_ key: String, today: String) -> some View {
-        let day = Int(key.suffix(2))!
-        let cycleDay = Day.between(cycle.lastStart, key) + 1
-        let expected = cycle.nextStart.map { (0..<cycle.periodLength).contains(Day.between($0, key)) } ?? false
-        let logged = (flow[key] ?? 0) > 0
+        let log = model.dayLog(key)
+        let level = log.flow ?? 0
         let isToday = key == today
-        let phase: CyclePhase? = cycleDay >= 1 && cycleDay <= cycle.typicalLength ? cycle.phase(on: cycleDay) : nil
-        Text("\(day)")
-            .scaledFont(15, .bold).lineLimit(1).minimumScaleFactor(0.5).padding(.horizontal, 2)
-            .foregroundStyle(isToday ? Color.onSolid : expected && !logged ? Color.peachInk : phase == .ovulation ? .white : Color.ink)
-            .frame(maxWidth: .infinity, minHeight: 40)
-            .background(RoundedRectangle(cornerRadius: 14).fill(isToday ? Color.solid : logged ? Color.rose : expected ? Color.surface : phase.map { $0 == .ovulation ? Color(hex: 0x5B6BE8) : $0 == .luteal ? Color.periwinkle : $0 == .period ? Color.rose : Color.blush } ?? Color.track))
-            .overlay(expected && !logged ? RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) : nil)
-            .accessibilityLabel("\(day)\(logged ? ", period logged" : expected ? ", expected period" : phase.map { ", \($0.rawValue)" } ?? "")")
+        let future = key > today
+        let expected = isExpected(key) && level < 2
+        let inBreak = breakWeek.contains(key) && level < 2
+        let phase = phase(key)
+        let fill: Color = isToday ? Color.solid
+            : level >= 2 ? Color(hex: 0xF07A6B).opacity(level == 4 ? 0.85 : level == 3 ? 0.6 : 0.38)
+            : phase.map { $0 == .ovulation ? Color.periwinkle : $0 == .period ? Color.rose : Color.track } ?? Color.track
+        Button { if !future { editingDay = key } } label: {
+            VStack(spacing: 1) {
+                Text("\(Int(key.suffix(2))!)").font(.subheadline.weight(.bold))
+                HStack(spacing: 2) {
+                    if level == 1 { Circle().fill(Color(hex: 0xF07A6B)).frame(width: 5, height: 5) }
+                    if !log.symptoms.isEmpty { Circle().fill(Color.mainText).frame(width: 5, height: 5) }
+                }
+                .frame(height: 5)
+            }
+            .foregroundStyle(isToday ? Color.onSolid : (expected || inBreak) ? Color.peachInk : future ? Color.muted : Color.ink)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(RoundedRectangle(cornerRadius: 14).fill(fill))
+            .overlay((expected || inBreak) ? RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) : nil)
+        }
+        .buttonStyle(.plain)
+        .disabled(future)
+        .accessibilityLabel(cellLabel(key, level: level, symptoms: log.symptoms, expected: expected, inBreak: inBreak))
+        .accessibilityHint(future ? "" : "Opens this day to log or edit")
+    }
+
+    private var legend: some View {
+        FlowLayout(spacing: 10) {
+            swatch(Color(hex: 0xF07A6B).opacity(0.6), "Period")
+            HStack(spacing: 4) { Circle().fill(Color(hex: 0xF07A6B)).frame(width: 6, height: 6); Text("Spotting") }
+            HStack(spacing: 4) { Circle().fill(Color.mainText).frame(width: 6, height: 6); Text("Symptoms") }
+            if cycle?.nextStart != nil { swatch(Color.surface, "Expected", dashed: true) }
+            if !breakWeek.isEmpty { swatch(Color.surface, "Break week", dashed: true) }
+            if cycle?.phaseKnown == true { swatch(Color.periwinkle, "Ovulation") }
+        }
+        .font(.caption).foregroundStyle(Color.muted)
+    }
+
+    private func swatch(_ fill: Color, _ text: String, dashed: Bool = false) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 4).fill(fill).frame(width: 14, height: 14)
+                .overlay(dashed ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2])) : nil)
+            Text(text)
+        }
+    }
+
+    private func isExpected(_ key: String) -> Bool {
+        guard let c = cycle, let next = c.nextStart, c.daysLate == nil else { return false }
+        return (0..<c.periodLength).contains(Day.between(next, key))
+    }
+
+    private func phase(_ key: String) -> CyclePhase? {
+        guard let c = cycle, c.phaseKnown, model.profile?.cycle != .irregular else { return nil }
+        let d = Day.between(c.lastStart, key) + 1
+        return d >= 1 && d <= c.typicalLength ? c.phase(on: d) : nil
+    }
+
+    private func cellLabel(_ key: String, level: Int, symptoms: Set<Symptom>, expected: Bool, inBreak: Bool) -> String {
+        var parts = [Day.short(key)]
+        if level >= 2 { parts.append(["", "", "light period", "medium period", "heavy period"][level]) }
+        if level == 1 { parts.append("spotting") }
+        if !symptoms.isEmpty { parts.append(symptoms.map(\.rawValue).sorted().joined(separator: ", ")) }
+        if expected { parts.append("period expected") }
+        if inBreak { parts.append("break week") }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -167,6 +254,7 @@ struct PhasesView: View {
 
 struct IrregularCycleView: View {
     @Environment(AppModel.self) private var model
+    @State private var loggingDay: String?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -202,7 +290,7 @@ struct IrregularCycleView: View {
                 Text("If your wrist temperature rises and stays up, that’s the pattern that usually follows ovulation. The app points it out after it happens, never as a prediction.").scaledFont(15).foregroundStyle(Color.ink)
             }
             AdaptiveStack(spacing: 10) {
-                PrimaryButton(title: "Period started") { Task { await model.logFlow(3, startsPeriod: true) } }
+                PrimaryButton(title: "Log my period") { loggingDay = model.today }
                 if model.profile?.conditions.contains(.pcos) == true {
                     NavigationLink { PCOSView() } label: {
                         Text("About PCOS").scaledFont(16, .bold).foregroundStyle(Color.ink)
@@ -212,6 +300,7 @@ struct IrregularCycleView: View {
             }
         }
         .detailPage()
+        .sheet(item: Binding(get: { loggingDay.map { IdentifiedDay(day: $0) } }, set: { loggingDay = $0?.day })) { d in DayLogSheet(day: d.day) }
     }
 }
 
@@ -260,10 +349,12 @@ struct PillCycleView: View {
                     }
                 }
             }
-            BleedCalendar(flow: model.health.flow, breakWeek: model.pack.map { p in
+            CardLabel("Bleeding and symptoms", color: .muted)
+            PeriodCalendar(cycle: nil, breakWeek: Set(model.pack.map { p in
                 let packStart = Day.shift(model.today, -(p.day - 1))
                 return (21...27).map { Day.shift(packStart, $0) }
-            } ?? [])
+            } ?? []))
+            Note("Tap any day to log bleeding, spotting or symptoms. On the pill, ring or patch, the break-week bleed is a withdrawal bleed, not a true period, and spotting in the first months is common.")
             if method?.ovulation == .stops || method?.ovulation == .sometimes {
                 Card(fill: .track) {
                     CardLabel("Doesn’t apply to you*", color: .muted)
@@ -442,86 +533,5 @@ struct PCOSView: View {
             Note("General information, not medical advice. The app can’t diagnose PCOS or any condition.")
         }
         .detailPage()
-    }
-}
-
-/// Bleeding on birth control: this month's calendar with logged bleeding and spotting, the
-/// expected break-week bleed for pill/ring/patch packs, quick logging, and recent bleeds.
-struct BleedCalendar: View {
-    @Environment(AppModel.self) private var model
-    var flow: [String: Int]
-    /// Dates of this pack's break week, when a withdrawal bleed is expected.
-    var breakWeek: [String]
-    @State private var loggedToday: Int?
-
-    var body: some View {
-        let cal = Calendar.current
-        let today = Day.key(.now)
-        let first = cal.date(from: cal.dateComponents([.year, .month], from: .now))!
-        let days = cal.range(of: .day, in: .month, for: .now)!.count
-        let lead = cal.component(.weekday, from: first) - 1
-        let expected = Set(breakWeek)
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                CardLabel("Bleeding · \(Date.now.formatted(.dateTime.month(.wide)))", color: .muted)
-                Spacer()
-            }
-            HStack { ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { Text($0.element).frame(maxWidth: .infinity) } }
-                .font(.caption.weight(.bold)).foregroundStyle(Color.muted)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-                ForEach(0..<(lead + days), id: \.self) { i in
-                    if i < lead {
-                        Color.clear.frame(height: 40)
-                    } else {
-                        let key = Day.key(cal.date(byAdding: .day, value: i - lead, to: first)!)
-                        let level = flow[key] ?? 0
-                        let isToday = key == today
-                        let isExpected = expected.contains(key) && level == 0
-                        Text("\(Int(key.suffix(2))!)")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(isToday ? Color.onSolid : isExpected ? Color.peachInk : Color.ink)
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(isToday ? Color.solid : level >= 3 ? Color(hex: 0xF07A6B).opacity(0.55) : level > 0 ? Color.rose : isExpected ? Color.surface : Color.track))
-                            .overlay(isExpected ? RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) : nil)
-                            .accessibilityLabel("\(Int(key.suffix(2))!)\(level >= 3 ? ", bleeding" : level > 0 ? ", light bleeding or spotting" : isExpected ? ", break week" : "")")
-                    }
-                }
-            }
-            HStack(spacing: 12) {
-                legend(Color(hex: 0xF07A6B).opacity(0.55), "Bleeding")
-                legend(Color.rose, "Light or spotting")
-                if !breakWeek.isEmpty { legend(Color.surface, "Break week", dashed: true) }
-            }
-            .font(.caption).foregroundStyle(Color.muted)
-
-            Text("Bleeding today?").font(.subheadline.weight(.bold)).foregroundStyle(Color.ink)
-            HStack(spacing: 8) {
-                ForEach(Array(zip([1, 2, 3, 4], ["Spotting", "Light", "Medium", "Heavy"])), id: \.0) { level, name in
-                    Chip(text: name, selected: loggedToday == level || (loggedToday == nil && flow[today] == level), selectedFill: .rose) {
-                        loggedToday = level
-                        let yesterday = Day.shift(today, -1)
-                        Task { await model.logFlow(level == 1 ? 2 : level, startsPeriod: (flow[yesterday] ?? 0) == 0) }
-                    }
-                }
-            }
-            let recent = Array(periods(flow).suffix(3).reversed())
-            if !recent.isEmpty {
-                Text("Recent bleeds").font(.subheadline.weight(.bold)).foregroundStyle(Color.ink).padding(.top, 4)
-                ForEach(recent, id: \.start) { p in
-                    ValueRow(label: Day.short(p.start), value: "\(p.days) day\(p.days == 1 ? "" : "s")")
-                }
-            }
-            Note("Saved to Apple Health. On the pill, ring or patch, the break-week bleed is a withdrawal bleed, not a true period; spotting in the first months is common.")
-        }
-        .padding(16)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-    }
-
-    private func legend(_ fill: Color, _ text: String, dashed: Bool = false) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 4).fill(fill).frame(width: 14, height: 14)
-                .overlay(dashed ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2])) : nil)
-            Text(text)
-        }
     }
 }

@@ -168,7 +168,8 @@ struct StageBars: View {
     private func row(_ name: String, _ minutes: Int, _ color: Color, _ total: Double) -> some View {
         AdaptiveStack(spacing: 8) {
             Text(name).scaledFont(12, .bold).foregroundStyle(Color.muted).frame(width: typeSize.isAccessibilitySize ? nil : 48, alignment: .leading)
-            Meter(value: Double(minutes) / total * 1.6, color: color, height: 20)
+            Meter(value: Double(minutes) / total, color: color, height: 20)
+            Text("\(Int((Double(minutes) / total * 100).rounded()))%").font(.caption.weight(.semibold)).foregroundStyle(Color.muted).frame(minWidth: 36, alignment: .trailing)
         }
         .accessibilityElement().accessibilityLabel("\(name) \(minutes) minutes")
     }

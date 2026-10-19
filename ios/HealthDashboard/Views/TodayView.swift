@@ -34,7 +34,7 @@ struct TodayView: View {
         .toolbar(.hidden, for: .navigationBar)
         .refreshable {
             await model.refreshHealth()
-            await model.refreshCalendar()
+            await model.refreshCalendar(force: true)
         }
     }
 
@@ -158,12 +158,17 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     AdaptiveStack(spacing: 4) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Circle().fill(c.phase.color).frame(width: 12, height: 12)
-                            Text(model.profile?.cycle == .irregular ? "Day \(c.day) since your last period" : "Cycle day \(c.day) · \(c.phase.rawValue)")
+                            Circle().fill(c.phaseKnown ? c.phase.color : Color.lavenderStrong).frame(width: 12, height: 12)
+                            Text(model.profile?.cycle == .irregular || !c.phaseKnown ? "Day \(c.day) since your last period" : "Cycle day \(c.day) · \(c.phase.rawValue)")
                                 .scaledFont(15, .bold).foregroundStyle(Color.ink)
                         }
                         Spacer(minLength: 0)
-                        if let next = c.nextStart { Text("Period ~\(Day.short(next).split(separator: ",").last!.trimmingCharacters(in: .whitespaces))").scaledFont(13).foregroundStyle(Color.muted) }
+                        if let late = c.daysLate {
+                            Text("\(late) day\(late == 1 ? "" : "s") late").scaledFont(13, .bold).foregroundStyle(Color.peachInk)
+                        } else if let next = c.nextStart {
+                            let d = Day.between(model.today, next)
+                            Text(d == 0 ? "Period expected today" : "Period in \(d) day\(d == 1 ? "" : "s")").scaledFont(13).foregroundStyle(Color.muted)
+                        }
                     }
                     if model.profile?.cycle == .natural {
                         HStack(spacing: 2) {
@@ -197,7 +202,8 @@ struct TodayView: View {
     }
 
     private func cycleNote(_ c: CycleStatus) -> String {
-        switch c.phase {
+        if !c.phaseKnown { return "Longer than your usual cycle, so the app isn’t guessing a phase. Log your period when it starts." }
+        return switch c.phase {
         case .luteal: "Part of today’s lower HRV and warmer nights is this phase, so recovery already allows for it."
         case .period: "You often sleep a little more now. Cramps can dip recovery on days 1–2."
         case .follicular: "Usually your best-recovered stretch. A good week for harder workouts."
@@ -208,7 +214,7 @@ struct TodayView: View {
     private var tiles: some View {
         AdaptiveGrid(columns: 2, spacing: 12) {
             NavigationLink { SleepView() } label: {
-                SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText)
+                SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText, emptyHint: "Needs a week of nights in a row")
             }
             NavigationLink { CaffeineView() } label: {
                 let mg = model.caffeineToday.reduce(0) { $0 + $1.value }
@@ -217,10 +223,10 @@ struct TodayView: View {
                           fill: mg > dailyCaffeineGuide ? .peach : .butter, ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk)
             }
             NavigationLink { FitnessView() } label: {
-                SmallTile(icon: "bolt.fill", label: "Fitness age", value: model.fitness.map { "\($0.fitnessAge)" } ?? "–", fill: .mint, ink: .mintInk)
+                SmallTile(icon: "bolt.fill", label: "Fitness age", value: model.fitness.map { "\($0.fitnessAge)" } ?? "–", fill: .mint, ink: .mintInk, emptyHint: "Needs a 20-min outdoor walk or run")
             }
             NavigationLink { StressView() } label: {
-                SmallTile(icon: "face.smiling", label: "Stress this week", value: model.stress?.weekLabel ?? "–", fill: .peach, ink: .peachInk)
+                SmallTile(icon: "face.smiling", label: "Stress this week", value: model.stress?.weekLabel ?? "–", fill: .peach, ink: .peachInk, emptyHint: "Needs a few days of Watch wear")
             }
         }
         .buttonStyle(.plain)
@@ -268,13 +274,19 @@ struct SmallTile: View {
     var value: String
     var fill: Color
     var ink: Color
+    /// Shown instead of the number when there isn't enough data yet.
+    var emptyHint: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: icon).scaledFont(18).foregroundStyle(ink).limitedTextGrowth()
                 .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(label).scaledFont(13, .semibold).foregroundStyle(Color.muted)
-            Text(value).numberFont(26).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
+            if value == "–", let emptyHint {
+                Text(emptyHint).scaledFont(13).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(value).numberFont(26).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

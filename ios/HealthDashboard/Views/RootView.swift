@@ -45,7 +45,7 @@ struct RootView: View {
                 model.publishWidgetSnapshot()
             }
         }
-        .onReceive(calendarTimer) { _ in Task { await model.refreshCalendar() } }
+        .onReceive(calendarTimer) { _ in Task { await model.refreshCalendar(force: true) } }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
 

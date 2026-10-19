@@ -33,7 +33,7 @@ enum DemoData {
             guard let start = periodStarts.filter({ $0 <= date }).max() else { return nil }
             return Day.between(start, date) + 1
         }
-        for s in periodStarts { for k in 0..<5 { d.flow[Day.shift(s, k)] = k < 2 ? 3 : k < 4 ? 2 : 1 } }
+        for s in periodStarts { for k in 0..<5 { d.flow[Day.shift(s, k)] = k < 2 ? 3 : 2 } }
 
         for i in 1...400 {
             let evening = cal.date(byAdding: .day, value: -i, to: today)!

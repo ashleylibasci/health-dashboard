@@ -6,18 +6,27 @@ struct Period: Equatable {
     var days: Int { Day.between(start, end) + 1 }
 }
 
-/// Groups logged flow days into periods (days up to 2 apart belong to the same period).
+/// Bleeding days this close together belong to one period, so a few unlogged days in the
+/// middle of a period don't start a new "cycle".
+let periodGapDays = 6
+
+/// Groups logged bleeding days into periods. Spotting is stored separately and never counts.
 func periods(_ flow: [String: Int]) -> [Period] {
-    let days = flow.filter { $0.value > 0 }.keys.sorted()
+    let days = flow.filter { $0.value >= 2 }.keys.sorted()
     var out: [Period] = []
     for d in days {
-        if let last = out.last, Day.between(last.end, d) <= 2 {
+        if let last = out.last, Day.between(last.end, d) <= periodGapDays {
             out[out.count - 1].end = d
         } else {
             out.append(Period(start: d, end: d))
         }
     }
     return out
+}
+
+/// Whether bleeding on `day` starts a new period: no bleeding logged in the days before it.
+func startsNewPeriod(_ day: String, flow: [String: Int]) -> Bool {
+    !(1...periodGapDays).contains { (flow[Day.shift(day, -$0)] ?? 0) >= 2 }
 }
 
 /// Lengths of complete cycles (start to next start), oldest first.
@@ -49,6 +58,17 @@ struct CycleStatus: Equatable {
     }
 
     var phase: CyclePhase { phase(on: day) }
+
+    /// Whether today's phase can be trusted: a temperature rise showed ovulation, or the cycle is
+    /// still within its usual length. Long irregular cycles don't get a phase guess.
+    var phaseKnown: Bool { ovulationDay != nil || day <= typicalLength + 3 }
+
+    /// Days past the expected start, once the period is late (natural cycles with a prediction only).
+    var daysLate: Int? {
+        guard let next = nextStart else { return nil }
+        let late = Day.between(next, Day.key(.now))
+        return late > 0 ? late : nil
+    }
     /// The last 5 days before the expected period, when PMS-type changes are most common.
     var isLateLuteal: Bool { phase == .luteal && day >= typicalLength - 5 }
 }
@@ -59,7 +79,7 @@ func cycleStatus(_ flow: [String: Int], wristTemp: [String: Double], predict: Bo
     let ps = periods(flow)
     guard let last = ps.last, Day.between(last.start, today) >= 0 else { return nil }
     let lengths = Array(cycleLengths(ps).suffix(6))
-    let typical = lengths.count >= 2 ? Int(median(lengths.map(Double.init))!.rounded()) : 28
+    let typical = lengths.isEmpty ? 28 : Int(median(lengths.map(Double.init))!.rounded())
     let range = lengths.count >= 2 ? lengths.min()!...lengths.max()! : nil
     let regular = range.map { $0.upperBound - $0.lowerBound <= 7 } ?? true
     let periodLength = Int(median(ps.suffix(6).map { Double($0.days) }) ?? 5)
@@ -125,6 +145,8 @@ func phaseStats(_ data: HealthData, cycles: Int = 6) -> [PhaseStats] {
         }
     }
     let typical = Int(median(cycleLengths(recent).map(Double.init)) ?? 28)
+    // Very short averages (often from gaps in logging) can't be split into phases.
+    guard typical >= 21 else { return [] }
     let ov = typical - 14
     let ranges: [CyclePhase: ClosedRange<Int>] = [.period: 1...5, .follicular: 6...(ov - 2), .ovulation: (ov - 1)...(ov + 1), .luteal: (ov + 2)...typical]
     func diff(_ xs: [Double]?, _ all: [Double]) -> Double? {
@@ -150,6 +172,7 @@ func packStatus(packStart: Date?, today: String = Day.key(.now)) -> PackStatus? 
     guard since >= 0 else { return nil }
     let day = since % 28 + 1
     let cycleStart = Day.shift(today, -(day - 1))
-    let bleed = day > 21 ? today : Day.shift(cycleStart, 21)
+    // The break week starts on pack day 22, whether or not it has started yet.
+    let bleed = Day.shift(cycleStart, 21)
     return PackStatus(day: day, nextBleed: bleed)
 }

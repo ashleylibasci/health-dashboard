@@ -34,19 +34,25 @@ struct CutoffTest: Equatable {
     var isReady: Bool { daysLogged >= 21 }
 }
 
-/// Compares each night's sleep with when that day's last caffeine was: before noon, noon–3pm, after 3pm.
-func cutoffTest(_ logs: [Reading], nights: [Night]) -> CutoffTest {
-    let lastByDay = Dictionary(grouping: logs, by: \.day).mapValues { $0.map(\.date).max()! }
+/// Compares each night's sleep with when that evening's last caffeine was: before noon, noon–3pm,
+/// or after 3pm. Caffeine after midnight counts toward the evening before (and as "after 3pm").
+/// Only days with a recorded night count, and a group needs 3+ nights before it's shown.
+func cutoffTest(_ logs: [Reading], nights: [Night], today: String = Day.key(.now)) -> CutoffTest {
+    let recent = logs.filter { Day.between($0.evening, today) <= 90 }
+    let lastByEvening = Dictionary(grouping: recent, by: \.evening).mapValues { $0.map { Day.eveningHour($0.date) }.max()! }
     let nightByDate = Dictionary(nights.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
     var groups: [Int: [Double]] = [:]
-    for (day, last) in lastByDay {
-        guard let night = nightByDate[day] else { continue }
-        let hour = Calendar.current.component(.hour, from: last)
+    var matched = 0
+    for (evening, hour) in lastByEvening {
+        guard let night = nightByDate[evening] else { continue }
+        matched += 1
         groups[hour < 12 ? 0 : hour < 15 ? 1 : 2, default: []].append(Double(night.asleepMinutes))
     }
     let labels = ["Last caffeine before 12pm", "12–3pm", "After 3pm"]
-    let buckets = (0..<3).compactMap { i in groups[i].map { CutoffBucket(label: labels[i], nights: $0.count, asleepMinutes: mean($0)!) } }
-    return CutoffTest(daysLogged: lastByDay.count, buckets: buckets)
+    let buckets = (0..<3).compactMap { i in
+        groups[i].flatMap { $0.count >= 3 ? CutoffBucket(label: labels[i], nights: $0.count, asleepMinutes: mean($0)!) : nil }
+    }
+    return CutoffTest(daysLogged: matched, buckets: buckets)
 }
 
 struct CaffeineDrink: Hashable {

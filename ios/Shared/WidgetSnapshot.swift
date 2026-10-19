@@ -35,6 +35,8 @@ struct WidgetSnapshot: Codable, Equatable {
     var sickTonight: String?
     var darkAtNight = true
     var bedtimeMinutes: Int?
+    /// Her water bottle size, so the Watch logs the right amount.
+    var bottleMl: Double?
 
     static let appGroup = "group.com.ashleylibasci.healthdashboard"
     private static let key = "widgetSnapshot.v1"
@@ -51,6 +53,7 @@ struct WidgetSnapshot: Codable, Equatable {
         typicalLength = v(.typicalLength, nil); periodLength = v(.periodLength, nil); ovulationDay = v(.ovulationDay, nil); daysToPeriod = v(.daysToPeriod, nil)
         tempDelta = v(.tempDelta, nil); caffeineAtBed = v(.caffeineAtBed, nil); examNote = v(.examNote, nil); sick = v(.sick, false)
         sickTonight = v(.sickTonight, nil); darkAtNight = v(.darkAtNight, true); bedtimeMinutes = v(.bedtimeMinutes, nil)
+        bottleMl = v(.bottleMl, nil)
     }
 
     var encoded: Data? { try? JSONEncoder().encode(self) }
@@ -71,9 +74,22 @@ struct WidgetSnapshot: Codable, Equatable {
     }
 
     /// Today's caffeine, reset to zero once the day changes.
-    var caffeineToday: Double {
+    var caffeineToday: Double { caffeineDay == Self.eveningKey() ? caffeineMg : 0 }
+
+    /// Whether the numbers are from today; after midnight, yesterday's recovery shouldn't pass for today's.
+    var isFromToday: Bool { Calendar.current.isDateInToday(updated) }
+
+    /// Today's evening as "yyyy-MM-dd" in the Gregorian calendar (any phone calendar setting),
+    /// where anything before 5am still counts as last night, matching the app.
+    static func eveningKey(_ date: Date = .now) -> String {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
+        let day = cal.component(.hour, from: date) < 5 ? cal.date(byAdding: .day, value: -1, to: date)! : date
         let f = DateFormatter()
+        f.calendar = cal
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
         f.dateFormat = "yyyy-MM-dd"
-        return caffeineDay == f.string(from: .now) ? caffeineMg : 0
+        return f.string(from: day)
     }
 }

@@ -22,9 +22,18 @@ struct ExamsView: View {
             case .loading:
                 Card { ProgressView("Checking your calendar…").frame(maxWidth: .infinity) }
             case .failed(let message):
-                Card {
+                Card(fill: .peach) {
                     Note(message)
-                    Button("Check the link") { showSettings = true }.fontWeight(.bold)
+                    Button(fixLabel) {
+                        if model.googleNeedsSignIn { Task { await model.connectGoogle() } } else { showSettings = true }
+                    }
+                    .fontWeight(.bold)
+                }
+                // Keep showing the exams already loaded instead of hiding them behind the error.
+                if !model.events.isEmpty {
+                    upcoming
+                    lens
+                    Note("Showing the last exams that loaded. Pull down to try again.")
                 }
             case .ready(let checkedAt):
                 upcoming
@@ -33,8 +42,18 @@ struct ExamsView: View {
             }
         }
         .detailPage()
-        .refreshable { await model.refreshCalendar() }
+        .refreshable { await model.refreshCalendar(force: true) }
         .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+
+    private var fixLabel: String {
+        switch model.calendarSource {
+        case .google? where model.googleNeedsSignIn: "Sign in with Google again"
+        case .google?: "Check Google Calendar in Settings"
+        case .apple?: "Check calendar access in Settings"
+        case .link?: "Check the link"
+        case nil: "Connect a calendar"
+        }
     }
 
     private var upcoming: some View {

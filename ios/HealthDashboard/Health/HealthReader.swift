@@ -1,10 +1,19 @@
 import HealthKit
 
 /// One timed reading, like a latte at 9:40am or a State of Mind log.
-struct Reading: Equatable {
+struct Reading: Equatable, Identifiable {
     var date: Date
     var value: Double
+    /// The Health sample's id, so a log can be edited or deleted.
+    var uuid: UUID? = nil
+    /// Saved by this app (the phone or Watch app). Health only lets an app change its own samples.
+    var mine = false
+    /// The drink's name, when it was saved with one ("Latte", "Celsius").
+    var name: String? = nil
+    var id: String { uuid?.uuidString ?? "\(date.timeIntervalSince1970)-\(value)" }
     var day: String { Day.key(date) }
+    /// The evening it belongs to: before 5am counts as the night before.
+    var evening: String { Day.evening(date) }
 }
 
 /// Everything the app reads from Health, already boiled down to one entry per night or day.
@@ -28,8 +37,12 @@ struct HealthData {
     var waterMl: [String: Double] = [:]
     /// Each alcoholic drink logged, with its time.
     var drinks: [Reading] = []
-    /// Menstrual flow by date: 1 unspecified, 2 light, 3 medium, 4 heavy, 0 = logged "none".
+    /// Menstrual flow by date: 2 light, 3 medium (or unspecified), 4 heavy, 0 = logged "no flow".
     var flow: [String: Int] = [:]
+    /// Days with spotting (bleeding between periods). Kept apart so it never counts as a period.
+    var spotting: Set<String> = []
+    /// Symptoms logged on each day.
+    var symptoms: [String: Set<Symptom>] = [:]
     /// Nightly wrist temperature (°C) by the date she woke up.
     var wristTemp: [String: Double] = [:]
     /// Daily average breathing rate while asleep, per minute.
@@ -64,18 +77,20 @@ struct HealthReader {
     static let heartRateType = HKQuantityType(.heartRate)
     static let respiratoryType = HKQuantityType(.respiratoryRate)
     static let oxygenType = HKQuantityType(.oxygenSaturation)
+    static let spottingType = HKCategoryType(.intermenstrualBleeding)
 
     /// Everything any screen uses, asked for once in the welcome flow.
     static var readTypes: Set<HKObjectType> {
-        [sleepType, restingHrType, hrvType, caffeineType, vo2MaxType, menstrualFlowType, wristTempType,
+        let base: Set<HKObjectType> = [sleepType, restingHrType, hrvType, caffeineType, vo2MaxType, menstrualFlowType, wristTempType,
          stateOfMindType, alcoholType, waterType, activeEnergyType, basalEnergyType, stepsType,
-         exerciseType, heartRateType, respiratoryType, oxygenType]
+         exerciseType, heartRateType, respiratoryType, oxygenType, spottingType]
+        return base.union(Symptom.allCases.map(\.type))
     }
 
     /// What the app can log for you: drinks, water, period days and how you feel.
     /// The simulator can also write sample sleep and heart data for testing.
     static var shareTypes: Set<HKSampleType> {
-        var types: Set<HKSampleType> = [caffeineType, alcoholType, waterType, menstrualFlowType, stateOfMindType]
+        var types: Set<HKSampleType> = [caffeineType, alcoholType, waterType, menstrualFlowType, stateOfMindType, spottingType]
         types.formUnion(Symptom.allCases.map(\.type))
         #if targetEnvironment(simulator)
         types.formUnion([sleepType, restingHrType, hrvType])
@@ -108,6 +123,8 @@ struct HealthReader {
         async let water = daily(waterType, .cumulativeSum, unit: .literUnit(with: .milli), since: since)
         async let drinks = readings(alcoholType, unit: .count(), window)
         async let flow = flowDays(window)
+        async let spotting = categoryDays(spottingType, window)
+        async let symptoms = symptomDays(window)
         async let temp = wakeDayReadings(wristTempType, unit: .degreeCelsius(), window)
         async let resp = daily(respiratoryType, .discreteAverage, unit: bpm, since: since)
         async let moods = moodReadings(window)
@@ -117,7 +134,7 @@ struct HealthReader {
         return try await HealthData(
             nights: buildNights(sleep), restingHr: rhr, hrv: hrv, caffeineLogs: caffeine, vo2: vo2,
             exerciseMinutes: exercise, steps: steps, activeKcal: active, restingKcal: resting, waterMl: water,
-            drinks: drinks, flow: flow, wristTemp: temp, respiratory: resp, moods: moods,
+            drinks: drinks, flow: flow, spotting: spotting, symptoms: symptoms, wristTemp: temp, respiratory: resp, moods: moods,
             hourlyHr: withoutExercise(hourly, exercise: hourlyExercise)
         )
     }
@@ -183,7 +200,11 @@ struct HealthReader {
             predicates: [.quantitySample(type: type, predicate: window)],
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
-        return try await query.result(for: store).map { Reading(date: $0.startDate, value: $0.quantity.doubleValue(for: unit)) }
+        return try await query.result(for: store).map {
+            Reading(date: $0.startDate, value: $0.quantity.doubleValue(for: unit), uuid: $0.uuid,
+                    mine: $0.sourceRevision.source.bundleIdentifier.hasPrefix("com.ashleylibasci.healthdashboard"),
+                    name: $0.metadata?[HKMetadataKeyFoodType] as? String)
+        }
     }
 
     /// Overnight readings keyed by the morning they ended on.
@@ -204,15 +225,29 @@ struct HealthReader {
         )
         var out: [String: Int] = [:]
         for s in try await query.result(for: store) {
+            // Switch on the raw value: `HKCategoryValueVaginalBleeding(rawValue:)` is optional, and
+            // matching `.none` against it would mean "unknown", not "no flow".
             let level: Int
-            switch HKCategoryValueVaginalBleeding(rawValue: s.value) {
-            case .light: level = 2
-            case .medium: level = 3
-            case .heavy: level = 4
-            case .none: level = 0
-            default: level = 1
+            switch s.value {
+            case HKCategoryValueVaginalBleeding.light.rawValue: level = 2
+            case HKCategoryValueVaginalBleeding.heavy.rawValue: level = 4
+            case HKCategoryValueVaginalBleeding.none.rawValue: level = 0
+            default: level = 3 // medium, or "unspecified"
             }
             out[Day.key(s.startDate)] = max(out[Day.key(s.startDate)] ?? 0, level)
+        }
+        return out
+    }
+
+    private static func categoryDays(_ type: HKCategoryType, _ window: NSPredicate) async throws -> Set<String> {
+        let query = HKSampleQueryDescriptor(predicates: [.categorySample(type: type, predicate: window)], sortDescriptors: [])
+        return Set(try await query.result(for: store).map { Day.key($0.startDate) })
+    }
+
+    private static func symptomDays(_ window: NSPredicate) async throws -> [String: Set<Symptom>] {
+        var out: [String: Set<Symptom>] = [:]
+        for symptom in Symptom.allCases {
+            for day in try await categoryDays(symptom.type, window) { out[day, default: []].insert(symptom) }
         }
         return out
     }

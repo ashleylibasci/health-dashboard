@@ -13,10 +13,11 @@ struct SickSignals: Equatable {
 /// Compares the last two mornings with the 4 weeks before. Needs 3 of the 4 signals up to say anything.
 /// When `lutealAdjust` is on, the temperature bar is raised by the usual luteal rise (about 0.3°C).
 func sickSignals(_ data: HealthData, lutealAdjust: Bool, today: String = Day.key(.now)) -> SickSignals? {
+    // Needs two weeks of history, so a new Watch's normal day-to-day swings don't look like illness.
     func change(_ series: [String: Double]) -> (last2: [Double], base: Double)? {
         let last2 = (0...1).compactMap { series[Day.shift(today, -$0)] }
-        let base = median((3...30).compactMap { series[Day.shift(today, -$0)] })
-        guard last2.count == 2, let base else { return nil }
+        let history = (3...30).compactMap { series[Day.shift(today, -$0)] }
+        guard last2.count == 2, history.count >= 14, let base = median(history) else { return nil }
         return (last2, base)
     }
     var rhr: Double?, hrv: Double?, temp: Double?, resp: Double?
@@ -28,7 +29,10 @@ func sickSignals(_ data: HealthData, lutealAdjust: Bool, today: String = Day.key
     }
     if let c = change(data.respiratory), mean(c.last2)! - c.base >= 1.5 { resp = round1(mean(c.last2)! - c.base) }
     let count = [rhr, hrv, temp, resp].compactMap { $0 }.count
-    guard count >= 3 else { return nil }
+    // Drinks raise resting heart rate and temperature the next morning, so after 2+ drinks
+    // all four signals have to move before calling it.
+    let drinksLastNight = data.drinks.filter { $0.evening == Day.shift(today, -1) }.reduce(0) { $0 + $1.value }
+    guard count >= (drinksLastNight >= 2 ? 4 : 3) else { return nil }
     return SickSignals(restingHr: rhr, hrv: hrv, temperature: temp, breathing: resp, count: count)
 }
 
@@ -47,7 +51,7 @@ func offReasons(
     var out: [OffReason] = []
     if let n = data.nights.last, Day.between(n.wakeDate, today) <= 0, let typical = typicalSleep(data.nights, before: n.date) {
         let short = typical - Double(n.asleepMinutes)
-        let debt = sleepDebt(data.nights).reduce(0, +)
+        let debt = sleepDebt(data.nights, today: today).compactMap { $0 }.reduce(0, +)
         if short >= 30 || debt >= 120 {
             out.append(OffReason(kind: .sleep, title: short >= 30 ? "Short on sleep" : "Sleep debt this week", detail: "\(hoursMinutes(Double(n.asleepMinutes))) last night and \(hoursMinutes(Double(debt))) of sleep debt this week.", weight: max(short, Double(debt) / 3) / 30))
         }
@@ -67,14 +71,12 @@ func offReasons(
             out.append(OffReason(kind: .cycle, title: "Day \(c.day) of your period", detail: "Cramps and lower iron can make the first days harder.", weight: 2.5))
         }
     }
+    // Last night = yesterday's evening, including anything after midnight.
     let yesterday = Day.shift(today, -1)
-    if let last = data.caffeineLogs.filter({ $0.day == yesterday }).map(\.date).max() {
-        let hour = Double(Calendar.current.component(.hour, from: last)) + Double(Calendar.current.component(.minute, from: last)) / 60
-        if hour > 14 {
-            out.append(OffReason(kind: .caffeine, title: "Afternoon caffeine", detail: "Yesterday’s last was at \(clockOfDay(Int(hour * 60))), past a 2pm cutoff.", weight: (hour - 14) * 1.5))
-        }
+    if let hour = data.caffeineLogs.filter({ $0.evening == yesterday }).map({ Day.eveningHour($0.date) }).max(), hour > 14 {
+        out.append(OffReason(kind: .caffeine, title: "Late caffeine", detail: "Your last was at \(clockOfDay(Int(hour * 60) % 1440)) last night, past a 2pm cutoff.", weight: (hour - 14) * 1.5))
     }
-    let lastNightDrinks = data.drinks.filter { $0.day == yesterday || ($0.day == today && Calendar.current.component(.hour, from: $0.date) < 6) }.reduce(0) { $0 + $1.value }
+    let lastNightDrinks = data.drinks.filter { $0.evening == yesterday }.reduce(0) { $0 + $1.value }
     if lastNightDrinks >= 2 {
         out.append(OffReason(kind: .drinks, title: "Drinks last night", detail: "\(Int(lastNightDrinks)) drinks. Your heart usually works harder the night after.", weight: lastNightDrinks))
     }

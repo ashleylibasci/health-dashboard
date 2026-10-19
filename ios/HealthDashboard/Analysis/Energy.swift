@@ -3,9 +3,11 @@ import Foundation
 /// Hours of sleep the app counts as "enough" when adding up sleep debt.
 let sleepNeedMinutes = 8 * 60
 
-/// Minutes short of 8 hours, per night, for the last 7 nights (0 when she got enough).
-func sleepDebt(_ nights: [Night]) -> [Int] {
-    nights.suffix(7).map { max(0, sleepNeedMinutes - $0.asleepMinutes) }
+/// Minutes short of 8 hours for each of the last 7 nights, oldest first (0 when she got enough,
+/// nil when there's no sleep recorded for that night).
+func sleepDebt(_ nights: [Night], today: String = Day.key(.now)) -> [Int?] {
+    let byDate = Dictionary(nights.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+    return (1...7).reversed().map { k in byDate[Day.shift(today, -k)].map { max(0, sleepNeedMinutes - $0.asleepMinutes) } }
 }
 
 struct EnergyNow: Equatable {

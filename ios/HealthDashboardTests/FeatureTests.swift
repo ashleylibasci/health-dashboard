@@ -29,8 +29,11 @@ struct RecoveryTests {
     @Test func steadyBedtimesScoreHigherThanSwingingOnes() {
         let steady = (0..<14).map { night(Day.shift("2026-10-01", $0), bed: 360 + ($0 % 2) * 20) }
         let swinging = (0..<14).map { night(Day.shift("2026-10-01", $0), bed: 300 + ($0 % 2) * 150, wake: 800 + ($0 % 2) * 150) }
-        #expect(sleepRegularity(steady)! > 85)
-        #expect(sleepRegularity(swinging)! < 40)
+        #expect(sleepRegularity(steady, today: "2026-10-15")! > 85)
+        #expect(sleepRegularity(swinging, today: "2026-10-15")! < 40)
+        // Nights days apart aren't compared.
+        let gappy = (0..<14).map { night(Day.shift("2026-10-01", $0 * 2)) }
+        #expect(sleepRegularity(gappy, today: "2026-10-30") == nil)
     }
 }
 
@@ -58,7 +61,7 @@ struct CycleTests {
     @Test func flowDaysGroupIntoPeriodsAndCycles() {
         var flow: [String: Int] = [:]
         for start in ["2026-08-01", "2026-08-29", "2026-09-28"] { for k in 0..<5 { flow[Day.shift(start, k)] = 3 } }
-        flow["2026-08-07"] = 1 // spotting 2 days after a period still counts as that period
+        flow["2026-08-07"] = 2 // light bleeding 2 days after still belongs to that period
         let ps = periods(flow)
         #expect(ps.count == 3)
         #expect(ps[0].end == "2026-08-07")
@@ -114,5 +117,71 @@ struct WellbeingTests {
         let days: Set<String> = ["2026-10-15", "2026-10-16", "2026-10-17"]
         #expect(streak(endingAt: "2026-10-18") { days.contains($0) } == 3)
         #expect(streak(endingAt: "2026-10-20") { days.contains($0) } == 0)
+    }
+}
+
+
+struct BugFixTests {
+    @Test func spottingNeverCountsAsAPeriod() {
+        var flow: [String: Int] = [:]
+        for k in 0..<5 { flow[Day.shift("2026-09-01", k)] = 3 }
+        flow["2026-09-14"] = 1 // spotting mid-cycle
+        for k in 0..<5 { flow[Day.shift("2026-09-29", k)] = 3 }
+        #expect(periods(flow).count == 2)
+        #expect(cycleLengths(periods(flow)) == [28])
+    }
+
+    @Test func aFewUnloggedDaysDontStartANewPeriod() {
+        let flow = ["2026-09-01": 3, "2026-09-02": 3, "2026-09-06": 2]
+        #expect(periods(flow).count == 1)
+        #expect(!startsNewPeriod("2026-09-06", flow: flow))
+        #expect(startsNewPeriod("2026-09-29", flow: flow))
+    }
+
+    @Test func shortCyclesDontCrashThePhasePage() {
+        var data = HealthData()
+        for start in ["2026-08-01", "2026-08-16", "2026-08-31"] { for k in 0..<3 { data.flow[Day.shift(start, k)] = 3 } }
+        #expect(phaseStats(data).isEmpty)
+    }
+
+    @Test func oneCompleteCycleIsUsedForThePrediction() {
+        let flow = ["2026-08-01": 3, "2026-09-05": 3]
+        let c = cycleStatus(flow, wristTemp: [:], predict: true, today: "2026-09-10")!
+        #expect(c.typicalLength == 35)
+        #expect(c.nextStart == "2026-10-10")
+    }
+
+    @Test func afterMidnightBelongsToLastNight() {
+        let chicago = TimeZone(identifier: "America/Chicago")!
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = chicago
+        let oneAM = cal.date(from: DateComponents(year: 2026, month: 10, day: 18, hour: 1, minute: 30))!
+        #expect(Day.evening(oneAM, in: chicago) == "2026-10-17")
+        #expect(Day.eveningHour(oneAM, in: chicago) == 25.5)
+    }
+
+    @Test func allNightersCountButAfternoonNapsDont() {
+        let chicago = TimeZone(identifier: "America/Chicago")!
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = chicago; f.dateFormat = "yyyy-MM-dd HH:mm"
+        let short = SleepSample(start: f.date(from: "2026-10-17 05:00")!, end: f.date(from: "2026-10-17 07:00")!, timeZone: chicago)
+        let nap = SleepSample(start: f.date(from: "2026-10-17 13:00")!, end: f.date(from: "2026-10-17 16:30")!, timeZone: chicago)
+        let nights = buildNights([short, nap])
+        #expect(nights.count == 1)
+        #expect(nights[0].date == "2026-10-16")
+        #expect(nights[0].asleepMinutes == 120)
+    }
+
+    @Test func cutoffTestPutsLateNightCaffeineAfter3pm() {
+        let chicago = TimeZone(identifier: "America/Chicago")!
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = chicago
+        var logs: [Reading] = [], nights: [Night] = []
+        for d in 0..<3 {
+            let evening = Day.shift("2026-10-01", d)
+            let next = Day.shift(evening, 1).split(separator: "-").compactMap { Int($0) }
+            logs.append(Reading(date: cal.date(from: DateComponents(year: next[0], month: next[1], day: next[2], hour: 1))!, value: 80))
+            nights.append(Night(date: evening, weekday: 0, bedtime: 500, wake: 900, asleepMinutes: 300, wakeDate: Day.shift(evening, 1)))
+        }
+        let test = cutoffTest(logs, nights: nights, today: "2026-10-05")
+        #expect(test.daysLogged == 3)
+        #expect(test.buckets.map(\.label) == ["After 3pm"])
     }
 }

@@ -1,122 +1,151 @@
 import SwiftUI
 
-/// The Log tab: quick buttons that save straight to Apple Health.
+/// The Log tab: quick buttons that save straight to Apple Health, plus period and symptom logging
+/// for any day through the day sheet.
 struct LogView: View {
     @Environment(AppModel.self) private var model
     @State private var stress: Int?
-    @State private var flow: Int?
-    @State private var symptoms: Set<Symptom> = []
-    @State private var toast: String?
+    @State private var toast: Toast?
     @State private var showOther = false
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var when = Date.now
+    @State private var customTime = false
+    @State private var busy = false
+    @State private var editingDay: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Log today").serifTitleFont(32).foregroundStyle(Color.ink).padding(.top, 8)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Log").font(.serifTitle(32)).foregroundStyle(Color.ink).padding(.top, 8)
+
+            if model.profile?.tracksCycle ?? false { cycleSection }
 
             section("Caffeine") {
-                AdaptiveStack(spacing: 10) {
-                    Button { log("Latte saved") { await model.logCaffeine(130) } } label: {
+                WhenPicker(date: $when, custom: $customTime)
+                HStack(spacing: 10) {
+                    Button { log("Latte saved") { await model.logCaffeine(130, name: "Latte", at: time) } } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "cup.and.saucer.fill").foregroundStyle(Color.butterInk)
-                            VStack(alignment: .leading) { Text("+ Latte").scaledFont(16, .bold); Text("130 mg").scaledFont(12) }
+                            VStack(alignment: .leading) { Text("+ Latte").font(.headline); Text("130 mg").font(.caption) }
                             Spacer(minLength: 0)
                         }
                         .foregroundStyle(Color.ink).padding(.horizontal, 14).frame(maxWidth: .infinity, minHeight: 60)
                         .background(Color.butter, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     Button { showOther.toggle() } label: {
-                        Text("+ Other").scaledFont(15, .bold).foregroundStyle(Color.ink)
+                        Text(showOther ? "Hide drinks" : "+ Other").font(.headline).foregroundStyle(Color.ink)
                             .frame(maxWidth: .infinity, minHeight: 60).background(Color.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(busy)
                 if showOther {
-                    CaffeinePicker { d in log("\(d.name) saved") { await model.logCaffeine(d.mg) } }
+                    CaffeinePicker { d in log("\(d.name) saved") { await model.logCaffeine(d.mg, name: d.name, at: time) } }
+                        .disabled(busy)
+                }
+                if let warn = caffeineLimitNote(model.caffeineToday.reduce(0) { $0 + $1.value }) {
+                    Label(warn, systemImage: "exclamationmark.triangle.fill").font(.subheadline.weight(.semibold)).foregroundStyle(Color.peachInk)
+                        .padding(12).background(Color.peach, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                NavigationLink { CaffeineView() } label: {
+                    Text("Today: \(Int(model.caffeineToday.reduce(0) { $0 + $1.value })) mg · see or change times ›")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.mainText)
                 }
             }
 
             section("Drinks & water") {
-                AdaptiveGrid(columns: 4, spacing: 8) {
-                    if model.profile?.prefs.drinksTracking ?? true {
+                if model.profile?.prefs.drinksTracking ?? true {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
                         ForEach(Array(zip(["Wine", "Beer", "Cocktail", "Shot"], [Color.lilac, .butter, .peach, .lavender])), id: \.0) { name, fill in
-                            quick(name, fill) { log("\(name) saved") { await model.logDrink() } }
+                            quick(name, fill) { log("\(name) saved · \(model.drinksTonight + 1) tonight") { await model.logDrink(name, at: time) } }
                         }
                     }
+                    Text("Uses the time above too.").font(.caption).foregroundStyle(Color.muted)
                 }
-                AdaptiveStack(spacing: 8) {
-                    Text("Water · \(bottleName(model.bottleMl))").scaledFont(13, .semibold).foregroundStyle(Color.mainText)
-                        .frame(width: typeSize.isAccessibilitySize ? nil : 92, alignment: .leading)
-                    HStack(spacing: 8) {
-                        quick("+ ¼", .lavender, ink: .mainText) { log("¼ bottle saved") { await model.logWater(bottles: 0.25) } }
-                        quick("+ ½", .lavender, ink: .mainText) { log("½ bottle saved") { await model.logWater(bottles: 0.5) } }
-                        quick("+ 1", .lavender, ink: .mainText) { log("Bottle saved") { await model.logWater(bottles: 1) } }
-                    }
+                HStack(spacing: 8) {
+                    Text("Water · \(bottleName(model.bottleMl))").font(.subheadline.weight(.semibold)).foregroundStyle(Color.mainText)
+                    quick("+ ¼", .lavender, ink: .mainText) { log("¼ bottle saved") { await model.logWater(bottles: 0.25) } }
+                    quick("+ ½", .lavender, ink: .mainText) { log("½ bottle saved") { await model.logWater(bottles: 0.5) } }
+                    quick("+ 1", .lavender, ink: .mainText) { log("Bottle saved") { await model.logWater(bottles: 1) } }
                 }
-                Text("\(bottleCount(model.bottlesToday)) of \(bottleCount(goalBottles(model.bottleMl))) bottles today").scaledFont(13).foregroundStyle(Color.muted)
+                Text("\(bottleCount(model.bottlesToday)) of \(bottleCount(goalBottles(model.bottleMl))) bottles today").font(.caption).foregroundStyle(Color.muted)
             }
 
-            section("Stress") {
+            section("Stress right now") {
                 HStack(spacing: 8) {
                     ForEach(1...5, id: \.self) { n in
-                        Button { stress = n } label: {
-                            Text("\(n)").numberFont(16).foregroundStyle(Color.ink)
+                        Button {
+                            stress = n
+                            log("Saved to Apple Health as State of Mind") { await model.logStress(n) }
+                        } label: {
+                            Text("\(n)").font(.number(16)).foregroundStyle(Color.ink)
                                 .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(stress == n ? (n >= 4 ? Color.peach : n <= 2 ? Color.mint : Color.lavender) : Color.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .overlay(stress == n ? RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(n >= 4 ? Color.peachInk : Color.mainText, lineWidth: 2) : nil)
                         }
                         .buttonStyle(.plain)
+                        .disabled(busy)
                         .accessibilityLabel(["Very calm", "Calm", "Okay", "Stressed", "Very stressed"][n - 1])
                         .accessibilityAddTraits(stress == n ? .isSelected : [])
                     }
                 }
-                Group {
-                    if typeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 2) { Text("1 is very calm"); Text("5 is very stressed") }
-                    } else {
-                        HStack { Text("Very calm"); Spacer(); Text("Very stressed") }
-                    }
-                }
-                .scaledFont(12).foregroundStyle(Color.muted)
-                Note("Saved to Apple Health as State of Mind.")
+                HStack { Text("Very calm"); Spacer(); Text("Very stressed") }.font(.caption).foregroundStyle(Color.muted)
             }
-
-            if model.profile?.tracksCycle ?? false {
-                section("Cycle") {
-                    AdaptiveGrid(columns: 4, spacing: 8) {
-                        ForEach(Array(zip([0, 2, 3, 4], ["No flow", "Light", "Medium", "Heavy"])), id: \.0) { level, name in
-                            Button { flow = level } label: {
-                                Text(name).scaledFont(14, flow == level ? .bold : .semibold).foregroundStyle(Color.ink)
-                                    .frame(maxWidth: .infinity, minHeight: 48)
-                                    .background(flow == level ? Color.lavender : Color.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                    .overlay(flow == level ? RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.mainText, lineWidth: 2) : nil)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(flow == level ? .isSelected : [])
-                        }
-                    }
-                    FlowLayout {
-                        ForEach(Symptom.cycle + (model.profile?.conditions.contains(.pcos) == true ? [.acne] : [])) { s in
-                            Chip(text: s.rawValue, selected: symptoms.contains(s)) {
-                                if symptoms.contains(s) { symptoms.remove(s) } else { symptoms.insert(s) }
-                            }
-                        }
-                    }
-                }
-            }
-
-            PrimaryButton(title: "Save") { saveSelections() }
-                .disabled(stress == nil && flow == nil && symptoms.isEmpty)
-                .opacity(stress == nil && flow == nil && symptoms.isEmpty ? 0.4 : 1)
-            if let warn = caffeineLimitNote(model.caffeineToday.reduce(0) { $0 + $1.value }) {
-                Label(warn, systemImage: "exclamationmark.triangle.fill").scaledFont(14, .semibold).foregroundStyle(Color.peachInk)
-                    .padding(12).background(Color.peach, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            if let toast { Label(toast, systemImage: "checkmark.circle.fill").scaledFont(15, .bold).foregroundStyle(Color.mintInk) }
-            if let err = model.lastLogError { Note("Couldn’t save to Apple Health: \(err)") }
         }
         .page()
         .toolbar(.hidden, for: .navigationBar)
+        .toast($toast)
+        .sheet(item: Binding(get: { editingDay.map { IdentifiedDay(day: $0) } }, set: { editingDay = $0?.day })) { d in
+            DayLogSheet(day: d.day)
+        }
+    }
+
+    private var time: Date { customTime ? when : .now }
+
+    /// Period and symptoms: shows what's already logged today, and opens the day sheet for today or any recent day.
+    private var cycleSection: some View {
+        section("Period & symptoms") {
+            let todayLog = model.dayLog(model.today)
+            Button { editingDay = model.today } label: {
+                HStack(spacing: 12) {
+                    FlowDrops(level: todayLog.flow ?? 0).frame(width: 36)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Today").font(.headline).foregroundStyle(Color.ink)
+                        Text(summary(todayLog)).font(.subheadline).foregroundStyle(Color.muted).multilineTextAlignment(.leading)
+                    }
+                    Spacer()
+                    Text(todayLog.flow == nil && todayLog.symptoms.isEmpty ? "Log" : "Edit").font(.subheadline.weight(.bold)).foregroundStyle(Color.mainText)
+                }
+                .padding(14)
+                .background(Color.rose, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            Text("Forgot a day?").font(.subheadline.weight(.bold)).foregroundStyle(Color.ink)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(1...7, id: \.self) { back in
+                        let day = Day.shift(model.today, -back)
+                        let saved = model.dayLog(day)
+                        Button { editingDay = day } label: {
+                            VStack(spacing: 4) {
+                                Text(back == 1 ? "Yest." : Day.weekdayName(day)).font(.caption.weight(.semibold))
+                                Text("\(Int(day.suffix(2))!)").font(.headline)
+                                FlowDrops(level: saved.flow ?? -1)
+                            }
+                            .foregroundStyle(Color.ink)
+                            .frame(width: 54, height: 78)
+                            .background(saved.flow.map { $0 >= 1 ? Color.rose : Color.surface } ?? Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(Day.short(day)): \(summary(saved)). Tap to log or edit.")
+                    }
+                }
+            }
+        }
+    }
+
+    private func summary(_ log: (flow: Int?, symptoms: Set<Symptom>)) -> String {
+        let flow = log.flow.map { ["No bleeding", "Spotting", "Light", "Medium", "Heavy"][$0] }
+        let parts = [flow] + log.symptoms.map(\.rawValue).sorted().map { Optional($0) }
+        let text = parts.compactMap { $0 }.joined(separator: " · ")
+        return text.isEmpty ? "Nothing logged yet" : text
     }
 
     private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
@@ -128,29 +157,27 @@ struct LogView: View {
 
     private func quick(_ name: String, _ fill: Color, ink: Color = .ink, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(name).scaledFont(14, .bold).foregroundStyle(ink)
+            Text(name).font(.subheadline.weight(.bold)).foregroundStyle(ink)
                 .frame(maxWidth: .infinity, minHeight: 48).background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(busy)
     }
 
+    /// One save at a time (so a double tap can't log twice), then a toast that clears itself.
     private func log(_ message: String, _ work: @escaping () async -> Void) {
+        guard !busy else { return }
+        busy = true
         Task {
             await work()
-            toast = model.lastLogError == nil ? message : nil
+            busy = false
+            toast = model.lastLogError.map { Toast(text: "Couldn’t save: \($0)", isError: true) } ?? Toast(text: message)
+            if customTime { customTime = false; when = .now }
         }
     }
+}
 
-    private func saveSelections() {
-        let s = stress, f = flow, sym = symptoms
-        log("Saved to Apple Health") {
-            if let s { await model.logStress(s) }
-            if let f {
-                let yesterday = Day.shift(model.today, -1)
-                await model.logFlow(f, startsPeriod: (model.health.flow[yesterday] ?? 0) == 0)
-            }
-            for x in sym { await model.logSymptom(x) }
-        }
-        stress = nil; flow = nil; symptoms = []
-    }
+struct IdentifiedDay: Identifiable {
+    var day: String
+    var id: String { day }
 }

@@ -6,6 +6,9 @@ struct SettingsView: View {
     @State private var link = ""
     @State private var addingSamples = false
     @State private var sampleMessage: String?
+    @State private var confirmRerun = false
+    @State private var showLink = false
+    @State private var linkError: String?
 
     var body: some View {
         NavigationStack {
@@ -23,10 +26,19 @@ struct SettingsView: View {
                             }
                         }
                         if profile.cycle == .hormonal, profile.birthControl?.hasPlaceboWeek == true {
-                            DatePicker("Current pack started", selection: Binding(get: { profile.packStart ?? .now }, set: { model.profile?.packStart = $0 }), in: ...Date.now, displayedComponents: .date)
+                            if let start = profile.packStart {
+                                DatePicker("Current pack started", selection: Binding(get: { start }, set: { model.profile?.packStart = $0 }), in: ...Date.now, displayedComponents: .date)
+                            } else {
+                                Button("Current pack started: not set. Set it") { model.profile?.packStart = Calendar.current.startOfDay(for: .now) }
+                            }
                         }
                         NavigationLink("Health conditions\(profile.conditions.isEmpty ? "" : " (\(profile.conditions.count))")") { ConditionsView() }
-                        DatePicker("Birthday", selection: Binding(get: { profile.birthday ?? Calendar.current.date(byAdding: .year, value: -20, to: .now)! }, set: { model.profile?.birthday = $0 }), in: ...Date.now, displayedComponents: .date)
+                        Toggle("Birthday (for fitness age)", isOn: Binding(
+                            get: { profile.birthday != nil },
+                            set: { model.profile?.birthday = $0 ? Calendar.current.date(byAdding: .year, value: -20, to: .now) : nil }))
+                        if let birthday = profile.birthday {
+                            DatePicker("Birthday", selection: Binding(get: { birthday }, set: { model.profile?.birthday = $0 }), in: ...Date.now, displayedComponents: .date)
+                        }
                         Picker("Water bottle", selection: Binding(get: { profile.bottleMl }, set: { model.profile?.bottleMl = $0 })) {
                             ForEach(bottleSizes, id: \.ml) { Text($0.name).tag($0.ml) }
                         }
@@ -36,10 +48,15 @@ struct SettingsView: View {
                         Toggle("Streaks", isOn: Binding(get: { profile.prefs.streaks }, set: { model.profile?.prefs.streaks = $0 }))
                         Toggle("Night version after 8pm", isOn: Binding(get: { profile.prefs.nightMode }, set: { model.profile?.prefs.nightMode = $0 }))
                         Toggle("Dark Watch screens at night", isOn: Binding(get: { profile.prefs.darkWatchAtNight }, set: { model.profile?.prefs.darkWatchAtNight = $0 }))
-                        Button("Run the welcome setup again") {
-                            model.profile = nil
-                            dismiss()
-                        }
+                        Button("Run the welcome setup again") { confirmRerun = true }
+                            .confirmationDialog("Go through the welcome screens again?", isPresented: $confirmRerun, titleVisibility: .visible) {
+                                Button("Start welcome setup") {
+                                    model.rerunWelcome()
+                                    dismiss()
+                                }
+                            } message: {
+                                Text("Your answers start filled in, your pill pack and logs are kept, and nothing in Apple Health changes.")
+                            }
                     } header: {
                         Text("Your profile")
                     } footer: {
@@ -49,13 +66,14 @@ struct SettingsView: View {
 
                 Section {
                     switch model.calendarSource {
+                    case .google? where model.googleNeedsSignIn: Label("Google signed you out", systemImage: "exclamationmark.circle.fill").foregroundStyle(Color.peachInk)
                     case .google?: Label("Google Calendar (signed in)", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
                     case .apple?: Label("Apple Calendar", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
                     case .link?: Label("Google secret link", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
                     case nil: EmptyView()
                     }
-                    if model.calendarSource != .google {
-                        Button(model.googleConfigured ? "Sign in with Google" : "Sign in with Google (needs setup)") { Task { await model.connectGoogle() } }
+                    if model.calendarSource != .google || model.googleNeedsSignIn {
+                        Button(model.googleNeedsSignIn ? "Sign in with Google again" : model.googleConfigured ? "Sign in with Google" : "Sign in with Google (needs setup)") { Task { await model.connectGoogle() } }
                             .disabled(!model.googleConfigured)
                     }
                     if model.calendarSource != .apple {
@@ -63,16 +81,26 @@ struct SettingsView: View {
                     }
                     if case .failed(let message) = model.calendarState { Text(message).font(.footnote).foregroundStyle(Color.peachInk) }
                     DisclosureGroup("Or use a secret link") {
-                        SecureField("Paste the secret address", text: $link)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                        HStack {
+                            if showLink {
+                                TextField("Paste the secret address", text: $link)
+                            } else {
+                                SecureField("Paste the secret address", text: $link)
+                            }
+                            Button(showLink ? "Hide" : "Show") { showLink.toggle() }.font(.footnote)
+                        }
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         Button("Save calendar link") {
+                            linkError = nil
                             Task {
                                 await model.setCalendarURL(link)
-                                dismiss()
+                                // Only close once it actually works; otherwise say why right here.
+                                if case .failed(let message) = model.calendarState { linkError = message } else { dismiss() }
                             }
                         }
                         .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
+                        if let linkError { Text(linkError).font(.footnote).foregroundStyle(Color.peachInk) }
                         Text("On a computer: calendar.google.com → the gear → Settings → your calendar → “Secret address in iCal format.” Treat it like a password; it’s kept in your phone’s Keychain.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }

@@ -36,8 +36,17 @@ struct RecoveryWidgetView: View {
     @Environment(\.widgetFamily) private var family
     var entry: SnapshotEntry
 
+    /// After midnight, until the app refreshes, don't show yesterday's recovery as today's.
+    static func todayOnly(_ snap: WidgetSnapshot) -> WidgetSnapshot {
+        guard !snap.isFromToday else { return snap }
+        var s = snap
+        s.recovery = nil; s.energy = nil; s.sleepMinutes = nil
+        s.headline = s.updated == .distantPast ? "Open the app to get started" : "Open the app for today’s numbers"
+        return s
+    }
+
     var body: some View {
-        let s = entry.snapshot
+        let s = Self.todayOnly(entry.snapshot)
         switch family {
         case .accessoryCircular:
             Gauge(value: Double(s.recovery ?? 0), in: 0...100) { Text("RECOV") } currentValueLabel: { Text(s.recovery.map(String.init) ?? "–") }

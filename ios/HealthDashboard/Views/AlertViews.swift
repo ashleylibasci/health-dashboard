@@ -20,7 +20,7 @@ struct SickView: View {
                     AdaptiveStack { CardLabel("What we noticed", color: .muted); Spacer(minLength: 0); Pill(text: s.confidence, fill: .peach, ink: .peachInk) }
                     if let v = s.restingHr { ValueRow(label: "Resting heart rate", value: "\(signed(v, " bpm")) · 2 mornings", valueColor: .peachInk) }
                     if let v = s.hrv { ValueRow(label: "HRV", value: "\(signed(v * 100, ""))%", valueColor: .peachInk) }
-                    if let v = s.temperature { ValueRow(label: "Wrist temperature", value: "+\(String(format: "%.1f", v))°\(model.cycle?.phase == .luteal ? " beyond cycle" : "")", valueColor: .peachInk) }
+                    if let v = s.temperature { ValueRow(label: "Wrist temperature", value: "+\(String(format: "%.1f", v)) °C\(model.cycle?.phase == .luteal ? " beyond cycle" : "")", valueColor: .peachInk) }
                     if let v = s.breathing { ValueRow(label: "Breathing rate", value: "\(signed(v, "")) / min", valueColor: .peachInk) }
                     if model.cycle?.phase == .luteal {
                         Label("Already adjusted for your luteal phase, which raises temperature on its own.", systemImage: "circle.fill")
@@ -37,8 +37,8 @@ struct SickView: View {
                     ForEach(Symptom.cold) { s in
                         Chip(text: s.rawValue, selected: logged.contains(s), selectedFill: .peach) {
                             guard !logged.contains(s) else { return }
-                            logged.insert(s)
-                            Task { await model.logSymptom(s) }
+                            // Only light up once Health actually saved it.
+                            Task { if await model.logSymptom(s) { logged.insert(s) } }
                         }
                     }
                     Chip(text: "I feel fine", selected: feelFine, selectedFill: .mint) { feelFine = true }
@@ -54,7 +54,7 @@ struct SickView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("When to see a doctor").scaledFont(15, .bold)
-                Text("Fever over 100.4°F, trouble breathing, or feeling worse after 3 days: contact McKinley Health Center or your doctor.").scaledFont(14).foregroundStyle(Color.muted2)
+                Text("Fever over 100.4 °F (38 °C), trouble breathing, or feeling worse after 3 days: contact McKinley Health Center or your doctor.").scaledFont(14).foregroundStyle(Color.muted2)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))

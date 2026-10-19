@@ -33,6 +33,8 @@ struct RecoveryView: View {
                     CardLabel("Last \(model.recovery.count) days", color: .muted)
                     Bars(values: model.recovery.map { Double($0.score) / 100 },
                          colors: model.recovery.enumerated().map { i, d in i == model.recovery.count - 1 ? .main : d.afterLateNight ? Color(hex: 0xFFD2BD) : Color(hex: 0xC9CFFF) })
+                        .accessibilityElement()
+                        .accessibilityLabel("Recovery for the last \(model.recovery.count) days: low \(model.recovery.map(\.score).min() ?? 0), high \(model.recovery.map(\.score).max() ?? 0), today \(model.recovery.last?.score ?? 0)")
                     Note("Peach days followed a bedtime after 2am.")
                 }
             }
@@ -71,6 +73,8 @@ struct StressView: View {
                         Note("No heart rate yet today.")
                     } else {
                         Bars(values: s.today.map { $0.level / 100 }, colors: s.today.map { $0.level >= 60 ? .peachBar : $0.level >= 45 ? Color(hex: 0xFFE07A) : Color(hex: 0xC9CFFF) }, height: 100, spacing: 4)
+                            .accessibilityElement()
+                            .accessibilityLabel("Stress through today: highest \(Int(s.today.map(\.level).max() ?? 0)) out of 100, \(s.stressedHours) hour\(s.stressedHours == 1 ? "" : "s") elevated")
                         HStack {
                             Text(clockOfDay(s.today.first!.hour * 60)); Spacer(); Text(clockOfDay(s.today.last!.hour * 60))
                         }.scaledFont(12).foregroundStyle(Color.muted)
@@ -195,14 +199,19 @@ struct EnergyView: View {
                 }
             }
             let debt = sleepDebt(model.health.nights)
+            let total = debt.compactMap { $0 }.reduce(0, +)
+            let missing = debt.filter { $0 == nil }.count
             Card {
                 AdaptiveStack(alignment: .firstTextBaseline) {
-                    CardLabel("Sleep debt this week", color: .muted)
+                    CardLabel("Sleep debt · last 7 nights", color: .muted)
                     Spacer(minLength: 0)
-                    Text(hoursMinutes(Double(debt.reduce(0, +)))).numberFont(22).foregroundStyle(debt.reduce(0, +) > 60 ? Color.peachInk : Color.mintInk)
+                    Text(hoursMinutes(Double(total))).numberFont(22).foregroundStyle(total > 60 ? Color.peachInk : Color.mintInk)
                 }
-                Bars(values: debt.map { Double($0) / 180 }, colors: debt.map { $0 >= 45 ? .peachBar : Color(hex: 0xC9CFFF) }, height: 60, spacing: 6)
-                Note(debt.reduce(0, +) <= 30 ? "Barely any. Nice." : "Minutes short of 8 hours each night. A couple of longer nights would clear \(debt.reduce(0, +) > 180 ? "most of" : "") it.")
+                Bars(values: debt.map { Double($0 ?? 0) / 180 }, colors: debt.map { $0 == nil ? Color.track : ($0! >= 45 ? .peachBar : Color.lavenderStrong) }, height: 60, spacing: 6)
+                    .accessibilityElement()
+                    .accessibilityLabel("Sleep debt for the last 7 nights: \(hoursMinutes(Double(total))) total\(missing > 0 ? ", \(missing) nights not recorded" : "")")
+                Note((total <= 30 ? "Barely any. Nice." : "Minutes short of 8 hours each night. A couple of longer nights would clear \(total > 180 ? "most of" : "") it.")
+                     + (missing > 0 ? " \(missing) night\(missing == 1 ? "" : "s") had no sleep recorded, so the real number may be higher." : ""))
             }
             WaterCard()
         }
@@ -213,6 +222,8 @@ struct EnergyView: View {
 /// Water in bottles of her own size, logged in quarters.
 struct WaterCard: View {
     @Environment(AppModel.self) private var model
+    @State private var busy = false
+    @State private var toast: Toast?
 
     var body: some View {
         let goal = goalBottles(model.bottleMl)
@@ -243,7 +254,15 @@ struct WaterCard: View {
             Text(done > goal ? "\(bottleCount(done)) bottles today, past your goal of \(bottleCount(goal))" : "\(bottleCount(done)) of \(bottleCount(goal)) bottles today").scaledFont(15, .bold).foregroundStyle(Color.ink)
             AdaptiveGrid(columns: 3, spacing: 8) {
                 ForEach([(0.25, "+ ¼"), (0.5, "+ ½"), (1.0, "+ 1 bottle")], id: \.0) { amount, label in
-                    Button { Task { await model.logWater(bottles: amount) } } label: {
+                    Button {
+                        guard !busy else { return }
+                        busy = true
+                        Task {
+                            await model.logWater(bottles: amount)
+                            busy = false
+                            toast = model.lastLogError.map { Toast(text: "Couldn’t save: \($0)", isError: true) } ?? Toast(text: "Water saved")
+                        }
+                    } label: {
                         Text(label).scaledFont(15, .bold).foregroundStyle(amount == 1 ? Color.onSolid : Color.ink)
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(amount == 1 ? Color.solid : Color.surface, in: Capsule())
@@ -256,6 +275,7 @@ struct WaterCard: View {
         }
         .padding(18)
         .background(Color.lavender, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .toast($toast)
     }
 }
 
@@ -349,15 +369,20 @@ struct TrendLine: View {
 struct CaffeineView: View {
     @Environment(AppModel.self) private var model
     @State private var showOther = false
+    @State private var busy = false
+    @State private var toast: Toast?
+    @State private var when = Date.now
+    @State private var customTime = false
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             PageTitle(plain: "Caffeine")
+            WhenPicker(date: $when, custom: $customTime)
             AdaptiveStack(spacing: 10) {
-                Button { Task { await model.logCaffeine(130) } } label: {
+                Button { logCaffeine(130, "Latte") } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "cup.and.saucer.fill").scaledFont(22).foregroundStyle(Color(hex: 0xFFE07A))
+                        Image(systemName: "cup.and.saucer.fill").scaledFont(22).foregroundStyle(Color.onSolid)
                         VStack(alignment: .leading) { Text("+ Latte").scaledFont(16, .bold); Text("130 mg").scaledFont(12) }
                         Spacer(minLength: 0)
                     }
@@ -370,8 +395,9 @@ struct CaffeineView: View {
                 }
             }
             .buttonStyle(.plain)
+            .disabled(busy)
             if showOther {
-                CaffeinePicker { d in Task { await model.logCaffeine(d.mg) } }
+                CaffeinePicker { d in logCaffeine(d.mg, d.name) }.disabled(busy)
             }
             let logs = model.caffeineToday
             Card(fill: .butter) {
@@ -387,6 +413,10 @@ struct CaffeineView: View {
                         .padding(12).background(Color.peach, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 Note(logs.isEmpty ? "Nothing logged today." : "About \(Int(atBed.rounded())) mg left at your usual bedtime (\(model.tonightBedtime.formatted(date: .omitted, time: .shortened))). Under \(Int(bedtimeCaffeineGoal)) is the goal.")
+            }
+            Card {
+                CardLabel("Today’s caffeine · tap to change", color: .muted)
+                CaffeineLogList()
             }
             let test = cutoffTest(model.health.caffeineLogs, nights: model.health.nights)
             Card {
@@ -414,6 +444,18 @@ struct CaffeineView: View {
             }
         }
         .detailPage()
+        .toast($toast)
+    }
+
+    private func logCaffeine(_ mg: Double, _ name: String) {
+        guard !busy else { return }
+        busy = true
+        Task {
+            await model.logCaffeine(mg, name: name, at: customTime ? when : .now)
+            busy = false
+            toast = model.lastLogError.map { Toast(text: "Couldn’t save: \($0)", isError: true) } ?? Toast(text: "\(name) saved · \(Int(mg)) mg")
+            customTime = false; when = .now
+        }
     }
 }
 
@@ -446,6 +488,8 @@ struct CaffeineCurve: View {
 
 struct DrinksView: View {
     @Environment(AppModel.self) private var model
+    @State private var busy = false
+    @State private var toast: Toast?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -453,13 +497,26 @@ struct DrinksView: View {
             Text("No judgment, just what your own data shows the morning after.").scaledFont(15).foregroundStyle(Color.muted)
             AdaptiveGrid(columns: 5, spacing: 8) {
                 ForEach(Array(zip(alcoholDrinks, [Color.lilac, .butter, .mint, .peach, .lavender])), id: \.0) { name, fill in
-                    Button { Task { await model.logDrink() } } label: {
+                    Button {
+                        guard !busy else { return }
+                        busy = true
+                        Task {
+                            await model.logDrink(name)
+                            busy = false
+                            toast = model.lastLogError.map { Toast(text: "Couldn’t save: \($0)", isError: true) }
+                                ?? Toast(text: "\(name) saved · \(model.drinksTonight) tonight")
+                        }
+                    } label: {
                         Text(name).scaledFont(13, .bold).foregroundStyle(Color.ink)
                             .frame(maxWidth: .infinity, minHeight: 64).background(fill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .disabled(busy)
                     .accessibilityLabel("Log a \(name.lowercased())")
                 }
+            }
+            if model.drinksTonight > 0 {
+                Text("\(model.drinksTonight) drink\(model.drinksTonight == 1 ? "" : "s") logged tonight").scaledFont(14, .semibold).foregroundStyle(Color.muted)
             }
             if let e = drinkEffect(model.health, recovery: model.recoveryByDate) {
                 Card {
@@ -488,6 +545,7 @@ struct DrinksView: View {
             }
         }
         .detailPage()
+        .toast($toast)
     }
 }
 

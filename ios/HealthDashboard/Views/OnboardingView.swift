@@ -53,6 +53,7 @@ struct OnboardingView: View {
         }
         .background(step == .intro ? Color.lavender : Color.ground)
         .animation(.easeInOut(duration: 0.2), value: step)
+        .onAppear(perform: prefill)
         .sheet(isPresented: $showConditions) { conditionsSheet }
     }
 
@@ -174,7 +175,9 @@ struct OnboardingView: View {
                 Divider()
                 prefRow("Streaks", "Small goals like brisk walks and bedtimes. Kept on your phone.", $prefs.streaks)
                 Divider()
-                prefRow("Dark Watch screens at night", "Switches automatically after sunset.", $prefs.darkWatchAtNight)
+                prefRow("Night version after 8pm", "The app switches to a dark look from 8pm to 6am.", $prefs.nightMode)
+                Divider()
+                prefRow("Dark Watch screens at night", "From 8pm to 6am on your Watch.", $prefs.darkWatchAtNight)
             }
             .padding(.horizontal, 18)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -209,7 +212,7 @@ struct OnboardingView: View {
     private var healthPage: some View {
         VStack(alignment: .leading, spacing: 16) {
             heading("Bring in your ", "health history")
-            Text("Connect Apple Health and the app reads everything your iPhone and Watch have already recorded: years of sleep, heart rate, workouts, cycle and drinks. Nothing to export or upload.")
+            Text("Connect Apple Health and the app reads everything your iPhone and Watch have already recorded: the past year of sleep, heart rate, workouts, cycle and drinks. Nothing to export or upload.")
                 .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             Card(fill: .lavender) {
                 switch model.healthState {
@@ -233,7 +236,13 @@ struct OnboardingView: View {
 
     private var importSummary: String {
         let h = model.health
-        guard let first = h.nights.first?.date else { return "No sleep found yet. It fills in as you wear your Watch to bed." }
+        guard let first = h.nights.first?.date else {
+            // Apple doesn't tell apps when access was refused, so nothing at all usually means that.
+            if h.restingHr.isEmpty && h.steps.isEmpty {
+                return "Nothing came in. If you tapped Don’t Allow or turned items off, turn them on in the Settings app → Health → Data Access & Devices → Health Dashboard. If your Watch is new, it fills in as you wear it."
+            }
+            return "No sleep found yet. It fills in as you wear your Watch to bed."
+        }
         return "Found \(h.nights.count) nights of sleep since \(Day.short(first)), \(h.restingHr.count) days of heart data and \(h.caffeine.count) caffeine logs."
     }
 
@@ -246,6 +255,22 @@ struct OnboardingView: View {
                 Card(fill: .mint) {
                     Label("\(sourceName(model.calendarSource)) connected: \(model.exams.count) exam\(model.exams.count == 1 ? "" : "s") found", systemImage: "checkmark.circle.fill")
                         .font(.headline).foregroundStyle(Color.mintInk)
+                }
+            } else if model.isCalendarConnected {
+                // Connected, but the first read is still going or didn't work: offer retry or a different choice.
+                Card(fill: .lavender) {
+                    if case .loading = model.calendarState {
+                        ProgressView("Reading \(sourceName(model.calendarSource))…")
+                    } else {
+                        Label("\(sourceName(model.calendarSource)) is connected, but it couldn’t be read yet.", systemImage: "exclamationmark.circle")
+                            .font(.headline).foregroundStyle(Color.ink)
+                    }
+                    HStack {
+                        Button("Try again") { Task { await model.refreshCalendar(force: true) } }.fontWeight(.bold)
+                        Spacer()
+                        Button("Choose a different one") { Task { await model.disconnectCalendar() } }
+                    }
+                    .font(.subheadline)
                 }
             } else {
                 CalendarChoiceCard(
@@ -261,7 +286,7 @@ struct OnboardingView: View {
                 ) { calendarChoice = .apple; showLinkField = false }
                 Button(showLinkField ? "Hide the link option" : "Can’t sign in? Use a Google secret link instead") {
                     showLinkField.toggle()
-                    if showLinkField { calendarChoice = .link }
+                    calendarChoice = showLinkField ? .link : (model.googleConfigured ? .google : .apple)
                 }
                 .font(.subheadline.weight(.semibold)).foregroundStyle(Color.mainText)
                 if showLinkField {
@@ -434,18 +459,34 @@ struct OnboardingView: View {
         case .reminders where model.notificationsAllowed == nil:
             Task { await model.requestNotifications() }
         case .done:
-            model.profile = Profile(
+            var profile = Profile(
                 name: trimmedName,
                 birthday: hasBirthday ? birthday : nil,
                 cycle: cycle ?? .notTracking,
                 birthControl: cycle == .hormonal ? birthControl : nil,
                 conditions: conditions,
                 prefs: prefs,
+                packStart: model.previousProfile?.packStart,
                 bottleMl: bottleMl
             )
+            profile.pillsTaken = model.previousProfile?.pillsTaken ?? []
+            model.previousProfile = nil
+            model.profile = profile
         default:
             advance()
         }
+    }
+
+    /// Running the welcome screens again starts with the current answers filled in.
+    private func prefill() {
+        guard let p = model.previousProfile, name.isEmpty else { return }
+        name = p.name
+        if let b = p.birthday { birthday = b; hasBirthday = true }
+        cycle = p.cycle
+        birthControl = p.birthControl
+        conditions = p.conditions
+        prefs = p.prefs
+        bottleMl = p.bottleMl
     }
 
     private func advance() {
@@ -598,7 +639,7 @@ struct ShortHistoryNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Only about a month came in", systemImage: "exclamationmark.triangle.fill").scaledFont(15, .bold).foregroundStyle(Color.peachInk)
-            Text("If you’ve had your Watch longer than that, Apple’s screen was probably set to “Past 30 Days.” To bring in the rest, open the Settings app → Health → Data Access & Devices → Health Dashboard and look for the option to share all past data.")
+            Text("If your Watch is newer than a month, that’s all there is, and you can ignore this. If you’ve had it longer, Apple’s screen was probably set to “Past 30 Days.” To bring in the rest, open the Settings app → Health → Data Access & Devices → Health Dashboard and look for the option to share all past data.")
                 .scaledFont(14).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)

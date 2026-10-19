@@ -36,8 +36,11 @@ struct Night: Codable, Equatable {
 
 /// Asleep periods more than this far apart belong to different sleeps.
 private let sessionGap: TimeInterval = 2 * 60 * 60
-/// Shorter sleeps are naps and don't count as the night's sleep.
-private let minNight: TimeInterval = 3 * 60 * 60
+/// Daytime sleeps (starting 10am–6pm) shorter than this are naps, not the night's sleep.
+private let napLimit: TimeInterval = 5 * 60 * 60
+/// Overnight sleeps shorter than this are too short to count (a brief doze, a Watch glitch).
+/// An all-nighter that ends in a 2-hour sleep still counts, so the worst nights aren't hidden.
+private let minNight: TimeInterval = 45 * 60
 
 /// Turns sleep-stage samples into one main sleep per night.
 /// iPhone and Watch can both record the same sleep, so overlapping samples are merged
@@ -74,11 +77,12 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
     for session in sessions {
         let first = session.first!, last = session.last!
         let asleep = session.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
-        if asleep < minNight { continue }
-
         let bed = LocalTime(first.start, first.startZone)
-        // Bedtimes before 6pm count toward the previous evening (e.g. 1am → yesterday).
-        let evening = bed.minutes < 18 * 60 ? Day.shift(bed.date, -1) : bed.date
+        let daytime = bed.minutes >= 10 * 60 && bed.minutes < 18 * 60
+        if asleep < minNight || (daytime && asleep < napLimit) { continue }
+
+        // Bedtimes after midnight (before 10am) count toward the previous evening (e.g. 1am → yesterday).
+        let evening = bed.minutes < 10 * 60 ? Day.shift(bed.date, -1) : bed.date
         let wake = LocalTime(last.end, last.endZone)
         let night = Night(
             date: evening,

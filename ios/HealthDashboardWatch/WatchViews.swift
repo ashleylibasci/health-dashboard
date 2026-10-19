@@ -16,6 +16,7 @@ struct WatchRootView: View {
             if s.cycleDay != nil && s.typicalLength != nil { WatchCycleView().tag("cycle") }
         }
         .tabViewStyle(.verticalPage)
+        .onOpenURL { url in if url.host == "log" { page = "log" } }
     }
 
     /// Test builds can open a page directly with `-page tonight` (etc.).
@@ -33,7 +34,7 @@ private struct PageHeader: View {
     var color: Color
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(color)
+            Text(title).scaledFont(15, .bold).foregroundStyle(color)
             Spacer()
         }
     }
@@ -50,8 +51,8 @@ struct WatchRecoveryView: View {
                 HStack(spacing: 10) {
                     WatchRing(value: s.recovery, size: 70, track: .surface)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(s.recoveryLabel.isEmpty ? "–" : s.recoveryLabel).font(.number(18)).foregroundStyle(Color.ink)
-                        Text(s.headline).font(.system(size: 13)).foregroundStyle(Color(hex: 0x4A4F6E))
+                        Text(s.recoveryLabel.isEmpty ? "–" : s.recoveryLabel).numberFont(18).foregroundStyle(Color.ink)
+                        Text(s.headline).scaledFont(13).foregroundStyle(Color(hex: 0x4A4F6E))
                     }
                     Spacer(minLength: 0)
                 }
@@ -62,8 +63,11 @@ struct WatchRecoveryView: View {
                     stat("HRV", s.hrv.map(String.init) ?? "–", s.hrvDown ? .peach : .surface, s.hrvDown ? .peachInk : .mainText)
                     stat("Sleep", s.sleepMinutes.map { "\($0 / 60):\(String(format: "%02d", $0 % 60))" } ?? "–", .surface, .mainText)
                 }
+                if s.updated != .distantPast && !s.isFromToday {
+                    Text("Yesterday’s numbers. Open the app on your iPhone to update.").scaledFont(12).foregroundStyle(Color.muted)
+                }
                 if s.updated == .distantPast {
-                    Text("Open Health Dashboard on your iPhone to send today’s numbers.").font(.system(size: 12)).foregroundStyle(Color.muted)
+                    Text("Open Health Dashboard on your iPhone to send today’s numbers.").scaledFont(12).foregroundStyle(Color.muted)
                 }
             }
         }
@@ -72,8 +76,8 @@ struct WatchRecoveryView: View {
 
     private func stat(_ label: String, _ value: String, _ fill: Color, _ ink: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label).font(.system(size: 11, weight: .bold)).foregroundStyle(ink)
-            Text(value).font(.system(size: 17, weight: .bold)).foregroundStyle(Color.ink).minimumScaleFactor(0.7).lineLimit(1)
+            Text(label).scaledFont(11, .bold).foregroundStyle(ink)
+            Text(value).scaledFont(17, .bold).foregroundStyle(Color.ink).minimumScaleFactor(0.7).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 7).padding(.vertical, 5)
@@ -91,10 +95,10 @@ struct WatchLogView: View {
                 PageHeader(title: "Log", color: .butterInk)
                 Button { Task { await store.logLatte() } } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "cup.and.saucer.fill").font(.system(size: 26))
+                        Image(systemName: "cup.and.saucer.fill").scaledFont(26)
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("Latte").font(.number(20))
-                            Text("130 mg").font(.system(size: 13, weight: .semibold))
+                            Text("Latte").numberFont(20)
+                            Text("130 mg").scaledFont(13, .semibold)
                         }
                         Spacer(minLength: 0)
                     }
@@ -103,8 +107,9 @@ struct WatchLogView: View {
                     .background(Color(hex: 0xFFE07A), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .disabled(store.saving)
                 HStack(spacing: 6) {
-                    small("+ Water", .lavender) { await store.logWater() }
+                    small("+ Water · \(bottleOz(store.bottleMl))", .lavender) { await store.logWater() }
                     small("+ Drink", Color(hex: 0xF3E9FF)) { await store.logDrink() }
                 }
                 HStack {
@@ -112,19 +117,22 @@ struct WatchLogView: View {
                     Spacer()
                     Text("Cutoff 2pm").fontWeight(.bold).foregroundStyle(Color.butterInk)
                 }
-                .font(.system(size: 12))
-                if let msg = store.lastLogged { Text(msg).font(.system(size: 12, weight: .bold)).foregroundStyle(Color.mintInk) }
+                .scaledFont(12)
+                if let msg = store.lastLogged { Text(msg).scaledFont(12, .bold).foregroundStyle(Color.mintInk) }
             }
         }
         .watchPage(.ground)
     }
 
+    private func bottleOz(_ ml: Double) -> String { "\(Int((ml / 29.5735).rounded())) oz" }
+
     private func small(_ title: String, _ fill: Color, _ action: @escaping () async -> Void) -> some View {
         Button { Task { await action() } } label: {
-            Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink)
+            Text(title).scaledFont(15, .bold).foregroundStyle(Color.ink).minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, minHeight: 44).background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(store.saving)
     }
 }
 
@@ -141,17 +149,17 @@ struct WatchTonightView: View {
             VStack(spacing: 8) {
                 PageHeader(title: "Tonight", color: dark ? Color(hex: 0x9AA6FA) : .mainText)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(pastBedtime ? "You’re up past" : "Asleep by").font(.system(size: 13)).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
+                    Text(pastBedtime ? "You’re up past" : "Asleep by").scaledFont(13).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
                     Text(s.bedBy?.replacingOccurrences(of: "am", with: "").replacingOccurrences(of: "pm", with: "") ?? "–")
-                        .font(.number(40)).foregroundStyle(dark ? .white : Color.ink)
+                        .numberFont(40).foregroundStyle(dark ? .white : Color.ink)
                     Text(pastBedtime ? "Asleep soon still gets you a good night" : "8 hours before morning class")
-                        .font(.system(size: 12)).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
+                        .scaledFont(12).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
                 .background(dark ? Color(hex: 0x15172B) : Color.lavender, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 if let note = s.examNote {
-                    Label(note, systemImage: "calendar").font(.system(size: 13, weight: .semibold))
+                    Label(note, systemImage: "calendar").scaledFont(13, .semibold)
                         .foregroundStyle(dark ? Color(hex: 0xD8DAEA) : Color.ink)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(8)
                         .background(dark ? Color(hex: 0x15172B) : Color.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -161,7 +169,7 @@ struct WatchTonightView: View {
                     Spacer()
                     if let c = s.caffeineAtBed { Text("Caffeine ~\(Int(c.rounded())) mg") }
                 }
-                .font(.system(size: 12)).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
+                .scaledFont(12).foregroundStyle(dark ? Color(hex: 0xB9BCD4) : Color(hex: 0x4A4F6E))
             }
         }
         .watchPage(dark ? .black : .ground)
@@ -180,23 +188,23 @@ struct WatchCycleView: View {
                     PhaseRing(day: s.cycleDay ?? 1, length: s.typicalLength ?? 28, periodLength: s.periodLength ?? 5, ovulation: s.ovulationDay ?? 14)
                         .frame(width: 84, height: 84)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(s.phase ?? "").font(.number(18)).foregroundStyle(Color.ink)
-                        if let d = s.daysToPeriod, d >= 0 { Text("Period ~\(d) days").font(.system(size: 12)).foregroundStyle(Color(hex: 0x4A4F6E)) }
-                        if let t = s.tempDelta { Text("Temp \(t >= 0 ? "+" : "")\(String(format: "%.1f", t))°").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.peachInk) }
+                        Text(s.phase ?? "").numberFont(18).foregroundStyle(Color.ink)
+                        if let d = s.daysToPeriod, d >= 0 { Text("Period ~\(d) days").scaledFont(12).foregroundStyle(Color(hex: 0x4A4F6E)) }
+                        if let t = s.tempDelta { Text("Temp \(t >= 0 ? "+" : "")\(String(format: "%.1f", t))°C").scaledFont(12, .bold).foregroundStyle(Color.peachInk) }
                     }
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 6) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Recovery").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.mainText)
-                        Text(s.recovery.map(String.init) ?? "–").font(.system(size: 20, weight: .bold)).foregroundStyle(Color.ink)
+                        Text("Recovery").scaledFont(11, .bold).foregroundStyle(Color.mainText)
+                        Text(s.recovery.map(String.init) ?? "–").scaledFont(20, .bold).foregroundStyle(Color.ink)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(8)
                     .background(Color.lavender, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     Button { Task { await store.logLatte() } } label: {
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("Tap to log").font(.system(size: 11, weight: .bold))
-                            Text("Latte").font(.system(size: 20, weight: .bold))
+                            Text("Tap to log").scaledFont(11, .bold)
+                            Text("Latte").scaledFont(20, .bold)
                         }
                         .foregroundStyle(Color.ink)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(8)
@@ -254,27 +262,27 @@ struct WatchSickView: View {
             VStack(spacing: 8) {
                 PageHeader(title: "Heads up", color: .peachInk)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Body working harder").font(.number(18)).foregroundStyle(Color.ink)
-                    Text("Bug coming on, or stress? Just a guess.").font(.system(size: 13)).foregroundStyle(Color(hex: 0x4A4F6E))
+                    Text("Body working harder").numberFont(18).foregroundStyle(Color.ink)
+                    Text("Bug coming on, or stress? Just a guess.").scaledFont(13).foregroundStyle(Color(hex: 0x4A4F6E))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(10)
                 .background(Color.peach, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 if answered {
-                    Text("Thanks. Take it easy today.").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.mintInk)
+                    Text("Thanks. Take it easy today.").scaledFont(13, .bold).foregroundStyle(Color.mintInk)
                 } else {
                     HStack(spacing: 6) {
                         Button { answered = true } label: {
-                            Text("Not great").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                            Text("Not great").scaledFont(14, .bold).foregroundStyle(.white)
                                 .frame(maxWidth: .infinity, minHeight: 44).background(Color.ink, in: Capsule())
                         }
                         Button { answered = true } label: {
-                            Text("I feel fine").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.mintInk)
+                            Text("I feel fine").scaledFont(14, .bold).foregroundStyle(Color.mintInk)
                                 .frame(maxWidth: .infinity, minHeight: 44).background(Color.mint, in: Capsule())
                         }
                     }
                     .buttonStyle(.plain)
                 }
-                if let t = s.sickTonight { Text(t).font(.system(size: 12)).foregroundStyle(Color(hex: 0x4A4F6E)) }
+                if let t = s.sickTonight { Text(t).scaledFont(12).foregroundStyle(Color(hex: 0x4A4F6E)) }
             }
         }
         .watchPage(.ground)

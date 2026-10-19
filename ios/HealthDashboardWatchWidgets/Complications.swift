@@ -20,8 +20,9 @@ struct ComplicationProvider: TimelineProvider {
 struct RecoveryComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "WatchRecovery", provider: ComplicationProvider()) { entry in
-            Gauge(value: Double(entry.snapshot.recovery ?? 0), in: 0...100) { Text("REC") } currentValueLabel: {
-                Text(entry.snapshot.recovery.map(String.init) ?? "–")
+            let today = entry.snapshot.isFromToday
+            Gauge(value: Double(today ? entry.snapshot.recovery ?? 0 : 0), in: 0...100) { Text("REC") } currentValueLabel: {
+                Text(today ? entry.snapshot.recovery.map(String.init) ?? "–" : "–")
             }
             .gaugeStyle(.accessoryCircular)
             .tint(Color.main)
@@ -41,6 +42,7 @@ struct LatteComplication: Widget {
                 Text("LATTE").font(.system(size: 9, weight: .bold))
             }
             .containerBackground(.clear, for: .widget)
+            .widgetURL(URL(string: "healthdashboard://log"))
         }
         .configurationDisplayName("Log a latte")
         .supportedFamilies([.accessoryCircular])

@@ -11,7 +11,31 @@ final class AppModel {
     enum CalendarState: Equatable { case notConnected, loading, ready(checkedAt: Date), failed(String) }
 
     private(set) var healthState: HealthState
-    private(set) var health = HealthData()
+    private(set) var health = HealthData() {
+        didSet { derived = Derived(health) }
+    }
+
+    /// Slow-to-compute numbers, worked out once whenever Health is re-read instead of on every screen draw.
+    struct Derived {
+        var recovery: [RecoveryDay] = []
+        var recoveryByDate: [String: Int] = [:]
+        init() {}
+        init(_ h: HealthData) {
+            recovery = recoveryDays(h.nights, restingHr: h.restingHr, hrv: h.hrv, days: 180)
+            recoveryByDate = Dictionary(recovery.map { ($0.date, $0.score) }, uniquingKeysWith: { a, _ in a })
+        }
+    }
+    private(set) var derived = Derived()
+    @ObservationIgnored private var _calendarRefreshing = false
+    @ObservationIgnored private var lastCalendarCheck = Date.distantPast
+    /// The profile from before "Run the welcome setup again", so the welcome screens start filled in
+    /// and pill-pack history isn't lost.
+    @ObservationIgnored var previousProfile: Profile?
+
+    func rerunWelcome() {
+        previousProfile = profile
+        profile = nil
+    }
     private(set) var calendarState: CalendarState
     private(set) var events: [CalendarEvent] = []
 
@@ -24,6 +48,16 @@ final class AppModel {
     private static let calendarAccount = "calendarICSURL"
 
     init() {
+        // Keychain items survive deleting the app, but nothing else does. On a fresh install,
+        // drop a leftover calendar link or Google sign-in so it doesn't reconnect by itself.
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: "installed.v1") {
+            if defaults.object(forKey: Self.connectedKey) == nil && ProfileStore.load() == nil {
+                Keychain.set(nil, for: Self.calendarAccount)
+                Keychain.set(nil, for: "googleRefreshToken")
+            }
+            defaults.set(true, forKey: "installed.v1")
+        }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-resetProfile") {
             ProfileStore.save(nil)
@@ -40,6 +74,7 @@ final class AppModel {
         #if DEBUG
         if DemoData.isOn {
             health = DemoData.health()
+            derived = Derived(health)
             healthState = .ready
             events = DemoData.events()
             calendarState = .ready(checkedAt: .now)
@@ -91,7 +126,8 @@ final class AppModel {
             healthState = .ready
             if !quiet { BackgroundHealth.shared.noteRefreshed() }
         } catch {
-            if !quiet || health.nights.isEmpty { healthState = quiet ? healthState : .failed(error.localizedDescription) }
+            // Keep showing the last numbers if there are any; only a first read with nothing shows an error.
+            if !quiet && health.nights.isEmpty && health.restingHr.isEmpty { healthState = .failed(error.localizedDescription) }
         }
     }
 
@@ -116,6 +152,10 @@ final class AppModel {
     enum CalendarSource: String { case google, apple, link }
 
     private static let sourceKey = "calendarSource"
+    private var calendarRefreshing: Bool {
+        get { _calendarRefreshing }
+        set { _calendarRefreshing = newValue }
+    }
     private let eventStore = EKEventStore()
 
     private static var storedSource: CalendarSource? {
@@ -126,6 +166,8 @@ final class AppModel {
     }
 
     var calendarSource: CalendarSource? { Self.storedSource }
+    /// Google rejected the saved sign-in; Settings and Exams offer to sign in again.
+    var googleNeedsSignIn: Bool { calendarSource == .google && !GoogleAuth.shared.isSignedIn }
     var isCalendarConnected: Bool { calendarSource != nil }
     var googleConfigured: Bool { GoogleAuth.shared.isConfigured }
 
@@ -135,7 +177,16 @@ final class AppModel {
         if source != .google { GoogleAuth.shared.signOut() }
         if source != .link { Keychain.set(nil, for: Self.calendarAccount) }
         events = []
+        lastCalendarCheck = .distantPast
         calendarState = source == nil ? .notConnected : .loading
+        // No calendar means no exams: drop exam reminders now, not at the next app open.
+        if source == nil {
+            let center = UNUserNotificationCenter.current()
+            Task {
+                let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix("exam-") }
+                center.removePendingNotificationRequests(withIdentifiers: ids)
+            }
+        }
     }
 
     /// Opens Google's sign-in page and reads Google Calendar directly.
@@ -144,7 +195,7 @@ final class AppModel {
         do {
             try await GoogleAuth.shared.signIn()
             setSource(.google)
-            await refreshCalendar()
+            await refreshCalendar(force: true)
         } catch GoogleError.cancelled {
             // Back to the choices, nothing changed.
         } catch {
@@ -161,7 +212,7 @@ final class AppModel {
                 return
             }
             setSource(.apple)
-            await refreshCalendar()
+            await refreshCalendar(force: true)
         } catch {
             calendarState = .failed(error.localizedDescription)
         }
@@ -179,7 +230,7 @@ final class AppModel {
         }
         setSource(.link)
         Keychain.set(trimmed, for: Self.calendarAccount)
-        await refreshCalendar()
+        await refreshCalendar(force: true)
     }
 
     private func readDeviceCalendar() {
@@ -196,8 +247,16 @@ final class AppModel {
         calendarState = .ready(checkedAt: .now)
     }
 
-    func refreshCalendar() async {
-        if isDemo { return }
+    /// Skips if a refresh is already running, or the last good one was under 5 minutes ago
+    /// (pass `force` for pull-to-refresh and right after connecting).
+    func refreshCalendar(force: Bool = false) async {
+        if isDemo || calendarRefreshing { return }
+        if !force, case .ready = calendarState, Date.now.timeIntervalSince(lastCalendarCheck) < 300 { return }
+        calendarRefreshing = true
+        defer {
+            calendarRefreshing = false
+            if case .ready = calendarState { lastCalendarCheck = .now }
+        }
         switch calendarSource {
         case nil:
             calendarState = .notConnected

@@ -32,13 +32,20 @@ struct RecoveryDay: Equatable {
 
 /// Typical night length over the 4 weeks before `date`, in minutes.
 func typicalSleep(_ nights: [Night], before date: String) -> Double? {
-    median(nights.filter { (1...28).contains(Day.between($0.date, date)) }.map { Double($0.asleepMinutes) })
+    let byDate = Dictionary(nights.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+    return typicalSleep(byDate, before: date)
+}
+
+/// The same, from nights indexed by date (fast enough to run for every day of the year).
+func typicalSleep(_ byDate: [String: Night], before date: String) -> Double? {
+    median((1...28).compactMap { byDate[Day.shift(date, -$0)].map { Double($0.asleepMinutes) } })
 }
 
 /// Recovery for each of the last `days` days that have enough history behind them.
 /// Each day is compared with the 28 days before it, so the score is always "vs. your normal".
 func recoveryDays(_ nights: [Night], restingHr: [String: Double], hrv: [String: Double], days: Int = 14, today: String = Day.key(.now)) -> [RecoveryDay] {
     let byWake = Dictionary(nights.map { ($0.wakeDate, $0) }, uniquingKeysWith: { a, _ in a })
+    let byEvening = Dictionary(nights.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
     return (0..<days).reversed().compactMap { back in
         let day = Day.shift(today, -back)
         func baseline(_ series: [String: Double]) -> Double? {
@@ -49,7 +56,7 @@ func recoveryDays(_ nights: [Night], restingHr: [String: Double], hrv: [String: 
         let hrvBase = baseline(hrv), rhrBase = baseline(restingHr)
         let hrvChange = zip2(hrv[day], hrvBase).map { $0 / $1 - 1 }
         let rhrChange = zip2(restingHr[day], rhrBase).map { $0 - $1 }
-        let sleepChange = zip2(night.map { Double($0.asleepMinutes) }, night.flatMap { typicalSleep(nights, before: $0.date) }).map { $0 - $1 }
+        let sleepChange = zip2(night.map { Double($0.asleepMinutes) }, night.flatMap { typicalSleep(byEvening, before: $0.date) }).map { $0 - $1 }
         guard hrvChange != nil || rhrChange != nil, sleepChange != nil || night == nil else { return nil }
 
         var score = 80.0
@@ -71,13 +78,13 @@ private func zip2(_ a: Double?, _ b: Double?) -> (Double, Double)? {
 }
 
 /// How consistent bed and wake times are, 0–100. Night-to-night shifts of about half an hour
-/// score in the 80s; a two-hour swing every night scores in the 40s.
-func sleepRegularity(_ nights: [Night], count: Int = 14) -> Int? {
-    let recent = Array(nights.suffix(count))
-    guard recent.count >= 7 else { return nil }
-    let shifts = zip(recent, recent.dropFirst()).map { a, b in
-        (Double(abs(b.bedtime - a.bedtime)) + Double(abs(b.wake - a.wake))) / 2
-    }
+/// score in the 80s; a two-hour swing every night scores in the 40s. Only back-to-back nights in
+/// the last three weeks are compared, so gaps (Watch not worn) and old habits don't count.
+func sleepRegularity(_ nights: [Night], today: String = Day.key(.now)) -> Int? {
+    let recent = nights.filter { Day.between($0.date, today) <= 21 }
+    let pairs = zip(recent, recent.dropFirst()).filter { Day.between($0.date, $1.date) == 1 }
+    guard pairs.count >= 5 else { return nil }
+    let shifts = pairs.map { a, b in (Double(abs(b.bedtime - a.bedtime)) + Double(abs(b.wake - a.wake))) / 2 }
     guard let avg = mean(shifts) else { return nil }
     return Int(max(0, min(100, 100 - avg / 2)).rounded())
 }

@@ -22,8 +22,11 @@ struct StressSummary: Equatable {
     /// This week's average vs. the three weeks before (1 = same).
     var weekRatio: Double?
 
+    /// Compared with her own days when there's enough history, so the label and the
+    /// "higher than N% of your evenings" line always agree.
     var label: String {
         guard let now else { return "No data" }
+        if let p = percentile { return p >= 0.8 ? "Elevated" : p >= 0.5 ? "Moderate" : "Low" }
         return now >= 60 ? "Elevated" : now >= 35 ? "Moderate" : "Low"
     }
 
@@ -55,7 +58,8 @@ func stressSummary(_ hourly: [Date: Double], resting: Double?, now: Date = .now)
     func part(_ h: Int) -> String { h < 12 ? "mornings" : h < 18 ? "afternoons" : "evenings" }
     var percentile: Double?
     if let latest {
-        let same = hourly.filter { $0.key < todayStart && part(cal.component(.hour, from: $0.key)) == part(latest.hour) }
+        // Awake hours only (7am–11pm), so sleeping hours don't make every daytime reading look high.
+        let same = hourly.filter { (7..<23).contains(cal.component(.hour, from: $0.key)) && $0.key < todayStart && part(cal.component(.hour, from: $0.key)) == part(latest.hour) }
             .map { stressLevel(heartRate: $0.value, resting: resting) }
         if same.count >= 20 { percentile = Double(same.filter { $0 < latest.level }.count) / Double(same.count) }
     }

@@ -11,7 +11,8 @@ final class BackgroundHealth {
     private weak var model: AppModel?
     private var started = false
     private var running: Task<Void, Never>?
-    private var lastRefresh = Date.distantPast
+    /// New data arrived while a refresh was running; run once more when it finishes.
+    private var needsAnotherPass = false
 
     /// What to watch, and how soon to be woken. Logs (drinks, water, period) come in right away;
     /// slow-moving readings at most hourly to save battery.
@@ -47,24 +48,27 @@ final class BackgroundHealth {
         }
     }
 
-    /// One refresh at a time; several types arriving together share it.
+    /// One refresh at a time. Data that lands mid-refresh triggers exactly one more pass, so nothing
+    /// is skipped and several types arriving together share the work.
     func update() async {
         if let running {
+            needsAnotherPass = true
             await running.value
             return
         }
-        // Every observer fires once when it starts; skip if the app just refreshed.
-        guard Date.now.timeIntervalSince(lastRefresh) > 120, let model else { return }
+        guard let model else { return }
         let task = Task { @MainActor in
-            await model.refreshHealth(quiet: true)
-            if model.healthState == .ready { model.publishWidgetSnapshot() }
-            self.lastRefresh = .now
+            repeat {
+                self.needsAnotherPass = false
+                await model.refreshHealth(quiet: true)
+                if model.healthState == .ready { model.publishWidgetSnapshot() }
+            } while self.needsAnotherPass
         }
         running = task
         await task.value
         running = nil
     }
 
-    /// Called after the app refreshes on its own (opening it), so observers don't repeat the work.
-    func noteRefreshed() { lastRefresh = .now }
+    /// Kept for callers that refresh on their own; nothing to skip any more.
+    func noteRefreshed() {}
 }

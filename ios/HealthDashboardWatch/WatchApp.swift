@@ -23,6 +23,8 @@ final class WatchStore: NSObject, WCSessionDelegate {
 
     var snapshot = WidgetSnapshot.load()
     var lastLogged: String?
+    /// One save at a time, so a double tap can't log twice.
+    var saving = false
     private let health = HKHealthStore()
 
     override init() {
@@ -62,10 +64,16 @@ final class WatchStore: NSObject, WCSessionDelegate {
     // MARK: Logging
 
     func logLatte() async { await log(HKQuantityType(.dietaryCaffeine), .gramUnit(with: .milli), 130, "Latte saved") }
-    func logWater() async { await log(HKQuantityType(.dietaryWater), .literUnit(with: .milli), 710, "Water saved") }
+    /// One bottle at the size she picked on the phone.
+    var bottleMl: Double { snapshot.bottleMl ?? 710 }
+    func logWater() async { await log(HKQuantityType(.dietaryWater), .literUnit(with: .milli), bottleMl, "Water saved") }
     func logDrink() async { await log(HKQuantityType(.numberOfAlcoholicBeverages), .count(), 1, "Drink saved") }
 
     private func log(_ type: HKQuantityType, _ unit: HKUnit, _ amount: Double, _ message: String) async {
+        guard !saving else { return }
+        saving = true
+        lastLogged = nil
+        defer { saving = false }
         do {
             try await health.requestAuthorization(toShare: [type], read: [])
             try await health.save(HKQuantitySample(type: type, quantity: HKQuantity(unit: unit, doubleValue: amount), start: .now, end: .now))
@@ -81,11 +89,7 @@ final class WatchStore: NSObject, WCSessionDelegate {
         }
     }
 
-    private func snapshotDay() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: .now)
-    }
+    private func snapshotDay() -> String { WidgetSnapshot.eveningKey() }
 }
 
 #if DEBUG

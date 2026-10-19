@@ -27,6 +27,32 @@ enum Day {
         return String(format: "%04d-%02d-%02d", d.year!, d.month!, d.day!)
     }
 
+    /// The evening a moment belongs to: anything before 5am counts as the night before,
+    /// so a 1am Red Bull or a 2am drink belongs to last night, not tomorrow.
+    static func evening(_ date: Date, in timeZone: TimeZone = .current) -> String {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = timeZone
+        let hour = c.component(.hour, from: date)
+        return hour < 5 ? shift(key(date, in: timeZone), -1) : key(date, in: timeZone)
+    }
+
+    /// Hours since the evening's midnight: 13.5 for 1:30pm, 25 for 1am the next morning.
+    static func eveningHour(_ date: Date, in timeZone: TimeZone = .current) -> Double {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = timeZone
+        let p = c.dateComponents([.hour, .minute], from: date)
+        let h = Double(p.hour ?? 0) + Double(p.minute ?? 0) / 60
+        return h < 5 ? h + 24 : h
+    }
+
+    /// Local midnight at the start of a day key.
+    static func start(_ key: String, in timeZone: TimeZone = .current) -> Date {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = timeZone
+        let p = key.split(separator: "-").compactMap { Int($0) }
+        return c.date(from: DateComponents(year: p[0], month: p[1], day: p[2]))!
+    }
+
     static func shift(_ key: String, _ days: Int) -> String {
         format(utc.date(byAdding: .day, value: days, to: parse(key))!)
     }
