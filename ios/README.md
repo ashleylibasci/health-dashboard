@@ -57,10 +57,31 @@ again to renew it. A paid Apple Developer account ($99/year) removes that limit.
 
 ## Calendar
 
-Tap the **A** in the top corner → paste the **Secret address in iCal format**
-from Google Calendar (Settings → your calendar). It's stored in the phone's
-Keychain. The app checks the calendar when it opens and every 30 minutes while
-it's open.
+Choose **Google Calendar** (sign in with Google; read straight from Google) or
+**Apple Calendar** (the calendars on the iPhone) in the welcome screens or
+Settings. A Google secret link still works as a backup. All are read-only.
+
+### One-time Google setup (about 10 minutes, free)
+
+Google sign-in needs your own free Google Cloud project, because the app isn't
+published.
+
+1. Go to **console.cloud.google.com**, sign in with the Google account your
+   exams are in, and create a project named "Health Dashboard".
+2. **APIs & Services → Library** → search "Google Calendar API" → **Enable**.
+3. **APIs & Services → OAuth consent screen** (also called Google Auth
+   Platform): choose **External**, fill in the app name and your email, and
+   add your Gmail as a **test user**.
+4. **Credentials → Create credentials → OAuth client ID** → type **iOS** →
+   bundle ID `com.ashleylibasci.healthdashboard` → **Create**.
+5. Copy the **Client ID** (ends in `.apps.googleusercontent.com`) and put it in
+   `HealthDashboard/Calendar/GoogleConfig` (`clientID` in
+   `GoogleCalendar.swift`), then run the app again.
+
+Google shows "Google hasn't verified this app" at sign-in. That's expected
+for a personal app: tap **Continue**. While the project is in **Testing**,
+Google signs you out every 7 days; publishing it ("Publish app" on the consent
+screen) stops that, and the unverified warning stays.
 
 ## Testing without a phone
 

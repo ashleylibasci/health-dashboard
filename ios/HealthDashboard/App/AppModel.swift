@@ -29,13 +29,14 @@ final class AppModel {
             ProfileStore.save(nil)
             UserDefaults.standard.removeObject(forKey: Self.connectedKey)
             Keychain.set(nil, for: Self.calendarAccount)
-            UserDefaults.standard.removeObject(forKey: Self.deviceCalendarKey)
+            UserDefaults.standard.removeObject(forKey: Self.sourceKey)
+            GoogleAuth.shared.signOut()
             profile = nil
         }
         #endif
         healthState = !HealthReader.isAvailable ? .unavailable
             : UserDefaults.standard.bool(forKey: Self.connectedKey) ? .loading : .notConnected
-        calendarState = Keychain.get(Self.calendarAccount) == nil && !UserDefaults.standard.bool(forKey: Self.deviceCalendarKey) ? .notConnected : .loading
+        calendarState = Self.storedSource == nil ? .notConnected : .loading
         #if DEBUG
         if DemoData.isOn {
             health = DemoData.health()
@@ -110,16 +111,48 @@ final class AppModel {
 
     var calendarURL: String? { Keychain.get(Self.calendarAccount) }
 
-    private static let deviceCalendarKey = "useDeviceCalendar"
+    /// Where exams come from: Google (signed in with Google), the iPhone's calendar (Apple
+    /// Calendar, plus any accounts added to the phone), or a Google secret link.
+    enum CalendarSource: String { case google, apple, link }
+
+    private static let sourceKey = "calendarSource"
     private let eventStore = EKEventStore()
-    /// Set when no Google account was found on the phone, so every calendar is being read.
-    private(set) var calendarNote: String?
 
-    /// Reading the Google Calendar that's already signed in on the iPhone (Settings → Calendar → Accounts).
-    var usesDeviceCalendar: Bool { UserDefaults.standard.bool(forKey: Self.deviceCalendarKey) }
-    var isCalendarConnected: Bool { usesDeviceCalendar || calendarURL != nil }
+    private static var storedSource: CalendarSource? {
+        if let raw = UserDefaults.standard.string(forKey: sourceKey) { return CalendarSource(rawValue: raw) }
+        // Earlier versions: a saved link, or the "use this iPhone's calendar" switch.
+        if UserDefaults.standard.bool(forKey: "useDeviceCalendar") { return .apple }
+        return Keychain.get(calendarAccount) != nil ? .link : nil
+    }
 
-    /// One tap: asks iOS for calendar access, then reads the Google account's calendars on this phone.
+    var calendarSource: CalendarSource? { Self.storedSource }
+    var isCalendarConnected: Bool { calendarSource != nil }
+    var googleConfigured: Bool { GoogleAuth.shared.isConfigured }
+
+    private func setSource(_ source: CalendarSource?) {
+        UserDefaults.standard.set(source?.rawValue, forKey: Self.sourceKey)
+        UserDefaults.standard.removeObject(forKey: "useDeviceCalendar")
+        if source != .google { GoogleAuth.shared.signOut() }
+        if source != .link { Keychain.set(nil, for: Self.calendarAccount) }
+        events = []
+        calendarState = source == nil ? .notConnected : .loading
+    }
+
+    /// Opens Google's sign-in page and reads Google Calendar directly.
+    func connectGoogle() async {
+        if isDemo { return }
+        do {
+            try await GoogleAuth.shared.signIn()
+            setSource(.google)
+            await refreshCalendar()
+        } catch GoogleError.cancelled {
+            // Back to the choices, nothing changed.
+        } catch {
+            calendarState = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Asks iOS for calendar access and reads the iPhone's calendars (Apple Calendar).
     func connectDeviceCalendar() async {
         if isDemo { return }
         do {
@@ -127,9 +160,7 @@ final class AppModel {
                 calendarState = .failed("Calendar access is off. Turn it on in the Settings app → Privacy & Security → Calendars → Health Dashboard.")
                 return
             }
-            UserDefaults.standard.set(true, forKey: Self.deviceCalendarKey)
-            Keychain.set(nil, for: Self.calendarAccount)
-            calendarState = .loading
+            setSource(.apple)
             await refreshCalendar()
         } catch {
             calendarState = .failed(error.localizedDescription)
@@ -137,47 +168,57 @@ final class AppModel {
     }
 
     func disconnectCalendar() async {
-        UserDefaults.standard.removeObject(forKey: Self.deviceCalendarKey)
-        await setCalendarURL(nil)
+        setSource(nil)
     }
 
     func setCalendarURL(_ url: String?) async {
         let trimmed = url?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else {
+            if calendarSource == .link { setSource(nil) }
+            return
+        }
+        setSource(.link)
         Keychain.set(trimmed, for: Self.calendarAccount)
-        if trimmed?.isEmpty == false { UserDefaults.standard.removeObject(forKey: Self.deviceCalendarKey) }
-        events = []
-        calendarState = trimmed?.isEmpty == false ? .loading : .notConnected
         await refreshCalendar()
     }
 
     private func readDeviceCalendar() {
         eventStore.reset()
-        let all = eventStore.calendars(for: .event)
-        let google = all.filter { cal in
-            let source = cal.source.title.lowercased()
-            return source.contains("gmail") || source.contains("google")
-        }
-        calendarNote = google.isEmpty ? "No Google account is signed in on this iPhone, so every calendar on the phone is being read. Add Google in the Settings app → Calendar → Accounts." : nil
         let start = Calendar.current.date(byAdding: .day, value: -365, to: .now)!
         let end = Calendar.current.date(byAdding: .day, value: 60, to: .now)!
-        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: google.isEmpty ? nil : google)
-        events = eventStore.events(matching: predicate).map { e in
-            let parts = Calendar.current.dateComponents([.hour, .minute], from: e.startDate)
-            return CalendarEvent(title: e.title ?? "", date: Day.key(e.startDate), minutes: e.isAllDay ? nil : (parts.hour ?? 0) * 60 + (parts.minute ?? 0))
-        }
-        .sorted { ($0.date, $0.minutes ?? -1) < ($1.date, $1.minutes ?? -1) }
+        events = eventStore.events(matching: eventStore.predicateForEvents(withStart: start, end: end, calendars: nil))
+            .filter { !$0.hasRecurrenceRules }
+            .map { e in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: e.startDate)
+                return CalendarEvent(title: e.title ?? "", date: Day.key(e.startDate), minutes: e.isAllDay ? nil : (parts.hour ?? 0) * 60 + (parts.minute ?? 0))
+            }
+            .sorted { ($0.date, $0.minutes ?? -1) < ($1.date, $1.minutes ?? -1) }
         calendarState = .ready(checkedAt: .now)
     }
 
     func refreshCalendar() async {
         if isDemo { return }
-        if usesDeviceCalendar {
+        switch calendarSource {
+        case nil:
+            calendarState = .notConnected
+            return
+        case .google?:
+            do {
+                events = try await GoogleCalendarAPI.events()
+                calendarState = .ready(checkedAt: .now)
+            } catch {
+                calendarState = .failed(error.localizedDescription)
+            }
+            return
+        case .apple?:
             guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
                 calendarState = .failed("Calendar access is off. Turn it on in the Settings app → Privacy & Security → Calendars → Health Dashboard.")
                 return
             }
             readDeviceCalendar()
             return
+        case .link?:
+            break
         }
         guard let link = calendarURL else {
             calendarState = .notConnected

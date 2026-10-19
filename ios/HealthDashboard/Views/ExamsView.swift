@@ -10,10 +10,10 @@ struct ExamsView: View {
             switch model.calendarState {
             case .notConnected:
                 Card {
-                    CardLabel("Connect Google Calendar")
-                    Text("Connect the Google Calendar on this iPhone once, and the app checks for exams every time it opens and every 30 minutes while it’s open.")
+                    CardLabel("Connect your calendar")
+                    Text("Connect Google Calendar or Apple Calendar once, and the app checks for exams every time it opens and every 30 minutes while it’s open.")
                         .scaledFont(15).foregroundStyle(Color.ink)
-                    Button("Use Google Calendar on this iPhone") { Task { await model.connectDeviceCalendar() } }
+                    Button("Connect a calendar") { showSettings = true }
                         .scaledFont(16, .bold)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .foregroundStyle(Color.onSolid)

@@ -118,6 +118,20 @@ struct CalendarTests {
         #expect(events[2].minutes == 13 * 60)
     }
 
+    @Test func readsGoogleEventsSkippingRepeatsAndCancelled() {
+        let page: [String: Any] = ["items": [
+            ["summary": "MATH 347 Midterm", "start": ["date": "2026-10-22"]],
+            ["summary": "CS 225 quiz", "start": ["dateTime": "2026-10-20T19:00:00Z"]],
+            ["summary": "Lecture", "recurringEventId": "abc", "start": ["dateTime": "2026-10-20T14:00:00-05:00"]],
+            ["summary": "Old exam", "status": "cancelled", "start": ["date": "2026-10-01"]],
+        ]]
+        let events = googleEvents(page, timeZone: chicago)
+        #expect(events.map(\.title) == ["MATH 347 Midterm", "CS 225 quiz"])
+        #expect(events[0].minutes == nil)
+        #expect(events[1].date == "2026-10-20")
+        #expect(events[1].minutes == 14 * 60) // 19:00 UTC is 2pm in Chicago
+    }
+
     @Test func matchesExamWordsAsWholeWords() {
         #expect(isExam("MATH 347 Midterm"))
         #expect(isExam("Finals week study group"))

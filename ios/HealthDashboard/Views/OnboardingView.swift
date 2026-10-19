@@ -30,6 +30,7 @@ struct OnboardingView: View {
     @State private var connecting = false
     @State private var showConditions = false
     @State private var showLinkField = false
+    @State private var calendarChoice: AppModel.CalendarSource = .google
 
     /// The steps actually shown, skipping birth control unless it applies.
     private var steps: [Step] {
@@ -238,22 +239,31 @@ struct OnboardingView: View {
 
     private var calendarPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            heading("Connect ", "Google Calendar")
+            heading("Connect your ", "calendar")
             Text("The app looks for exams, midterms, finals and quizzes so it can warn you before exam week and compare how you sleep then.")
-                .scaledFont(15).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                .font(.subheadline).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             if model.isCalendarConnected, case .ready = model.calendarState {
                 Card(fill: .mint) {
-                    Label("Connected: \(model.exams.count) exam\(model.exams.count == 1 ? "" : "s") found", systemImage: "checkmark.circle.fill")
-                        .scaledFont(16, .bold).foregroundStyle(Color.mintInk)
-                    if let note = model.calendarNote { Note(note) }
+                    Label("\(sourceName(model.calendarSource)) connected: \(model.exams.count) exam\(model.exams.count == 1 ? "" : "s") found", systemImage: "checkmark.circle.fill")
+                        .font(.headline).foregroundStyle(Color.mintInk)
                 }
             } else {
-                Card(fill: .lavender) {
-                    Text("If your Google account is signed in on this iPhone (Settings → Calendar → Accounts), one tap is all it takes. iOS will ask to share your calendar.")
-                        .scaledFont(15).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+                CalendarChoiceCard(
+                    selected: calendarChoice == .google, icon: "g.circle.fill", title: "Google Calendar",
+                    detail: model.googleConfigured ? "Sign in with Google. The app reads your calendar straight from Google, read-only."
+                        : "Needs a one-time setup on a computer first. Until then, use Apple Calendar or a link.",
+                    enabled: model.googleConfigured
+                ) { calendarChoice = .google; showLinkField = false }
+                CalendarChoiceCard(
+                    selected: calendarChoice == .apple, icon: "calendar", title: "Apple Calendar",
+                    detail: "Reads the calendars on this iPhone, including any accounts added in Settings → Calendar → Accounts.",
+                    enabled: true
+                ) { calendarChoice = .apple; showLinkField = false }
+                Button(showLinkField ? "Hide the link option" : "Can’t sign in? Use a Google secret link instead") {
+                    showLinkField.toggle()
+                    if showLinkField { calendarChoice = .link }
                 }
-                Button(showLinkField ? "Hide the link option" : "No Google account on this phone? Use a secret link instead") { showLinkField.toggle() }
-                    .scaledFont(14, .semibold).foregroundStyle(Color.mainText)
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Color.mainText)
                 if showLinkField {
                     VStack(alignment: .leading, spacing: 8) {
                         step(1, "On a computer, open **calendar.google.com** → the gear → **Settings**.")
@@ -271,8 +281,13 @@ struct OnboardingView: View {
                 }
             }
             if case .failed(let message) = model.calendarState { Note(message) }
-            privacyNote("Events are read on your phone and never uploaded.")
+            privacyNote("Read-only. Events are read on your phone and never uploaded.")
         }
+        .onAppear { if !model.googleConfigured { calendarChoice = .apple } }
+    }
+
+    private func sourceName(_ source: AppModel.CalendarSource?) -> String {
+        switch source { case .google?: "Google Calendar"; case .apple?: "Apple Calendar"; case .link?: "Calendar link"; case nil: "Calendar" }
     }
 
     private var remindersPage: some View {
@@ -366,7 +381,8 @@ struct OnboardingView: View {
         case .health: model.healthState == .ready ? "Continue" : "Connect Apple Health"
         case .calendar:
             model.isCalendarConnected ? "Continue"
-                : showLinkField && !calendarLink.trimmingCharacters(in: .whitespaces).isEmpty ? "Connect with link" : "Use Google Calendar on this iPhone"
+                : calendarChoice == .google ? "Sign in with Google"
+                : calendarChoice == .apple ? "Use Apple Calendar" : "Connect with link"
         case .reminders: model.notificationsAllowed == nil ? "Turn on reminders" : "Continue"
         case .done: model.recoveryToday == nil ? "Start learning my normal" : "See today"
         default: "Continue"
@@ -389,6 +405,10 @@ struct OnboardingView: View {
         case .name: !trimmedName.isEmpty
         case .cycle: cycle != nil
         case .birthControl: birthControl != nil
+        case .calendar: model.isCalendarConnected
+            || (calendarChoice == .google && model.googleConfigured)
+            || calendarChoice == .apple
+            || (calendarChoice == .link && !calendarLink.trimmingCharacters(in: .whitespaces).isEmpty)
         default: true
         }
     }
@@ -404,10 +424,10 @@ struct OnboardingView: View {
         case .calendar where !model.isCalendarConnected:
             connecting = true
             Task {
-                if showLinkField && !calendarLink.trimmingCharacters(in: .whitespaces).isEmpty {
-                    await model.setCalendarURL(calendarLink)
-                } else {
-                    await model.connectDeviceCalendar()
+                switch calendarChoice {
+                case .google: await model.connectGoogle()
+                case .apple: await model.connectDeviceCalendar()
+                case .link: await model.setCalendarURL(calendarLink)
                 }
                 connecting = false
             }
@@ -583,5 +603,39 @@ struct ShortHistoryNote: View {
         }
         .padding(12)
         .background(Color.peach, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+/// One calendar option on the welcome step.
+struct CalendarChoiceCard: View {
+    var selected: Bool
+    var icon: String
+    var title: String
+    var detail: String
+    var enabled: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: icon).font(.title2).foregroundStyle(Color.mainText)
+                    .frame(width: 40, height: 40).background(Color.lavender, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline).foregroundStyle(Color.ink)
+                    Text(detail).font(.subheadline).foregroundStyle(Color.muted2)
+                        .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3).foregroundStyle(selected ? Color.mainText : Color.muted)
+            }
+            .padding(16)
+            .background(selected ? Color.lavender : Color.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(selected ? Color.mainText : .clear, lineWidth: 2))
+            .opacity(enabled ? 1 : 0.55)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

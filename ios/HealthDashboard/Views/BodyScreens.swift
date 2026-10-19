@@ -83,7 +83,7 @@ struct StressView: View {
                             }
                         }
                     }
-                    Note("Read from how far your heart rate runs above your resting rate. Workouts show up here too.")
+                    Note("Read from how far your heart rate runs above your resting rate. Walks and workouts are left out, so exercise never counts as stress.")
                 }
                 if !model.stressDrivers.isEmpty {
                     Card {
@@ -230,15 +230,17 @@ struct WaterCard: View {
                         .scaledFont(13, .semibold).foregroundStyle(Color.mainText)
                 }
             }
-            HStack(alignment: .bottom, spacing: 8) {
-                ForEach(0..<Int(goal.rounded(.up)), id: \.self) { i in
-                    BottleShape(fill: min(1, max(0, done - Double(i))))
+            // One bottle per bottle drunk, even past the goal; the extra ones turn green.
+            let shown = max(Int(goal.rounded(.up)), Int(done.rounded(.up)))
+            FlowLayout(spacing: 8) {
+                ForEach(0..<shown, id: \.self) { i in
+                    BottleShape(fill: min(1, max(0, done - Double(i))), extra: Double(i) >= goal)
                         .frame(width: 26, height: 52)
                 }
             }
             .accessibilityElement()
             .accessibilityLabel("\(bottleCount(done)) of \(bottleCount(goal)) bottles")
-            Text("\(bottleCount(done)) of \(bottleCount(goal)) bottles today").scaledFont(15, .bold).foregroundStyle(Color.ink)
+            Text(done > goal ? "\(bottleCount(done)) bottles today, past your goal of \(bottleCount(goal))" : "\(bottleCount(done)) of \(bottleCount(goal)) bottles today").scaledFont(15, .bold).foregroundStyle(Color.ink)
             AdaptiveGrid(columns: 3, spacing: 8) {
                 ForEach([(0.25, "+ ¼"), (0.5, "+ ½"), (1.0, "+ 1 bottle")], id: \.0) { amount, label in
                     Button { Task { await model.logWater(bottles: amount) } } label: {
@@ -260,12 +262,14 @@ struct WaterCard: View {
 /// A simple water bottle outline that fills from the bottom.
 struct BottleShape: View {
     var fill: Double
+    /// Bottles past the daily goal.
+    var extra = false
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: w * 0.3).fill(Color.surface)
-                RoundedRectangle(cornerRadius: w * 0.3).fill(Color.main)
+                RoundedRectangle(cornerRadius: w * 0.3).fill(extra ? Color(hex: 0x5CC79A) : Color.main)
                     .frame(height: h * 0.85 * fill)
                 RoundedRectangle(cornerRadius: 3).fill(Color.mainText)
                     .frame(width: w * 0.5, height: h * 0.12)

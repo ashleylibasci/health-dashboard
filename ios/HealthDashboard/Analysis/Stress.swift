@@ -1,7 +1,7 @@
 import Foundation
 
-/// Stress is read from how far your heart rate runs above your resting rate when you're
-/// not asleep: about 4 points per bpm above resting, capped at 100. Workouts count too.
+/// Stress is read from how far your heart rate runs above your resting rate while you're awake
+/// and not exercising: about 4 points per bpm above resting, capped at 100.
 func stressLevel(heartRate: Double, resting: Double) -> Double {
     max(0, min(100, (heartRate - resting) * 4))
 }
@@ -85,7 +85,7 @@ func stressFactors(daily: [String: Double], nights: [Night], exercise: [String: 
         ("Deadline or exam day", { busyDays.contains($0) }),
         ("Under 7h sleep", { (sleepBefore[$0] ?? 999) < 420 }),
         ("Late luteal phase", { lateLutealDays.contains($0) }),
-        ("20-min walk or workout", { (exercise[$0] ?? 0) >= 20 }),
+        ("Days with a 20-min walk or workout", { (exercise[$0] ?? 0) >= 20 }),
         ("8+ hours sleep", { (sleepBefore[$0] ?? 0) >= 480 }),
     ]
     return checks.compactMap { name, test in

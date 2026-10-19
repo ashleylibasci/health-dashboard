@@ -48,11 +48,18 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    if model.usesDeviceCalendar {
-                        Label("Using the Google Calendar on this iPhone", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
-                        if let note = model.calendarNote { Text(note).font(.footnote).foregroundStyle(.secondary) }
-                    } else {
-                        Button("Use Google Calendar on this iPhone") { Task { await model.connectDeviceCalendar() } }
+                    switch model.calendarSource {
+                    case .google?: Label("Google Calendar (signed in)", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
+                    case .apple?: Label("Apple Calendar", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
+                    case .link?: Label("Google secret link", systemImage: "checkmark.circle.fill").foregroundStyle(Color.mintInk)
+                    case nil: EmptyView()
+                    }
+                    if model.calendarSource != .google {
+                        Button(model.googleConfigured ? "Sign in with Google" : "Sign in with Google (needs setup)") { Task { await model.connectGoogle() } }
+                            .disabled(!model.googleConfigured)
+                    }
+                    if model.calendarSource != .apple {
+                        Button("Use Apple Calendar") { Task { await model.connectDeviceCalendar() } }
                     }
                     if case .failed(let message) = model.calendarState { Text(message).font(.footnote).foregroundStyle(Color.peachInk) }
                     DisclosureGroup("Or use a secret link") {
@@ -76,9 +83,9 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Google Calendar")
+                    Text("Calendar")
                 } footer: {
-                    Text("One tap works when your Google account is signed in on this iPhone (Settings app → Calendar → Accounts). Events are read on your phone and never uploaded.")
+                    Text("Google reads your calendar straight from Google. Apple Calendar reads the calendars on this iPhone. Both are read-only, and events never leave your phone.")
                 }
 
                 Section {

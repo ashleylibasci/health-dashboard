@@ -8,6 +8,7 @@ struct CycleView: View {
         switch model.profile?.cycle {
         case .natural?: CycleCalendarView()
         case .irregular?: IrregularCycleView()
+        case .hormonal? where model.profile?.birthControl == .copperIUD: CycleCalendarView()
         case .hormonal?: PillCycleView()
         default: VStack { Note("Cycle tracking is off. Turn it on in Settings.") }.detailPage()
         }
@@ -259,6 +260,10 @@ struct PillCycleView: View {
                     }
                 }
             }
+            BleedCalendar(flow: model.health.flow, breakWeek: model.pack.map { p in
+                let packStart = Day.shift(model.today, -(p.day - 1))
+                return (21...27).map { Day.shift(packStart, $0) }
+            } ?? [])
             if method?.ovulation == .stops || method?.ovulation == .sometimes {
                 Card(fill: .track) {
                     CardLabel("Doesn’t apply to you*", color: .muted)
@@ -437,5 +442,86 @@ struct PCOSView: View {
             Note("General information, not medical advice. The app can’t diagnose PCOS or any condition.")
         }
         .detailPage()
+    }
+}
+
+/// Bleeding on birth control: this month's calendar with logged bleeding and spotting, the
+/// expected break-week bleed for pill/ring/patch packs, quick logging, and recent bleeds.
+struct BleedCalendar: View {
+    @Environment(AppModel.self) private var model
+    var flow: [String: Int]
+    /// Dates of this pack's break week, when a withdrawal bleed is expected.
+    var breakWeek: [String]
+    @State private var loggedToday: Int?
+
+    var body: some View {
+        let cal = Calendar.current
+        let today = Day.key(.now)
+        let first = cal.date(from: cal.dateComponents([.year, .month], from: .now))!
+        let days = cal.range(of: .day, in: .month, for: .now)!.count
+        let lead = cal.component(.weekday, from: first) - 1
+        let expected = Set(breakWeek)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                CardLabel("Bleeding · \(Date.now.formatted(.dateTime.month(.wide)))", color: .muted)
+                Spacer()
+            }
+            HStack { ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { Text($0.element).frame(maxWidth: .infinity) } }
+                .font(.caption.weight(.bold)).foregroundStyle(Color.muted)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
+                ForEach(0..<(lead + days), id: \.self) { i in
+                    if i < lead {
+                        Color.clear.frame(height: 40)
+                    } else {
+                        let key = Day.key(cal.date(byAdding: .day, value: i - lead, to: first)!)
+                        let level = flow[key] ?? 0
+                        let isToday = key == today
+                        let isExpected = expected.contains(key) && level == 0
+                        Text("\(Int(key.suffix(2))!)")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(isToday ? Color.onSolid : isExpected ? Color.peachInk : Color.ink)
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(isToday ? Color.solid : level >= 3 ? Color(hex: 0xF07A6B).opacity(0.55) : level > 0 ? Color.rose : isExpected ? Color.surface : Color.track))
+                            .overlay(isExpected ? RoundedRectangle(cornerRadius: 14).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 2, dash: [4, 3])) : nil)
+                            .accessibilityLabel("\(Int(key.suffix(2))!)\(level >= 3 ? ", bleeding" : level > 0 ? ", light bleeding or spotting" : isExpected ? ", break week" : "")")
+                    }
+                }
+            }
+            HStack(spacing: 12) {
+                legend(Color(hex: 0xF07A6B).opacity(0.55), "Bleeding")
+                legend(Color.rose, "Light or spotting")
+                if !breakWeek.isEmpty { legend(Color.surface, "Break week", dashed: true) }
+            }
+            .font(.caption).foregroundStyle(Color.muted)
+
+            Text("Bleeding today?").font(.subheadline.weight(.bold)).foregroundStyle(Color.ink)
+            HStack(spacing: 8) {
+                ForEach(Array(zip([1, 2, 3, 4], ["Spotting", "Light", "Medium", "Heavy"])), id: \.0) { level, name in
+                    Chip(text: name, selected: loggedToday == level || (loggedToday == nil && flow[today] == level), selectedFill: .rose) {
+                        loggedToday = level
+                        let yesterday = Day.shift(today, -1)
+                        Task { await model.logFlow(level == 1 ? 2 : level, startsPeriod: (flow[yesterday] ?? 0) == 0) }
+                    }
+                }
+            }
+            let recent = Array(periods(flow).suffix(3).reversed())
+            if !recent.isEmpty {
+                Text("Recent bleeds").font(.subheadline.weight(.bold)).foregroundStyle(Color.ink).padding(.top, 4)
+                ForEach(recent, id: \.start) { p in
+                    ValueRow(label: Day.short(p.start), value: "\(p.days) day\(p.days == 1 ? "" : "s")")
+                }
+            }
+            Note("Saved to Apple Health. On the pill, ring or patch, the break-week bleed is a withdrawal bleed, not a true period; spotting in the first months is common.")
+        }
+        .padding(16)
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private func legend(_ fill: Color, _ text: String, dashed: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 4).fill(fill).frame(width: 14, height: 14)
+                .overlay(dashed ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: 0xF07A6B), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2])) : nil)
+            Text(text)
+        }
     }
 }

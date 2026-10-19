@@ -36,7 +36,9 @@ struct HealthData {
     var respiratory: [String: Double] = [:]
     /// State of Mind logs: valence from −1 (very unpleasant) to 1 (very pleasant).
     var moods: [Reading] = []
-    /// Average heart rate per hour for the last 30 days, keyed by the hour's start.
+    /// Average heart rate per hour for the last 30 days, keyed by the hour's start. Hours with
+    /// exercise (and the hour after, while heart rate comes down) are left out, so a walk or
+    /// workout never reads as stress.
     var hourlyHr: [Date: Double] = [:]
 }
 
@@ -110,11 +112,13 @@ struct HealthReader {
         async let resp = daily(respiratoryType, .discreteAverage, unit: bpm, since: since)
         async let moods = moodReadings(window)
         async let hourly = hourlyAverages(heartRateType, unit: bpm, since: monthAgo)
+        async let hourlyExercise = hourlyStats(exerciseType, .cumulativeSum, unit: .minute(), since: monthAgo)
 
         return try await HealthData(
             nights: buildNights(sleep), restingHr: rhr, hrv: hrv, caffeineLogs: caffeine, vo2: vo2,
             exerciseMinutes: exercise, steps: steps, activeKcal: active, restingKcal: resting, waterMl: water,
-            drinks: drinks, flow: flow, wristTemp: temp, respiratory: resp, moods: moods, hourlyHr: hourly
+            drinks: drinks, flow: flow, wristTemp: temp, respiratory: resp, moods: moods,
+            hourlyHr: withoutExercise(hourly, exercise: hourlyExercise)
         )
     }
 
@@ -156,15 +160,20 @@ struct HealthReader {
 
     /// Average per hour, for the stress chart.
     private static func hourlyAverages(_ type: HKQuantityType, unit: HKUnit, since: Date) async throws -> [Date: Double] {
+        try await hourlyStats(type, .discreteAverage, unit: unit, since: since)
+    }
+
+    private static func hourlyStats(_ type: HKQuantityType, _ options: HKStatisticsOptions, unit: HKUnit, since: Date) async throws -> [Date: Double] {
         let query = HKStatisticsCollectionQueryDescriptor(
             predicate: .quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: since, end: nil)),
-            options: .discreteAverage,
+            options: options,
             anchorDate: since,
             intervalComponents: DateComponents(hour: 1)
         )
         var out: [Date: Double] = [:]
         try await query.result(for: store).enumerateStatistics(from: since, to: .now) { stats, _ in
-            if let q = stats.averageQuantity() { out[stats.startDate] = q.doubleValue(for: unit) }
+            let q = options.contains(.cumulativeSum) ? stats.sumQuantity() : stats.averageQuantity()
+            if let q { out[stats.startDate] = q.doubleValue(for: unit) }
         }
         return out
     }
@@ -215,4 +224,11 @@ struct HealthReader {
         )
         return try await query.result(for: store).map { Reading(date: $0.startDate, value: $0.valence) }
     }
+}
+
+/// Drops hours with 5+ exercise minutes, and the hour after each, from the hourly heart rate.
+func withoutExercise(_ hourly: [Date: Double], exercise: [Date: Double]) -> [Date: Double] {
+    let active = exercise.filter { $0.value >= 5 }.keys
+    let skip = Set(active.flatMap { [$0, $0.addingTimeInterval(3600)] })
+    return hourly.filter { !skip.contains($0.key) }
 }

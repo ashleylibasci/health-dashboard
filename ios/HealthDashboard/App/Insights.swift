@@ -33,8 +33,11 @@ extension AppModel {
     }
 
     var cycle: CycleStatus? {
-        guard let p = profile, p.cycle == .natural || p.cycle == .irregular else { return nil }
-        return cycleStatus(health.flow, wristTemp: health.wristTemp, predict: p.cycle == .natural && !p.conditions.contains(.pcos))
+        guard let p = profile else { return nil }
+        // A copper IUD has no hormones, so the natural cycle (and its predictions) carry on.
+        let naturalCycle = p.cycle == .natural || (p.cycle == .hormonal && p.birthControl == .copperIUD)
+        guard naturalCycle || p.cycle == .irregular else { return nil }
+        return cycleStatus(health.flow, wristTemp: health.wristTemp, predict: naturalCycle && !p.conditions.contains(.pcos))
     }
     var pack: PackStatus? {
         guard let p = profile, p.cycle == .hormonal, p.birthControl?.hasPlaceboWeek == true else { return nil }
