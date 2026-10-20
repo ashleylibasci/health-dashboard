@@ -666,7 +666,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads today’s caffeine so the Watch can show it.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water and drinks you log on your Watch.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water, drinks and moods you log on your Watch.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
@@ -697,7 +697,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads today’s caffeine so the Watch can show it.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water and drinks you log on your Watch.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves the lattes, water, drinks and moods you log on your Watch.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;

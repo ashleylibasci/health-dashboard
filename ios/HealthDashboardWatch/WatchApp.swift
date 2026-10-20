@@ -70,6 +70,23 @@ final class WatchStore: NSObject, WCSessionDelegate {
     func logWater() async { await log(HKQuantityType(.dietaryWater), .literUnit(with: .milli), bottleMl, "Water saved") }
     func logDrink() async { await log(HKQuantityType(.numberOfAlcoholicBeverages), .count(), 1, "Drink saved") }
 
+    /// How today feels, 1 (very calm) … 5 (very stressed), saved as a State of Mind like the phone does.
+    func logMood(_ level: Int) async {
+        guard !saving else { return }
+        saving = true
+        lastLogged = nil
+        defer { saving = false }
+        let valence = [0.8, 0.4, 0, -0.4, -0.8][max(0, min(4, level - 1))]
+        let labels: [HKStateOfMind.Label] = level >= 4 ? [.stressed] : level <= 2 ? [.calm] : [.content]
+        do {
+            try await health.requestAuthorization(toShare: [HKSampleType.stateOfMindType()], read: [])
+            try await health.save(HKStateOfMind(date: .now, kind: .momentaryEmotion, valence: valence, labels: labels, associations: [.education]))
+            lastLogged = "Mood saved"
+        } catch {
+            lastLogged = "Couldn’t save to Health"
+        }
+    }
+
     private func log(_ type: HKQuantityType, _ unit: HKUnit, _ amount: Double, _ message: String) async {
         guard !saving else { return }
         saving = true
@@ -112,8 +129,8 @@ extension WidgetSnapshot {
         s.sick = ProcessInfo.processInfo.arguments.contains("-demoSick"); s.sickTonight = "Tonight: bed by 11:30, extra water."
         s.caffeineMg = 130; s.caffeineDay = WidgetSnapshot.eveningKey()
         s.waterBottles = 1.5; s.waterGoal = 3; s.waterDay = WidgetSnapshot.calendarKey(); s.bottleMl = 710
-        s.caffeineMg = 130; s.caffeineDay = WidgetSnapshot.eveningKey()
-        s.waterBottles = 1.5; s.waterGoal = 3; s.waterDay = WidgetSnapshot.calendarKey(); s.bottleMl = 710
+        s.recoveryWeek = [74, 80, 52, 76, 83, 77, 72]; s.recoveryWeekLate = [false, false, true, false, false, false, false]
+        s.usualRecovery = 78; s.hrvChange = -0.06; s.restingHrChange = 2
         s.updated = .now
         return s
     }

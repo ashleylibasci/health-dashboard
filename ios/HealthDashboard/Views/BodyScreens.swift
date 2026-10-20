@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 struct RecoveryView: View {
@@ -20,21 +21,22 @@ struct RecoveryView: View {
                 .background(Color.lavender, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                 Card {
                     CardLabel("What went into today", color: .muted)
-                    ValueRow(label: "HRV vs. your normal", value: r.hrvChange.map { "\(signed($0 * 100, ""))%" } ?? "no data")
-                    ValueRow(label: "Resting HR vs. normal", value: signed(r.restingHrChange, " bpm"))
-                    ValueRow(label: "Sleep vs. typical", value: r.sleepChange.map { ($0 >= 0 ? "+" : "−") + hoursMinutes(abs($0)) } ?? "no data")
-                    Note("Your normal is the 4 weeks before today. HRV counts most, then resting heart rate, then sleep. Around 80 is a typical day for you.")
+                    // Each bar leans the way it moved today: left pulled recovery down, right lifted it.
+                    ContributionRow(label: "HRV", value: r.hrvChange.map { "\(signed($0 * 100, ""))%" } ?? "no data",
+                                    effect: (r.hrvChange ?? 0) / 0.15)
+                    ContributionRow(label: "Resting HR", value: signed(r.restingHrChange, " bpm"),
+                                    effect: -(r.restingHrChange ?? 0) / 8)
+                    ContributionRow(label: "Sleep", value: r.sleepChange.map { ($0 >= 0 ? "+" : "−") + hoursMinutes(abs($0)) } ?? "no data",
+                                    effect: (r.sleepChange ?? 0) / 120)
+                    Note("Bars left of the line pulled today down. Your normal is the 4 weeks before today; HRV counts most, then resting heart rate, then sleep.")
                 }
             } else {
                 Card(fill: .lavender) { Note("Recovery needs 7 days of resting heart rate or HRV and a night of sleep. It fills in over your first two weeks.") }
             }
             if !model.recovery.isEmpty {
                 Card {
-                    CardLabel("Last \(model.recovery.count) days", color: .muted)
-                    Bars(values: model.recovery.map { Double($0.score) / 100 },
-                         colors: model.recovery.enumerated().map { i, d in i == model.recovery.count - 1 ? .main : d.afterLateNight ? Color(hex: 0xFFD2BD) : Color(hex: 0xC9CFFF) })
-                        .accessibilityElement()
-                        .accessibilityLabel("Recovery for the last \(model.recovery.count) days: low \(model.recovery.map(\.score).min() ?? 0), high \(model.recovery.map(\.score).max() ?? 0), today \(model.recovery.last?.score ?? 0)")
+                    CardLabel("Last \(model.recovery.count) days · touch a day", color: .muted)
+                    RecoveryChart(days: model.recovery, usual: model.usualRecovery)
                     Note("Peach days followed a bedtime after 2am.")
                 }
             }
@@ -621,5 +623,90 @@ struct FlowLayout: Layout {
     private func fitted(_ s: LayoutSubview, _ width: CGFloat) -> CGSize {
         let size = s.sizeThatFits(.unspecified)
         return size.width <= width ? size : s.sizeThatFits(ProposedViewSize(width: width, height: nil))
+    }
+}
+
+/// The last two weeks of recovery; touch or drag to read a day. Peach days followed a 2am bedtime.
+struct RecoveryChart: View {
+    var days: [RecoveryDay]
+    var usual: Int?
+    @State private var selected: String?
+
+    var body: some View {
+        let shown = days.first { $0.date == selected } ?? days.last
+        VStack(alignment: .leading, spacing: 10) {
+            if let d = shown {
+                HStack {
+                    Text(Day.weekdayName(d.date, long: true)).scaledFont(13, .bold).foregroundStyle(d.afterLateNight ? Color.peachInk : Color.mainText)
+                    Spacer(minLength: 8)
+                    Text("\(d.score) · \(d.afterLateNight ? "after a late night" : d.label.lowercased())")
+                        .scaledFont(13, .semibold).foregroundStyle(Color.ink).contentTransition(.numericText())
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(d.afterLateNight ? Color.peach : Color.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .animation(.snappy(duration: 0.2), value: d.date)
+            }
+            Chart {
+                ForEach(days, id: \.date) { d in
+                    BarMark(x: .value("Day", d.date), y: .value("Recovery", d.score), width: .ratio(0.65))
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .foregroundStyle(d.date == days.last?.date ? Color.main : d.afterLateNight ? Color(hex: 0xF5A487) : Color(hex: 0xC9CFFF))
+                        .opacity(shown == nil || shown?.date == d.date ? 1 : 0.55)
+                }
+                if let usual {
+                    RuleMark(y: .value("Usual", usual))
+                        .foregroundStyle(Color.mainText.opacity(0.6))
+                        .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                        .annotation(position: .top, alignment: .trailing) {
+                            Text("usual \(usual)").scaledFont(11, .semibold).foregroundStyle(Color.mainText)
+                        }
+                }
+            }
+            .chartXSelection(value: $selected)
+            .chartXAxis {
+                // Just the ends, "2 weeks ago" and "Today", so the labels never crowd.
+                AxisMarks { v in
+                    if let k = v.as(String.self), k == days.first?.date || k == days.last?.date {
+                        AxisValueLabel(k == days.last?.date ? "Today" : "\(days.count - 1) days ago", anchor: k == days.last?.date ? .topTrailing : .topLeading)
+                    }
+                }
+            }
+            .chartYAxis(.hidden)
+            .chartYScale(domain: 0...100)
+            .frame(height: 170)
+            .sensoryFeedback(.selection, trigger: selected)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Recovery for the last \(days.count) days: " + days.map { "\(Day.weekdayName($0.date, long: true)) \($0.score)" }.joined(separator: ", "))
+        }
+    }
+}
+
+/// One factor in today's score, as a bar leaning left (pulled it down) or right (lifted it).
+struct ContributionRow: View {
+    var label: String
+    var value: String
+    /// −1…1: how hard, and which way, it moved today.
+    var effect: Double
+
+    var body: some View {
+        let e = min(1, max(-1, effect))
+        HStack(spacing: 10) {
+            Text(label).scaledFont(15, .semibold).foregroundStyle(Color.ink).frame(width: 92, alignment: .leading)
+            GeometryReader { geo in
+                let half = geo.size.width / 2
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.track)
+                    Capsule().fill(e < 0 ? Color(hex: 0xF08A68) : Color(hex: 0x5CC79A))
+                        .frame(width: max(4, abs(e) * half))
+                        .offset(x: e < 0 ? half - abs(e) * half : half)
+                    Rectangle().fill(Color.muted.opacity(0.5)).frame(width: 2, height: 16).offset(x: half - 1)
+                }
+            }
+            .frame(height: 10)
+            Text(value).scaledFont(15, .bold).foregroundStyle(e < -0.05 ? Color.peachInk : Color.ink)
+                .frame(minWidth: 64, alignment: .trailing)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) \(value), \(e < -0.05 ? "pulled recovery down" : e > 0.05 ? "lifted recovery" : "about normal")")
     }
 }

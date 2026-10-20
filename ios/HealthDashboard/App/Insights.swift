@@ -107,6 +107,12 @@ extension AppModel {
         snap.updated = .now
         snap.restingHr = health.restingHr[today].map { Int($0.rounded()) }
         snap.hrv = health.hrv[today].map { Int($0.rounded()) }
+        let week = recovery.suffix(7)
+        snap.recoveryWeek = week.map(\.score)
+        snap.recoveryWeekLate = week.map(\.afterLateNight)
+        snap.usualRecovery = usualRecovery
+        snap.hrvChange = r?.hrvChange
+        snap.restingHrChange = r?.restingHrChange
         snap.hrUp = (r?.restingHrChange ?? 0) >= 3
         snap.hrvDown = (r?.hrvChange ?? 0) <= -0.1
         if let c = cycle {

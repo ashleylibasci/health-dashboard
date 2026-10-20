@@ -3,6 +3,7 @@ import SwiftUI
 /// The Body tab: every deep-dive screen in one place.
 struct BodyView: View {
     @Environment(AppModel.self) private var model
+    @Namespace private var zoom
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -31,8 +32,12 @@ struct BodyView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
+    /// Each card zooms open into its screen, and back into the card when you go back.
     private func link<V: View>(_ destination: V, _ icon: String, _ title: String, _ detail: String, _ fill: Color = .lavender, _ ink: Color = .mainText) -> some View {
-        NavigationLink { destination } label: { LinkCard(icon: icon, title: title, detail: detail, iconFill: fill, iconInk: ink) }
-            .buttonStyle(.plain)
+        NavigationLink { destination.navigationTransition(.zoom(sourceID: title, in: zoom)) } label: {
+            LinkCard(icon: icon, title: title, detail: detail, iconFill: fill, iconInk: ink)
+                .matchedTransitionSource(id: title, in: zoom)
+        }
+        .buttonStyle(PressScale())
     }
 }

@@ -41,6 +41,13 @@ struct WidgetSnapshot: Codable, Equatable {
     var waterBottles: Double = 0
     var waterGoal: Double = 3
     var waterDay: String = ""
+    /// The last 7 recovery scores, oldest first, and which followed a bedtime after 2am.
+    var recoveryWeek: [Int] = []
+    var recoveryWeekLate: [Bool] = []
+    var usualRecovery: Int?
+    /// Today vs. her 4-week normal: HRV as a fraction (−0.06 = 6% lower), resting HR in bpm.
+    var hrvChange: Double?
+    var restingHrChange: Double?
 
     static let appGroup = "group.com.ashleylibasci.healthdashboard"
     private static let key = "widgetSnapshot.v1"
@@ -59,6 +66,8 @@ struct WidgetSnapshot: Codable, Equatable {
         sickTonight = v(.sickTonight, nil); darkAtNight = v(.darkAtNight, true); bedtimeMinutes = v(.bedtimeMinutes, nil)
         bottleMl = v(.bottleMl, nil)
         waterBottles = v(.waterBottles, 0); waterGoal = v(.waterGoal, 3); waterDay = v(.waterDay, "")
+        recoveryWeek = v(.recoveryWeek, []); recoveryWeekLate = v(.recoveryWeekLate, []); usualRecovery = v(.usualRecovery, nil)
+        hrvChange = v(.hrvChange, nil); restingHrChange = v(.restingHrChange, nil)
     }
 
     var encoded: Data? { try? JSONEncoder().encode(self) }

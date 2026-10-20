@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 struct TodayView: View {
@@ -14,10 +15,12 @@ struct TodayView: View {
         hiddenNudges[n.id].map { Day.between($0, model.today) < 14 } ?? false
     }
 
+    @Namespace private var zoom
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
-            greeting
+            chips
             switch model.healthState {
             case .loading where model.health.nights.isEmpty:
                 Card { ProgressView("Reading Apple Health…").frame(maxWidth: .infinity) }
@@ -33,18 +36,21 @@ struct TodayView: View {
                 recoveryCard
                 alerts
                 cycleCard
+                HStack(alignment: .firstTextBaseline) {
+                    Text("This week").scaledFont(17, .bold).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
+                    Spacer()
+                }
+                .padding(.top, 4)
                 tiles
                 if let nudge = model.nudges.first(where: { !nudgeHidden($0) }) {
                     NudgeCard(nudge: nudge) { hiddenNudges[nudge.id] = model.today }
-                }
-                if let exam = model.upcomingExams.first, !greetingIsAbout(exam) {
-                    NavigationLink { ExamsView() } label: { examBanner(exam) }.buttonStyle(.plain)
                 }
                 more
             }
         }
         .page()
         .toolbar(.hidden, for: .navigationBar)
+        .animation(.snappy, value: model.recoveryToday?.score)
         .refreshable {
             await model.refreshHealth()
             await model.refreshCalendar(force: true)
@@ -52,10 +58,16 @@ struct TodayView: View {
     }
 
     private var header: some View {
-        HStack {
-            Text(Date.now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
-                .scaledFont(15, .semibold).foregroundStyle(Color.muted)
-            Spacer()
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()).uppercased())
+                    .scaledFont(13, .semibold).foregroundStyle(Color.muted).kerning(0.3)
+                Text("Good \(partOfDay), \(model.profile?.firstName ?? "there")")
+                    .serifTitleFont(28).foregroundStyle(Color.ink)
+                    .lineLimit(2).minimumScaleFactor(0.8)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            Spacer(minLength: 8)
             Button { showSettings = true } label: {
                 Text(model.profile?.initial ?? "•").scaledFont(17, .bold, design: .rounded).foregroundStyle(Color.ink).limitedTextGrowth()
                     .frame(width: 44, height: 44).background(Color.peach, in: Circle())
@@ -65,36 +77,47 @@ struct TodayView: View {
         .padding(.top, 8)
     }
 
-    private var greeting: some View {
+    private var partOfDay: String {
         let hour = Calendar.current.component(.hour, from: .now)
-        let part = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"
-        return (Text("Good \(part), \(model.profile?.firstName ?? "there"). ") + Text(advice).italic().foregroundColor(.mainText))
-            .serifTitleFont(30).foregroundStyle(Color.ink).lineSpacing(2)
-            .fixedSize(horizontal: false, vertical: true)
+        return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"
+    }
+
+    /// What's coming up, as small chips under the greeting: the next exam and tonight's bedtime.
+    @ViewBuilder private var chips: some View {
+        let exam = model.upcomingExams.first
+        if exam != nil || model.weekend != nil {
+            FlowLayout {
+                if let exam {
+                    NavigationLink { ExamsView().navigationTransition(.zoom(sourceID: "exams", in: zoom)) } label: {
+                        Chiplet(icon: "calendar", text: "\(exam.title) · \(examWhen(exam))", fill: .butter, ink: .butterInk)
+                            .matchedTransitionSource(id: "exams", in: zoom)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if model.weekend != nil {
+                    NavigationLink { SleepView().navigationTransition(.zoom(sourceID: "bedtime", in: zoom)) } label: {
+                        Chiplet(icon: "moon.fill", text: "Bed by \(clockTime(Double(model.bedtimeTarget)))", fill: .lavender, ink: .mainText)
+                            .matchedTransitionSource(id: "bedtime", in: zoom)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func examWhen(_ exam: CalendarEvent) -> String {
+        let d = Day.between(model.today, exam.date)
+        return d == 0 ? "Today" : d == 1 ? "Tomorrow" : d < 7 ? Day.weekdayName(exam.date, long: false) : "in \(d) days"
     }
 
     /// A rough day: the getting-sick signals are on, or recovery is low.
     private var isOffDay: Bool { model.sick != nil || (model.recoveryToday?.score ?? 100) < 60 }
 
-    /// The exam the greeting is talking about, so the banner doesn't repeat it.
-    private var greetingExam: CalendarEvent? {
-        guard !isOffDay else { return nil }
-        return model.upcomingExams.first { Day.between(model.today, $0.date) <= 3 }
-    }
-
-    private func greetingIsAbout(_ exam: CalendarEvent) -> Bool { greetingExam == exam }
-
-    private var advice: String {
-        let today = model.today
-        // On a rough day the cards below carry the detail; keep the greeting short.
-        if isOffDay { return "Go easy today." }
-        if let exam = greetingExam {
-            let d = Day.between(today, exam.date)
-            let when = d == 0 ? "today" : d == 1 ? "tomorrow" : Day.weekdayName(exam.date, long: true)
-            return "\(exam.title) is \(when), so protect your sleep before it."
-        }
-        if model.weekend != nil { return "Aim to be asleep by \(clockTime(Double(model.bedtimeTarget))) tonight." }
-        return "Here’s what your Watch has been noticing."
+    /// The one-line take on today, at the top of the recovery card.
+    private var headline: String {
+        guard let r = model.recoveryToday else { return "Still learning your normal" }
+        if model.sick != nil || r.score < 60 { return "Go easy today" }
+        return r.score >= 80 ? "Good to go" : "Take it steady"
     }
 
     @ViewBuilder private var alerts: some View {
@@ -130,40 +153,43 @@ struct TodayView: View {
     }
 
     private var recoveryCard: some View {
-        NavigationLink { RecoveryView() } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                AdaptiveStack(spacing: 8) {
-                    CardLabel("Recovery")
-                    Spacer(minLength: 0)
-                    if let r = model.recoveryToday { Pill(text: r.label, fill: .surface, ink: .ink) }
-                }
+        let r = model.recoveryToday
+        return NavigationLink { RecoveryView().navigationTransition(.zoom(sourceID: "recovery", in: zoom)) } label: {
+            VStack(alignment: .leading, spacing: 16) {
                 AdaptiveStack(spacing: 16) {
-                    Ring(value: model.recoveryToday?.score)
-                    VStack(alignment: .leading, spacing: 8) {
-                        MetricRow(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded())) bpm" },
-                                  change: model.recoveryToday?.restingHrChange.map { d in
-                                      let n = Int(d.rounded()); return n == 0 ? "your normal" : "\(abs(n)) bpm \(n > 0 ? "above" : "below") normal"
-                                  }, worse: (model.recoveryToday?.restingHrChange ?? 0) >= 3)
-                        MetricRow(label: "HRV", value: model.health.hrv[model.today].map { "\(Int($0.rounded())) ms" },
-                                  change: model.recoveryToday?.hrvChange.map { d in
-                                      let n = Int((d * 100).rounded()); return n == 0 ? "your normal" : "\(abs(n))% \(n > 0 ? "above" : "below") normal"
-                                  }, worse: (model.recoveryToday?.hrvChange ?? 0) <= -0.1)
-                        MetricRow(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) },
-                                  change: model.recoveryToday?.sleepChange.map { d in
-                                      abs(d) < 15 ? "a typical night" : "\(hoursMinutes(abs(d))) \(d > 0 ? "more" : "less") than usual"
-                                  }, worse: (model.recoveryToday?.sleepChange ?? 0) <= -45)
+                    ZStack {
+                        Ring(value: r?.score, size: 104, track: .lavender)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(headline).scaledFont(20, .bold).foregroundStyle(Color.ink)
+                        Text(r.map { ((model.usualRecovery.map { "Usual is \($0). " } ?? "") + $0.reason) }
+                             ?? "Recovery fills in once there are 7 days of heart data and a night of sleep from your Watch.")
+                            .scaledFont(14).foregroundStyle(Color.muted2).multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                if model.recoveryToday == nil {
-                    Note("Recovery fills in once there are 7 days of heart data and a night of sleep from your Watch.")
+                AdaptiveGrid(columns: 3, spacing: 8) {
+                    StatCell(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded()))" }, unit: "bpm",
+                             change: r?.restingHrChange.map { d in
+                                 let n = Int(d.rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n)) vs normal"
+                             }, worse: (r?.restingHrChange ?? 0) >= 3)
+                    StatCell(label: "HRV", value: model.health.hrv[model.today].map { "\(Int($0.rounded()))" }, unit: "ms",
+                             change: r?.hrvChange.map { d in
+                                 let n = Int((d * 100).rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n))% vs normal"
+                             }, worse: (r?.hrvChange ?? 0) <= -0.1)
+                    StatCell(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) }, unit: nil,
+                             change: r?.sleepChange.map { d in abs(d) < 15 ? "Typical" : "\(hoursMinutes(abs(d))) \(d > 0 ? "more" : "less")" },
+                             worse: (r?.sleepChange ?? 0) <= -45)
                 }
             }
-            .padding(20)
-            .background(Color.lavender, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(18)
+            .background(Color.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
+            .matchedTransitionSource(id: "recovery", in: zoom)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
+        .accessibilityHint("Opens recovery details")
     }
-
 
     @ViewBuilder private var cycleCard: some View {
         if let c = model.cycle {
@@ -225,42 +251,50 @@ struct TodayView: View {
     }
 
     private var tiles: some View {
-        AdaptiveGrid(columns: 2, spacing: 12) {
-            NavigationLink { SleepView() } label: {
-                SmallTile(icon: "moon.fill", label: "Sleep regularity", value: model.regularity.map(String.init) ?? "–", fill: .lavender, ink: .mainText, emptyHint: "Needs a week of nights in a row")
-            }
-            NavigationLink { CaffeineView() } label: {
-                let mg = model.caffeineToday.reduce(0) { $0 + $1.value }
-                SmallTile(icon: mg > dailyCaffeineGuide ? "exclamationmark.triangle.fill" : "cup.and.saucer.fill",
-                          label: mg > dailyCaffeineGuide ? "Caffeine · over 400" : "Caffeine today", value: "\(Int(mg)) mg",
-                          fill: mg > dailyCaffeineGuide ? .peach : .butter, ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk)
-            }
-            NavigationLink { FitnessView() } label: {
-                SmallTile(icon: "bolt.fill", label: "Fitness age", value: model.fitness.map { "\($0.fitnessAge)" } ?? "–", fill: .mint, ink: .mintInk, emptyHint: "Needs a 20-min outdoor walk or run")
-            }
-            NavigationLink { StressView() } label: {
-                SmallTile(icon: "face.smiling", label: "Stress this week", value: model.stress?.weekLabel ?? "–", fill: .peach, ink: .peachInk, emptyHint: "Needs a few days of Watch wear")
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func examBanner(_ exam: CalendarEvent) -> some View {
-        let d = Day.between(model.today, exam.date)
-        return HStack(spacing: 12) {
-            AdaptiveStack(spacing: 12) {
-                Image(systemName: "calendar").scaledFont(20).foregroundStyle(Color.butterInk).limitedTextGrowth()
-                    .frame(width: 40, height: 40).background(Color.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(exam.title).scaledFont(15, .bold).foregroundStyle(Color.ink)
-                    Text(d == 0 ? "Today" : d == 1 ? "Tomorrow · protect tonight’s sleep" : "\(Day.weekdayName(exam.date, long: true)) · protect sleep the nights before")
-                        .scaledFont(14).foregroundStyle(Color.muted)
+        let week = model.lastWeek
+        let mg = model.caffeineToday.reduce(0) { $0 + $1.value }
+        let stressDays: [Double] = model.stressBaseline.map { base in
+            let daily = dailyStress(model.health.hourlyHr, resting: base)
+            return (0..<7).reversed().compactMap { daily[Day.shift(model.today, -$0)] }
+        } ?? []
+        return AdaptiveGrid(columns: 2, spacing: 10) {
+            tile("sleep", SleepView()) {
+                MetricTile(icon: "moon.fill", title: "Sleep", ink: .mainText,
+                           value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) } ?? "–",
+                           detail: model.regularity.map { "Regularity \($0)" } ?? "Needs a week of nights") {
+                    Sparkline(values: week.map { Double($0.asleepMinutes) / 60 }, color: .main)
                 }
             }
-            Spacer(minLength: 0)
+            tile("caffeine", CaffeineView()) {
+                MetricTile(icon: mg > dailyCaffeineGuide ? "exclamationmark.triangle.fill" : "cup.and.saucer.fill",
+                           title: "Caffeine", ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk,
+                           value: "\(Int(mg)) mg", detail: "Cutoff 2pm") {
+                    ProgressBar(value: mg / dailyCaffeineGuide, color: mg > dailyCaffeineGuide ? Color(hex: 0xF08A68) : Color(hex: 0xE0A800),
+                                track: .butter)
+                }
+            }
+            tile("fitness", FitnessView()) {
+                MetricTile(icon: "bolt.fill", title: "Fitness age", ink: .mintInk,
+                           value: model.fitness.map { "\($0.fitnessAge)" } ?? "–",
+                           detail: model.fitness.map { String(format: "VO₂ max %.1f", $0.latest) } ?? "Needs an outdoor walk") {
+                    Sparkline(values: (model.fitness?.monthly.suffix(7).map(\.value)) ?? [], color: Color(hex: 0x2FA472))
+                }
+            }
+            tile("stress", StressView()) {
+                MetricTile(icon: "face.smiling", title: "Stress", ink: .peachInk,
+                           value: model.stress?.weekLabel ?? "–", detail: "Last 7 days") {
+                    Sparkline(values: stressDays, color: Color(hex: 0xF08A68), bars: true)
+                }
+            }
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(Color.butter, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    /// A tile that zooms open into its screen.
+    private func tile<Destination: View, Label: View>(_ id: String, _ destination: Destination, @ViewBuilder label: () -> Label) -> some View {
+        NavigationLink { destination.navigationTransition(.zoom(sourceID: id, in: zoom)) } label: {
+            label().matchedTransitionSource(id: id, in: zoom)
+        }
+        .buttonStyle(PressScale())
     }
 
     @ViewBuilder private var more: some View {
@@ -281,52 +315,124 @@ struct TodayView: View {
     }
 }
 
-struct SmallTile: View {
+/// A small rounded chip with an icon, for what's coming up.
+struct Chiplet: View {
     var icon: String
-    var label: String
-    var value: String
+    var text: String
     var fill: Color
     var ink: Color
-    /// Shown instead of the number when there isn't enough data yet.
-    var emptyHint: String? = nil
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: icon).scaledFont(18).foregroundStyle(ink).limitedTextGrowth()
-                .frame(width: 40, height: 40).background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            Text(label).scaledFont(13, .semibold).foregroundStyle(Color.muted)
-            if value == "–", let emptyHint {
-                Text(emptyHint).scaledFont(13).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(value).numberFont(26).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
+        Label(text, systemImage: icon)
+            .scaledFont(13, .semibold).foregroundStyle(ink)
+            .padding(.horizontal, 12).frame(minHeight: 32)
+            .background(fill, in: Capsule())
     }
 }
 
-/// One line of the recovery card: the number, and what it means compared with normal.
-struct MetricRow: View {
+/// One number in the recovery card: label, value, and how it compares with normal.
+struct StatCell: View {
     var label: String
     var value: String?
+    var unit: String?
     var change: String?
     var worse = false
-    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        AdaptiveStack(alignment: .firstTextBaseline, spacing: 2) {
-            Text(label).scaledFont(15).foregroundStyle(Color.ink)
-            Spacer(minLength: 0)
-            VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 0) {
-                Text(value ?? "–").scaledFont(15, .bold).foregroundStyle(Color.ink)
-                if let change {
-                    Text(change).scaledFont(12, worse ? .bold : .regular).foregroundStyle(worse ? Color.peachInk : Color.muted)
-                }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).scaledFont(12, .semibold).foregroundStyle(Color.muted)
+            (Text(value ?? "–").font(.number(19)) + Text(unit.map { " \($0)" } ?? "").font(.system(size: 12, weight: .semibold)).foregroundColor(.muted))
+                .foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.7)
+                .contentTransition(.numericText())
+            if let change {
+                Text(change).scaledFont(12, .semibold).foregroundStyle(worse ? Color.peachInk : Color.muted)
+                    .lineLimit(1).minimumScaleFactor(0.75)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(10)
+        .background(Color.track, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A week-at-a-glance tile: what it is, today's number, a line of context and a tiny chart.
+struct MetricTile<Chart: View>: View {
+    var icon: String
+    var title: String
+    var ink: Color
+    var value: String
+    var detail: String
+    @ViewBuilder var chart: Chart
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: icon).scaledFont(13, .semibold).foregroundStyle(ink)
+            Text(value).numberFont(26).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+            Text(detail).scaledFont(12, .semibold).foregroundStyle(Color.muted).lineLimit(1).minimumScaleFactor(0.8)
+            chart.frame(height: 30).padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens \(title.lowercased())")
+    }
+}
+
+/// Seven days as a tiny line (or bars), today marked. Decoration: the tile says the numbers.
+struct Sparkline: View {
+    var values: [Double]
+    var color: Color
+    var bars = false
+
+    var body: some View {
+        if values.count >= 2 {
+            Chart(Array(values.enumerated()), id: \.offset) { i, v in
+                if bars {
+                    BarMark(x: .value("Day", i), y: .value("Value", v))
+                        .foregroundStyle(i == values.count - 1 ? color : color.opacity(0.4))
+                        .cornerRadius(3)
+                } else {
+                    LineMark(x: .value("Day", i), y: .value("Value", v))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(color)
+                        .lineStyle(StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+                    if i == values.count - 1 {
+                        PointMark(x: .value("Day", i), y: .value("Value", v)).foregroundStyle(color).symbolSize(28)
+                    }
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartYScale(domain: .automatic(includesZero: bars))
+            .accessibilityHidden(true)
+        } else {
+            Color.clear
+        }
+    }
+}
+
+/// A thin rounded progress bar.
+struct ProgressBar: View {
+    var value: Double
+    var color: Color
+    var track: Color
+    var body: some View {
+        VStack {
+            Spacer(minLength: 0)
+            Meter(value: value, color: color, track: track, height: 8)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Cards and tiles shrink a touch while pressed, so a tap feels like it landed.
+struct PressScale: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
     }
 }

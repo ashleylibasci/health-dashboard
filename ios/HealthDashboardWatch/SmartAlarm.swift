@@ -19,6 +19,8 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     private(set) var watching = false
     /// "Woke you at 7:22, 23 min early" from the last alarm.
     private(set) var lastResult: String? { didSet { UserDefaults.standard.set(lastResult, forKey: "smartAlarmLast") } }
+    /// Movement in each 30-second epoch of the last window, for the graph on the alarm page.
+    private(set) var lastWindow: [Double] = [] { didSet { UserDefaults.standard.set(lastWindow, forKey: "smartAlarmWindow") } }
     var error: String?
 
     private var session: WKExtendedRuntimeSession?
@@ -31,6 +33,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         plan = d.data(forKey: "smartAlarmPlan").flatMap { try? JSONDecoder().decode(SmartAlarmPlan.self, from: $0) }
         armedFor = (d.object(forKey: "smartAlarmArmedFor") as? Date).flatMap { $0 > .now ? $0 : nil }
         lastResult = d.string(forKey: "smartAlarmLast")
+        lastWindow = d.array(forKey: "smartAlarmWindow") as? [Double] ?? []
         super.init()
     }
 
@@ -92,6 +95,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
                 if detector.add(epoch) { break }
             }
             guard !Task.isCancelled else { return }
+            lastWindow = detector.epochs
             let early = Int(latest.timeIntervalSinceNow / 60)
             lastResult = early >= 1
                 ? "Woke you at \(Date.now.formatted(date: .omitted, time: .shortened)), \(early) min early, in light sleep."

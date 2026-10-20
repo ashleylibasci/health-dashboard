@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 struct SleepView: View {
@@ -176,45 +177,62 @@ struct StageBars: View {
     }
 }
 
+/// Each night as a bar from falling asleep to waking, earliest at the top. Touch or drag
+/// across it to read any night; it starts on last night.
 struct WeekChart: View {
     var nights: [Night]
-    private let start = 2.0 * 60, span = 16.0 * 60
-    @ScaledMetric(relativeTo: .caption) private var dayWidth = 30.0
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var selected: String?
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(nights, id: \.date) { n in
-                HStack(spacing: 8) {
-                    Text(Day.weekdayName(n.date)).scaledFont(12).foregroundStyle(Color.muted).frame(width: dayWidth, alignment: .leading)
-                    GeometryReader { geo in
-                        let left = fraction(n.bedtime), right = fraction(n.wake)
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.track)
-                            Capsule().fill(n.isWeekend ? Color.peachBar : Color.main)
-                                .frame(width: max(4, (right - left) * geo.size.width))
-                                .offset(x: left * geo.size.width)
-                        }
-                    }
-                    .frame(height: 14)
+        let shown = nights.first { $0.date == selected } ?? nights.last
+        VStack(alignment: .leading, spacing: 10) {
+            if let n = shown {
+                HStack {
+                    Text(Day.weekdayName(n.date, long: true)).scaledFont(13, .bold).foregroundStyle(Color.mainText)
+                    Spacer(minLength: 8)
+                    Text("\(clockTime(Double(n.bedtime))) – \(clockTime(Double(n.wake))) · \(hoursMinutes(Double(n.asleepMinutes)))")
+                        .scaledFont(13, .semibold).foregroundStyle(Color.ink).monospacedDigit()
+                        .contentTransition(.numericText())
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(Day.weekdayName(n.date, long: true)): asleep \(clockTime(Double(n.bedtime))), awake \(clockTime(Double(n.wake)))")
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(Color.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .animation(.snappy(duration: 0.2), value: n.date)
             }
-            HStack {
-                // Every other time at the accessibility sizes, so they still fit on one line.
-                ForEach(typeSize.isAccessibilitySize ? ["8pm", "4am", "12pm"] : ["8pm", "12am", "4am", "8am", "12pm"], id: \.self) { t in
-                    Text(t)
-                    if t != "12pm" { Spacer() }
+            Chart(nights, id: \.date) { n in
+                BarMark(x: .value("Night", Day.weekdayName(n.date)),
+                        yStart: .value("Asleep", -n.bedtime), yEnd: .value("Awake", -n.wake), width: .ratio(0.55))
+                    .clipShape(Capsule())
+                    .foregroundStyle(n.isWeekend ? Color.peachBar : Color.main)
+                    .opacity(shown == nil || shown?.date == n.date ? 1 : 0.45)
+                if n.date == shown?.date {
+                    RuleMark(x: .value("Night", Day.weekdayName(n.date)))
+                        .foregroundStyle(Color.mainText.opacity(0.35))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .zIndex(-1)
                 }
             }
-            .scaledFont(12).foregroundStyle(Color.muted)
-            .padding(.leading, dayWidth + 8)
-            .accessibilityHidden(true)
+            .chartXSelection(value: Binding(
+                get: { selected.map { Day.weekdayName($0) } },
+                set: { name in selected = name.flatMap { nm in nights.last { Day.weekdayName($0.date) == nm }?.date } }
+            ))
+            .chartYAxis {
+                AxisMarks(values: .stride(by: 240)) { v in
+                    AxisGridLine().foregroundStyle(Color.track)
+                    AxisValueLabel { if let m = v.as(Int.self) { Text(clockTime(Double(-m))) } }
+                }
+            }
+            .chartYScale(domain: yDomain)
+            .frame(height: 190)
+            .sensoryFeedback(.selection, trigger: selected)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(nights.map { "\(Day.weekdayName($0.date, long: true)): asleep \(clockTime(Double($0.bedtime))), awake \(clockTime(Double($0.wake)))" }.joined(separator: ". "))
         }
     }
 
-    private func fraction(_ minutes: Int) -> CGFloat {
-        CGFloat(min(1, max(0, (Double(minutes) - start) / span)))
+    /// Whole 4-hour steps around the earliest bedtime and the latest wake-up (negative, so earlier sits on top).
+    private var yDomain: ClosedRange<Int> {
+        let early = (nights.map(\.bedtime).min() ?? 360) / 240 * 240
+        let late = ((nights.map(\.wake).max() ?? 840) + 239) / 240 * 240
+        return -late ... -early
     }
 }

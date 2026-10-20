@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Setting the smart alarm: the latest she wants to be up, and how early it may wake her.
 struct WatchAlarmView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var alarm = SmartAlarm.shared
     @State private var latest = WatchAlarmView.defaultLatest
     @State private var window = 30
@@ -10,43 +11,35 @@ struct WatchAlarmView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Smart alarm").scaledFont(15, .bold).foregroundStyle(Color.mainText)
-                if alarm.isArmed, let plan = alarm.plan {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Up by").scaledFont(13).foregroundStyle(Color(hex: 0x4A4F6E))
-                        Text(plan.latestText).numberFont(36).foregroundStyle(Color.ink)
-                        Text("Wakes you in light sleep from \(SmartAlarmPlan(latest: plan.latest - plan.window).latestText)\(plan.repeats ? ", every day" : "")")
-                            .scaledFont(12).foregroundStyle(Color(hex: 0x4A4F6E))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(Color.lavender, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    Button("Turn off", role: .destructive) { alarm.turnOff() }
-                } else {
-                    Text("Up by").scaledFont(13).foregroundStyle(Color(hex: 0x4A4F6E))
-                    DatePicker("Up by", selection: $latest, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                    Picker("Can wake me", selection: $window) {
-                        ForEach([10, 20, 30], id: \.self) { Text("\($0) min early").tag($0) }
-                    }
-                    .pickerStyle(.navigationLink)
-                    Toggle("Every day", isOn: $repeats)
-                    Button {
-                        let parts = Calendar.current.dateComponents([.hour, .minute], from: latest)
-                        alarm.arm(SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats))
-                    } label: {
-                        Text("Set alarm").scaledFont(15, .bold).frame(maxWidth: .infinity)
-                    }
-                    .tint(.main)
+                Text("Up by").scaledFont(13).foregroundStyle(WatchTint.secondary)
+                DatePicker("Up by", selection: $latest, displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                Picker("Can wake me", selection: $window) {
+                    ForEach([10, 20, 30], id: \.self) { Text("\($0) min early").tag($0) }
                 }
-                if let error = alarm.error { Text(error).scaledFont(12, .bold).foregroundStyle(Color.peachInk) }
-                if let last = alarm.lastResult { Text(last).scaledFont(12).foregroundStyle(Color(hex: 0x4A4F6E)) }
+                .pickerStyle(.navigationLink)
+                Toggle("Every day", isOn: $repeats).tint(WatchTint.alarm)
+                Button {
+                    let parts = Calendar.current.dateComponents([.hour, .minute], from: latest)
+                    alarm.arm(SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats))
+                    dismiss()
+                } label: {
+                    Text(alarm.isArmed ? "Save" : "Set alarm").scaledFont(16, .bold).frame(maxWidth: .infinity)
+                }
+                .tint(WatchTint.alarm)
+                if alarm.isArmed {
+                    Button("Turn off", role: .destructive) {
+                        alarm.turnOff()
+                        dismiss()
+                    }
+                }
                 Text("Keep your Watch on overnight. It watches your movement in the window and taps you awake when you’re sleeping lightly, so mornings feel less groggy.")
-                    .scaledFont(12).foregroundStyle(Color(hex: 0x4A4F6E))
+                    .scaledFont(12).foregroundStyle(WatchTint.secondary)
             }
         }
-        .foregroundStyle(Color.ink)
-        .watchPage(.ground)
+        .navigationTitle("Smart alarm")
+        .sensoryFeedback(.success, trigger: alarm.isArmed)
+        .watchScreen(tint: WatchTint.alarm)
         .onAppear {
             guard let p = alarm.plan else { return }
             latest = Calendar.current.date(bySettingHour: p.latest / 60, minute: p.latest % 60, second: 0, of: .now) ?? latest
@@ -65,9 +58,10 @@ struct WatchRingingView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "sun.horizon.fill").font(.system(size: 40)).foregroundStyle(Color(hex: 0xFFC94D))
+                .symbolEffect(.pulse)
             Text("Good morning").numberFont(22).foregroundStyle(.white)
             if let last = alarm.lastResult {
-                Text(last).scaledFont(12).foregroundStyle(Color.white.opacity(0.75)).multilineTextAlignment(.center)
+                Text(last).scaledFont(12).foregroundStyle(WatchTint.secondary).multilineTextAlignment(.center)
             }
             Button { alarm.stop() } label: {
                 Text("Stop").scaledFont(18, .bold).frame(maxWidth: .infinity, minHeight: 50)
@@ -75,6 +69,21 @@ struct WatchRingingView: View {
             .tint(Color(hex: 0xFFC94D))
         }
         .padding(.horizontal, 6)
-        .watchPage(.black)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            RadialGradient(colors: [WatchTint.alarm.opacity(0.5), .black], center: .top, startRadius: 0, endRadius: 220).ignoresSafeArea()
+        }
+    }
+}
+
+extension View {
+    /// A pushed screen's backdrop, matching the page it came from.
+    func watchScreen(tint: Color) -> some View {
+        containerBackground(for: .navigation) {
+            ZStack {
+                Color.black
+                RadialGradient(colors: [tint.opacity(0.45), tint.opacity(0.12), .clear], center: .topTrailing, startRadius: 0, endRadius: 200)
+            }
+        }
     }
 }
