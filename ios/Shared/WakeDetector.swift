@@ -50,16 +50,19 @@ struct SmartAlarmPlan: Codable, Equatable {
     var window: Int = 30
     var repeats = true
 
-    /// The next time the latest wake time comes around after `now`.
+    /// The next time the latest wake time comes around: today if it's still ahead, else tomorrow.
+    /// Built from the clock time (not midnight plus minutes), so a daylight-saving night stays right.
     func nextLatest(after now: Date, calendar: Calendar = .current) -> Date {
-        let midnight = calendar.startOfDay(for: now)
-        let today = calendar.date(byAdding: .minute, value: latest, to: midnight)!
-        return today > now.addingTimeInterval(TimeInterval(window * 60)) ? today : calendar.date(byAdding: .day, value: 1, to: today)!
+        let t = (latest % 1440 + 1440) % 1440
+        let today = calendar.date(bySettingHour: t / 60, minute: t % 60, second: 0, of: now)!
+        return today > now.addingTimeInterval(2 * 60) ? today : calendar.date(byAdding: .day, value: 1, to: today)!
     }
 
-    /// When the window opens and the Watch starts watching for light sleep.
+    /// When the window opens and the Watch starts watching for light sleep: `window` minutes
+    /// (at most the Watch's 30) before the latest time, or in a minute if that's already passed.
     func windowStart(after now: Date, calendar: Calendar = .current) -> Date {
-        nextLatest(after: now, calendar: calendar).addingTimeInterval(-TimeInterval(min(30, window) * 60))
+        let latest = nextLatest(after: now, calendar: calendar)
+        return max(latest.addingTimeInterval(-TimeInterval(min(30, window) * 60)), now.addingTimeInterval(60))
     }
 
     var latestText: String {

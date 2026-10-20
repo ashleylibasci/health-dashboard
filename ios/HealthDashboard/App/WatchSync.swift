@@ -61,7 +61,16 @@ final class WatchSync: NSObject, WCSessionDelegate {
         Task { @MainActor in AlarmLink.shared.receive(status) }
     }
 
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        guard activationState == .activated else { return }
+        Task { @MainActor in AlarmLink.shared.refresh() }
+    }
+
+    /// The Watch app was just installed: send it anything waiting.
+    func sessionWatchStateDidChange(_ session: WCSession) {
+        Task { @MainActor in AlarmLink.shared.refresh() }
+    }
+
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
 }

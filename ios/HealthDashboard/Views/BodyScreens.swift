@@ -650,7 +650,7 @@ struct RecoveryChart: View {
                 ForEach(days, id: \.date) { d in
                     BarMark(x: .value("Day", d.date), y: .value("Recovery", d.score), width: .ratio(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .foregroundStyle(d.date == days.last?.date ? Color.main : d.afterLateNight ? Color(hex: 0xF5A487) : Color(hex: 0xC9CFFF))
+                        .foregroundStyle(d.date == Day.key(.now) ? Color.main : d.afterLateNight ? Color(hex: 0xF5A487) : Color(hex: 0xC9CFFF))
                         .opacity(shown == nil || shown?.date == d.date ? 1 : 0.55)
                 }
                 if let usual {
@@ -664,10 +664,11 @@ struct RecoveryChart: View {
             }
             .chartXSelection(value: $selected)
             .chartXAxis {
-                // Just the ends, "2 weeks ago" and "Today", so the labels never crowd.
+                // Just the two ends, so the labels never crowd. Counted in calendar days from
+                // today, since a day without a score leaves a gap the bars don't show.
                 AxisMarks { v in
                     if let k = v.as(String.self), k == days.first?.date || k == days.last?.date {
-                        AxisValueLabel(k == days.last?.date ? "Today" : "\(days.count - 1) days ago", anchor: k == days.last?.date ? .topTrailing : .topLeading)
+                        AxisValueLabel(dayLabel(k), anchor: k == days.last?.date ? .topTrailing : .topLeading)
                     }
                 }
             }
@@ -681,17 +682,53 @@ struct RecoveryChart: View {
     }
 }
 
+extension RecoveryChart {
+    private func dayLabel(_ key: String) -> String {
+        let ago = Day.between(key, Day.key(.now))
+        return ago == 0 ? "Today" : ago == 1 ? "Yesterday" : "\(ago) days ago"
+    }
+}
+
 /// One factor in today's score, as a bar leaning left (pulled it down) or right (lifted it).
 struct ContributionRow: View {
     var label: String
     var value: String
     /// −1…1: how hard, and which way, it moved today.
     var effect: Double
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let e = min(1, max(-1, effect))
-        HStack(spacing: 10) {
-            Text(label).scaledFont(15, .semibold).foregroundStyle(Color.ink).frame(width: 92, alignment: .leading)
+        // At the accessibility text sizes the name and value sit above the bar.
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(label).foregroundStyle(Color.ink)
+                    Spacer(minLength: 8)
+                    Text(value).fontWeight(.bold).foregroundStyle(e < -0.05 ? Color.peachInk : Color.ink)
+                }
+                .scaledFont(15, .semibold)
+                bar(e)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(e))
+        } else {
+            HStack(spacing: 10) {
+                Text(label).scaledFont(15, .semibold).foregroundStyle(Color.ink).frame(width: 92, alignment: .leading)
+                bar(e)
+                Text(value).scaledFont(15, .bold).foregroundStyle(e < -0.05 ? Color.peachInk : Color.ink)
+                    .frame(minWidth: 64, alignment: .trailing)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(e))
+        }
+    }
+
+    private func spoken(_ e: Double) -> String {
+        "\(label) \(value), \(e < -0.05 ? "pulled recovery down" : e > 0.05 ? "lifted recovery" : "about normal")"
+    }
+
+    private func bar(_ e: Double) -> some View {
             GeometryReader { geo in
                 let half = geo.size.width / 2
                 ZStack(alignment: .leading) {
@@ -703,10 +740,5 @@ struct ContributionRow: View {
                 }
             }
             .frame(height: 10)
-            Text(value).scaledFont(15, .bold).foregroundStyle(e < -0.05 ? Color.peachInk : Color.ink)
-                .frame(minWidth: 64, alignment: .trailing)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) \(value), \(e < -0.05 ? "pulled recovery down" : e > 0.05 ? "lifted recovery" : "about normal")")
     }
 }

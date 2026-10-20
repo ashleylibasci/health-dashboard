@@ -243,9 +243,16 @@ struct SmartAlarmTests {
         let latest = plan.nextLatest(after: evening, calendar: cal)
         #expect(cal.dateComponents([.day, .hour, .minute], from: latest) == DateComponents(day: 21, hour: 7, minute: 45))
         #expect(latest.timeIntervalSince(plan.windowStart(after: evening, calendar: cal)) == 20 * 60)
-        // Set at 7:30am, already inside the window: tomorrow's alarm, not one in 15 minutes.
+        // Set at 7:30am, inside the window: still this morning, watching from a minute from now.
         let morning = cal.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 7, minute: 30))!
-        #expect(cal.component(.day, from: plan.nextLatest(after: morning, calendar: cal)) == 22)
+        #expect(cal.component(.day, from: plan.nextLatest(after: morning, calendar: cal)) == 21)
+        #expect(plan.windowStart(after: morning, calendar: cal) == morning.addingTimeInterval(60))
+        // Set at 7:44, a minute before: too late for today, so tomorrow.
+        let late = cal.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 7, minute: 44))!
+        #expect(cal.component(.day, from: plan.nextLatest(after: late, calendar: cal)) == 22)
+        // The night clocks spring forward (US, March 8 2026): 7:45 stays 7:45.
+        let dst = cal.date(from: DateComponents(year: 2026, month: 3, day: 8, hour: 1, minute: 30))!
+        #expect(cal.dateComponents([.hour, .minute], from: plan.nextLatest(after: dst, calendar: cal)) == DateComponents(hour: 7, minute: 45))
         #expect(plan.latestText == "7:45am")
         #expect(SmartAlarmPlan(latest: -20).latestText == "11:40pm")
     }

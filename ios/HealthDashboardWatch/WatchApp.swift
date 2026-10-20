@@ -71,6 +71,8 @@ final class WatchStore: NSObject, WCSessionDelegate {
         // Keep caffeine logged on the Watch today if the phone hasn't caught up yet.
         var merged = snap
         if snapshot.caffeineDay == snap.caffeineDay { merged.caffeineMg = max(snap.caffeineMg, snapshot.caffeineMg) }
+        // Same for water: an older snapshot (the one replayed at launch) never lowers today's count.
+        if snapshot.waterDay == snap.waterDay { merged.waterBottles = max(snap.waterBottles, snapshot.waterBottles) }
         snapshot = merged
         merged.save()
     }

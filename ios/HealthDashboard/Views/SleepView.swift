@@ -200,22 +200,25 @@ struct WeekChart: View {
                 .animation(.snappy(duration: 0.2), value: n.date)
             }
             Chart(nights, id: \.date) { n in
-                BarMark(x: .value("Night", Day.weekdayName(n.date)),
+                // Keyed by date, not weekday name, so two Mondays a week apart never share a slot.
+                BarMark(x: .value("Night", n.date),
                         yStart: .value("Asleep", -n.bedtime), yEnd: .value("Awake", -n.wake), width: .ratio(0.55))
                     .clipShape(Capsule())
                     .foregroundStyle(n.isWeekend ? Color.peachBar : Color.main)
                     .opacity(shown == nil || shown?.date == n.date ? 1 : 0.45)
                 if n.date == shown?.date {
-                    RuleMark(x: .value("Night", Day.weekdayName(n.date)))
+                    RuleMark(x: .value("Night", n.date))
                         .foregroundStyle(Color.mainText.opacity(0.35))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         .zIndex(-1)
                 }
             }
-            .chartXSelection(value: Binding(
-                get: { selected.map { Day.weekdayName($0) } },
-                set: { name in selected = name.flatMap { nm in nights.last { Day.weekdayName($0.date) == nm }?.date } }
-            ))
+            .chartXSelection(value: $selected)
+            .chartXAxis {
+                AxisMarks { v in
+                    AxisValueLabel { if let d = v.as(String.self) { Text(Day.weekdayName(d)) } }
+                }
+            }
             .chartYAxis {
                 AxisMarks(values: .stride(by: 240)) { v in
                     AxisGridLine().foregroundStyle(Color.track)

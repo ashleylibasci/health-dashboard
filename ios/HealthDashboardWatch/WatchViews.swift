@@ -26,7 +26,10 @@ struct WatchRootView: View {
             guard let p = url.host.flatMap(WatchPage.init(link:)) else { return }
             withAnimation(.snappy) { page = p }
         }
-        .fullScreenCover(isPresented: .constant(alarm.ringing)) { WatchRingingView() }
+        // Closing the cover any way at all stops the alarm, so it can never keep buzzing out of reach.
+        .fullScreenCover(isPresented: Binding(get: { alarm.ringing }, set: { if !$0 { alarm.stop() } })) {
+            WatchRingingView().interactiveDismissDisabled()
+        }
     }
 
     /// Test builds can open a page directly with `-page tonight` (etc.).
@@ -106,7 +109,7 @@ struct WatchRecoveryView: View {
                 if s.recoveryWeek.count >= 2 {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("LAST \(s.recoveryWeek.count) DAYS").scaledFont(12, .semibold).foregroundStyle(WatchTint.secondary)
-                        WeekBars(scores: s.recoveryWeek, late: s.recoveryWeekLate)
+                        WeekBars(scores: s.recoveryWeek, late: s.recoveryWeekLate, endsToday: s.isFromToday && s.recovery != nil)
                     }
                     .padding(10)
                     .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -162,11 +165,13 @@ struct VsNormalGauge: View {
 struct WeekBars: View {
     var scores: [Int]
     var late: [Bool]
+    /// Whether the last bar is today's score (it isn't until today's is in).
+    var endsToday = true
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 5) {
             ForEach(scores.indices, id: \.self) { i in
-                let isToday = i == scores.count - 1
+                let isToday = endsToday && i == scores.count - 1
                 let isLate = i < late.count && late[i]
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(isLate ? Color(hex: 0xFF9A7A) : WatchTint.recovery.opacity(isToday ? 1 : 0.45))
@@ -308,7 +313,7 @@ struct WatchLogView: View {
                     Text("cutoff 2pm").scaledFont(12, .semibold).foregroundStyle(WatchTint.secondary)
                 }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    LogTile(title: "Latte", detail: "\(Int(s.caffeineToday)) of 400 mg", icon: "cup.and.saucer.fill",
+                    LogTile(title: "Latte", detail: "\(Int(s.caffeineToday)) of 400 mg", shortDetail: "\(Int(s.caffeineToday)) mg", icon: "cup.and.saucer.fill",
                             tint: WatchTint.log, progress: s.caffeineToday / 400) { await store.logLatte() }
                     LogTile(title: "Water", detail: "\(bottles(s.waterToday)) of \(bottles(s.waterGoal))", icon: "drop.fill",
                             tint: WatchTint.water, progress: s.waterToday / max(1, s.waterGoal)) { await store.logWater() }
@@ -353,6 +358,8 @@ struct WatchLogView: View {
 struct LogTile: View {
     var title: String
     var detail: String
+    /// Used instead of `detail` where it doesn't fit (a 41mm Watch, large text).
+    var shortDetail: String? = nil
     var icon: String
     var tint: Color
     var progress: Double? = nil
@@ -374,8 +381,12 @@ struct LogTile: View {
                 .frame(width: 34, height: 34)
                 Spacer(minLength: 0)
                 Text(title).scaledFont(16, .bold).foregroundStyle(.white)
-                Text(detail).scaledFont(12, .semibold).foregroundStyle(WatchTint.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                    .contentTransition(.numericText())
+                ViewThatFits(in: .horizontal) {
+                    Text(detail)
+                    Text(shortDetail ?? detail).minimumScaleFactor(0.8)
+                }
+                .scaledFont(12, .semibold).foregroundStyle(WatchTint.secondary).lineLimit(1)
+                .contentTransition(.numericText())
             }
             .frame(maxWidth: .infinity, minHeight: WatchSize.scaled(84), alignment: .leading)
             .padding(10)
@@ -432,7 +443,12 @@ struct WatchAlarmPage: View {
                             .scaledFont(12, .bold).foregroundStyle(Color(hex: 0x6EE79A))
                     }
                 }
-                if alarm.isArmed, let plan = alarm.plan {
+                if alarm.ringing {
+                    Button { alarm.stop() } label: {
+                        Label("Stop alarm", systemImage: "stop.fill").scaledFont(16, .bold).frame(maxWidth: .infinity)
+                    }
+                    .tint(Color(hex: 0xFFC94D))
+                } else if alarm.isArmed, let plan = alarm.plan {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Up by").scaledFont(13).foregroundStyle(WatchTint.secondary)
                         Text(plan.latestText).numberFont(40).foregroundStyle(.white)
@@ -464,6 +480,7 @@ struct WatchAlarmPage: View {
                     NavigationLink { WatchAlarmView() } label: {
                         Text("Change").scaledFont(15, .semibold).frame(maxWidth: .infinity)
                     }
+                    Button("Turn off", role: .destructive) { alarm.turnOff() }
                 } else {
                     Text("Wakes you in light sleep, up to 30 minutes before you need to be up.")
                         .scaledFont(15).foregroundStyle(WatchTint.secondary)

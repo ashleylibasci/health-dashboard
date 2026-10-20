@@ -31,8 +31,12 @@ final class AlarmLink {
         if status.state == .off { plan = nil } else if let p = status.plan { plan = p }
     }
 
-    /// Asks the Watch how things stand, if it's around.
-    func refresh() { WatchSync.shared.requestAlarmStatus() }
+    /// Asks the Watch how things stand, and resends a plan the Watch never got (it wasn't
+    /// reachable or set up when she saved it).
+    func refresh() {
+        if let plan, watchStatus == nil { WatchSync.shared.sendAlarm(plan) }
+        WatchSync.shared.requestAlarmStatus()
+    }
 
     private func save<T: Encodable>(_ value: T?, _ key: String) {
         UserDefaults.standard.set(value.flatMap { try? JSONEncoder().encode($0) }, forKey: key)

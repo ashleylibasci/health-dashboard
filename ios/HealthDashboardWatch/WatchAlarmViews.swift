@@ -39,7 +39,7 @@ struct WatchAlarmView: View {
                         .scaledFont(13, .semibold).foregroundStyle(Color(hex: 0xFF8A80))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if alarm.isArmed {
+                if alarm.plan != nil {
                     Button("Turn off", role: .destructive) {
                         alarm.turnOff()
                         dismiss()
@@ -69,19 +69,22 @@ struct WatchRingingView: View {
     @State private var alarm = SmartAlarm.shared
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "sun.horizon.fill").font(.system(size: 40)).foregroundStyle(Color(hex: 0xFFC94D))
-                .symbolEffect(.pulse)
-            Text("Good morning").numberFont(22).foregroundStyle(.white)
-            if let last = alarm.lastResult {
-                Text(last).scaledFont(12).foregroundStyle(WatchTint.secondary).multilineTextAlignment(.center)
+        // Stop sits first after the greeting and the rest scrolls, so it's always reachable on a small Watch.
+        ScrollView {
+            VStack(spacing: 10) {
+                Image(systemName: "sun.horizon.fill").font(.system(size: 32)).foregroundStyle(Color(hex: 0xFFC94D))
+                    .symbolEffect(.pulse)
+                Text("Good morning").numberFont(20).foregroundStyle(.white)
+                Button { alarm.stop() } label: {
+                    Text("Stop").scaledFont(18, .bold).frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .tint(Color(hex: 0xFFC94D))
+                if let last = alarm.lastResult {
+                    Text(last).scaledFont(12).foregroundStyle(WatchTint.secondary).multilineTextAlignment(.center)
+                }
             }
-            Button { alarm.stop() } label: {
-                Text("Stop").scaledFont(18, .bold).frame(maxWidth: .infinity, minHeight: 50)
-            }
-            .tint(Color(hex: 0xFFC94D))
+            .scenePadding(.horizontal)
         }
-        .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             RadialGradient(colors: [WatchTint.alarm.opacity(0.5), .black], center: .top, startRadius: 0, endRadius: 220).ignoresSafeArea()
