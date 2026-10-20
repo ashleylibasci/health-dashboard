@@ -185,3 +185,68 @@ struct BugFixTests {
         #expect(test.buckets.map(\.label) == ["After 3pm"])
     }
 }
+
+struct DataNudgeTests {
+    private let today = "2026-10-20"
+    private func watchNights(_ backs: [Int]) -> [Night] {
+        backs.sorted(by: >).map { back in
+            var n = night(Day.shift(today, -back - 1))
+            n.stages = SleepStages(deep: 60, rem: 90, core: 240, awake: 10, wakeUps: 2)
+            return n
+        }
+    }
+
+    @Test func noNudgesWithoutAWatch() {
+        #expect(dataNudges(HealthData(), today: today, tracksCycle: true).isEmpty)
+    }
+
+    @Test func pointsOutMissedNightsAndAStaleVO2() {
+        var h = HealthData()
+        h.nights = watchNights(Array(8...28) + [1, 2, 3])
+        h.vo2 = [Reading(date: Day.start(Day.shift(today, -45)), value: 38)]
+        let ids = dataNudges(h, today: today, tracksCycle: false).map(\.id)
+        #expect(ids == ["sleep-gaps", "vo2-stale"])
+    }
+
+    @Test func quietWhenDataIsFresh() {
+        var h = HealthData()
+        h.nights = watchNights(Array(1...28))
+        h.vo2 = [Reading(date: Day.start(Day.shift(today, -10)), value: 38)]
+        for back in 1...14 { h.wristTemp[Day.shift(today, -back)] = 34.5 }
+        #expect(dataNudges(h, today: today, tracksCycle: true).isEmpty)
+        h.wristTemp = [:]
+        #expect(dataNudges(h, today: today, tracksCycle: true).map(\.id) == ["temp-none"])
+    }
+}
+
+struct SmartAlarmTests {
+    @Test func stillnessDoesNotWakeButRestlessnessDoes() {
+        var d = WakeDetector()
+        let woke = [0.003, 0.004, 0.03, 0.002, 0.025].map { d.add($0) }
+        // One twitch isn't light sleep; a second within two minutes is.
+        #expect(woke == [false, false, false, false, true])
+    }
+
+    @Test func movementIgnoresWhichWayTheWristLies() {
+        let still = Array(repeating: (x: 0.0, y: 0.0, z: -1.0), count: 20)
+        #expect(WakeDetector.movement(still) == 0)
+        let tilted = Array(repeating: (x: 0.6, y: 0.0, z: -0.8), count: 20)
+        #expect(WakeDetector.movement(tilted) < 1e-9)
+        #expect(WakeDetector.movement([(0, 0, -1), (0, 0, -1.1), (0, 0, -1)]) > 0.05)
+    }
+
+    @Test func windowOpensBeforeTheNextLatestTime() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Chicago")!
+        let plan = SmartAlarmPlan(latest: 7 * 60 + 45, window: 20)
+        let evening = cal.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 23))!
+        let latest = plan.nextLatest(after: evening, calendar: cal)
+        #expect(cal.dateComponents([.day, .hour, .minute], from: latest) == DateComponents(day: 21, hour: 7, minute: 45))
+        #expect(latest.timeIntervalSince(plan.windowStart(after: evening, calendar: cal)) == 20 * 60)
+        // Set at 7:30am, already inside the window: tomorrow's alarm, not one in 15 minutes.
+        let morning = cal.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 7, minute: 30))!
+        #expect(cal.component(.day, from: plan.nextLatest(after: morning, calendar: cal)) == 22)
+        #expect(plan.latestText == "7:45am")
+        #expect(SmartAlarmPlan(latest: -20).latestText == "11:40pm")
+    }
+}

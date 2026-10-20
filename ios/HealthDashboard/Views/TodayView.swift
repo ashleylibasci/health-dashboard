@@ -3,6 +3,16 @@ import SwiftUI
 struct TodayView: View {
     @Environment(AppModel.self) private var model
     @Binding var showSettings: Bool
+    /// Nudge id → the day "Not now" was tapped. Each stays hidden for two weeks.
+    @AppStorage("hiddenNudges") private var hiddenNudgesData = Data()
+    private var hiddenNudges: [String: String] {
+        get { (try? JSONDecoder().decode([String: String].self, from: hiddenNudgesData)) ?? [:] }
+        nonmutating set { hiddenNudgesData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    private func nudgeHidden(_ n: DataNudge) -> Bool {
+        hiddenNudges[n.id].map { Day.between($0, model.today) < 14 } ?? false
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -24,6 +34,9 @@ struct TodayView: View {
                 alerts
                 cycleCard
                 tiles
+                if let nudge = model.nudges.first(where: { !nudgeHidden($0) }) {
+                    NudgeCard(nudge: nudge) { hiddenNudges[nudge.id] = model.today }
+                }
                 if let exam = model.upcomingExams.first, !greetingIsAbout(exam) {
                     NavigationLink { ExamsView() } label: { examBanner(exam) }.buttonStyle(.plain)
                 }

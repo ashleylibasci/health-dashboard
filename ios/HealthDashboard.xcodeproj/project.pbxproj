@@ -670,6 +670,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				INFOPLIST_FILE = "HealthDashboardWatch-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -700,6 +701,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ashleylibasci.healthdashboard;
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				INFOPLIST_FILE = "HealthDashboardWatch-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

@@ -1,31 +1,125 @@
 import SwiftUI
 
-/// Vertical pages, as in the canvas: the getting-sick alert first when it's on, then Recovery,
-/// Log, Tonight and Cycle. Tonight switches to dark after 8pm when that setting is on.
+/// The Watch home: one row per feature, each with a colorful round icon and today's number,
+/// like the system apps. The getting-sick heads-up sits on top when it's on.
 struct WatchRootView: View {
     @Environment(WatchStore.self) private var store
-    @State private var page = WatchRootView.startPage
+    @State private var path: [String] = WatchRootView.startPath
+    @State private var alarm = SmartAlarm.shared
 
     var body: some View {
         let s = store.snapshot
-        TabView(selection: $page) {
-            if s.sick { WatchSickView().tag("sick") }
-            WatchRecoveryView().tag("recovery")
-            WatchLogView().tag("log")
-            WatchTonightView().tag("tonight")
-            if s.cycleDay != nil && s.typicalLength != nil { WatchCycleView().tag("cycle") }
+        let today = s.isFromToday
+        NavigationStack(path: $path) {
+            List {
+                if s.sick {
+                    row("sick", icon: "thermometer.medium", tint: Color(hex: 0xF07A6B), title: "Heads up", value: "Body working harder")
+                }
+                row("recovery", icon: "heart.circle.fill", tint: .main, title: "Recovery",
+                    value: today ? (s.recovery.map { "\($0) · \(s.recoveryLabel)" } ?? "Learning you") : "Open iPhone app")
+                row("log", icon: "cup.and.saucer.fill", tint: Color(hex: 0xE0A800), title: "Log a drink",
+                    value: "\(Int(s.caffeineToday)) mg today")
+                row("water", icon: "drop.fill", tint: Color(hex: 0x4FA3F7), title: "Water",
+                    value: "\(bottleText(s.waterToday)) of \(bottleText(s.waterGoal)) bottles")
+                row("tonight", icon: "moon.stars.fill", tint: Color(hex: 0x7C6CF0), title: "Tonight",
+                    value: s.bedBy.map { "Bed by \($0)" } ?? "Bedtime")
+                row("alarm", icon: "alarm.fill", tint: Color(hex: 0xF5A623), title: "Smart alarm",
+                    value: alarm.isArmed ? alarm.plan.map { "Up by \($0.latestText)" } ?? "On" : "Off")
+                if s.cycleDay != nil, s.typicalLength != nil {
+                    row("cycle", icon: "circle.dashed", tint: Color(hex: 0xF07A6B), title: "Cycle",
+                        value: "Day \(s.cycleDay!)\(s.phase.map { " · \($0)" } ?? "")")
+                } else if let d = s.cycleDay {
+                    row("cycle", icon: "pills.fill", tint: Color(hex: 0xF07A6B), title: "Pill pack", value: "Day \(d)")
+                }
+            }
+            .listStyle(.carousel)
+            .navigationTitle("Health")
+            .navigationDestination(for: String.self) { page in
+                switch page {
+                case "sick": WatchSickView()
+                case "log": WatchLogView()
+                case "water": WatchWaterView()
+                case "tonight": WatchTonightView()
+                case "alarm": WatchAlarmView()
+                case "cycle": WatchCycleView()
+                default: WatchRecoveryView()
+                }
+            }
         }
-        .tabViewStyle(.verticalPage)
-        .onOpenURL { url in if url.host == "log" { page = "log" } }
+        .onOpenURL { url in
+            guard let host = url.host else { return }
+            path = [host]
+        }
+        .fullScreenCover(isPresented: .constant(alarm.ringing)) { WatchRingingView() }
+    }
+
+    private func row(_ page: String, icon: String, tint: Color, title: String, value: String) -> some View {
+        NavigationLink(value: page) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(tint.gradient, in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    // The Watch home is always on black, so the text is set white explicitly.
+                    Text(title).scaledFont(16, .semibold).foregroundStyle(.white)
+                    Text(value).scaledFont(13).foregroundStyle(Color.white.opacity(0.7)).lineLimit(2)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .accessibilityLabel("\(title), \(value)")
+    }
+
+    private func bottleText(_ x: Double) -> String {
+        let q = Int((x * 4).rounded())
+        let frac = ["", "¼", "½", "¾"][q % 4]
+        return q / 4 == 0 && !frac.isEmpty ? frac : "\(q / 4)\(frac)"
     }
 
     /// Test builds can open a page directly with `-page tonight` (etc.).
-    private static var startPage: String {
+    private static var startPath: [String] {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
-        if let i = args.firstIndex(of: "-page"), i + 1 < args.count { return args[i + 1] }
+        if let i = args.firstIndex(of: "-page"), i + 1 < args.count, args[i + 1] != "home" { return [args[i + 1]] }
         #endif
-        return WatchStore.shared.snapshot.sick ? "sick" : "recovery"
+        return []
+    }
+}
+
+/// Water on the Watch: bottles today, and one tap to add a bottle at her size.
+struct WatchWaterView: View {
+    @Environment(WatchStore.self) private var store
+
+    var body: some View {
+        let s = store.snapshot
+        let done = s.waterToday, goal = max(1, s.waterGoal)
+        ScrollView {
+            VStack(spacing: 10) {
+                Gauge(value: min(done, goal), in: 0...goal) {
+                    Image(systemName: "drop.fill")
+                } currentValueLabel: {
+                    Text(done.formatted(.number.precision(.fractionLength(0...2))))
+                }
+                .gaugeStyle(.accessoryCircularCapacity)
+                .tint(Color(hex: 0x4FA3F7))
+                .scaleEffect(1.4)
+                .padding(.vertical, 12)
+                Text("\(done.formatted(.number.precision(.fractionLength(0...2)))) of \(goal.formatted(.number.precision(.fractionLength(0...2)))) bottles")
+                    .scaledFont(15, .semibold).foregroundStyle(Color.ink)
+                Button { Task { await store.logWater() } } label: {
+                    Label("Add a bottle · \(Int((store.bottleMl / 29.5735).rounded())) oz", systemImage: "plus")
+                        .scaledFont(15, .bold).frame(maxWidth: .infinity)
+                }
+                .tint(Color(hex: 0x4FA3F7))
+                .disabled(store.saving)
+                if let msg = store.lastLogged { Text(msg).scaledFont(12, .bold).foregroundStyle(Color.mintInk) }
+            }
+        }
+        .foregroundStyle(Color.ink)
+        .watchPage(.ground)
+        .navigationTitle("Water")
     }
 }
 

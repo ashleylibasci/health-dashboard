@@ -6,6 +6,7 @@ import WidgetKit
 @main
 struct HealthDashboardWatchApp: App {
     @State private var store = WatchStore.shared
+    @WKApplicationDelegateAdaptor private var appDelegate: WatchAppDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -77,6 +78,12 @@ final class WatchStore: NSObject, WCSessionDelegate {
         do {
             try await health.requestAuthorization(toShare: [type], read: [])
             try await health.save(HKQuantitySample(type: type, quantity: HKQuantity(unit: unit, doubleValue: amount), start: .now, end: .now))
+            if type == HKQuantityType(.dietaryWater) {
+                let day = WidgetSnapshot.calendarKey()
+                snapshot.waterBottles = (snapshot.waterDay == day ? snapshot.waterBottles : 0) + 1
+                snapshot.waterDay = day
+                snapshot.save()
+            }
             if type == HKQuantityType(.dietaryCaffeine) {
                 let today = snapshotDay()
                 snapshot.caffeineMg = (snapshot.caffeineDay == today ? snapshot.caffeineMg : 0) + amount
@@ -103,6 +110,10 @@ extension WidgetSnapshot {
         s.typicalLength = 29; s.periodLength = 5; s.ovulationDay = 15; s.daysToPeriod = 7; s.tempDelta = 0.3
         s.caffeineAtBed = 17; s.examNote = "Midterm in 2 days. Tonight counts."; s.bedtimeMinutes = 375
         s.sick = ProcessInfo.processInfo.arguments.contains("-demoSick"); s.sickTonight = "Tonight: bed by 11:30, extra water."
+        s.caffeineMg = 130; s.caffeineDay = WidgetSnapshot.eveningKey()
+        s.waterBottles = 1.5; s.waterGoal = 3; s.waterDay = WidgetSnapshot.calendarKey(); s.bottleMl = 710
+        s.caffeineMg = 130; s.caffeineDay = WidgetSnapshot.eveningKey()
+        s.waterBottles = 1.5; s.waterGoal = 3; s.waterDay = WidgetSnapshot.calendarKey(); s.bottleMl = 710
         s.updated = .now
         return s
     }

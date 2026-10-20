@@ -37,6 +37,10 @@ struct WidgetSnapshot: Codable, Equatable {
     var bedtimeMinutes: Int?
     /// Her water bottle size, so the Watch logs the right amount.
     var bottleMl: Double?
+    /// Water today and the goal, both in bottles.
+    var waterBottles: Double = 0
+    var waterGoal: Double = 3
+    var waterDay: String = ""
 
     static let appGroup = "group.com.ashleylibasci.healthdashboard"
     private static let key = "widgetSnapshot.v1"
@@ -54,6 +58,7 @@ struct WidgetSnapshot: Codable, Equatable {
         tempDelta = v(.tempDelta, nil); caffeineAtBed = v(.caffeineAtBed, nil); examNote = v(.examNote, nil); sick = v(.sick, false)
         sickTonight = v(.sickTonight, nil); darkAtNight = v(.darkAtNight, true); bedtimeMinutes = v(.bedtimeMinutes, nil)
         bottleMl = v(.bottleMl, nil)
+        waterBottles = v(.waterBottles, 0); waterGoal = v(.waterGoal, 3); waterDay = v(.waterDay, "")
     }
 
     var encoded: Data? { try? JSONEncoder().encode(self) }
@@ -75,6 +80,17 @@ struct WidgetSnapshot: Codable, Equatable {
 
     /// Today's caffeine, reset to zero once the day changes.
     var caffeineToday: Double { caffeineDay == Self.eveningKey() ? caffeineMg : 0 }
+    var waterToday: Double { waterDay == Self.calendarKey() ? waterBottles : 0 }
+
+    /// Today's plain calendar date as "yyyy-MM-dd" (Gregorian), for daily totals like water.
+    static func calendarKey(_ date: Date = .now) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
 
     /// Whether the numbers are from today; after midnight, yesterday's recovery shouldn't pass for today's.
     var isFromToday: Bool { Calendar.current.isDateInToday(updated) }

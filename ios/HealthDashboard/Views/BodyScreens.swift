@@ -38,6 +38,7 @@ struct RecoveryView: View {
                     Note("Peach days followed a bedtime after 2am.")
                 }
             }
+            AccuracyLink(metric: .heart)
         }
         .detailPage()
     }
@@ -336,6 +337,7 @@ struct FitnessView: View {
                 Meter(value: Double(days) / 3, color: Color(hex: 0x5CC79A))
                 Note("Days with 20+ minutes of exercise. Three a week is what moves VO₂ max.")
             }
+            AccuracyLink(metric: .vo2)
         }
         .detailPage()
     }

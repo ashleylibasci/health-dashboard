@@ -56,6 +56,7 @@ struct CycleCalendarView: View {
                 NavigationLink { PhasesView() } label: {
                     LinkCard(icon: "chart.bar.fill", title: "How your cycle affects you", detail: "Sleep, heart rate and HRV in each phase")
                 }.buttonStyle(.plain)
+                AccuracyLink(metric: .wristTemp)
             } else {
                 PeriodCalendar(cycle: nil)
                 Note("Tap a day to log your period. Predictions start after your first period is logged.")

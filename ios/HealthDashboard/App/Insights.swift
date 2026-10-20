@@ -55,6 +55,8 @@ extension AppModel {
         guard profile?.prefs.sickAlerts ?? true else { return nil }
         return sickSignals(health, lutealAdjust: cycle.map { $0.phaseKnown && $0.phase == .luteal } ?? false)
     }
+    /// Missing or out-of-date Watch data worth a heads-up, most useful first.
+    var nudges: [DataNudge] { dataNudges(health, today: today, tracksCycle: profile?.tracksCycle ?? false) }
     var reasons: [OffReason] { offReasons(data: health, sick: sick, cycle: cycle, exams: exams, hrvChange: recoveryToday?.hrvChange) }
 
     /// The bedtime the app suggests: your usual school-night time, rounded down to the half hour.
@@ -99,6 +101,9 @@ extension AppModel {
         snap.caffeineMg = caffeineToday.reduce(0) { $0 + $1.value }
         snap.caffeineDay = tonight
         snap.bottleMl = bottleMl
+        snap.waterBottles = bottlesToday
+        snap.waterGoal = goalBottles(bottleMl)
+        snap.waterDay = WidgetSnapshot.calendarKey()
         snap.updated = .now
         snap.restingHr = health.restingHr[today].map { Int($0.rounded()) }
         snap.hrv = health.hrv[today].map { Int($0.rounded()) }

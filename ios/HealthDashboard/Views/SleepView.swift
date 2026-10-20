@@ -37,6 +37,7 @@ struct SleepView: View {
             NavigationLink { LateNightView() } label: {
                 LinkCard(icon: "moon.zzz.fill", title: "Late-night cost", detail: "What a 2am night costs you")
             }.buttonStyle(.plain)
+            AccuracyLink(metric: .sleep)
         }
         .page()
         .toolbar(.hidden, for: .navigationBar)
