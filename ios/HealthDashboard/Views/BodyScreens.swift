@@ -37,7 +37,7 @@ struct RecoveryView: View {
                 Card {
                     CardLabel("Last \(model.recovery.count) days · touch a day", color: .muted)
                     RecoveryChart(days: model.recovery, usual: model.usualRecovery)
-                    Note("Peach days followed a bedtime after 2am.")
+                    Note("Peach days followed a bedtime after 2am." + (model.usualRecovery.map { " The dashed line is your usual, \($0)." } ?? ""))
                 }
             }
             AccuracyLink(metric: .heart)
@@ -650,16 +650,14 @@ struct RecoveryChart: View {
                 ForEach(days, id: \.date) { d in
                     BarMark(x: .value("Day", d.date), y: .value("Recovery", d.score), width: .ratio(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .foregroundStyle(d.date == Day.key(.now) ? Color.main : d.afterLateNight ? Color(hex: 0xF5A487) : Color(hex: 0xC9CFFF))
-                        .opacity(shown == nil || shown?.date == d.date ? 1 : 0.55)
+                        .foregroundStyle(d.date == Day.key(.now) ? Color.main : d.afterLateNight ? Color(hex: 0xF5A487) : Color.main.opacity(0.4))
+                        // Dim the others only while she's touching a day.
+                        .opacity(selected == nil || shown?.date == d.date ? 1 : 0.5)
                 }
                 if let usual {
                     RuleMark(y: .value("Usual", usual))
                         .foregroundStyle(Color.mainText.opacity(0.6))
                         .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
-                        .annotation(position: .top, alignment: .trailing) {
-                            Text("usual \(usual)").scaledFont(11, .semibold).foregroundStyle(Color.mainText)
-                        }
                 }
             }
             .chartXSelection(value: $selected)

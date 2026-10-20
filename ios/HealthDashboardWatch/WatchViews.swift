@@ -491,6 +491,11 @@ struct WatchAlarmPage: View {
                 }
                 if let error = alarm.error { Text(error).scaledFont(12, .bold).foregroundStyle(Color(hex: 0xFF8A80)) }
                 if let last = alarm.lastResult { Text(last).scaledFont(12).foregroundStyle(WatchTint.secondary) }
+                if alarm.mornings.count >= 2 {
+                    let recent = alarm.mornings.suffix(5).map { $0.minutesEarly == 0 ? "on time" : "\($0.minutesEarly)m early" }
+                    Text("Recent mornings: " + recent.joined(separator: ", "))
+                        .scaledFont(12).foregroundStyle(WatchTint.secondary)
+                }
             }
             .animation(.snappy, value: alarm.isArmed)
             .watchMargins()

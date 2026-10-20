@@ -257,3 +257,31 @@ struct SmartAlarmTests {
         #expect(SmartAlarmPlan(latest: -20).latestText == "11:40pm")
     }
 }
+
+struct AlarmSettingsTests {
+    @Test func olderSavedPlansAndStatusesStillLoad() throws {
+        // Saved by an earlier build, before sensitivity, the phone backup and the morning log existed.
+        let plan = try JSONDecoder().decode(SmartAlarmPlan.self, from: Data(#"{"latest":465,"window":20,"repeats":false}"#.utf8))
+        #expect(plan.latest == 465 && plan.window == 20 && !plan.repeats)
+        #expect(plan.sensitivity == .normal && !plan.phoneBackup)
+        let status = try JSONDecoder().decode(WatchAlarmStatus.self, from: Data(#"{"state":"waiting","plan":{"latest":465}}"#.utf8))
+        #expect(status.state == .waiting && status.mornings.isEmpty && status.plan?.window == 30)
+    }
+
+    @Test func sensitivityMovesTheThreshold() {
+        #expect(SmartAlarmPlan.Sensitivity.gentle.threshold > SmartAlarmPlan.Sensitivity.normal.threshold)
+        #expect(SmartAlarmPlan.Sensitivity.sensitive.threshold < SmartAlarmPlan.Sensitivity.normal.threshold)
+        // A stir that "Normal" ignores is enough for "Sensitive".
+        var normal = WakeDetector(threshold: SmartAlarmPlan.Sensitivity.normal.threshold)
+        var sensitive = WakeDetector(threshold: SmartAlarmPlan.Sensitivity.sensitive.threshold)
+        let stirs = [0.003, 0.01, 0.003, 0.01]
+        #expect(!stirs.map { normal.add($0) }.contains(true))
+        #expect(stirs.map { sensitive.add($0) }.last == true)
+    }
+
+    @Test func tileOrderSkipsUnknownNames() {
+        #expect(TodayTile.parse("stress,water,oldtile,sleep") == [.stress, .water, .sleep])
+        #expect(TodayTile.parse(TodayTile.defaultOrder) == [.sleep, .caffeine, .fitness, .stress])
+        #expect(TodayTile.parse("").isEmpty)
+    }
+}

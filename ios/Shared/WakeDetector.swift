@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 /// Decides, from wrist movement, when she's in light sleep during the smart alarm window.
 /// Light sleep and the brief wake-ups between cycles come with small shifts and turns; deep
@@ -9,7 +12,7 @@ import Foundation
 /// light sleep. A single twitch isn't enough.
 struct WakeDetector {
     /// Average change in acceleration (g) per sample. Still in bed is about 0.002–0.005; turning
-    /// over is well above 0.02. A starting guess, worth tuning against real nights.
+    /// over is well above 0.02. Set from her sensitivity choice (`SmartAlarmPlan.Sensitivity`).
     var threshold = 0.012
     var epochsNeeded = 2
     var lookback = 4
@@ -32,7 +35,18 @@ struct WakeDetector {
     }
 }
 
+/// One morning's alarm, for the log that shows how early it tends to wake her.
+struct AlarmMorning: Codable, Equatable, Identifiable {
+    var date: Date
+    /// Minutes before the latest time it went off; 0 when it waited for the latest time.
+    var minutesEarly: Int
+    /// The busiest 30 seconds of movement in the window, to compare against the threshold.
+    var peakMovement: Double
+    var id: Date { date }
+}
+
 /// What the Watch tells the iPhone about the smart alarm, so the phone can show whether it's set.
+/// The Watch also keeps the latest one in the App Group for the watch-face complication.
 struct WatchAlarmStatus: Codable, Equatable {
     enum State: String, Codable { case armed, waiting, failed, off }
     var state: State
@@ -40,6 +54,40 @@ struct WatchAlarmStatus: Codable, Equatable {
     var latest: Date?
     var plan: SmartAlarmPlan?
     var message: String?
+    /// The last two weeks of mornings, newest last.
+    var mornings: [AlarmMorning] = []
+
+    init(state: State, latest: Date? = nil, plan: SmartAlarmPlan? = nil, message: String? = nil, mornings: [AlarmMorning] = []) {
+        self.state = state; self.latest = latest; self.plan = plan; self.message = message; self.mornings = mornings
+    }
+
+    /// Older Watch builds sent no mornings; read what's there.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        state = try c.decode(State.self, forKey: .state)
+        latest = try c.decodeIfPresent(Date.self, forKey: .latest)
+        plan = try c.decodeIfPresent(SmartAlarmPlan.self, forKey: .plan)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        mornings = try c.decodeIfPresent([AlarmMorning].self, forKey: .mornings) ?? []
+    }
+
+    /// Set and still ahead (a status saved before the alarm went off reads as no longer set).
+    var isSet: Bool { state == .armed && (latest ?? .distantPast) > .now }
+
+    private static let key = "watchAlarmStatus.v1"
+
+    static func load() -> WatchAlarmStatus? {
+        UserDefaults(suiteName: WidgetSnapshot.appGroup)?.data(forKey: key).flatMap { try? JSONDecoder().decode(WatchAlarmStatus.self, from: $0) }
+    }
+
+    /// Saves it for the complication and asks the watch face to redraw.
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults(suiteName: WidgetSnapshot.appGroup)?.set(data, forKey: Self.key)
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
 }
 
 /// When the next alarm should be: the latest wake time, and the window before it.
@@ -49,6 +97,38 @@ struct SmartAlarmPlan: Codable, Equatable {
     /// How early it may wake her, in minutes. The Watch allows a session of up to 30.
     var window: Int = 30
     var repeats = true
+    var sensitivity: Sensitivity = .normal
+    /// Also set a regular iPhone alarm at the latest time, cancelled if the Watch wakes her first.
+    var phoneBackup = false
+
+    /// How much movement counts as light sleep. "Gentle" needs more stirring before it wakes
+    /// her (so it tends to wake her later); "Sensitive" goes off at smaller movements.
+    enum Sensitivity: String, Codable, CaseIterable, Identifiable {
+        case gentle, normal, sensitive
+        var id: String { rawValue }
+        var name: String { rawValue.capitalized }
+        var threshold: Double {
+            switch self {
+            case .gentle: 0.018
+            case .normal: 0.012
+            case .sensitive: 0.008
+            }
+        }
+    }
+
+    init(latest: Int, window: Int = 30, repeats: Bool = true, sensitivity: Sensitivity = .normal, phoneBackup: Bool = false) {
+        self.latest = latest; self.window = window; self.repeats = repeats; self.sensitivity = sensitivity; self.phoneBackup = phoneBackup
+    }
+
+    /// Plans saved before a setting existed get its default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        latest = try c.decode(Int.self, forKey: .latest)
+        window = try c.decodeIfPresent(Int.self, forKey: .window) ?? 30
+        repeats = try c.decodeIfPresent(Bool.self, forKey: .repeats) ?? true
+        sensitivity = try c.decodeIfPresent(Sensitivity.self, forKey: .sensitivity) ?? .normal
+        phoneBackup = try c.decodeIfPresent(Bool.self, forKey: .phoneBackup) ?? false
+    }
 
     /// The next time the latest wake time comes around: today if it's still ahead, else tomorrow.
     /// Built from the clock time (not midnight plus minutes), so a daylight-saving night stays right.

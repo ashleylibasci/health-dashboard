@@ -32,6 +32,7 @@ extension WidgetSnapshot {
 
 private let lavender = Color(hex: 0x7C8CF8), coffee = Color(hex: 0xE0A800), water = Color(hex: 0x4FA3F7)
 private let rose = Color(hex: 0xF07A6B), night = Color(hex: 0x7C6CF0), mint = Color(hex: 0x5CC79A)
+private let alarm = Color(hex: 0xFFA94D)
 
 /// Every face spot: circle, corner, a wide rectangle, and the one-line text spot.
 private let allFamilies: [WidgetFamily] = [.accessoryCircular, .accessoryCorner, .accessoryRectangular, .accessoryInline]
@@ -293,6 +294,87 @@ struct EnergyComplication: Widget {
     }
 }
 
+// MARK: Smart alarm
+
+struct AlarmEntry: TimelineEntry {
+    var date: Date
+    var status: WatchAlarmStatus?
+}
+
+/// Redraws when the Watch app saves a new status, and again once the alarm time has passed.
+struct AlarmProvider: TimelineProvider {
+    func placeholder(in context: Context) -> AlarmEntry { AlarmEntry(date: .now, status: .preview) }
+    func getSnapshot(in context: Context, completion: @escaping (AlarmEntry) -> Void) {
+        completion(AlarmEntry(date: .now, status: context.isPreview ? .preview : WatchAlarmStatus.load()))
+    }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<AlarmEntry>) -> Void) {
+        let status = WatchAlarmStatus.load()
+        var entries = [AlarmEntry(date: .now, status: status)]
+        if let latest = status?.latest, latest > .now { entries.append(AlarmEntry(date: latest.addingTimeInterval(60), status: status)) }
+        completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(3600))))
+    }
+}
+
+extension WatchAlarmStatus {
+    static var preview: WatchAlarmStatus {
+        WatchAlarmStatus(state: .armed, latest: .now.addingTimeInterval(9 * 3600), plan: SmartAlarmPlan(latest: 465))
+    }
+}
+
+struct AlarmComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var status: WatchAlarmStatus?
+
+    var body: some View {
+        let set = status?.isSet ?? false
+        // Needs opening: a plan that the Watch hasn't been able to schedule yet.
+        let needsApp = !set && status?.plan != nil
+        let time = status?.plan.map { $0.latestText.replacingOccurrences(of: "am", with: "").replacingOccurrences(of: "pm", with: "") }
+        let icon = needsApp ? "alarm.waves.left.and.right" : "alarm.fill"
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: icon).font(.title3).foregroundStyle(alarm).widgetAccentable()
+                .widgetLabel(set ? (time ?? "On") : needsApp ? "Open app" : "Off")
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 1) {
+                Label("Smart alarm", systemImage: icon).font(.headline).foregroundStyle(alarm).widgetAccentable()
+                if set, let plan = status?.plan {
+                    Text("Up by \(plan.latestText)").font(.body.weight(.semibold))
+                    Text("Set · from \(SmartAlarmPlan(latest: plan.latest - plan.window).latestText)").font(.caption2).foregroundStyle(.secondary)
+                } else if needsApp {
+                    Text("Not set yet").font(.body.weight(.semibold))
+                    Text("Tap to open and set it").font(.caption2).foregroundStyle(.secondary)
+                } else {
+                    Text("Off").font(.body.weight(.semibold))
+                    Text("Tap to set one").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        case .accessoryInline:
+            Label(set ? "Alarm \(time ?? "on")" : needsApp ? "Alarm needs app" : "Alarm off", systemImage: icon)
+        default:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Image(systemName: icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(alarm).widgetAccentable()
+                    Text(set ? (time ?? "On") : needsApp ? "!" : "Off").font(.system(size: 14, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.6)
+                }
+            }
+        }
+    }
+}
+
+struct AlarmComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchSmartAlarm", provider: AlarmProvider()) { e in
+            AlarmComplicationView(status: e.status).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://alarm"))
+        }
+        .configurationDisplayName("Smart alarm")
+        .description("Whether tomorrow’s alarm is set, and for when.")
+        .supportedFamilies(allFamilies)
+    }
+}
+
 @main
 struct WatchComplications: WidgetBundle {
     var body: some Widget {
@@ -302,5 +384,6 @@ struct WatchComplications: WidgetBundle {
         CycleComplication()
         BedtimeComplication()
         EnergyComplication()
+        AlarmComplication()
     }
 }

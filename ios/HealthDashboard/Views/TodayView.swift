@@ -16,6 +16,9 @@ struct TodayView: View {
     }
 
     @Namespace private var zoom
+    @State private var editingTiles = false
+    /// The tiles she shows, in her order (the rest are hidden).
+    @AppStorage("todayTiles") private var tileOrder = TodayTile.defaultOrder
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -42,6 +45,9 @@ struct TodayView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("This week").scaledFont(17, .bold).foregroundStyle(Color.ink).accessibilityAddTraits(.isHeader)
                     Spacer()
+                    Button("Edit") { editingTiles = true }
+                        .scaledFont(15, .semibold).foregroundStyle(Color.mainText)
+                        .accessibilityLabel("Edit tiles")
                 }
                 .padding(.top, 4)
                 tiles
@@ -54,6 +60,8 @@ struct TodayView: View {
         .page()
         .toolbar(.hidden, for: .navigationBar)
         .animation(.snappy, value: model.recoveryToday?.score)
+        .animation(.snappy, value: tileOrder)
+        .sheet(isPresented: $editingTiles) { TileEditor(order: $tileOrder) }
         .refreshable {
             await model.refreshHealth()
             await model.refreshCalendar(force: true)
@@ -261,35 +269,58 @@ struct TodayView: View {
             return (0..<7).reversed().compactMap { daily[Day.shift(model.today, -$0)] }
         } ?? []
         return AdaptiveGrid(columns: 2, spacing: 10) {
-            tile("sleep", SleepView()) {
-                MetricTile(icon: "moon.fill", title: "Sleep", ink: .mainText,
-                           value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) } ?? "–",
-                           detail: model.regularity.map { "Regularity \($0)" } ?? "Needs a week of nights") {
-                    Sparkline(values: week.map { Double($0.asleepMinutes) / 60 }, color: .main)
-                }
-            }
-            tile("caffeine", CaffeineView()) {
-                MetricTile(icon: mg > dailyCaffeineGuide ? "exclamationmark.triangle.fill" : "cup.and.saucer.fill",
-                           title: "Caffeine", ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk,
-                           value: "\(Int(mg)) mg", detail: "Cutoff 2pm") {
-                    ProgressBar(value: mg / dailyCaffeineGuide, color: mg > dailyCaffeineGuide ? Color(hex: 0xF08A68) : Color(hex: 0xE0A800),
-                                track: .butter)
-                }
-            }
-            tile("fitness", FitnessView()) {
-                MetricTile(icon: "bolt.fill", title: "Fitness age", ink: .mintInk,
-                           value: model.fitness.map { "\($0.fitnessAge)" } ?? "–",
-                           detail: model.fitness.map { String(format: "VO₂ max %.1f", $0.latest) } ?? "Needs an outdoor walk") {
-                    Sparkline(values: (model.fitness?.monthly.suffix(7).map(\.value)) ?? [], color: Color(hex: 0x2FA472))
-                }
-            }
-            tile("stress", StressView()) {
-                MetricTile(icon: "face.smiling", title: "Stress", ink: .peachInk,
-                           value: model.stress?.weekLabel ?? "–", detail: "Last 7 days") {
-                    Sparkline(values: stressDays, color: Color(hex: 0xF08A68), bars: true)
+            ForEach(TodayTile.parse(tileOrder)) { t in
+                switch t {
+                case .sleep:
+                    tile("sleep", SleepView()) {
+                        MetricTile(icon: "moon.fill", title: "Sleep", ink: .mainText,
+                                   value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) } ?? "–",
+                                   detail: model.regularity.map { "Regularity \($0)" } ?? "Needs a week of nights") {
+                            Sparkline(values: week.map { Double($0.asleepMinutes) / 60 }, color: .main)
+                        }
+                    }
+                case .caffeine:
+                    tile("caffeine", CaffeineView()) {
+                        MetricTile(icon: mg > dailyCaffeineGuide ? "exclamationmark.triangle.fill" : "cup.and.saucer.fill",
+                                   title: "Caffeine", ink: mg > dailyCaffeineGuide ? .peachInk : .butterInk,
+                                   value: "\(Int(mg)) mg", detail: "Cutoff 2pm") {
+                            ProgressBar(value: mg / dailyCaffeineGuide, color: mg > dailyCaffeineGuide ? Color(hex: 0xF08A68) : Color(hex: 0xE0A800),
+                                        track: .butter)
+                        }
+                    }
+                case .water:
+                    tile("water", EnergyView()) {
+                        let goal = goalBottles(model.bottleMl)
+                        MetricTile(icon: "drop.fill", title: "Water", ink: .mainText,
+                                   value: "\(bottleText(model.bottlesToday)) of \(bottleText(goal))", detail: "Bottles today") {
+                            ProgressBar(value: model.bottlesToday / max(1, goal), color: Color(hex: 0x4FA3F7), track: .lavender)
+                        }
+                    }
+                case .fitness:
+                    tile("fitness", FitnessView()) {
+                        MetricTile(icon: "bolt.fill", title: "Fitness age", ink: .mintInk,
+                                   value: model.fitness.map { "\($0.fitnessAge)" } ?? "–",
+                                   detail: model.fitness.map { String(format: "VO₂ max %.1f", $0.latest) } ?? "Needs an outdoor walk") {
+                            Sparkline(values: (model.fitness?.monthly.suffix(7).map(\.value)) ?? [], color: Color(hex: 0x2FA472))
+                        }
+                    }
+                case .stress:
+                    tile("stress", StressView()) {
+                        MetricTile(icon: "face.smiling", title: "Stress", ink: .peachInk,
+                                   value: model.stress?.weekLabel ?? "–", detail: "Last 7 days") {
+                            Sparkline(values: stressDays, color: Color(hex: 0xF08A68), bars: true)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /// Quarter bottles as "1½".
+    private func bottleText(_ x: Double) -> String {
+        let q = Int((x * 4).rounded())
+        let frac = ["", "¼", "½", "¾"][q % 4]
+        return q / 4 == 0 && !frac.isEmpty ? frac : "\(q / 4)\(frac)"
     }
 
     /// A tile that zooms open into its screen.
@@ -437,5 +468,88 @@ struct PressScale: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.snappy(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+/// The week tiles on Today, in the order she picks.
+enum TodayTile: String, CaseIterable, Identifiable {
+    case sleep, caffeine, water, fitness, stress
+    var id: String { rawValue }
+    static let defaultOrder = "sleep,caffeine,fitness,stress"
+
+    var name: String {
+        switch self {
+        case .sleep: "Sleep"
+        case .caffeine: "Caffeine"
+        case .water: "Water"
+        case .fitness: "Fitness age"
+        case .stress: "Stress"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .sleep: "moon.fill"
+        case .caffeine: "cup.and.saucer.fill"
+        case .water: "drop.fill"
+        case .fitness: "bolt.fill"
+        case .stress: "face.smiling"
+        }
+    }
+
+    /// The shown tiles from the saved list; unknown names (from an older build) are skipped.
+    static func parse(_ saved: String) -> [TodayTile] { saved.split(separator: ",").compactMap { TodayTile(rawValue: String($0)) } }
+}
+
+/// Show, hide and reorder the Today tiles: shown ones on top in order (drag to move), hidden ones below.
+struct TileEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var order: String
+    @State private var shown: [TodayTile] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(shown) { t in
+                        Button { withAnimation { shown.removeAll { $0 == t } } } label: {
+                            Label(t.name, systemImage: t.icon)
+                        }
+                        .accessibilityHint("Hides this tile")
+                    }
+                    .onMove { shown.move(fromOffsets: $0, toOffset: $1) }
+                } header: {
+                    Text("Shown")
+                } footer: {
+                    Text("Drag to reorder. Tap to hide.")
+                }
+                let hidden = TodayTile.allCases.filter { !shown.contains($0) }
+                if !hidden.isEmpty {
+                    Section("Hidden") {
+                        ForEach(hidden) { t in
+                            Button { withAnimation { shown.append(t) } } label: {
+                                Label(t.name, systemImage: t.icon).foregroundStyle(Color.muted)
+                            }
+                            .accessibilityHint("Shows this tile")
+                        }
+                    }
+                }
+            }
+            .environment(\.editMode, .constant(.active))
+            .tint(Color.mainText)
+            .navigationTitle("Today’s tiles")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Reset") { shown = TodayTile.parse(TodayTile.defaultOrder) } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        order = shown.map(\.rawValue).joined(separator: ",")
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .onAppear { shown = TodayTile.parse(order) }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -29,6 +29,8 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     private(set) var lastResult: String? { didSet { UserDefaults.standard.set(lastResult, forKey: "smartAlarmLast") } }
     /// Movement in each 30-second epoch of the last window, for the graph on the alarm page.
     private(set) var lastWindow: [Double] = [] { didSet { UserDefaults.standard.set(lastWindow, forKey: "smartAlarmWindow") } }
+    /// The last two weeks of mornings, newest last, so she (and the iPhone) can see how it's waking her.
+    private(set) var mornings: [AlarmMorning] = [] { didSet { save(mornings, "smartAlarmMornings") } }
     var error: String?
 
     private var session: WKExtendedRuntimeSession?
@@ -40,6 +42,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     /// Whether the current session's window has begun.
     private var windowStarted = false
     private static let backupID = "smartAlarmBackup"
+    private static let reminderID = "smartAlarmReminder"
 
     override init() {
         let d = UserDefaults.standard
@@ -47,6 +50,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         armedFor = (d.object(forKey: "smartAlarmArmedFor") as? Date).flatMap { $0 > .now ? $0 : nil }
         lastResult = d.string(forKey: "smartAlarmLast")
         lastWindow = d.array(forKey: "smartAlarmWindow") as? [Double] ?? []
+        mornings = d.data(forKey: "smartAlarmMornings").flatMap { try? JSONDecoder().decode([AlarmMorning].self, from: $0) } ?? []
         super.init()
     }
 
@@ -57,10 +61,10 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     var isWaiting: Bool { plan != nil && !isArmed }
 
     var status: WatchAlarmStatus {
-        if let armedFor, isArmed { return WatchAlarmStatus(state: .armed, latest: armedFor, plan: plan) }
-        if let error, plan != nil { return WatchAlarmStatus(state: .failed, plan: plan, message: error) }
-        if plan != nil { return WatchAlarmStatus(state: .waiting, plan: plan) }
-        return WatchAlarmStatus(state: .off)
+        if let armedFor, isArmed { return WatchAlarmStatus(state: .armed, latest: armedFor, plan: plan, mornings: mornings) }
+        if let error, plan != nil { return WatchAlarmStatus(state: .failed, plan: plan, message: error, mornings: mornings) }
+        if plan != nil { return WatchAlarmStatus(state: .waiting, plan: plan, mornings: mornings) }
+        return WatchAlarmStatus(state: .off, mornings: mornings)
     }
 
     // MARK: Setting it
@@ -169,8 +173,33 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.backupID])
     }
 
-    /// Tells the iPhone how the alarm stands.
-    private func report() { WatchStore.shared.sendAlarmStatus(status) }
+    /// Tells the iPhone and the watch face how the alarm stands, and keeps the evening reminder in step.
+    private func report() {
+        let status = status
+        status.save()
+        WatchStore.shared.sendAlarmStatus(status)
+        Task { await updateReminder() }
+    }
+
+    /// When an alarm is set but not scheduled (watchOS needs the app open for that), a nudge in the
+    /// evening, or half an hour from now if it's later, to open the app. Gone once it's scheduled.
+    private func updateReminder() async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.reminderID])
+        guard let plan, !isArmed, !ringing, !watching else { return }
+        let evening = Calendar.current.date(bySettingHour: 21, minute: 0, second: 0, of: .now)!
+        let when = evening > .now.addingTimeInterval(30 * 60) ? evening : .now.addingTimeInterval(30 * 60)
+        // Not if the alarm itself would come first.
+        guard when < plan.nextLatest(after: .now).addingTimeInterval(-TimeInterval(plan.window * 60)) else { return }
+        guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Your smart alarm isn’t set yet"
+        content.body = "Open Health Dashboard on your Watch to set it for \(plan.latestText)."
+        content.sound = .default
+        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: when)
+        try? await center.add(UNNotificationRequest(identifier: Self.reminderID, content: content,
+                                                    trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
+    }
 
     // MARK: The window
 
@@ -200,8 +229,9 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
                 MainActor.assumeIsolated { self?.samples.append((a.x, a.y, a.z)) }
             }
         }
+        let threshold = (plan?.sensitivity ?? .normal).threshold
         watchTask = Task {
-            var detector = WakeDetector()
+            var detector = WakeDetector(threshold: threshold)
             while !Task.isCancelled, Date.now < latest {
                 try? await Task.sleep(for: .seconds(30))
                 let epoch = WakeDetector.movement(samples)
@@ -211,6 +241,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
             guard !Task.isCancelled else { return }
             lastWindow = detector.epochs
             let early = Int(latest.timeIntervalSinceNow / 60)
+            mornings = Array((mornings + [AlarmMorning(date: .now, minutesEarly: max(0, early), peakMovement: detector.epochs.max() ?? 0)]).suffix(14))
             lastResult = early >= 1
                 ? "Woke you at \(Date.now.formatted(date: .omitted, time: .shortened)), \(early) min early, in light sleep."
                 : "No light sleep in the window, so it woke you at your latest time."
@@ -229,6 +260,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
             report()
         }
         removeBackup()
+        WatchStore.shared.sendAlarmRang()
         session?.notifyUser(hapticType: .notification) { next in
             next.pointee = .notification
             return 3

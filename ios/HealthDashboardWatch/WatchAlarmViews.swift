@@ -7,6 +7,7 @@ struct WatchAlarmView: View {
     @State private var latest = WatchAlarmView.defaultLatest
     @State private var window = 30
     @State private var repeats = true
+    @State private var sensitivity = SmartAlarmPlan.Sensitivity.normal
 
     var body: some View {
         ScrollView {
@@ -18,12 +19,18 @@ struct WatchAlarmView: View {
                     ForEach([10, 20, 30], id: \.self) { Text("\($0) min early").tag($0) }
                 }
                 .pickerStyle(.navigationLink)
+                Picker("Wakes on", selection: $sensitivity) {
+                    ForEach(SmartAlarmPlan.Sensitivity.allCases) { Text($0.name).tag($0) }
+                }
+                .pickerStyle(.navigationLink)
                 Toggle("Every day", isOn: $repeats).tint(WatchTint.alarm)
                 Button {
                     let parts = Calendar.current.dateComponents([.hour, .minute], from: latest)
                     Task {
                         // Stay here until the Watch confirms, so a refusal shows its reason.
-                        if await alarm.arm(SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats)) { dismiss() }
+                        let plan = SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats,
+                                                  sensitivity: sensitivity, phoneBackup: alarm.plan?.phoneBackup ?? false)
+                        if await alarm.arm(plan) { dismiss() }
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -58,6 +65,7 @@ struct WatchAlarmView: View {
             latest = Calendar.current.date(bySettingHour: p.latest / 60, minute: p.latest % 60, second: 0, of: .now) ?? latest
             window = p.window
             repeats = p.repeats
+            sensitivity = p.sensitivity
         }
     }
 

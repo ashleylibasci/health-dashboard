@@ -56,6 +56,9 @@ final class WatchSync: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) { receive(userInfo) }
 
     private func receive(_ message: [String: Any]) {
+        if message["alarmRang"] != nil {
+            Task { @MainActor in AlarmLink.shared.watchRang() }
+        }
         guard let data = message["alarmStatus"] as? Data,
               let status = try? JSONDecoder().decode(WatchAlarmStatus.self, from: data) else { return }
         Task { @MainActor in AlarmLink.shared.receive(status) }

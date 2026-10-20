@@ -89,6 +89,14 @@ final class WatchStore: NSObject, WCSessionDelegate {
         }
     }
 
+    /// The smart alarm just woke her: the iPhone cancels its backup alarm. A message (not a queued
+    /// transfer), because it wakes the iPhone app in the background straight away.
+    func sendAlarmRang() {
+        guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
+        let message: [String: Any] = ["alarmRang": Date.now]
+        WCSession.default.sendMessage(message, replyHandler: nil) { _ in WCSession.default.transferUserInfo(message) }
+    }
+
     // MARK: Logging
 
     func logLatte() async { await log(HKQuantityType(.dietaryCaffeine), .gramUnit(with: .milli), 130, "Latte saved") }

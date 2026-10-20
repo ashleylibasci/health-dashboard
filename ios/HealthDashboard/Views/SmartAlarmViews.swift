@@ -20,6 +20,11 @@ struct SmartAlarmCard: View {
                         .scaledFont(14).foregroundStyle(Color.muted2)
                 }
                 if let note = statusNote { Note(note) }
+                if plan.phoneBackup, let at = PhoneBackupAlarm.scheduledFor {
+                    Label("Backup on iPhone at \(at.formatted(date: .omitted, time: .shortened))", systemImage: "iphone")
+                        .scaledFont(13, .semibold).foregroundStyle(Color.muted2)
+                }
+                if let mornings = link.watchStatus?.mornings, !mornings.isEmpty { MorningLog(mornings: mornings) }
                 HStack(spacing: 10) {
                     Button("Change") { editing = true }.buttonStyle(.bordered)
                     Button("Turn off", role: .destructive) { withAnimation(.snappy) { link.set(nil) } }.buttonStyle(.bordered)
@@ -96,7 +101,24 @@ struct SmartAlarmSheet: View {
                     Text("Within this window, your Watch taps you awake at the first sign of light sleep.")
                 }
                 Section {
+                    Picker("Wakes on", selection: $plan.sensitivity) {
+                        ForEach(SmartAlarmPlan.Sensitivity.allCases) { Text($0.name).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Sensitivity")
+                } footer: {
+                    Text("Gentle waits for more stirring, so it tends to wake you later. Sensitive goes off at smaller movements. If it wakes you too early or never early, change this.")
+                }
+                Section {
                     Toggle("Every day", isOn: $plan.repeats)
+                    if PhoneBackupAlarm.isAvailable {
+                        Toggle("Backup alarm on iPhone", isOn: $plan.phoneBackup)
+                    }
+                } footer: {
+                    if PhoneBackupAlarm.isAvailable {
+                        Text("Rings on your iPhone at the latest time if your Watch hasn’t woken you, like when it’s not on or the alarm didn’t get set.")
+                    }
                 }
             }
             .navigationTitle("Smart alarm")
@@ -122,5 +144,38 @@ struct SmartAlarmSheet: View {
             let c = Calendar.current.dateComponents([.hour, .minute], from: date)
             plan.latest = (c.hour ?? 8) * 60 + (c.minute ?? 0)
         }
+    }
+}
+
+/// The last few mornings: how early the Watch woke her, as small bars, plus a line of what it means.
+struct MorningLog: View {
+    var mornings: [AlarmMorning]
+
+    var body: some View {
+        let recent = Array(mornings.suffix(7))
+        let early = recent.filter { $0.minutesEarly > 0 }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("LAST \(recent.count) MORNINGS").labelFont().foregroundStyle(Color.butterInk)
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(recent) { m in
+                    VStack(spacing: 3) {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(m.minutesEarly > 0 ? Color(hex: 0xE0A800) : Color(hex: 0xE0A800).opacity(0.3))
+                            .frame(height: max(6, CGFloat(m.minutesEarly) * 1.6))
+                        Text(m.date.formatted(.dateTime.weekday(.narrow))).scaledFont(11, .semibold).foregroundStyle(Color.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 64, alignment: .bottom)
+            .accessibilityElement()
+            .accessibilityLabel(recent.map { "\($0.date.formatted(.dateTime.weekday(.wide))): \($0.minutesEarly == 0 ? "at the latest time" : "\($0.minutesEarly) minutes early")" }.joined(separator: ", "))
+            Text(early.isEmpty ? "It hasn’t found light sleep in the window yet. Try Sensitive."
+                 : early.count == recent.count && (early.map(\.minutesEarly).max() ?? 0) >= 25 ? "Usually wakes you near the start of the window. If that’s too early, try Gentle."
+                 : "Woke you early on \(early.count) of \(recent.count) mornings.")
+                .scaledFont(13).foregroundStyle(Color.muted2)
+        }
+        .padding(12)
+        .background(Color.surface.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
