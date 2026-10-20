@@ -26,6 +26,7 @@ struct SleepView: View {
                     .scaledFont(13).foregroundStyle(Color.muted)
                 }
             }
+            SmartAlarmCard()
             if let n = model.lastNight, n.stages != nil {
                 NavigationLink { SleepStagesView() } label: {
                     LinkCard(icon: "waveform.path.ecg", title: "Last night, stage by stage", detail: "Deep, REM, core and wake-ups")

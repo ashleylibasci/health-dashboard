@@ -10,8 +10,8 @@ struct HealthDashboardWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // The Watch screens draw their own light and night looks, so keep the light palette here.
-            WatchRootView().environment(store).environment(\.colorScheme, .light)
+            // Every Watch page is dark, so system controls (pickers, toggles) need light text too.
+            WatchRootView().environment(store).environment(\.colorScheme, .dark)
         }
     }
 }
@@ -53,13 +53,38 @@ final class WatchStore: NSObject, WCSessionDelegate {
         Task { @MainActor in self.receive(userInfo) }
     }
 
+    /// Smart alarm settings from the iPhone, when both apps are open.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        Task { @MainActor in self.receive(message) }
+    }
+
     private func receive(_ context: [String: Any]) {
+        if let data = context["alarmPlan"] as? Data {
+            let plan = try? JSONDecoder().decode(SmartAlarmPlan.self, from: data)
+            Task { await SmartAlarm.shared.receiveFromPhone(plan) }
+        } else if context["alarmOff"] as? Bool == true {
+            Task { await SmartAlarm.shared.receiveFromPhone(nil) }
+        } else if context["alarmStatusRequest"] as? Bool == true {
+            sendAlarmStatus(SmartAlarm.shared.status)
+        }
         guard let data = context["snapshot"] as? Data, let snap = WidgetSnapshot.decode(data) else { return }
         // Keep caffeine logged on the Watch today if the phone hasn't caught up yet.
         var merged = snap
         if snapshot.caffeineDay == snap.caffeineDay { merged.caffeineMg = max(snap.caffeineMg, snapshot.caffeineMg) }
         snapshot = merged
         merged.save()
+    }
+
+    /// Tells the iPhone whether the smart alarm is set: straight away when it's reachable, else queued.
+    func sendAlarmStatus(_ status: WatchAlarmStatus) {
+        guard WCSession.isSupported(), WCSession.default.activationState == .activated,
+              let data = try? JSONEncoder().encode(status) else { return }
+        let message: [String: Any] = ["alarmStatus": data]
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(message, replyHandler: nil) { _ in WCSession.default.transferUserInfo(message) }
+        } else {
+            WCSession.default.transferUserInfo(message)
+        }
     }
 
     // MARK: Logging

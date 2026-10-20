@@ -26,6 +26,41 @@ final class WatchSync: NSObject, WCSessionDelegate {
 
     private var lastComplicationSend = Date.distantPast
 
+    /// Whether there's a Watch with the app on it to send the alarm to.
+    var watchReady: Bool {
+        WCSession.isSupported() && WCSession.default.activationState == .activated
+            && WCSession.default.isPaired && WCSession.default.isWatchAppInstalled
+    }
+
+    /// The smart alarm plan (nil turns it off): straight to the Watch app if it's open, else queued for when it is.
+    func sendAlarm(_ plan: SmartAlarmPlan?) {
+        guard watchReady else { return }
+        let message: [String: Any] = plan.flatMap { try? JSONEncoder().encode($0) }.map { ["alarmPlan": $0] } ?? ["alarmOff": true]
+        deliver(message)
+    }
+
+    func requestAlarmStatus() {
+        guard watchReady, WCSession.default.isReachable else { return }
+        WCSession.default.sendMessage(["alarmStatusRequest": true], replyHandler: nil)
+    }
+
+    private func deliver(_ message: [String: Any]) {
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(message, replyHandler: nil) { _ in WCSession.default.transferUserInfo(message) }
+        } else {
+            WCSession.default.transferUserInfo(message)
+        }
+    }
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) { receive(message) }
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) { receive(userInfo) }
+
+    private func receive(_ message: [String: Any]) {
+        guard let data = message["alarmStatus"] as? Data,
+              let status = try? JSONDecoder().decode(WatchAlarmStatus.self, from: data) else { return }
+        Task { @MainActor in AlarmLink.shared.receive(status) }
+    }
+
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }

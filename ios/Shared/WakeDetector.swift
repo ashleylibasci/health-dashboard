@@ -32,6 +32,16 @@ struct WakeDetector {
     }
 }
 
+/// What the Watch tells the iPhone about the smart alarm, so the phone can show whether it's set.
+struct WatchAlarmStatus: Codable, Equatable {
+    enum State: String, Codable { case armed, waiting, failed, off }
+    var state: State
+    /// The latest wake time it's set for, when armed.
+    var latest: Date?
+    var plan: SmartAlarmPlan?
+    var message: String?
+}
+
 /// When the next alarm should be: the latest wake time, and the window before it.
 struct SmartAlarmPlan: Codable, Equatable {
     /// Minutes after midnight, e.g. 7:45am = 465.

@@ -1,10 +1,16 @@
 import CoreMotion
+import UserNotifications
 import WatchKit
 
 /// The smart alarm: a watchOS smart-alarm session that starts up to 30 minutes before her latest
 /// wake time, watches wrist movement, and taps her awake at the first sign of light sleep (or at
 /// the latest time if that never comes). The app sleeps the rest of the night, so it costs
 /// almost no battery.
+///
+/// watchOS only lets the app schedule a session while it's open and active, one at a time. So a
+/// plan sent from the iPhone waits until the Watch app is next open, and a repeating alarm re-arms
+/// whenever the app opens. A plain notification at the latest time backs up every alarm, in case
+/// the session never runs.
 @MainActor
 @Observable
 final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
@@ -17,6 +23,8 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     private(set) var ringing = false
     /// Inside the window, watching for light sleep.
     private(set) var watching = false
+    /// Waiting for the Watch app to be open so it can schedule the alarm.
+    private(set) var arming = false
     /// "Woke you at 7:22, 23 min early" from the last alarm.
     private(set) var lastResult: String? { didSet { UserDefaults.standard.set(lastResult, forKey: "smartAlarmLast") } }
     /// Movement in each 30-second epoch of the last window, for the graph on the alarm page.
@@ -27,6 +35,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     private let motion = CMMotionManager()
     private var samples: [(x: Double, y: Double, z: Double)] = []
     private var watchTask: Task<Void, Never>?
+    private static let backupID = "smartAlarmBackup"
 
     override init() {
         let d = UserDefaults.standard
@@ -39,26 +48,75 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
 
     var isArmed: Bool { armedFor.map { $0 > .now } ?? false }
 
+    /// Set but not scheduled yet: from the iPhone while the Watch app was closed, or a repeating
+    /// alarm whose next morning hasn't been scheduled.
+    var isWaiting: Bool { plan != nil && !isArmed }
+
+    var status: WatchAlarmStatus {
+        if let armedFor, isArmed { return WatchAlarmStatus(state: .armed, latest: armedFor, plan: plan) }
+        if let error, plan != nil { return WatchAlarmStatus(state: .failed, plan: plan, message: error) }
+        if plan != nil { return WatchAlarmStatus(state: .waiting, plan: plan) }
+        return WatchAlarmStatus(state: .off)
+    }
+
     // MARK: Setting it
 
-    /// Schedules the next window. Only works while the app is open, which is why Stop re-arms
-    /// the next morning's alarm straight away.
-    func arm(_ plan: SmartAlarmPlan) {
+    /// Schedules the next window and waits to hear whether the Watch accepted it. Only works
+    /// while the app is open and active.
+    @discardableResult
+    func arm(_ plan: SmartAlarmPlan) async -> Bool {
         self.plan = plan
         error = nil
+        guard WKApplication.shared().applicationState == .active else {
+            report()
+            return false
+        }
+        arming = true
+        defer { arming = false }
         session?.invalidate()
         let s = WKExtendedRuntimeSession()
         s.delegate = self
-        s.start(at: plan.windowStart(after: .now))
         session = s
+        s.start(at: plan.windowStart(after: .now))
+        // The answer comes back as the session's state (or an invalidation with an error).
+        for _ in 0..<20 where s.state != .scheduled && s.state != .invalid {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard s.state == .scheduled else {
+            if session === s { session = nil }
+            armedFor = nil
+            if error == nil { error = "Your Watch didn’t accept the alarm. Try again with the app open." }
+            report()
+            return false
+        }
         armedFor = plan.nextLatest(after: .now)
+        await scheduleBackup(at: armedFor!)
+        report()
+        return true
     }
 
     func turnOff() {
         plan = nil
         armedFor = nil
+        error = nil
         session?.invalidate()
         session = nil
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.backupID])
+        report()
+    }
+
+    /// A plan (or nil, to turn it off) sent from the iPhone.
+    func receiveFromPhone(_ plan: SmartAlarmPlan?) async {
+        guard let plan else { turnOff(); return }
+        await arm(plan)
+    }
+
+    /// The app just became active: schedule anything that's waiting, like a plan from the iPhone
+    /// or tomorrow's repeat after the system's own alarm screen was used to stop it.
+    func armIfWaiting() async {
+        guard let plan, !isArmed, !arming, !ringing, !watching else { return }
+        if session != nil { return }
+        await arm(plan)
     }
 
     /// The system launched the app for a scheduled session (see `WatchAppDelegate`).
@@ -66,6 +124,24 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         s.delegate = self
         session = s
     }
+
+    /// A plain notification at the latest time, so she's woken even if the session never runs.
+    private func scheduleBackup(at date: Date) async {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.backupID])
+        guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Time to get up"
+        content.body = "Your smart alarm’s latest time."
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        try? await center.add(UNNotificationRequest(identifier: Self.backupID, content: content,
+                                                    trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
+    }
+
+    /// Tells the iPhone how the alarm stands.
+    private func report() { WatchStore.shared.sendAlarmStatus(status) }
 
     // MARK: The window
 
@@ -75,8 +151,9 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
 
     private func startWatching(_ s: WKExtendedRuntimeSession) {
         session = s
-        // Turned off after this was scheduled, and the old session couldn't be reached to cancel it.
-        guard let plan, let latest = armedFor else { s.invalidate(); return }
+        // Turned off after this was scheduled. It still has to buzz once, or watchOS warns her
+        // and offers to block future alarms, so wake her at the time it was set for.
+        let latest = armedFor ?? s.expirationDate ?? .now
         watching = true
         samples = []
         if motion.isAccelerometerAvailable {
@@ -99,7 +176,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
             let early = Int(latest.timeIntervalSinceNow / 60)
             lastResult = early >= 1
                 ? "Woke you at \(Date.now.formatted(date: .omitted, time: .shortened)), \(early) min early, in light sleep."
-                : "No light sleep in the window, so it woke you at \(plan.latestText)."
+                : "No light sleep in the window, so it woke you at your latest time."
             ring()
         }
     }
@@ -108,6 +185,7 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         motion.stopAccelerometerUpdates()
         watching = false
         ringing = true
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.backupID])
         session?.notifyUser(hapticType: .notification) { next in
             next.pointee = .notification
             return 3
@@ -123,7 +201,12 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         session?.invalidate()
         session = nil
         armedFor = nil
-        if let plan, plan.repeats { arm(plan) }
+        if let plan, plan.repeats {
+            Task { await arm(plan) }
+        } else {
+            plan = nil
+            report()
+        }
     }
 
     nonisolated func extendedRuntimeSessionWillExpire(_ s: WKExtendedRuntimeSession) {
@@ -132,17 +215,34 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
     }
 
     nonisolated func extendedRuntimeSession(_ s: WKExtendedRuntimeSession, didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason, error: (any Error)?) {
+        let message = reason == .error ? Self.describe(error) : nil
         Task { @MainActor in
+            if let message { self.error = message }
             guard self.session === s else { return }
             self.watchTask?.cancel()
             self.motion.stopAccelerometerUpdates()
             self.watching = false
             self.ringing = false
             self.session = nil
-            if reason == .error || reason == .sessionInProgress {
-                self.armedFor = nil
-                self.error = error?.localizedDescription ?? "The Watch couldn’t set the alarm. Try again."
-            }
+            // Ended without ringing (an error, or the system stopped it): it's no longer set.
+            if reason != .none { self.armedFor = nil }
+            self.report()
+        }
+    }
+
+    /// Plain words for the reasons watchOS refuses a smart alarm.
+    nonisolated private static func describe(_ error: (any Error)?) -> String {
+        guard let error = error as NSError?, error.domain == WKExtendedRuntimeSessionErrorDomain else {
+            return "Your Watch couldn’t set the alarm. Try again with the app open."
+        }
+        // The codes from WKExtendedRuntimeSessionErrorCode.
+        return switch error.code {
+        case 2: "Smart alarms can only be set up to 36 hours ahead."
+        case 3: "Open Health Dashboard on your Watch to finish setting the alarm."
+        case 6: "Background App Refresh is off for Health Dashboard. On your Watch: Settings → General → Background App Refresh, and turn it on."
+        case 7: "This copy of the Watch app isn’t set up for smart alarms. Install the latest build from the iPhone."
+        case 8: "Your Watch isn’t letting this app schedule alarms. Deleting and reinstalling the Watch app usually resets it."
+        default: "Your Watch couldn’t set the alarm (error \(error.code)). Try again with the app open."
         }
     }
 
@@ -155,5 +255,9 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     func handle(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
         MainActor.assumeIsolated { SmartAlarm.shared.adopt(extendedRuntimeSession) }
+    }
+
+    func applicationDidBecomeActive() {
+        MainActor.assumeIsolated { Task { await SmartAlarm.shared.armIfWaiting() } }
     }
 }

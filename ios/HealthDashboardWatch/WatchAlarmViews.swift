@@ -21,12 +21,24 @@ struct WatchAlarmView: View {
                 Toggle("Every day", isOn: $repeats).tint(WatchTint.alarm)
                 Button {
                     let parts = Calendar.current.dateComponents([.hour, .minute], from: latest)
-                    alarm.arm(SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats))
-                    dismiss()
+                    Task {
+                        // Stay here until the Watch confirms, so a refusal shows its reason.
+                        if await alarm.arm(SmartAlarmPlan(latest: parts.hour! * 60 + parts.minute!, window: window, repeats: repeats)) { dismiss() }
+                    }
                 } label: {
-                    Text(alarm.isArmed ? "Save" : "Set alarm").scaledFont(16, .bold).frame(maxWidth: .infinity)
+                    HStack(spacing: 6) {
+                        if alarm.arming { ProgressView().frame(width: 18, height: 18) }
+                        Text(alarm.arming ? "Setting…" : alarm.isArmed ? "Save" : "Set alarm").scaledFont(16, .bold)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .tint(WatchTint.alarm)
+                .disabled(alarm.arming)
+                if let error = alarm.error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .scaledFont(13, .semibold).foregroundStyle(Color(hex: 0xFF8A80))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if alarm.isArmed {
                     Button("Turn off", role: .destructive) {
                         alarm.turnOff()
@@ -36,6 +48,7 @@ struct WatchAlarmView: View {
                 Text("Keep your Watch on overnight. It watches your movement in the window and taps you awake when you’re sleeping lightly, so mornings feel less groggy.")
                     .scaledFont(12).foregroundStyle(WatchTint.secondary)
             }
+            .scenePadding(.horizontal)
         }
         .navigationTitle("Smart alarm")
         .sensoryFeedback(.success, trigger: alarm.isArmed)

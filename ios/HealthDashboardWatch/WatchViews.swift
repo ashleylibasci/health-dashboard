@@ -1,8 +1,9 @@
 import SwiftUI
+import WatchKit
 
-/// The Watch app: one full-screen page per feature, paged with the Digital Crown like Apple's own
-/// apps. Each page glows in its own color and the system cross-fades between them as you scroll.
-/// The getting-sick heads-up comes first when it's on.
+/// The Watch app: one full-screen page per feature. Swipe left and right between them; the Digital
+/// Crown scrolls within a page. Each page glows in its own color. The smart alarm sits right after
+/// Tonight, and the getting-sick heads-up comes first when it's on.
 struct WatchRootView: View {
     @Environment(WatchStore.self) private var store
     @State private var page = WatchRootView.startPage
@@ -14,12 +15,12 @@ struct WatchRootView: View {
             TabView(selection: $page) {
                 if s.sick { WatchSickView().tag(WatchPage.sick) }
                 WatchRecoveryView().tag(WatchPage.recovery)
-                WatchTonightView().tag(WatchPage.tonight)
-                WatchLogView().tag(WatchPage.log)
+                WatchTonightView { withAnimation(.snappy) { page = .alarm } }.tag(WatchPage.tonight)
                 WatchAlarmPage().tag(WatchPage.alarm)
-                if s.cycleDay != nil { WatchCycleView().tag(WatchPage.cycle) }
+                WatchLogView().tag(WatchPage.log)
+                WatchCycleView().tag(WatchPage.cycle)
             }
-            .tabViewStyle(.verticalPage)
+            .tabViewStyle(.page)
         }
         .onOpenURL { url in
             guard let p = url.host.flatMap(WatchPage.init(link:)) else { return }
@@ -70,6 +71,12 @@ enum WatchTint {
     static let secondary = Color.white.opacity(0.72)
 }
 
+/// Sizes that follow the screen, so the same page fits a 41mm and a 49mm Watch.
+enum WatchSize {
+    static let width = WKInterfaceDevice.current().screenBounds.width
+    static func scaled(_ points: CGFloat) -> CGFloat { (points * width / 205).rounded() }
+}
+
 // MARK: Recovery
 
 struct WatchRecoveryView: View {
@@ -81,7 +88,7 @@ struct WatchRecoveryView: View {
             VStack(alignment: .leading, spacing: 12) {
                 WatchHeader(title: "Recovery", tint: WatchTint.recovery)
                 HStack(spacing: 10) {
-                    WatchRing(value: s.isFromToday ? s.recovery : nil, size: 84, tint: WatchTint.recovery)
+                    WatchRing(value: s.isFromToday ? s.recovery : nil, size: WatchSize.scaled(76), tint: WatchTint.recovery)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(s.isFromToday ? s.headline : "Not updated yet").scaledFont(17, .bold).foregroundStyle(.white)
                             .fixedSize(horizontal: false, vertical: true)
@@ -111,6 +118,7 @@ struct WatchRecoveryView: View {
                 }
             }
             .animation(.snappy, value: s)
+            .watchMargins()
         }
         .watchPage(tint: WatchTint.recovery)
     }
@@ -176,6 +184,9 @@ struct WeekBars: View {
 
 struct WatchTonightView: View {
     @Environment(WatchStore.self) private var store
+    @State private var alarm = SmartAlarm.shared
+    /// Moves to the smart alarm page, right next door.
+    var showAlarm: () -> Void
 
     var body: some View {
         let s = store.snapshot
@@ -184,7 +195,7 @@ struct WatchTonightView: View {
             VStack(alignment: .leading, spacing: 10) {
                 WatchHeader(title: "Tonight", tint: WatchTint.tonight)
                 SleepDial(bedtime: bed, hours: 8)
-                    .frame(width: 124, height: 124)
+                    .frame(width: WatchSize.scaled(118), height: WatchSize.scaled(118))
                     .frame(maxWidth: .infinity)
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -197,6 +208,21 @@ struct WatchTonightView: View {
                         Text(clock(bed + 8 * 60)).numberFont(20).foregroundStyle(.white)
                     }
                 }
+                Button(action: showAlarm) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "alarm.fill").foregroundStyle(WatchTint.alarm)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("Smart alarm").scaledFont(14, .semibold).foregroundStyle(.white)
+                            Text(alarm.isArmed ? alarm.plan.map { "Up by \($0.latestText)" } ?? "On" : alarm.isWaiting ? "Open to finish setting" : "Off · tap to set")
+                                .scaledFont(12).foregroundStyle(WatchTint.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").scaledFont(12, .bold).foregroundStyle(WatchTint.secondary)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(WatchTint.alarm.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(PressScale())
                 if let note = s.examNote {
                     WatchPill(icon: "calendar", tint: WatchTint.log, text: note)
                 }
@@ -204,6 +230,7 @@ struct WatchTonightView: View {
                     WatchPill(icon: "cup.and.saucer.fill", tint: WatchTint.log, text: "~\(Int(c.rounded())) mg caffeine at bed")
                 }
             }
+            .watchMargins()
         }
         .watchPage(tint: WatchTint.tonight, at: .top)
     }
@@ -291,6 +318,7 @@ struct WatchLogView: View {
                 .disabled(store.saving)
             }
             .animation(.snappy, value: s)
+            .watchMargins()
         }
         .overlay(alignment: .bottom) {
             if let msg = store.lastLogged {
@@ -349,7 +377,7 @@ struct LogTile: View {
                 Text(detail).scaledFont(12, .semibold).foregroundStyle(WatchTint.secondary).lineLimit(1).minimumScaleFactor(0.8)
                     .contentTransition(.numericText())
             }
-            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: WatchSize.scaled(84), alignment: .leading)
             .padding(10)
             .background(tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
@@ -415,6 +443,27 @@ struct WatchAlarmPage: View {
                         Text("Change").scaledFont(15, .semibold).frame(maxWidth: .infinity)
                     }
                     .tint(WatchTint.alarm)
+                } else if let plan = alarm.plan {
+                    // Set (maybe from the iPhone) but not scheduled: watchOS only allows that with the app open.
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Up by").scaledFont(13).foregroundStyle(WatchTint.secondary)
+                        Text(plan.latestText).numberFont(40).foregroundStyle(.white.opacity(0.6))
+                            .minimumScaleFactor(0.7).lineLimit(1)
+                    }
+                    Button {
+                        Task { await alarm.arm(plan) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if alarm.arming { ProgressView().frame(width: 18, height: 18) }
+                            Text(alarm.arming ? "Setting…" : "Finish setting").scaledFont(16, .bold)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .tint(WatchTint.alarm)
+                    .disabled(alarm.arming)
+                    NavigationLink { WatchAlarmView() } label: {
+                        Text("Change").scaledFont(15, .semibold).frame(maxWidth: .infinity)
+                    }
                 } else {
                     Text("Wakes you in light sleep, up to 30 minutes before you need to be up.")
                         .scaledFont(15).foregroundStyle(WatchTint.secondary)
@@ -427,6 +476,7 @@ struct WatchAlarmPage: View {
                 if let last = alarm.lastResult { Text(last).scaledFont(12).foregroundStyle(WatchTint.secondary) }
             }
             .animation(.snappy, value: alarm.isArmed)
+            .watchMargins()
         }
         .watchPage(tint: WatchTint.alarm, at: .topTrailing)
     }
@@ -485,7 +535,7 @@ struct WatchCycleView: View {
                 if let length = s.typicalLength, let day = s.cycleDay {
                     WatchHeader(title: "Cycle", tint: WatchTint.cycle)
                     PhaseRing(day: day, length: length, periodLength: s.periodLength ?? 5, ovulation: s.ovulationDay ?? length - 14, phase: s.phase)
-                        .frame(width: 104, height: 104)
+                        .frame(width: WatchSize.scaled(100), height: WatchSize.scaled(100))
                         .frame(maxWidth: .infinity)
                     HStack(spacing: 6) {
                         if let d = s.daysToPeriod, d >= 0 {
@@ -502,8 +552,15 @@ struct WatchCycleView: View {
                     WatchHeader(title: "Pill pack", tint: WatchTint.cycle)
                     Text("Day \(day)").numberFont(40).foregroundStyle(.white)
                     if let p = s.phase { Text(p).scaledFont(15).foregroundStyle(WatchTint.secondary) }
+                } else {
+                    WatchHeader(title: "Cycle", tint: WatchTint.cycle)
+                    Image(systemName: "circle.dashed").font(.system(size: 36, weight: .semibold)).foregroundStyle(WatchTint.cycle)
+                    Text("Nothing to show yet").scaledFont(17, .bold).foregroundStyle(.white)
+                    Text("Turn on cycle tracking in Settings on your iPhone, or log your period there. Your cycle shows up here after the iPhone app next opens.")
+                        .scaledFont(13).foregroundStyle(WatchTint.secondary)
                 }
             }
+            .watchMargins()
         }
         .watchPage(tint: WatchTint.cycle, at: .top)
     }
@@ -572,6 +629,7 @@ struct WatchSickView: View {
                 }
                 if let t = s.sickTonight { Text(t).scaledFont(13).foregroundStyle(WatchTint.secondary) }
             }
+            .watchMargins()
         }
         .sensoryFeedback(.success, trigger: answered)
         .watchPage(tint: WatchTint.sick)
@@ -647,6 +705,12 @@ struct WatchRing: View {
 }
 
 extension View {
+    /// Keeps a page's content off the rounded edges of the screen, with room under the page dots.
+    func watchMargins() -> some View {
+        scenePadding(.horizontal)
+            .padding(.bottom, 14)
+    }
+
     /// A page's backdrop: its color glowing from one corner into black, as the system's own apps do.
     /// It's the page's container background, so the system cross-fades it as you scroll pages.
     func watchPage(tint: Color, at anchor: UnitPoint = .topLeading) -> some View {
