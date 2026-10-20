@@ -112,24 +112,26 @@ struct HealthReader {
         let monthAgo = Calendar.current.date(byAdding: .day, value: -30, to: Calendar.current.startOfDay(for: .now))!
 
         async let sleep = sleepSamples(window)
-        async let rhr = daily(restingHrType, .discreteAverage, unit: bpm, since: since)
-        async let hrv = daily(hrvType, .discreteAverage, unit: .secondUnit(with: .milli), since: since)
-        async let caffeine = readings(caffeineType, unit: .gramUnit(with: .milli), window)
-        async let vo2 = readings(vo2MaxType, unit: HKUnit(from: "ml/kg*min"), HKQuery.predicateForSamples(withStart: nil, end: nil))
-        async let exercise = daily(exerciseType, .cumulativeSum, unit: .minute(), since: since)
-        async let steps = daily(stepsType, .cumulativeSum, unit: .count(), since: since)
-        async let active = daily(activeEnergyType, .cumulativeSum, unit: .kilocalorie(), since: since)
-        async let resting = daily(basalEnergyType, .cumulativeSum, unit: .kilocalorie(), since: since)
-        async let water = daily(waterType, .cumulativeSum, unit: .literUnit(with: .milli), since: since)
-        async let drinks = readings(alcoholType, unit: .count(), window)
-        async let flow = flowDays(window)
-        async let spotting = categoryDays(spottingType, window)
-        async let symptoms = symptomDays(window)
-        async let temp = wakeDayReadings(wristTempType, unit: .degreeCelsius(), window)
-        async let resp = daily(respiratoryType, .discreteAverage, unit: bpm, since: since)
-        async let moods = moodReadings(window)
-        async let hourly = hourlyAverages(heartRateType, unit: bpm, since: monthAgo)
-        async let hourlyExercise = hourlyStats(exerciseType, .cumulativeSum, unit: .minute(), since: monthAgo)
+        // Sleep is required; everything else falls back to empty if it can't be read (for example a
+        // type added in an update that hasn't been allowed yet), so one item never blocks the rest.
+        async let rhr = orEmpty([:]) { try await daily(restingHrType, .discreteAverage, unit: bpm, since: since) }
+        async let hrv = orEmpty([:]) { try await daily(hrvType, .discreteAverage, unit: .secondUnit(with: .milli), since: since) }
+        async let caffeine = orEmpty([]) { try await readings(caffeineType, unit: .gramUnit(with: .milli), window) }
+        async let vo2 = orEmpty([]) { try await readings(vo2MaxType, unit: HKUnit(from: "ml/kg*min"), HKQuery.predicateForSamples(withStart: nil, end: nil)) }
+        async let exercise = orEmpty([:]) { try await daily(exerciseType, .cumulativeSum, unit: .minute(), since: since) }
+        async let steps = orEmpty([:]) { try await daily(stepsType, .cumulativeSum, unit: .count(), since: since) }
+        async let active = orEmpty([:]) { try await daily(activeEnergyType, .cumulativeSum, unit: .kilocalorie(), since: since) }
+        async let resting = orEmpty([:]) { try await daily(basalEnergyType, .cumulativeSum, unit: .kilocalorie(), since: since) }
+        async let water = orEmpty([:]) { try await daily(waterType, .cumulativeSum, unit: .literUnit(with: .milli), since: since) }
+        async let drinks = orEmpty([]) { try await readings(alcoholType, unit: .count(), window) }
+        async let flow = orEmpty([:]) { try await flowDays(window) }
+        async let spotting = orEmpty([]) { try await categoryDays(spottingType, window) }
+        async let symptoms = orEmpty([:]) { try await symptomDays(window) }
+        async let temp = orEmpty([:]) { try await wakeDayReadings(wristTempType, unit: .degreeCelsius(), window) }
+        async let resp = orEmpty([:]) { try await daily(respiratoryType, .discreteAverage, unit: bpm, since: since) }
+        async let moods = orEmpty([]) { try await moodReadings(window) }
+        async let hourly = orEmpty([:]) { try await hourlyAverages(heartRateType, unit: bpm, since: monthAgo) }
+        async let hourlyExercise = orEmpty([:]) { try await hourlyStats(exerciseType, .cumulativeSum, unit: .minute(), since: monthAgo) }
 
         return try await HealthData(
             nights: buildNights(sleep), restingHr: rhr, hrv: hrv, caffeineLogs: caffeine, vo2: vo2,
@@ -137,6 +139,15 @@ struct HealthReader {
             drinks: drinks, flow: flow, spotting: spotting, symptoms: symptoms, wristTemp: temp, respiratory: resp, moods: moods,
             hourlyHr: withoutExercise(hourly, exercise: hourlyExercise)
         )
+    }
+
+    private static func orEmpty<T>(_ fallback: T, _ read: () async throws -> T) async -> T {
+        (try? await read()) ?? fallback
+    }
+
+    /// True when the app reads or saves something Apple hasn't asked her about yet (new in an update).
+    static func needsPermissionPrompt() async -> Bool {
+        (try? await store.statusForAuthorizationRequest(toShare: shareTypes, read: readTypes)) == .shouldRequest
     }
 
     private static func sleepSamples(_ window: NSPredicate) async throws -> [SleepSample] {

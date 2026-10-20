@@ -45,6 +45,9 @@ struct RootView: View {
                 model.publishWidgetSnapshot()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
+            Task { await model.phoneUnlocked() }
+        }
         .onReceive(calendarTimer) { _ in Task { await model.refreshCalendar(force: true) } }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }

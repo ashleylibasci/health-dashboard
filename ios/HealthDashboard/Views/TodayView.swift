@@ -25,7 +25,10 @@ struct TodayView: View {
             case .loading where model.health.nights.isEmpty:
                 Card { ProgressView("Reading Apple Health…").frame(maxWidth: .infinity) }
             case .failed(let message):
-                Card { Note("Couldn’t read Apple Health: \(message)") }
+                Card {
+                    Note("Couldn’t read Apple Health: \(message)")
+                    PrimaryButton(title: "Try again") { Task { await model.refreshHealth() } }
+                }
             case .notConnected:
                 Card(fill: .lavender) {
                     CardLabel("Apple Health isn’t connected")

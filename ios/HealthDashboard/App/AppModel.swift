@@ -1,4 +1,5 @@
 import EventKit
+import HealthKit
 import Foundation
 import Observation
 import UserNotifications
@@ -121,14 +122,26 @@ final class AppModel {
     func refreshHealth(quiet: Bool = false) async {
         guard !isDemo, healthState != .unavailable, UserDefaults.standard.bool(forKey: Self.connectedKey) else { return }
         if health.nights.isEmpty && !quiet { healthState = .loading }
+        // An update added new kinds of data: ask about just those (Apple's sheet appears once).
+        if !quiet, await HealthReader.needsPermissionPrompt() { try? await HealthReader.requestAccess() }
         do {
             health = try await HealthReader.read()
             healthState = .ready
-            if !quiet { BackgroundHealth.shared.noteRefreshed() }
+        } catch let error as HKError where error.code == .errorDatabaseInaccessible {
+            // The phone is locked, so iOS keeps Health data out of reach. That isn't a problem to
+            // show: keep the last numbers (or keep "loading") and read again as soon as it unlocks.
+            if health.nights.isEmpty && health.restingHr.isEmpty { healthState = .loading }
         } catch {
             // Keep showing the last numbers if there are any; only a first read with nothing shows an error.
             if !quiet && health.nights.isEmpty && health.restingHr.isEmpty { healthState = .failed(error.localizedDescription) }
         }
+    }
+
+    /// Called when the phone is unlocked: anything that failed while it was locked gets read now.
+    func phoneUnlocked() async {
+        await refreshHealth()
+        await refreshCalendar()
+        if healthState == .ready { publishWidgetSnapshot() }
     }
 
     var weekend: WeekendShift? { weekendShift(health.nights) }

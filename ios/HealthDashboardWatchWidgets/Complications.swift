@@ -7,69 +7,289 @@ struct ComplicationEntry: TimelineEntry {
 }
 
 struct ComplicationProvider: TimelineProvider {
-    func placeholder(in context: Context) -> ComplicationEntry { ComplicationEntry(date: .now, snapshot: WidgetSnapshot()) }
+    func placeholder(in context: Context) -> ComplicationEntry { ComplicationEntry(date: .now, snapshot: .preview) }
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-        completion(ComplicationEntry(date: .now, snapshot: WidgetSnapshot.load()))
+        completion(ComplicationEntry(date: .now, snapshot: context.isPreview ? .preview : WidgetSnapshot.load()))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-        completion(Timeline(entries: [ComplicationEntry(date: .now, snapshot: WidgetSnapshot.load())], policy: .after(.now.addingTimeInterval(1800))))
+        // The phone pushes fresh numbers; this re-checks every 30 minutes and at midnight.
+        let next = min(Date.now.addingTimeInterval(1800), Calendar.current.startOfDay(for: .now.addingTimeInterval(86400)))
+        completion(Timeline(entries: [ComplicationEntry(date: .now, snapshot: WidgetSnapshot.load())], policy: .after(next)))
     }
 }
 
-/// Recovery as a ring, from the canvas's watch face.
+extension WidgetSnapshot {
+    static var preview: WidgetSnapshot {
+        var s = WidgetSnapshot()
+        s.recovery = 72; s.recoveryLabel = "Moderate"; s.headline = "Go easy today"; s.energy = 58; s.bedBy = "12:15am"
+        s.cycleDay = 22; s.phase = "Luteal"; s.caffeineMg = 130; s.caffeineDay = WidgetSnapshot.eveningKey()
+        s.waterBottles = 1.5; s.waterGoal = 3; s.waterDay = WidgetSnapshot.calendarKey(); s.updated = .now
+        return s
+    }
+    var recoveryToday: Int? { isFromToday ? recovery : nil }
+    var bedShort: String { bedBy?.replacingOccurrences(of: "am", with: "").replacingOccurrences(of: "pm", with: "") ?? "–" }
+}
+
+private let lavender = Color(hex: 0x7C8CF8), coffee = Color(hex: 0xE0A800), water = Color(hex: 0x4FA3F7)
+private let rose = Color(hex: 0xF07A6B), night = Color(hex: 0x7C6CF0), mint = Color(hex: 0x5CC79A)
+
+/// Every face spot: circle, corner, a wide rectangle, and the one-line text spot.
+private let allFamilies: [WidgetFamily] = [.accessoryCircular, .accessoryCorner, .accessoryRectangular, .accessoryInline]
+
+// MARK: Recovery
+
+struct RecoveryComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        let value = s.recoveryToday
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: "heart.fill").font(.title3).widgetAccentable()
+                .widgetLabel { Gauge(value: Double(value ?? 0), in: 0...100) { Text("REC") } currentValueLabel: { Text(value.map(String.init) ?? "–") }.tint(lavender) }
+        case .accessoryRectangular:
+            HStack(spacing: 8) {
+                Gauge(value: Double(value ?? 0), in: 0...100) { EmptyView() } currentValueLabel: { Text(value.map(String.init) ?? "–") }
+                    .gaugeStyle(.accessoryCircularCapacity).tint(lavender)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Recovery").font(.headline).widgetAccentable()
+                    Text(value == nil ? "Open the app" : s.headline).font(.caption)
+                    Text("Bed by \(s.bedShort)").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        case .accessoryInline:
+            Label("Recovery \(value.map(String.init) ?? "–")", systemImage: "heart.fill")
+        default:
+            Gauge(value: Double(value ?? 0), in: 0...100) { Image(systemName: "heart.fill") } currentValueLabel: { Text(value.map(String.init) ?? "–") }
+                .gaugeStyle(.accessoryCircular).tint(lavender)
+        }
+    }
+}
+
 struct RecoveryComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchRecovery", provider: ComplicationProvider()) { entry in
-            let today = entry.snapshot.isFromToday
-            Gauge(value: Double(today ? entry.snapshot.recovery ?? 0 : 0), in: 0...100) { Text("REC") } currentValueLabel: {
-                Text(today ? entry.snapshot.recovery.map(String.init) ?? "–" : "–")
-            }
-            .gaugeStyle(.accessoryCircular)
-            .tint(Color.main)
-            .containerBackground(.clear, for: .widget)
+        StaticConfiguration(kind: "WatchRecovery", provider: ComplicationProvider()) { e in
+            RecoveryComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://recovery"))
         }
         .configurationDisplayName("Recovery")
-        .supportedFamilies([.accessoryCircular, .accessoryCorner])
+        .description("Today’s recovery score.")
+        .supportedFamilies(allFamilies)
     }
 }
 
-/// Opens the app's Log page for a one-tap latte.
-struct LatteComplication: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchLatte", provider: ComplicationProvider()) { _ in
-            VStack(spacing: 0) {
-                Image(systemName: "cup.and.saucer.fill").font(.system(size: 18))
-                Text("LATTE").font(.system(size: 9, weight: .bold))
+// MARK: Caffeine
+
+struct CaffeineComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        let mg = Int(s.caffeineToday)
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: "cup.and.saucer.fill").font(.title3).foregroundStyle(coffee).widgetAccentable()
+                .widgetLabel("\(mg) mg")
+        case .accessoryRectangular:
+            HStack(spacing: 8) {
+                Image(systemName: "cup.and.saucer.fill").font(.title2).foregroundStyle(coffee).widgetAccentable()
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(mg) mg today").font(.headline)
+                    Text(s.caffeineAtBed.map { "~\(Int($0)) mg left at bedtime" } ?? "Tap to log a latte").font(.caption)
+                    Text("Cutoff 2pm").font(.caption2).foregroundStyle(.secondary)
+                }
             }
-            .containerBackground(.clear, for: .widget)
-            .widgetURL(URL(string: "healthdashboard://log"))
+        case .accessoryInline:
+            Label("\(mg) mg caffeine", systemImage: "cup.and.saucer.fill")
+        default:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Image(systemName: "cup.and.saucer.fill").font(.system(size: 15)).foregroundStyle(coffee).widgetAccentable()
+                    Text("\(mg)").font(.system(size: 15, weight: .bold, design: .rounded))
+                    Text("MG").font(.system(size: 8, weight: .bold))
+                }
+            }
         }
-        .configurationDisplayName("Log a latte")
-        .supportedFamilies([.accessoryCircular])
     }
 }
 
-/// Energy, bedtime and cycle day in one line, like the bottom of the canvas face.
-struct TodayComplication: Widget {
+struct CaffeineComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchToday", provider: ComplicationProvider()) { entry in
-            let s = entry.snapshot
-            HStack(spacing: 10) {
-                item("ENERGY", s.energy.map { "\($0)%" } ?? "–")
-                item("BED BY", s.bedBy?.replacingOccurrences(of: "am", with: "").replacingOccurrences(of: "pm", with: "") ?? "–")
-                if let d = s.cycleDay { item("CYCLE", "D\(d)") }
-            }
-            .containerBackground(.clear, for: .widget)
+        StaticConfiguration(kind: "WatchLatte", provider: ComplicationProvider()) { e in
+            CaffeineComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://log"))
         }
-        .configurationDisplayName("Today")
-        .supportedFamilies([.accessoryRectangular])
+        .configurationDisplayName("Caffeine")
+        .description("Caffeine today. Tap to log a latte.")
+        .supportedFamilies(allFamilies)
     }
+}
 
-    private func item(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(label).font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 18, weight: .bold, design: .rounded))
+// MARK: Water
+
+struct WaterComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        let done = s.waterToday, goal = max(1, s.waterGoal)
+        let text = done.formatted(.number.precision(.fractionLength(0...1)))
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: "drop.fill").font(.title3).foregroundStyle(water).widgetAccentable()
+                .widgetLabel { Gauge(value: min(done, goal), in: 0...goal) { Text("Water") }.tint(water) }
+        case .accessoryRectangular:
+            HStack(spacing: 8) {
+                Gauge(value: min(done, goal), in: 0...goal) { Image(systemName: "drop.fill") } currentValueLabel: { Text(text) }
+                    .gaugeStyle(.accessoryCircularCapacity).tint(water)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Water").font(.headline).widgetAccentable()
+                    Text("\(text) of \(goal.formatted(.number.precision(.fractionLength(0...1)))) bottles").font(.caption)
+                }
+            }
+        case .accessoryInline:
+            Label("\(text) of \(goal.formatted(.number.precision(.fractionLength(0...1)))) bottles", systemImage: "drop.fill")
+        default:
+            Gauge(value: min(done, goal), in: 0...goal) { Image(systemName: "drop.fill") } currentValueLabel: { Text(text) }
+                .gaugeStyle(.accessoryCircularCapacity).tint(water)
         }
+    }
+}
+
+struct WaterComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchWater", provider: ComplicationProvider()) { e in
+            WaterComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://water"))
+        }
+        .configurationDisplayName("Water")
+        .description("Bottles today. Tap to add one.")
+        .supportedFamilies(allFamilies)
+    }
+}
+
+// MARK: Cycle
+
+struct CycleComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        let day = s.cycleDay, length = Double(s.typicalLength ?? 28)
+        switch family {
+        case .accessoryCorner:
+            Text(day.map { "D\($0)" } ?? "–").font(.system(size: 18, weight: .bold, design: .rounded)).widgetAccentable()
+                .widgetLabel(s.phase ?? "Cycle")
+        case .accessoryRectangular:
+            HStack(spacing: 8) {
+                Gauge(value: Double(day ?? 0), in: 0...length) { EmptyView() } currentValueLabel: { Text(day.map(String.init) ?? "–") }
+                    .gaugeStyle(.accessoryCircularCapacity).tint(rose)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(s.phase ?? "Cycle").font(.headline).widgetAccentable()
+                    Text(s.daysToPeriod.map { $0 > 0 ? "Period in \($0) days" : $0 == 0 ? "Period expected today" : "Log your period" } ?? "Day \(day ?? 0)").font(.caption)
+                }
+            }
+        case .accessoryInline:
+            Label("Day \(day.map(String.init) ?? "–")\(s.phase.map { " · \($0)" } ?? "")", systemImage: "circle.dashed")
+        default:
+            Gauge(value: Double(day ?? 0), in: 0...length) { Text("DAY") } currentValueLabel: { Text(day.map(String.init) ?? "–") }
+                .gaugeStyle(.accessoryCircular).tint(rose)
+        }
+    }
+}
+
+struct CycleComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchCycle", provider: ComplicationProvider()) { e in
+            CycleComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://cycle"))
+        }
+        .configurationDisplayName("Cycle day")
+        .description("Cycle day and phase, or pill-pack day.")
+        .supportedFamilies(allFamilies)
+    }
+}
+
+// MARK: Bedtime and energy
+
+struct BedtimeComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: "moon.stars.fill").font(.title3).foregroundStyle(night).widgetAccentable()
+                .widgetLabel("Bed \(s.bedShort)")
+        case .accessoryRectangular:
+            HStack(spacing: 8) {
+                Image(systemName: "moon.stars.fill").font(.title2).foregroundStyle(night).widgetAccentable()
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Bed by \(s.bedShort)").font(.headline)
+                    Text(s.examNote ?? (s.energy.map { "Energy \($0)%" } ?? "Tonight")).font(.caption).lineLimit(2)
+                }
+            }
+        case .accessoryInline:
+            Label("Bed by \(s.bedShort)", systemImage: "moon.stars.fill")
+        default:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 0) {
+                    Image(systemName: "moon.stars.fill").font(.system(size: 13)).foregroundStyle(night).widgetAccentable()
+                    Text(s.bedShort).font(.system(size: 14, weight: .bold, design: .rounded)).minimumScaleFactor(0.6)
+                }
+            }
+        }
+    }
+}
+
+struct BedtimeComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchBedtime", provider: ComplicationProvider()) { e in
+            BedtimeComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://tonight"))
+        }
+        .configurationDisplayName("Bedtime")
+        .description("When to be asleep tonight.")
+        .supportedFamilies(allFamilies)
+    }
+}
+
+struct EnergyComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    var s: WidgetSnapshot
+
+    var body: some View {
+        let energy = s.isFromToday ? s.energy : nil
+        switch family {
+        case .accessoryCorner:
+            Image(systemName: "bolt.fill").font(.title3).foregroundStyle(mint).widgetAccentable()
+                .widgetLabel { Gauge(value: Double(energy ?? 0), in: 0...100) { Text("Energy") }.tint(mint) }
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Label("Energy", systemImage: "bolt.fill").font(.headline).widgetAccentable()
+                    Spacer()
+                    Text(energy.map { "\($0)%" } ?? "–").font(.headline)
+                }
+                Gauge(value: Double(energy ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryLinearCapacity).tint(mint)
+                Text("ENERGY · BED BY · CYCLE").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+                Text("\(energy.map { "\($0)%" } ?? "–")  ·  \(s.bedShort)  ·  \(s.cycleDay.map { "D\($0)" } ?? "–")").font(.caption)
+            }
+        case .accessoryInline:
+            Label("Energy \(energy.map { "\($0)%" } ?? "–")", systemImage: "bolt.fill")
+        default:
+            Gauge(value: Double(energy ?? 0), in: 0...100) { Image(systemName: "bolt.fill") } currentValueLabel: { Text(energy.map(String.init) ?? "–") }
+                .gaugeStyle(.accessoryCircular).tint(mint)
+        }
+    }
+}
+
+struct EnergyComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchToday", provider: ComplicationProvider()) { e in
+            EnergyComplicationView(s: e.snapshot).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://recovery"))
+        }
+        .configurationDisplayName("Energy")
+        .description("Energy left today, plus bedtime and cycle day.")
+        .supportedFamilies(allFamilies)
     }
 }
 
@@ -77,7 +297,10 @@ struct TodayComplication: Widget {
 struct WatchComplications: WidgetBundle {
     var body: some Widget {
         RecoveryComplication()
-        TodayComplication()
-        LatteComplication()
+        CaffeineComplication()
+        WaterComplication()
+        CycleComplication()
+        BedtimeComplication()
+        EnergyComplication()
     }
 }
