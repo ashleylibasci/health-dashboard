@@ -137,6 +137,10 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 } header: {
                     Text("Apple Health")
+                } footer: {
+                    // Which build is installed, so she can tell an update landed.
+                    Text("Health Dashboard \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                        .padding(.top, 8)
                 }
 
                 #if targetEnvironment(simulator)
