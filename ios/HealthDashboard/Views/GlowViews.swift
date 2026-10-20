@@ -11,6 +11,8 @@ struct GaugeCell: View {
     var position: Double
     var tint: Color
     var change: String?
+    /// Worse than her normal: the change shows in peach, as the Light look does.
+    var worse = false
     /// In its own tinted pane (Recovery) or bare (inside the Today card).
     var boxed = false
 
@@ -26,7 +28,10 @@ struct GaugeCell: View {
             .scaleEffect(1.1)
             .padding(.vertical, 4)
             Text(label).scaledFont(13, .bold).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.8)
-            if let change { Text(change).scaledFont(12, .semibold).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.8) }
+            if let change {
+                Text(change).scaledFont(12, worse ? .bold : .semibold).foregroundStyle(worse ? Color.peachInk : Color.muted2)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, boxed ? 12 : 0)
@@ -45,13 +50,18 @@ struct RecoveryGauges: View {
         let r = model.recoveryToday
         let hrv = model.health.hrv[model.today], rhr = model.health.restingHr[model.today]
         HStack(spacing: boxed ? 8 : 6) {
+            // Every dial leans right when that number is better than normal: higher HRV, lower
+            // resting heart rate, more sleep.
             GaugeCell(label: "HRV", value: hrv.map { "\(Int($0.rounded()))" } ?? "–", position: 0.5 + (r?.hrvChange ?? 0) * 2.5,
-                      tint: Color(hex: 0xFF9A7A), change: r?.hrvChange.map { signedPercent($0) }, boxed: boxed)
-            GaugeCell(label: "Resting HR", value: rhr.map { "\(Int($0.rounded()))" } ?? "–", position: 0.5 + (r?.restingHrChange ?? 0) / 10,
-                      tint: Color(hex: 0xFF6B8A), change: r?.restingHrChange.map { signedWhole($0, " bpm") }, boxed: boxed)
+                      tint: Color(hex: 0xFF9A7A), change: r?.hrvChange.map { signedPercent($0) },
+                      worse: (r?.hrvChange ?? 0) <= -0.1, boxed: boxed)
+            GaugeCell(label: "Resting HR", value: rhr.map { "\(Int($0.rounded()))" } ?? "–", position: 0.5 - (r?.restingHrChange ?? 0) / 10,
+                      tint: Color(hex: 0xFF6B8A), change: r?.restingHrChange.map { signedWhole($0, " bpm") },
+                      worse: (r?.restingHrChange ?? 0) >= 3, boxed: boxed)
             GaugeCell(label: "Sleep", value: model.lastNight.map { String(format: "%.1fh", Double($0.asleepMinutes) / 60) } ?? "–",
                       position: Double(model.lastNight?.asleepMinutes ?? 0) / 540, tint: Color(hex: 0x5EE0C1),
-                      change: r?.sleepChange.map { abs($0) < 15 ? "typical" : "\($0 > 0 ? "+" : "−")\(hoursMinutes(abs($0)))" }, boxed: boxed)
+                      change: r?.sleepChange.map { abs($0) < 15 ? "typical" : "\($0 > 0 ? "+" : "−")\(hoursMinutes(abs($0)))" },
+                      worse: (r?.sleepChange ?? 0) <= -45, boxed: boxed)
         }
     }
 
@@ -128,7 +138,8 @@ struct TonightCard: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text("TONIGHT").labelFont().foregroundStyle(Color(hex: 0xC7B8FF))
-                Text("Bed by \(clockTime(Double(bed))), up \(clockTime(Double(bed + 8 * 60)))")
+                // "Up" is the smart alarm's time when there is one, so the card never shows two.
+                Text("Bed by \(clockTime(Double(bed))), up \(link.plan?.latestText ?? clockTime(Double(bed + 8 * 60)))")
                     .scaledFont(17, .bold).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
                 Label(alarmText, systemImage: "alarm.fill")
                     .scaledFont(13, .semibold).foregroundStyle(Color.ink)
@@ -144,8 +155,13 @@ struct TonightCard: View {
     }
 
     private var alarmText: String {
-        guard let plan = link.plan else { return "Smart alarm off" }
-        return "Smart alarm \(plan.latestText) · \(link.watchStatus?.isSet == true ? "On" : "setting up")"
+        guard link.plan != nil else { return "Smart alarm off" }
+        return switch link.watchStatus?.state {
+        case .armed where link.watchStatus?.isSet == true: "Smart alarm on"
+        case .failed: "Smart alarm not set"
+        case .waiting, .armed: "Smart alarm: open Watch app"
+        default: WatchSync.shared.watchReady ? "Smart alarm: sending" : "Smart alarm needs the Watch app"
+        }
     }
 }
 

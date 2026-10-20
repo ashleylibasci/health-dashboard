@@ -5,6 +5,8 @@ struct Ring: View {
     var value: Int?
     var size: CGFloat = 96
     var track: Color = .surface
+    /// A small word under the number, like "MODERATE".
+    var caption: String? = nil
     /// The ring grows with the text size so the number inside stays readable.
     @ScaledMetric(relativeTo: .title) private var scale = 1.0
 
@@ -18,8 +20,12 @@ struct Ring: View {
                                           : AnyShapeStyle(Color.main),
                         style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text(value.map(String.init) ?? "–").numberFont(self.size * 0.3).foregroundStyle(Color.ink)
-                .lineLimit(1).minimumScaleFactor(0.5).padding(size * 0.16)
+            VStack(spacing: 2) {
+                Text(value.map(String.init) ?? "–").numberFont(self.size * 0.3).foregroundStyle(Color.ink)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                if let caption { Text(caption).labelFont().foregroundStyle(Color.mainText).lineLimit(1).minimumScaleFactor(0.6) }
+            }
+            .padding(size * 0.16)
         }
         .frame(width: size, height: size)
         .accessibilityElement()

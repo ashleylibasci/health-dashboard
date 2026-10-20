@@ -23,7 +23,7 @@ final class AlarmLink {
         self.plan = plan
         watchStatus = nil
         WatchSync.shared.sendAlarm(plan)
-        Task { await PhoneBackupAlarm.update(for: plan) }
+        PhoneBackupAlarm.shared.update(for: plan)
     }
 
     /// The Watch's report. Its plan wins, so a change made on the Watch shows here too.
@@ -31,14 +31,11 @@ final class AlarmLink {
         watchStatus = status
         if status.state == .off { plan = nil } else if let p = status.plan { plan = p }
         // The backup follows the Watch: at the time it confirmed, or the plan's next time while it waits.
-        Task { await PhoneBackupAlarm.update(for: plan, latest: status.state == .armed ? status.latest : nil) }
+        PhoneBackupAlarm.shared.update(for: plan, latest: status.state == .armed ? status.latest : nil)
     }
 
-    /// The Watch woke her: this morning's backup on the iPhone isn't needed.
-    func watchRang() {
-        guard let at = PhoneBackupAlarm.scheduledFor, at.timeIntervalSinceNow < 3 * 3600 else { return }
-        PhoneBackupAlarm.cancel()
-    }
+    /// She stopped the Watch's alarm at `stoppedAt`: this morning's backup on the iPhone isn't needed.
+    func watchRang(at stoppedAt: Date) { PhoneBackupAlarm.shared.watchRang(at: stoppedAt) }
 
     /// Asks the Watch how things stand, and resends a plan the Watch never got (it wasn't
     /// reachable or set up when she saved it).

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(Appearance.key) private var appearance = "glow"
+    @State private var look = "glow"
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var link = ""
@@ -47,11 +48,16 @@ struct SettingsView: View {
                         Toggle("Body-working-harder alerts", isOn: Binding(get: { profile.prefs.sickAlerts }, set: { model.profile?.prefs.sickAlerts = $0 }))
                         Toggle("Drinks tracking", isOn: Binding(get: { profile.prefs.drinksTracking }, set: { model.profile?.prefs.drinksTracking = $0 }))
                         Toggle("Streaks", isOn: Binding(get: { profile.prefs.streaks }, set: { model.profile?.prefs.streaks = $0 }))
-                        Picker("Look", selection: $appearance) {
+                        // Applied when Settings closes: switching redraws the whole app, which would
+                        // otherwise close this sheet out from under her.
+                        Picker("Look", selection: $look) {
                             Text("Glow").tag("glow")
                             Text("Light").tag("light")
                         }
-                        if appearance == "light" {
+                        if look != appearance {
+                            Text("Changes when you close Settings.").font(.footnote).foregroundStyle(.secondary)
+                        }
+                        if look == "light" {
                             Toggle("Night version after 8pm", isOn: Binding(get: { profile.prefs.nightMode }, set: { model.profile?.prefs.nightMode = $0 }))
                         }
                         Button("Run the welcome setup again") { confirmRerun = true }
@@ -174,7 +180,11 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .onAppear { link = model.calendarURL ?? "" }
+            .onAppear {
+                link = model.calendarURL ?? ""
+                look = appearance
+            }
+            .onDisappear { if look != appearance { appearance = look } }
             .task { await model.checkNotifications() }
         }
     }

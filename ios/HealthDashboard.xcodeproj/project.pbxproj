@@ -519,11 +519,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthDashboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboard-Info.plist";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AlarmKit,
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Health Dashboard looks for exams on your calendar so it can warn you before exam week and compare how you sleep then. Events stay on your phone.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
@@ -549,11 +554,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthDashboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboard-Info.plist";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AlarmKit,
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = "Health Dashboard";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Health Dashboard looks for exams on your calendar so it can warn you before exam week and compare how you sleep then. Events stay on your phone.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health Dashboard reads your sleep, heart, activity, cycle, drinks and mood data to explain how your nights and habits affect you. It stays on your phone.";
@@ -578,7 +588,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1;
@@ -594,7 +604,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1;
@@ -610,7 +620,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWidgets-Info.plist";
@@ -636,7 +646,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWidgets-Info.plist";
@@ -663,7 +673,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWatch-Info.plist";
@@ -694,7 +704,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWatch-Info.plist";
@@ -724,7 +734,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWatchWidgets-Info.plist";
@@ -751,7 +761,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HealthDashboardWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 93C3VKR4FJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "HealthDashboardWatchWidgets-Info.plist";

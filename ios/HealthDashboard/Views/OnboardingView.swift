@@ -174,10 +174,6 @@ struct OnboardingView: View {
                 prefRow("Drinks tracking", "See how alcohol affects your sleep and recovery.", $prefs.drinksTracking)
                 Divider()
                 prefRow("Streaks", "Small goals like brisk walks and bedtimes. Kept on your phone.", $prefs.streaks)
-                Divider()
-                prefRow("Night version after 8pm", "The app switches to a dark look from 8pm to 6am.", $prefs.nightMode)
-                Divider()
-                prefRow("Dark Watch screens at night", "From 8pm to 6am on your Watch.", $prefs.darkWatchAtNight)
             }
             .padding(.horizontal, 18)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))

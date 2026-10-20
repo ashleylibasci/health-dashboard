@@ -19,7 +19,14 @@ private struct ToastModifier: ViewModifier {
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(toast.isError ? Color.peachInk : Color.mintInk)
                     .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(toast.isError ? Color.peach : Color.mint, in: Capsule())
+                    // Frosted underneath, so the words stay readable over whatever scrolls behind (the
+                    // Glow tints are see-through on their own).
+                    .background {
+                        ZStack {
+                            Capsule().fill(.thickMaterial)
+                            Capsule().fill(toast.isError ? Color.peach : Color.mint)
+                        }
+                    }
                     .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
                     .padding(.horizontal, 20).padding(.bottom, 90)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

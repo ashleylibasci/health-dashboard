@@ -58,6 +58,7 @@ struct SetSmartAlarmIntent: AppIntent {
         plan.latest = (parts.hour ?? 8) * 60 + (parts.minute ?? 0)
         plan.repeats = repeats
         AlarmLink.shared.set(plan)
+        await PhoneBackupAlarm.shared.settle()
         return .result(dialog: "Smart alarm set for \(plan.latestText). Open Health Dashboard on your Watch if it hasn’t confirmed by bedtime.")
     }
 }
@@ -69,6 +70,7 @@ struct TurnOffSmartAlarmIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         AlarmLink.shared.set(nil)
+        await PhoneBackupAlarm.shared.settle()
         return .result(dialog: "Smart alarm turned off.")
     }
 }

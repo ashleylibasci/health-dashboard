@@ -10,10 +10,7 @@ struct RecoveryView: View {
             if Appearance.isGlow, let r = model.recoveryToday {
                 // Glow: one big ring in the middle, today's three dials under it.
                 VStack(spacing: 10) {
-                    ZStack {
-                        Ring(value: r.score, size: 180, track: .lavender)
-                        Text(r.label.uppercased()).labelFont().foregroundStyle(Color.mainText).offset(y: 38)
-                    }
+                    Ring(value: r.score, size: 180, track: .lavender, caption: r.label.uppercased())
                     Text((model.usualRecovery.map { r.score < $0 ? "Below your usual \($0). " : "At or above your usual \($0). " } ?? "") + r.reason)
                         .scaledFont(15).foregroundStyle(Color.muted2).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)

@@ -32,12 +32,20 @@ final class WatchSync: NSObject, WCSessionDelegate {
             && WCSession.default.isPaired && WCSession.default.isWatchAppInstalled
     }
 
-    /// The smart alarm plan (nil turns it off): straight to the Watch app if it's open, else queued for when it is.
+    /// The smart alarm plan (nil turns it off): straight to the Watch app if it's open, else queued for
+    /// when it is. Before the connection is up (Siri can run this right after launch) it's held and
+    /// sent once it is, so a "turn off" is never dropped.
     func sendAlarm(_ plan: SmartAlarmPlan?) {
-        guard watchReady else { return }
         let message: [String: Any] = plan.flatMap { try? JSONEncoder().encode($0) }.map { ["alarmPlan": $0] } ?? ["alarmOff": true]
+        guard watchReady else {
+            pendingAlarm = message
+            return
+        }
+        pendingAlarm = nil
         deliver(message)
     }
+
+    private var pendingAlarm: [String: Any]?
 
     func requestAlarmStatus() {
         guard watchReady, WCSession.default.isReachable else { return }
@@ -56,8 +64,8 @@ final class WatchSync: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) { receive(userInfo) }
 
     private func receive(_ message: [String: Any]) {
-        if message["alarmRang"] != nil {
-            Task { @MainActor in AlarmLink.shared.watchRang() }
+        if let stoppedAt = message["alarmRang"] as? Date {
+            Task { @MainActor in AlarmLink.shared.watchRang(at: stoppedAt) }
         }
         guard let data = message["alarmStatus"] as? Data,
               let status = try? JSONDecoder().decode(WatchAlarmStatus.self, from: data) else { return }
@@ -66,6 +74,10 @@ final class WatchSync: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         guard activationState == .activated else { return }
+        if let pendingAlarm, watchReady {
+            self.pendingAlarm = nil
+            deliver(pendingAlarm)
+        }
         Task { @MainActor in AlarmLink.shared.refresh() }
     }
 

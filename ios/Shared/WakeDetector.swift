@@ -72,7 +72,10 @@ struct WatchAlarmStatus: Codable, Equatable {
     }
 
     /// Set and still ahead (a status saved before the alarm went off reads as no longer set).
-    var isSet: Bool { state == .armed && (latest ?? .distantPast) > .now }
+    var isSet: Bool { isSet(at: .now) }
+
+    /// The same, as of `date`: the watch face draws its entries ahead of time.
+    func isSet(at date: Date) -> Bool { state == .armed && (latest ?? .distantPast) > date }
 
     private static let key = "watchAlarmStatus.v1"
 

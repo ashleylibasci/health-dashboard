@@ -324,9 +324,11 @@ extension WatchAlarmStatus {
 struct AlarmComplicationView: View {
     @Environment(\.widgetFamily) private var family
     var status: WatchAlarmStatus?
+    /// When this entry shows: watch faces draw entries before their time comes.
+    var date: Date
 
     var body: some View {
-        let set = status?.isSet ?? false
+        let set = status?.isSet(at: date) ?? false
         // Needs opening: a plan that the Watch hasn't been able to schedule yet.
         let needsApp = !set && status?.plan != nil
         let time = status?.plan.map { $0.latestText.replacingOccurrences(of: "am", with: "").replacingOccurrences(of: "pm", with: "") }
@@ -367,7 +369,7 @@ struct AlarmComplicationView: View {
 struct AlarmComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "WatchSmartAlarm", provider: AlarmProvider()) { e in
-            AlarmComplicationView(status: e.status).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://alarm"))
+            AlarmComplicationView(status: e.status, date: e.date).containerBackground(.clear, for: .widget).widgetURL(URL(string: "healthdashboard://alarm"))
         }
         .configurationDisplayName("Smart alarm")
         .description("Whether tomorrow’s alarm is set, and for when.")

@@ -187,10 +187,12 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [Self.reminderID])
         guard let plan, !isArmed, !ringing, !watching else { return }
+        // 9pm, unless that's past (or after tonight's alarm, as when it's set after midnight): then half an hour from now.
+        let windowStart = plan.windowStart(after: .now)
         let evening = Calendar.current.date(bySettingHour: 21, minute: 0, second: 0, of: .now)!
-        let when = evening > .now.addingTimeInterval(30 * 60) ? evening : .now.addingTimeInterval(30 * 60)
-        // Not if the alarm itself would come first.
-        guard when < plan.nextLatest(after: .now).addingTimeInterval(-TimeInterval(plan.window * 60)) else { return }
+        let soon = Date.now.addingTimeInterval(30 * 60)
+        let when = evening > soon && evening < windowStart ? evening : soon
+        guard when < windowStart else { return }
         guard (try? await center.requestAuthorization(options: [.alert, .sound])) == true else { return }
         let content = UNMutableNotificationContent()
         content.title = "Your smart alarm isn’t set yet"
@@ -259,8 +261,8 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
             plan = nil
             report()
         }
-        removeBackup()
-        WatchStore.shared.sendAlarmRang()
+        // The backups (this notification, the iPhone's alarm) stay until she actually stops it,
+        // in case she sleeps through the taps.
         session?.notifyUser(hapticType: .notification) { next in
             next.pointee = .notification
             return 3
@@ -281,8 +283,15 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
         armedFor = nil
     }
 
+    /// She's up: the backups aren't needed this morning.
+    private func confirmAwake() {
+        removeBackup()
+        WatchStore.shared.sendAlarmRang()
+    }
+
     /// Stops the buzzing and, if it repeats, sets tomorrow's alarm while the app is open.
     func stop() {
+        if ringing { confirmAwake() }
         watchTask?.cancel()
         motion.stopAccelerometerUpdates()
         ringing = false
@@ -315,6 +324,8 @@ final class SmartAlarm: NSObject, WKExtendedRuntimeSessionDelegate {
             self.watchTask?.cancel()
             self.motion.stopAccelerometerUpdates()
             let ran = self.windowStarted
+            // Stopped from the system's own alarm screen while it was buzzing: she's up.
+            if self.ringing { self.confirmAwake() }
             self.watching = false
             self.ringing = false
             self.session = nil

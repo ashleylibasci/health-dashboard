@@ -20,9 +20,14 @@ struct SmartAlarmCard: View {
                         .scaledFont(14).foregroundStyle(Color.muted2)
                 }
                 if let note = statusNote { Note(note) }
-                if plan.phoneBackup, let at = PhoneBackupAlarm.scheduledFor {
-                    Label("Backup on iPhone at \(at.formatted(date: .omitted, time: .shortened))", systemImage: "iphone")
-                        .scaledFont(13, .semibold).foregroundStyle(Color.muted2)
+                if plan.phoneBackup {
+                    if PhoneBackupAlarm.shared.denied {
+                        Label("The iPhone backup needs alarms allowed: Settings app → Health Dashboard → Alarms.", systemImage: "exclamationmark.triangle.fill")
+                            .scaledFont(13, .semibold).foregroundStyle(Color.peachInk)
+                    } else if let at = PhoneBackupAlarm.shared.scheduledFor {
+                        Label("Backup on iPhone at \(at.formatted(date: .omitted, time: .shortened))", systemImage: "iphone")
+                            .scaledFont(13, .semibold).foregroundStyle(Color.muted2)
+                    }
                 }
                 if let mornings = link.watchStatus?.mornings, !mornings.isEmpty { MorningLog(mornings: mornings) }
                 HStack(spacing: 10) {
@@ -114,6 +119,8 @@ struct SmartAlarmSheet: View {
                     Toggle("Every day", isOn: $plan.repeats)
                     if PhoneBackupAlarm.isAvailable {
                         Toggle("Backup alarm on iPhone", isOn: $plan.phoneBackup)
+                            // Ask iOS now, while she's looking, not later from the background.
+                            .onChange(of: plan.phoneBackup) { _, on in if on { Task { await PhoneBackupAlarm.shared.requestPermission() } } }
                     }
                 } footer: {
                     if PhoneBackupAlarm.isAvailable {

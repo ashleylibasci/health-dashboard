@@ -11,10 +11,17 @@ struct SickView: View {
                 .scaledFont(14, .semibold).foregroundStyle(Color.ink)
                 .padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.butter, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            (Text("Your body’s working ") + Text("harder than usual").italic().foregroundColor(.peachInk))
-                .serifTitleFont(34).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
-            Text("For two mornings, several signals moved together. That can happen a day or two before a cold. It can also be stress, a late night, or nothing at all.")
-                .scaledFont(16).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+            // Once the signals settle (say after a refresh while this is open) the page says so,
+            // instead of a "working harder" headline over a "looks normal" card.
+            if model.sick != nil {
+                (Text("Your body’s working ") + Text("harder than usual").italic().foregroundColor(.peachInk))
+                    .serifTitleFont(34).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+                Text("For two mornings, several signals moved together. That can happen a day or two before a cold. It can also be stress, a late night, or nothing at all.")
+                    .scaledFont(16).foregroundStyle(Color.muted2).fixedSize(horizontal: false, vertical: true)
+            } else {
+                (Text("Your body looks ") + Text("like your normal").italic().foregroundColor(.mintInk))
+                    .serifTitleFont(34).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
+            }
             if let s = model.sick {
                 Card {
                     AdaptiveStack { CardLabel("What we noticed", color: .muted); Spacer(minLength: 0); Pill(text: s.confidence, fill: .peach, ink: .peachInk) }

@@ -523,27 +523,40 @@ struct TileEditor: View {
             List {
                 Section {
                     ForEach(shown) { t in
-                        Button { withAnimation { shown.removeAll { $0 == t } } } label: {
+                        HStack {
                             Label(t.name, systemImage: t.icon)
+                            Spacer()
+                            Button { withAnimation { shown.removeAll { $0 == t } } } label: {
+                                Image(systemName: "minus.circle.fill").font(.title3).foregroundStyle(Color.peachInk)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Hide \(t.name)")
                         }
-                        .accessibilityHint("Hides this tile")
                     }
                     .onMove { shown.move(fromOffsets: $0, toOffset: $1) }
                 } header: {
                     Text("Shown")
                 } footer: {
-                    Text("Drag to reorder. Tap to hide.")
+                    Text("Drag to reorder.")
                 }
                 let hidden = TodayTile.allCases.filter { !shown.contains($0) }
                 if !hidden.isEmpty {
                     Section("Hidden") {
                         ForEach(hidden) { t in
-                            Button { withAnimation { shown.append(t) } } label: {
+                            HStack {
                                 Label(t.name, systemImage: t.icon).foregroundStyle(Color.muted)
+                                Spacer()
+                                Button { withAnimation { shown.append(t) } } label: {
+                                    Image(systemName: "plus.circle.fill").font(.title3).foregroundStyle(Color.mintInk)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Show \(t.name)")
                             }
-                            .accessibilityHint("Shows this tile")
                         }
                     }
+                }
+                Section {
+                    Button("Reset to default") { withAnimation { shown = TodayTile.parse(TodayTile.defaultOrder) } }
                 }
             }
             .environment(\.editMode, .constant(.active))
@@ -551,7 +564,7 @@ struct TileEditor: View {
             .navigationTitle("Today’s tiles")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Reset") { shown = TodayTile.parse(TodayTile.defaultOrder) } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         order = shown.map(\.rawValue).joined(separator: ",")
