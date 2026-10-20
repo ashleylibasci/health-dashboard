@@ -7,12 +7,17 @@ extension Color {
         self.init(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
     }
 
-    /// A color that switches with light and dark appearance.
-    init(light: UInt32, dark: UInt32) {
+    /// A color that switches with light and dark appearance. `glow` is the Glow look (the
+    /// Watch's style: black, frosted glass, tinted panes), used in place of `dark` when it's on.
+    init(light: UInt32, dark: UInt32, glow: (hex: UInt32, alpha: CGFloat)? = nil) {
         #if os(iOS)
         self.init(uiColor: UIColor { traits in
-            let hex = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+            func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> UIColor {
+                UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+            }
+            guard traits.userInterfaceStyle == .dark else { return color(light) }
+            if Appearance.isGlow, let glow { return color(glow.hex, glow.alpha) }
+            return color(dark)
         })
         #else
         // The Watch draws its own day and night looks, so it always uses the light values.
@@ -20,33 +25,41 @@ extension Color {
         #endif
     }
 
-    static let ground = Color(light: 0xFAFAF7, dark: 0x111325)
-    static let surface = Color(light: 0xFFFFFF, dark: 0x1C1F36)
-    static let ink = Color(light: 0x1D2142, dark: 0xF1F2FA)
-    static let muted = Color(light: 0x5A5F7A, dark: 0xB4B7CF)
+    static let ground = Color(light: 0xFAFAF7, dark: 0x111325, glow: (0x000000, 1))
+    static let surface = Color(light: 0xFFFFFF, dark: 0x1C1F36, glow: (0xFFFFFF, 0.08))
+    static let ink = Color(light: 0x1D2142, dark: 0xF1F2FA, glow: (0xFFFFFF, 1))
+    static let muted = Color(light: 0x5A5F7A, dark: 0xB4B7CF, glow: (0xA9AAB6, 1))
     /// Secondary text on tinted cards.
-    static let muted2 = Color(light: 0x4A4F6E, dark: 0xC8CBE0)
+    static let muted2 = Color(light: 0x4A4F6E, dark: 0xC8CBE0, glow: (0xC4C5D0, 1))
     static let main = Color(hex: 0x7C8CF8)
-    static let mainText = Color(light: 0x4453C9, dark: 0xA3AEFF)
-    static let line = Color(light: 0xECECF2, dark: 0x2C3050)
-    static let track = Color(light: 0xF3F3F7, dark: 0x2A2D48)
-    static let lavender = Color(light: 0xECEEFF, dark: 0x252A52)
-    static let periwinkle = Color(light: 0xE4E7FF, dark: 0x2B3160)
-    static let lavenderStrong = Color(light: 0xC9CFFF, dark: 0x3B4384)
-    static let peach = Color(light: 0xFFE8DE, dark: 0x3D2721)
+    static let mainText = Color(light: 0x4453C9, dark: 0xA3AEFF, glow: (0xAEB8FF, 1))
+    static let line = Color(light: 0xECECF2, dark: 0x2C3050, glow: (0xFFFFFF, 0.1))
+    static let track = Color(light: 0xF3F3F7, dark: 0x2A2D48, glow: (0xFFFFFF, 0.1))
+    static let lavender = Color(light: 0xECEEFF, dark: 0x252A52, glow: (0x7C8BFF, 0.18))
+    static let periwinkle = Color(light: 0xE4E7FF, dark: 0x2B3160, glow: (0x7C8BFF, 0.22))
+    static let lavenderStrong = Color(light: 0xC9CFFF, dark: 0x3B4384, glow: (0x7C8BFF, 0.34))
+    static let peach = Color(light: 0xFFE8DE, dark: 0x3D2721, glow: (0xFF9A7A, 0.16))
     static let peachInk = Color(light: 0xB04A2E, dark: 0xFFB59A)
     static let peachBar = Color(hex: 0xFFB59A)
-    static let blush = Color(light: 0xFFF1EA, dark: 0x382A25)
-    static let rose = Color(light: 0xFFE6E2, dark: 0x3F2629)
-    static let butter = Color(light: 0xFFF4CC, dark: 0x3A3220)
+    static let blush = Color(light: 0xFFF1EA, dark: 0x382A25, glow: (0xFF9A7A, 0.12))
+    static let rose = Color(light: 0xFFE6E2, dark: 0x3F2629, glow: (0xFF8A80, 0.16))
+    static let butter = Color(light: 0xFFF4CC, dark: 0x3A3220, glow: (0xFFD666, 0.15))
     static let butterInk = Color(light: 0x7A5A00, dark: 0xFFD966)
-    static let mint = Color(light: 0xDDF5EA, dark: 0x1B3B2F)
+    static let mint = Color(light: 0xDDF5EA, dark: 0x1B3B2F, glow: (0x5EE0C1, 0.14))
     static let mintInk = Color(light: 0x1F7A55, dark: 0x7FD9AE)
-    static let lilac = Color(light: 0xF3E9FF, dark: 0x30264A)
+    static let lilac = Color(light: 0xF3E9FF, dark: 0x30264A, glow: (0xB79BF5, 0.16))
     static let lilacInk = Color(light: 0x7A3FC2, dark: 0xCFA9FF)
     /// The dark pill buttons, which turn light at night.
     static let solid = Color(light: 0x1D2142, dark: 0xE6E8FF)
     static let onSolid = Color(light: 0xFFFFFF, dark: 0x15172B)
+}
+
+/// Which look the iPhone app uses. Glow (the Watch's style) is the default, set at launch;
+/// Light is the original Morning light look. Read wherever a color resolves, so widgets, which
+/// never set it, keep the original colors.
+enum Appearance {
+    static let key = "appearance"
+    static var isGlow: Bool { UserDefaults.standard.string(forKey: key) == "glow" }
 }
 
 /// The design pairs Fraunces (headlines), Bricolage Grotesque (numbers) and Instrument Sans (text).
@@ -222,7 +235,8 @@ func signed(_ v: Double?, _ unit: String) -> String {
 }
 
 extension View {
-    /// The shared page frame: Morning light ground, scrolling, comfortable side margins.
+    /// The shared page frame: the page's ground (in Glow, black with its color glowing from the
+    /// top), scrolling, comfortable side margins.
     func page() -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) { self }
@@ -230,6 +244,32 @@ extension View {
                 .padding(.top, 8)
                 .padding(.bottom, 24)
         }
-        .background(Color.ground)
+        .background { PageGround() }
+    }
+
+    /// The color a page glows in the Glow look (indigo unless a screen picks its own).
+    func pageGlow(_ color: Color) -> some View { environment(\.pageGlow, color) }
+}
+
+extension EnvironmentValues {
+    @Entry var pageGlow = Color(hex: 0x3A46B8)
+}
+
+/// A page's background: the plain ground, or in the Glow look black with the page's color glowing
+/// down from the top, like the Watch pages.
+struct PageGround: View {
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.pageGlow) private var glow
+
+    var body: some View {
+        if scheme == .dark && Appearance.isGlow {
+            ZStack {
+                Color.black
+                RadialGradient(colors: [glow.opacity(0.85), glow.opacity(0.35), .clear], center: UnitPoint(x: 0.15, y: 0), startRadius: 0, endRadius: 520)
+            }
+            .ignoresSafeArea()
+        } else {
+            Color.ground.ignoresSafeArea()
+        }
     }
 }

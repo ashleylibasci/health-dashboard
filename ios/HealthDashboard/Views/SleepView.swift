@@ -11,10 +11,16 @@ struct SleepView: View {
             if week.isEmpty {
                 Card { Note("No sleep in Apple Health yet.") }
             } else {
-                AdaptiveStack(spacing: 10) {
-                    Tile(label: "Average", value: hoursMinutes(mean(week.map { Double($0.asleepMinutes) })!), fill: .lavender, ink: .mainText)
-                    Tile(label: "Asleep at", value: clockTime(median(week.map { Double($0.bedtime) })!), fill: .lavender, ink: .mainText)
-                    Tile(label: "Regularity", value: model.regularity.map(String.init) ?? "–", fill: .mint, ink: .mintInk)
+                if Appearance.isGlow, let last = week.last {
+                    // Glow: last night on the dial, then the smart alarm right under it.
+                    LastNightCard(night: last, regularity: model.regularity)
+                    SmartAlarmCard()
+                } else {
+                    AdaptiveStack(spacing: 10) {
+                        Tile(label: "Average", value: hoursMinutes(mean(week.map { Double($0.asleepMinutes) })!), fill: .lavender, ink: .mainText)
+                        Tile(label: "Asleep at", value: clockTime(median(week.map { Double($0.bedtime) })!), fill: .lavender, ink: .mainText)
+                        Tile(label: "Regularity", value: model.regularity.map(String.init) ?? "–", fill: .mint, ink: .mintInk)
+                    }
                 }
                 Card {
                     CardLabel("When you slept · last \(week.count) nights", color: .muted)
@@ -26,7 +32,7 @@ struct SleepView: View {
                     .scaledFont(13).foregroundStyle(Color.muted)
                 }
             }
-            SmartAlarmCard()
+            if !Appearance.isGlow || model.lastWeek.isEmpty { SmartAlarmCard() }
             if let n = model.lastNight, n.stages != nil {
                 NavigationLink { SleepStagesView() } label: {
                     LinkCard(icon: "waveform.path.ecg", title: "Last night, stage by stage", detail: "Deep, REM, core and wake-ups")
@@ -42,6 +48,7 @@ struct SleepView: View {
             AccuracyLink(metric: .sleep)
         }
         .page()
+        .pageGlow(Color(hex: 0x50389E))
         .toolbar(.hidden, for: .navigationBar)
     }
 

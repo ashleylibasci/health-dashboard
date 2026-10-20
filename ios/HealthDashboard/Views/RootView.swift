@@ -6,6 +6,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var now = Date.now
+    /// "glow" (the default, always dark like the Watch) or "light" (the original look, dark at night if she wants).
+    @AppStorage(Appearance.key) private var appearance = "glow"
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     /// The warm dark night version from 8pm to 6am (test builds can force it with `-night`).
@@ -33,8 +35,10 @@ struct RootView: View {
                 tabs
             }
         }
+        // A new identity when the look changes, so every color is worked out again.
+        .id(appearance)
         .tint(.mainText)
-        .preferredColorScheme(isNight ? .dark : .light)
+        .preferredColorScheme(appearance == "glow" || isNight ? .dark : .light)
         .onReceive(minuteTimer) { now = $0 }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }

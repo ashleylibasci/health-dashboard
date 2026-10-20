@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @AppStorage(Appearance.key) private var appearance = "glow"
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var link = ""
@@ -46,8 +47,13 @@ struct SettingsView: View {
                         Toggle("Body-working-harder alerts", isOn: Binding(get: { profile.prefs.sickAlerts }, set: { model.profile?.prefs.sickAlerts = $0 }))
                         Toggle("Drinks tracking", isOn: Binding(get: { profile.prefs.drinksTracking }, set: { model.profile?.prefs.drinksTracking = $0 }))
                         Toggle("Streaks", isOn: Binding(get: { profile.prefs.streaks }, set: { model.profile?.prefs.streaks = $0 }))
-                        Toggle("Night version after 8pm", isOn: Binding(get: { profile.prefs.nightMode }, set: { model.profile?.prefs.nightMode = $0 }))
-                        Toggle("Dark Watch screens at night", isOn: Binding(get: { profile.prefs.darkWatchAtNight }, set: { model.profile?.prefs.darkWatchAtNight = $0 }))
+                        Picker("Look", selection: $appearance) {
+                            Text("Glow").tag("glow")
+                            Text("Light").tag("light")
+                        }
+                        if appearance == "light" {
+                            Toggle("Night version after 8pm", isOn: Binding(get: { profile.prefs.nightMode }, set: { model.profile?.prefs.nightMode = $0 }))
+                        }
                         Button("Run the welcome setup again") { confirmRerun = true }
                             .confirmationDialog("Go through the welcome screens again?", isPresented: $confirmRerun, titleVisibility: .visible) {
                                 Button("Start welcome setup") {

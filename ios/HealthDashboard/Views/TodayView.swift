@@ -40,6 +40,12 @@ struct TodayView: View {
                 }
             default:
                 recoveryCard
+                if Appearance.isGlow && model.weekend != nil {
+                    NavigationLink { SleepView().navigationTransition(.zoom(sourceID: "tonight", in: zoom)) } label: {
+                        TonightCard().matchedTransitionSource(id: "tonight", in: zoom)
+                    }
+                    .buttonStyle(PressScale())
+                }
                 alerts
                 cycleCard
                 HStack(alignment: .firstTextBaseline) {
@@ -179,22 +185,27 @@ struct TodayView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                AdaptiveGrid(columns: 3, spacing: 8) {
-                    StatCell(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded()))" }, unit: "bpm",
-                             change: r?.restingHrChange.map { d in
-                                 let n = Int(d.rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n)) vs normal"
-                             }, worse: (r?.restingHrChange ?? 0) >= 3)
-                    StatCell(label: "HRV", value: model.health.hrv[model.today].map { "\(Int($0.rounded()))" }, unit: "ms",
-                             change: r?.hrvChange.map { d in
-                                 let n = Int((d * 100).rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n))% vs normal"
-                             }, worse: (r?.hrvChange ?? 0) <= -0.1)
-                    StatCell(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) }, unit: nil,
-                             change: r?.sleepChange.map { d in abs(d) < 15 ? "Typical" : "\(hoursMinutes(abs(d))) \(d > 0 ? "more" : "less")" },
-                             worse: (r?.sleepChange ?? 0) <= -45)
+                if Appearance.isGlow {
+                    RecoveryGauges()
+                } else {
+                    AdaptiveGrid(columns: 3, spacing: 8) {
+                        StatCell(label: "Resting HR", value: model.health.restingHr[model.today].map { "\(Int($0.rounded()))" }, unit: "bpm",
+                                 change: r?.restingHrChange.map { d in
+                                     let n = Int(d.rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n)) vs normal"
+                                 }, worse: (r?.restingHrChange ?? 0) >= 3)
+                        StatCell(label: "HRV", value: model.health.hrv[model.today].map { "\(Int($0.rounded()))" }, unit: "ms",
+                                 change: r?.hrvChange.map { d in
+                                     let n = Int((d * 100).rounded()); return n == 0 ? "Your normal" : "\(n > 0 ? "+" : "−")\(abs(n))% vs normal"
+                                 }, worse: (r?.hrvChange ?? 0) <= -0.1)
+                        StatCell(label: "Sleep", value: model.lastNight.map { hoursMinutes(Double($0.asleepMinutes)) }, unit: nil,
+                                 change: r?.sleepChange.map { d in abs(d) < 15 ? "Typical" : "\(hoursMinutes(abs(d))) \(d > 0 ? "more" : "less")" },
+                                 worse: (r?.sleepChange ?? 0) <= -45)
+                    }
                 }
             }
             .padding(18)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay { if Appearance.isGlow { RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Color.line) } }
             .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
             .matchedTransitionSource(id: "recovery", in: zoom)
         }
@@ -408,8 +419,9 @@ struct MetricTile<Chart: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
+        // Glow tints each tile in its own color, like the Watch's Log tiles.
+        .background(Appearance.isGlow ? ink.opacity(0.16) : Color.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: Appearance.isGlow ? .clear : Color(red: 20 / 255, green: 20 / 255, blue: 40 / 255).opacity(0.06), radius: 1, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens \(title.lowercased())")
     }

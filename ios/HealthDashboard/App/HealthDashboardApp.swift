@@ -5,6 +5,8 @@ struct HealthDashboardApp: App {
     @State private var model: AppModel
 
     init() {
+        // Glow (the Watch's style) is the look until she picks Light in Settings.
+        UserDefaults.standard.register(defaults: [Appearance.key: "glow"])
         WatchSync.shared.activate()
         let model = AppModel()
         _model = State(initialValue: model)

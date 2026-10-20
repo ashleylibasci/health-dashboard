@@ -12,8 +12,11 @@ struct Ring: View {
         let size = size * min(scale, 1.6)
         ZStack {
             Circle().stroke(track, lineWidth: size * 0.115)
+            // Glow fades the ring from light to deep indigo, like the Watch's.
             Circle().trim(from: 0, to: CGFloat(value ?? 0) / 100)
-                .stroke(Color.main, style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
+                .stroke(Appearance.isGlow ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0xC3CAFF), Color(hex: 0x5B6BE8)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                          : AnyShapeStyle(Color.main),
+                        style: StrokeStyle(lineWidth: size * 0.115, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(value.map(String.init) ?? "–").numberFont(self.size * 0.3).foregroundStyle(Color.ink)
                 .lineLimit(1).minimumScaleFactor(0.5).padding(size * 0.16)
