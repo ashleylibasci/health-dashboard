@@ -13,8 +13,14 @@ struct SnapshotProvider: TimelineProvider {
         completion(SnapshotEntry(date: .now, snapshot: context.isPreview ? .sample : WidgetSnapshot.load()))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<SnapshotEntry>) -> Void) {
-        // The app pushes fresh numbers whenever it reads Health; this just re-checks hourly.
-        completion(Timeline(entries: [SnapshotEntry(date: .now, snapshot: WidgetSnapshot.load())], policy: .after(.now.addingTimeInterval(3600))))
+        // The app pushes fresh numbers whenever it reads Health. Between those, entries at midnight
+        // and 5am make the day-based values (recovery, cycle day, today's caffeine) turn over on time.
+        let snap = WidgetSnapshot.load()
+        let cal = Calendar.current
+        let midnight = cal.startOfDay(for: .now.addingTimeInterval(86_400))
+        let fiveAM = cal.nextDate(after: .now, matching: DateComponents(hour: 5, minute: 0), matchingPolicy: .nextTime)!
+        let entries = [Date.now, midnight, fiveAM].sorted().map { SnapshotEntry(date: $0, snapshot: snap) }
+        completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(3600))))
     }
 }
 
@@ -36,17 +42,23 @@ struct RecoveryWidgetView: View {
     @Environment(\.widgetFamily) private var family
     var entry: SnapshotEntry
 
-    /// After midnight, until the app refreshes, don't show yesterday's recovery as today's.
-    static func todayOnly(_ snap: WidgetSnapshot) -> WidgetSnapshot {
-        guard !snap.isFromToday else { return snap }
+    /// After midnight, until the app refreshes, don't show yesterday's numbers as today's: recovery,
+    /// energy and sleep go blank, the cycle day moves on with the calendar, and the phase and
+    /// bedtime (which may have changed) are left out. `date` is when the entry shows.
+    static func todayOnly(_ snap: WidgetSnapshot, at date: Date = .now) -> WidgetSnapshot {
+        let cal = Calendar.current
+        guard !cal.isDate(snap.updated, inSameDayAs: date) else { return snap }
         var s = snap
         s.recovery = nil; s.energy = nil; s.sleepMinutes = nil
         s.headline = s.updated == .distantPast ? "Open the app to get started" : "Open the app for today’s numbers"
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: snap.updated), to: cal.startOfDay(for: date)).day ?? 0
+        if let d = snap.cycleDay, days > 0, days < 7 { s.cycleDay = d + days } else if days >= 7 { s.cycleDay = nil }
+        s.phase = nil; s.bedBy = nil
         return s
     }
 
     var body: some View {
-        let s = Self.todayOnly(entry.snapshot)
+        let s = Self.todayOnly(entry.snapshot, at: entry.date)
         switch family {
         case .accessoryCircular:
             Gauge(value: Double(s.recovery ?? 0), in: 0...100) { Text("RECOV") } currentValueLabel: { Text(s.recovery.map(String.init) ?? "–") }
@@ -113,7 +125,7 @@ struct CycleWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "Cycle", provider: SnapshotProvider()) { entry in
             VStack(spacing: 0) {
-                Text(entry.snapshot.cycleDay.map { "D\($0)" } ?? "–").font(.system(size: 20, weight: .bold, design: .rounded))
+                Text(RecoveryWidgetView.todayOnly(entry.snapshot, at: entry.date).cycleDay.map { "D\($0)" } ?? "–").font(.system(size: 20, weight: .bold, design: .rounded))
                 Text("CYCLE").font(.system(size: 9, weight: .bold))
             }
             .containerBackground(.clear, for: .widget)
@@ -134,7 +146,7 @@ struct LatteWidget: Widget {
                     Image(systemName: "cup.and.saucer.fill").font(.system(size: 28)).foregroundStyle(Color.butterInk)
                     Spacer()
                     Text("+ Latte").font(.number(22)).foregroundStyle(Color.ink)
-                    Text("Today \(Int(entry.snapshot.caffeineToday)) mg · cutoff 2pm").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.butterInk)
+                    Text("Today \(Int(entry.snapshot.caffeine(at: entry.date))) mg · cutoff 2pm").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.butterInk)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }

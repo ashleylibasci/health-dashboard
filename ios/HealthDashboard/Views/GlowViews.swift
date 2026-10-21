@@ -27,7 +27,8 @@ struct GaugeCell: View {
             .tint(Gradient(colors: [tint.opacity(0.55), tint]))
             .scaleEffect(1.1)
             .padding(.vertical, 4)
-            Text(label).scaledFont(13, .bold).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.8)
+            Text(label).scaledFont(13, .bold).foregroundStyle(Color.ink).lineLimit(2).minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
             if let change {
                 Text(change).scaledFont(12, worse ? .bold : .semibold).foregroundStyle(worse ? Color.peachInk : Color.muted2)
                     .lineLimit(1).minimumScaleFactor(0.8)
@@ -130,7 +131,7 @@ struct TonightCard: View {
 
     var body: some View {
         let bed = model.bedtimeTarget
-        HStack(spacing: 14) {
+        AdaptiveStack(spacing: 14) {
             SleepDialView(start: bed, minutes: 8 * 60) {
                 Text("8h").numberFont(20).foregroundStyle(Color.ink)
             }
@@ -146,8 +147,8 @@ struct TonightCard: View {
                     .padding(.horizontal, 10).frame(minHeight: 30)
                     .background(Color(hex: 0xFFA94D).opacity(0.2), in: Capsule())
             }
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background(Color(hex: 0x9B86FF).opacity(0.14), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color(hex: 0x9B86FF).opacity(0.2)))
@@ -171,12 +172,17 @@ struct LastNightCard: View {
     var regularity: Int?
 
     var body: some View {
-        HStack(spacing: 16) {
+        // At the accessibility text sizes the numbers go under the dial instead of beside it.
+        AdaptiveStack(spacing: 16) {
             SleepDialView(start: night.bedtime, minutes: night.wake - night.bedtime) {
                 VStack(spacing: 2) {
-                    Text(hoursMinutes(Double(night.asleepMinutes))).numberFont(24).foregroundStyle(Color.ink)
-                    Text("last night").scaledFont(11, .semibold).foregroundStyle(Color.muted)
+                    // Inside the dial, so it shrinks to fit rather than growing past the ring.
+                    Text(hoursMinutes(Double(night.asleepMinutes))).font(.number(24)).foregroundStyle(Color.ink)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    Text(night.wakeDate == Day.key(.now) ? "last night" : "\(Day.weekdayName(night.date)) night")
+                        .font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted)
                 }
+                .padding(.horizontal, 26)
             }
             .frame(width: 150, height: 150)
             VStack(alignment: .leading, spacing: 10) {
@@ -184,8 +190,8 @@ struct LastNightCard: View {
                 stat("AWAKE", clockTime(Double(night.wake)), Color(hex: 0xFFA94D))
                 if let regularity { stat("REGULARITY", "\(regularity)", Color(hex: 0x5EE0C1)) }
             }
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Color.line))
@@ -195,8 +201,8 @@ struct LastNightCard: View {
 
     private func stat(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label).labelFont().foregroundStyle(tint)
-            Text(value).numberFont(20).foregroundStyle(Color.ink)
+            Text(label).labelFont().foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).numberFont(20).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.7)
         }
     }
 }

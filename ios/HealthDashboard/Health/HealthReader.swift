@@ -141,8 +141,17 @@ struct HealthReader {
         )
     }
 
-    private static func orEmpty<T>(_ fallback: T, _ read: () async throws -> T) async -> T {
-        (try? await read()) ?? fallback
+    /// Falls back to empty when one kind of data can't be read (say, not allowed yet), but not when
+    /// the phone is locked: then nothing can be read, and an empty series would wipe out the real
+    /// numbers on screen and in the widgets. That error goes up so the last numbers are kept.
+    private static func orEmpty<T>(_ fallback: T, _ read: () async throws -> T) async throws -> T {
+        do {
+            return try await read()
+        } catch let error as HKError where error.code == .errorDatabaseInaccessible {
+            throw error
+        } catch {
+            return fallback
+        }
     }
 
     /// True when the app reads or saves something Apple hasn't asked her about yet (new in an update).
@@ -213,7 +222,8 @@ struct HealthReader {
         )
         return try await query.result(for: store).map {
             Reading(date: $0.startDate, value: $0.quantity.doubleValue(for: unit), uuid: $0.uuid,
-                    mine: $0.sourceRevision.source.bundleIdentifier.hasPrefix("com.ashleylibasci.healthdashboard"),
+                    // Only samples this iPhone app saved: Health won't let it delete ones the Watch app or a widget saved.
+                    mine: $0.sourceRevision.source.bundleIdentifier == Bundle.main.bundleIdentifier,
                     name: $0.metadata?[HKMetadataKeyFoodType] as? String)
         }
     }

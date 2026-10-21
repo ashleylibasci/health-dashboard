@@ -147,9 +147,14 @@ extension AppModel {
     /// so logs from Shortcuts or other apps have to be changed in the Health app.
     @discardableResult
     func editCaffeine(_ log: Reading, mg: Double, at date: Date) async -> Bool {
-        guard await deleteSample(log, type: HealthReader.caffeineType) else { return false }
+        // Check first that the old one can be removed, then save the new one before removing it,
+        // so a failed save never loses the original.
+        guard log.mine, log.uuid != nil else { return await deleteSample(log, type: HealthReader.caffeineType) }
         await logCaffeine(mg, name: log.name, at: date)
-        return lastLogError == nil
+        guard lastLogError == nil else { return false }
+        let removed = await deleteSample(log, type: HealthReader.caffeineType)
+        await afterChange()
+        return removed
     }
 
     @discardableResult
@@ -190,8 +195,11 @@ extension AppModel {
         for type in [HealthReader.menstrualFlowType, HealthReader.spottingType] + Symptom.allCases.map(\.type) {
             _ = try? await HealthReader.store.deleteObjects(of: type, predicate: mine)
         }
+        // The sheet starts filled in with what other apps logged too; don't save those a second time.
+        let elsewhere = await loggedElsewhere(from: start, to: end)
+        let symptoms = symptoms.subtracting(elsewhere.symptoms)
         var samples: [HKObject] = []
-        if let flow {
+        if let flow, !(flow == 1 && elsewhere.spotting), !(flow >= 2 && elsewhere.flow == flow) {
             if flow == 1 {
                 samples.append(HKCategorySample(type: HealthReader.spottingType, value: HKCategoryValue.notApplicable.rawValue, start: start, end: end.addingTimeInterval(-1)))
             } else {
@@ -210,6 +218,33 @@ extension AppModel {
             return true
         }
         return await save(samples)
+    }
+
+    /// What another app (like Apple's Cycle Tracking) logged for a day: the heaviest flow (2 light,
+    /// 3 medium or unspecified, 4 heavy), whether there was spotting, and which symptoms.
+    private func loggedElsewhere(from start: Date, to end: Date) async -> (flow: Int?, spotting: Bool, symptoms: Set<Symptom>) {
+        let others = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate),
+            NSCompoundPredicate(notPredicateWithSubpredicate: HKQuery.predicateForObjects(from: .default())),
+        ])
+        func samples(_ type: HKCategoryType) async -> [HKCategorySample] {
+            let query = HKSampleQueryDescriptor(predicates: [.categorySample(type: type, predicate: others)], sortDescriptors: [])
+            return (try? await query.result(for: HealthReader.store)) ?? []
+        }
+        let flow = await samples(HealthReader.menstrualFlowType).compactMap { s -> Int? in
+            switch HKCategoryValueVaginalBleeding(rawValue: s.value) {
+            case .light: 2
+            case .medium, .unspecified: 3
+            case .heavy: 4
+            default: nil
+            }
+        }.max()
+        let spotting = await !samples(HealthReader.spottingType).isEmpty
+        var symptoms: Set<Symptom> = []
+        for symptom in Symptom.allCases {
+            if await !samples(symptom.type).isEmpty { symptoms.insert(symptom) }
+        }
+        return (flow, spotting, symptoms)
     }
 
     /// Stress 1 (very calm) … 5 (very stressed), saved as a State of Mind.
@@ -243,11 +278,16 @@ extension AppModel {
         if isDemoMode { return true }
         lastLogError = nil
         guard log.mine, let uuid = log.uuid else {
-            lastLogError = "This one was logged by another app (like Shortcuts), so only the Health app can change it: Health → Browse → Nutrition → Caffeine."
+            lastLogError = "This one was logged somewhere else (your Watch, a widget or Shortcuts), so only the Health app can change it: Health → Browse → Nutrition → Caffeine."
             return false
         }
         do {
-            _ = try await HealthReader.store.deleteObjects(of: type, predicate: HKQuery.predicateForObject(with: uuid))
+            // Health only removes what this app saved, and reports how many it removed.
+            let removed = try await HealthReader.store.deleteObjects(of: type, predicate: HKQuery.predicateForObject(with: uuid))
+            guard removed > 0 else {
+                lastLogError = "Apple Health didn’t let the app change this one. You can change it in Health → Browse → Nutrition → Caffeine."
+                return false
+            }
             return true
         } catch {
             lastLogError = "Couldn’t change it in Apple Health: \(error.localizedDescription)"

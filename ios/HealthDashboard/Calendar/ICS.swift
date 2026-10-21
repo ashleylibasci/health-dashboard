@@ -11,8 +11,12 @@ struct CalendarEvent: Equatable {
 /// Words in an event title that mark it as an exam. Matched as whole words, any case.
 let examWords = ["exam", "midterm", "final", "quiz"]
 
+/// Words that mean the event is about an exam but isn't one: "Midterm review session".
+let notExamWords = ["review", "prep", "study", "studying", "office hours", "practice", "tutoring"]
+
 func isExam(_ title: String, words: [String] = examWords) -> Bool {
-    words.contains { title.range(of: "\\b\($0)s?\\b", options: [.regularExpression, .caseInsensitive]) != nil }
+    func has(_ w: String) -> Bool { title.range(of: "\\b\(w)s?\\b", options: [.regularExpression, .caseInsensitive]) != nil }
+    return words.contains(where: has) && !notExamWords.contains(where: has)
 }
 
 /// Reads the events out of an iCalendar (.ics) feed, the format behind Google Calendar's
@@ -23,17 +27,25 @@ func parseICS(_ text: String, timeZone: TimeZone = .current) -> [CalendarEvent] 
     let unfolded = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\n ", with: "").replacingOccurrences(of: "\n\t", with: "")
     var events: [CalendarEvent] = []
     var title: String?, start: String?, params = "", repeats = false, cancelled = false, inEvent = false
+    /// How deep inside the event's own sub-blocks (a reminder's VALARM has its own SUMMARY,
+    /// like "Alarm notification", which must not replace the event's title).
+    var nested = 0
 
     for line in unfolded.split(separator: "\n", omittingEmptySubsequences: true).map(String.init) {
         if line == "BEGIN:VEVENT" {
             inEvent = true
+            nested = 0
             title = nil; start = nil; params = ""; repeats = false; cancelled = false
         } else if line == "END:VEVENT" {
             if let t = title, let s = start, !repeats, !cancelled, let when = parseStart(s, params, timeZone) {
                 events.append(CalendarEvent(title: t, date: when.date, minutes: when.minutes))
             }
             inEvent = false
-        } else if inEvent, let colon = line.firstIndex(of: ":") {
+        } else if inEvent, line.hasPrefix("BEGIN:") {
+            nested += 1
+        } else if inEvent, line.hasPrefix("END:") {
+            nested = max(0, nested - 1)
+        } else if inEvent, nested == 0, let colon = line.firstIndex(of: ":") {
             let head = line[..<colon].split(separator: ";").map(String.init)
             let value = String(line[line.index(after: colon)...])
             switch head.first {

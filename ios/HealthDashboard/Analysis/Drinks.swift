@@ -12,10 +12,8 @@ struct DrinkEffect: Equatable {
 
 /// Mornings after 3+ drinks vs. mornings after none, from her own data.
 func drinkEffect(_ data: HealthData, recovery: [String: Int], minDrinks: Double = 3) -> DrinkEffect? {
-    let perEvening = Dictionary(grouping: data.drinks) { r -> String in
-        // A drink after midnight still belongs to the evening before.
-        Calendar.current.component(.hour, from: r.date) < 6 ? Day.shift(r.day, -1) : r.day
-    }.mapValues { $0.reduce(0) { $0 + $1.value } }
+    // A drink after midnight (before 5am, as everywhere else) still belongs to the evening before.
+    let perEvening = Dictionary(grouping: data.drinks, by: \.evening).mapValues { $0.reduce(0) { $0 + $1.value } }
     let heavy = data.nights.filter { (perEvening[$0.date] ?? 0) >= minDrinks }
     let dry = data.nights.filter { perEvening[$0.date] == nil }
     guard heavy.count >= 2, dry.count >= 5 else { return nil }

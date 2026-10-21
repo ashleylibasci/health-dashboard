@@ -12,6 +12,7 @@ final class AppModel {
     enum CalendarState: Equatable { case notConnected, loading, ready(checkedAt: Date), failed(String) }
 
     private(set) var healthState: HealthState
+    @ObservationIgnored private var readGeneration = 0
     private(set) var health = HealthData() {
         didSet { derived = Derived(health) }
     }
@@ -124,8 +125,14 @@ final class AppModel {
         if health.nights.isEmpty && !quiet { healthState = .loading }
         // An update added new kinds of data: ask about just those (Apple's sheet appears once).
         if !quiet, await HealthReader.needsPermissionPrompt() { try? await HealthReader.requestAccess() }
+        // Reads can overlap (opening the app, unlocking, saving a log); only the newest one's
+        // result counts, so an older read finishing last can't undo a just-saved latte.
+        readGeneration += 1
+        let generation = readGeneration
         do {
-            health = try await HealthReader.read()
+            let data = try await HealthReader.read()
+            guard generation == readGeneration else { return }
+            health = data
             healthState = .ready
         } catch let error as HKError where error.code == .errorDatabaseInaccessible {
             // The phone is locked, so iOS keeps Health data out of reach. That isn't a problem to
@@ -148,7 +155,9 @@ final class AppModel {
     var lateNight: LateNightCost? { lateNightCost(health.nights, restingHr: health.restingHr, hrv: health.hrv) }
     var lastWeek: [Night] { Array(health.nights.suffix(7)) }
     var recentLate: [Night] { Array(health.nights.filter { $0.bedtime >= lateBedtime }.suffix(3).reversed()) }
-    var lastNight: Night? { health.nights.last }
+    /// The night she woke up from today. Nil when the Watch wasn't worn last night, so an older
+    /// night never passes for "last night".
+    var lastNight: Night? { health.nights.last.flatMap { $0.wakeDate == today ? $0 : nil } }
 
     /// Typical resting HR and HRV over the 4 weeks before today, to compare today against.
     func typical(_ series: [String: Double]) -> Double? {

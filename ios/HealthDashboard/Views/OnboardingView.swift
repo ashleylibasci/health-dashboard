@@ -51,7 +51,10 @@ struct OnboardingView: View {
             footer.padding(.horizontal, 20).padding(.bottom, 12)
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         }
-        .background(step == .intro ? Color.lavender : Color.ground)
+        // The welcome screen is lavender in the Light look; in Glow every step has the glowing black ground.
+        .background {
+            if step == .intro && !Appearance.isGlow { Color.lavender.ignoresSafeArea() } else { PageGround() }
+        }
         .animation(.easeInOut(duration: 0.2), value: step)
         .onAppear(perform: prefill)
         .sheet(isPresented: $showConditions) { conditionsSheet }

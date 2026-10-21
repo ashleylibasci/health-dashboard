@@ -134,7 +134,10 @@ struct CalendarTests {
 
     @Test func matchesExamWordsAsWholeWords() {
         #expect(isExam("MATH 347 Midterm"))
-        #expect(isExam("Finals week study group"))
+        // About an exam, but not one: no reminder the night before.
+        #expect(!isExam("Finals week study group"))
+        #expect(!isExam("Midterm review session"))
+        #expect(isExam("CHEM 101 Final Exam"))
         #expect(!isExam("Examine lab results"))
         #expect(!isExam("Quizlet session"))
     }
@@ -152,5 +155,51 @@ struct CalendarTests {
         #expect(lens.examWeeks.asleepMinutes == 360)
         #expect(lens.normalWeeks.asleepMinutes == 480)
         #expect(lens.normalWeeks.nights == 56 - 12 - 2)
+    }
+}
+
+struct ReviewFixTests {
+    @Test func aLongWakeUpInTheNightIsStillOneNight() {
+        // Asleep 11pm–2am, up for 2½ hours, asleep again 4:30–8am.
+        let nights = buildNights([sample("2026-10-16 23:00", "2026-10-17 02:00"), sample("2026-10-17 04:30", "2026-10-17 08:00")])
+        #expect(nights.count == 1)
+        #expect(nights[0].asleepMinutes == 390)
+        #expect(clockTime(Double(nights[0].bedtime)) == "11:00pm")
+    }
+
+    @Test func watchAwakeTimeIsTakenOutOfAnotherAppsSleepBlock() {
+        var awake = sample("2026-10-17 03:00", "2026-10-17 03:40")
+        awake.stage = .awake
+        // Another sleep app wrote one block over the Watch's 40-minute wake-up.
+        let nights = buildNights([sample("2026-10-16 23:20", "2026-10-17 07:05"), awake])
+        #expect(nights.count == 1)
+        #expect(nights[0].asleepMinutes == 465 - 40)
+    }
+
+    @Test func aTwentyOneDayCycleDoesNotCrashThePhases() {
+        var data = HealthData()
+        for start in ["2026-07-01", "2026-07-22", "2026-08-12", "2026-09-02"] {
+            for d in 0..<4 { data.flow[Day.shift(start, d)] = 3 }
+        }
+        let stats = phaseStats(data)
+        #expect(stats.count == 4)
+        #expect(stats.allSatisfy { $0.days.lowerBound <= $0.days.upperBound })
+    }
+
+    @Test func aRemindersTitleDoesNotReplaceTheEventTitle() {
+        let ics = """
+        BEGIN:VCALENDAR
+        BEGIN:VEVENT
+        DTSTART:20261020T150000Z
+        SUMMARY:MATH 347 Midterm
+        BEGIN:VALARM
+        ACTION:EMAIL
+        SUMMARY:Alarm notification
+        END:VALARM
+        END:VEVENT
+        END:VCALENDAR
+        """
+        let events = parseICS(ics, timeZone: chicago)
+        #expect(events.map(\.title) == ["MATH 347 Midterm"])
     }
 }

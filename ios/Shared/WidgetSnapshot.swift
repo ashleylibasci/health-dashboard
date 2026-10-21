@@ -88,7 +88,9 @@ struct WidgetSnapshot: Codable, Equatable {
     }
 
     /// Today's caffeine, reset to zero once the day changes.
-    var caffeineToday: Double { caffeineDay == Self.eveningKey() ? caffeineMg : 0 }
+    var caffeineToday: Double { caffeine(at: .now) }
+    /// The day's caffeine as of `date` (widgets draw entries ahead of the time they show).
+    func caffeine(at date: Date) -> Double { caffeineDay == Self.eveningKey(date) ? caffeineMg : 0 }
     var waterToday: Double { waterDay == Self.calendarKey() ? waterBottles : 0 }
 
     /// Today's plain calendar date as "yyyy-MM-dd" (Gregorian), for daily totals like water.

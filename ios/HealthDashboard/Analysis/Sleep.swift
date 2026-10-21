@@ -49,17 +49,30 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
     struct Span { var start: Date; var end: Date; var startZone: TimeZone; var endZone: TimeZone }
 
     // Merge overlapping or touching samples into continuous asleep spans.
-    var spans: [Span] = []
+    var merged: [Span] = []
     let sorted = samples.sorted(by: { $0.start < $1.start })
     for s in sorted where s.stage != .awake {
-        if var last = spans.last, s.start <= last.end {
+        if var last = merged.last, s.start <= last.end {
             if s.end > last.end {
                 last.end = s.end
                 last.endZone = s.timeZone
             }
-            spans[spans.count - 1] = last
+            merged[merged.count - 1] = last
         } else {
-            spans.append(Span(start: s.start, end: s.end, startZone: s.timeZone, endZone: s.timeZone))
+            merged.append(Span(start: s.start, end: s.end, startZone: s.timeZone, endZone: s.timeZone))
+        }
+    }
+
+    // A time the Watch saw her awake is awake, even if another sleep app wrote one long
+    // "asleep" block over it, so cut those times out of the merged spans.
+    var spans = merged
+    for awake in sorted where awake.stage == .awake {
+        spans = spans.flatMap { span -> [Span] in
+            guard awake.start < span.end, awake.end > span.start else { return [span] }
+            var pieces: [Span] = []
+            if awake.start > span.start { pieces.append(Span(start: span.start, end: awake.start, startZone: span.startZone, endZone: awake.timeZone)) }
+            if awake.end < span.end { pieces.append(Span(start: awake.end, end: span.end, startZone: awake.timeZone, endZone: span.endZone)) }
+            return pieces
         }
     }
 
@@ -73,7 +86,9 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
         }
     }
 
-    var byDate: [String: Night] = [:]
+    /// One evening's main sleep while it's being put together.
+    struct Main { var first: Span; var last: Span; var asleep: TimeInterval; var daytime: Bool }
+    var byEvening: [String: Main] = [:]
     for session in sessions {
         let first = session.first!, last = session.last!
         let asleep = session.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
@@ -83,21 +98,31 @@ func buildNights(_ samples: [SleepSample]) -> [Night] {
 
         // Bedtimes after midnight (before 10am) count toward the previous evening (e.g. 1am → yesterday).
         let evening = bed.minutes < 10 * 60 ? Day.shift(bed.date, -1) : bed.date
-        let wake = LocalTime(last.end, last.endZone)
-        let night = Night(
+        let main = Main(first: first, last: last, asleep: asleep, daytime: daytime)
+        guard let existing = byEvening[evening] else { byEvening[evening] = main; continue }
+        // Two overnight sleeps a few hours apart are one night with a long wake-up in the middle
+        // (asleep 11–2, up until 4:30, asleep again): add them up rather than keep only one half.
+        if !existing.daytime && !daytime && first.start.timeIntervalSince(existing.last.end) <= 5 * 60 * 60 {
+            byEvening[evening] = Main(first: existing.first, last: last, asleep: existing.asleep + asleep, daytime: false)
+        } else if asleep > existing.asleep {
+            // Otherwise keep the longer one.
+            byEvening[evening] = main
+        }
+    }
+    return byEvening.map { evening, m in
+        let bed = LocalTime(m.first.start, m.first.startZone)
+        let wake = LocalTime(m.last.end, m.last.endZone)
+        return Night(
             date: evening,
             weekday: Day.weekday(evening),
             bedtime: bed.minutesAfter6pm(evening),
             wake: wake.minutesAfter6pm(evening),
-            asleepMinutes: Int((asleep / 60).rounded()),
+            asleepMinutes: Int((m.asleep / 60).rounded()),
             wakeDate: wake.date,
-            stages: stages(in: first.start...last.end, of: sorted)
+            stages: stages(in: m.first.start...m.last.end, of: sorted)
         )
-        // If two qualifying sleeps share an evening, keep the longer one.
-        if let existing = byDate[evening], existing.asleepMinutes >= night.asleepMinutes { continue }
-        byDate[evening] = night
     }
-    return byDate.values.sorted { $0.date < $1.date }
+    .sorted { $0.date < $1.date }
 }
 
 /// Adds up the Watch's stage samples inside one night. Unspecified "asleep" samples (from the

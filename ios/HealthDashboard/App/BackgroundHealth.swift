@@ -67,6 +67,8 @@ final class BackgroundHealth {
         running = task
         await task.value
         running = nil
+        // Data that arrived between the last pass and now gets its pass too.
+        if needsAnotherPass { await update() }
     }
 
     /// Kept for callers that refresh on their own; nothing to skip any more.

@@ -144,10 +144,12 @@ func phaseStats(_ data: HealthData, cycles: Int = 6) -> [PhaseStats] {
             if let v = data.hrv[date] { buckets[phase, default: ([], [], [])].hrv.append(v); allHrv.append(v) }
         }
     }
-    let typical = Int(median(cycleLengths(recent).map(Double.init)) ?? 28)
+    let typical = Int((median(cycleLengths(recent).map(Double.init)) ?? 28).rounded())
     // Very short averages (often from gaps in logging) can't be split into phases.
     guard typical >= 21 else { return [] }
-    let ov = typical - 14
+    // In a short cycle (21–23 days) ovulation is kept late enough that the follicular phase is
+    // at least a day, so no phase's range runs backwards.
+    let ov = max(typical - 14, 8)
     let ranges: [CyclePhase: ClosedRange<Int>] = [.period: 1...5, .follicular: 6...(ov - 2), .ovulation: (ov - 1)...(ov + 1), .luteal: (ov + 2)...typical]
     func diff(_ xs: [Double]?, _ all: [Double]) -> Double? {
         guard let xs, xs.count >= 3, let a = mean(xs), let b = mean(all) else { return nil }
