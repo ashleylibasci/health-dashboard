@@ -18,13 +18,14 @@ Do all of these, in order, every time:
    xcrun devicectl device install app --device 00008160-000D146A00434036 \
      DerivedData/Build/Products/Debug-iphoneos/HealthDashboard.app
    xcrun devicectl device process launch --device 00008160-000D146A00434036 \
-     com.ashleylibasci.healthdashboard
+     com.ashleylibasci.healthdashboard.next
    ```
-   If the Watch shows up in `xcrun devicectl list devices`, launch `com.ashleylibasci.healthdashboard.watchkitapp` on it the same way. If not, say so and ask Ashley to open the app on the Watch.
+   If the Watch shows up in `xcrun devicectl list devices`, launch `com.ashleylibasci.healthdashboard.next.watchkitapp` on it the same way. If not, say so and ask Ashley to open the app on the Watch.
 3. **Commit and push to GitHub** (`origin` → https://github.com/ashleylibasci/health-dashboard, branch `main`). This repo is public: never commit health data, exports, the zip or anything personal.
 
 If any step fails (phone locked or not connected, signing, a failing build), stop and tell Ashley which step failed and why; don't skip ahead to commit and push.
 
 ## Notes
+- The new app installs as **Health Next** (`com.ashleylibasci.healthdashboard.next`, Watch `….next.watchkitapp`) alongside the old Health Dashboard (`com.ashleylibasci.healthdashboard`), which Ashley still uses for its iPhone backup alarm. Never install over the old app's bundle ID; Ashley decides when to switch back.
 - Signing: team `93C3VKR4FJ` (Ashley Libasci, Personal Team) is set in `project.yml` for both targets. A free team's install expires after 7 days; reinstalling renews it.
 - Logic tests: `cd health-dashboard-app/Packages/HealthCore && swift test`.

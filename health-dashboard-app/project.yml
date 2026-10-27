@@ -1,6 +1,6 @@
 name: HealthDashboard
 options:
-  bundleIdPrefix: com.ashleylibasci.healthdashboard
+  bundleIdPrefix: com.ashleylibasci.healthdashboard.next
   deploymentTarget:
     iOS: "17.0"
     watchOS: "10.0"
@@ -31,14 +31,14 @@ targets:
     info:
       path: HealthDashboard/Resources/Info.plist
       properties:
-        CFBundleDisplayName: Health Dashboard
+        CFBundleDisplayName: Health Next
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone."
         NSHealthUpdateUsageDescription: "Saves the caffeine and water you log to Apple Health."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only (portrait-locked)
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
@@ -57,15 +57,15 @@ targets:
     info:
       path: HealthDashboardWatch/Info.plist
       properties:
-        CFBundleDisplayName: Health Dashboard
+        CFBundleDisplayName: Health Next
         WKApplication: true
-        WKCompanionAppBundleIdentifier: com.ashleylibasci.healthdashboard
+        WKCompanionAppBundleIdentifier: com.ashleylibasci.healthdashboard.next
         WKBackgroundModes: [alarm]
         NSHealthShareUsageDescription: "Reads your heart rate and sleep to time your smart alarm and energy curve."
         NSHealthUpdateUsageDescription: "Saves the caffeine you log to Apple Health."
         NSMotionUsageDescription: "Watches for movement during your wake window so the smart alarm can wake you from light sleep."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
