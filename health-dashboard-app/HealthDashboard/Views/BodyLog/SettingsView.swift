@@ -1,0 +1,655 @@
+import SwiftUI
+import UIKit
+import HealthCore
+
+/// Appearance, body setup, what the app shows, Apple Watch and data.
+struct SettingsView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    /// "dark" (default), "light" or "system". Read by the app root.
+    @AppStorage("appearance") private var appearance = "dark"
+
+    @State private var confirmRedo = false
+    @State private var confirmDelete = false
+    @State private var confirmSample = false
+    /// Notifications are switched off for the app in iOS Settings while a
+    /// nudge or alert toggle is on.
+    @State private var notificationsBlocked = false
+    @FocusState private var nameFocused: Bool
+
+    private struct Mode: Identifiable {
+        let id: String
+        let name: String
+        let note: String
+    }
+
+    private let modes: [Mode] = [
+        Mode(id: "dark", name: "Dark", note: "Dark is the default. It matches your Watch and is easier on your eyes at night."),
+        Mode(id: "light", name: "Light", note: "Every screen keeps the same layout and colors for each metric, on a light background."),
+        Mode(id: "system", name: "Match iPhone", note: "Follows your iPhone\u{2019}s Light or Dark setting, and switches with it if you set it to Automatic."),
+    ]
+
+    var body: some View {
+        Screen(title: "Settings", accent: .indigo) {
+            profile
+            profileCard
+            appearanceSection
+            sleepSection
+            bodySection
+            if model.packMethod != nil { packSection }
+            waterSection
+            showSection
+            watchSection
+            dataSection
+            privacySection
+        }
+        .task { await checkNotifications() }
+        .onChange(of: store.data.peakDipNudges) { _, on in notificationToggleChanged(on) }
+        .onChange(of: store.data.sickAlerts) { _, on in notificationToggleChanged(on) }
+        .confirmationDialog("Redo setup?", isPresented: $confirmRedo, titleVisibility: .visible) {
+            Button("Redo setup") { store.data.onboarded = false }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You\u{2019}ll go through the setup questions again, starting from your current answers, so you only change what you want. Your logs, sleep history and Apple Health data stay.")
+        }
+        .confirmationDialog("Show example data?", isPresented: $confirmSample, titleVisibility: .visible) {
+            Button("Show example data") { model.loadSample() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The app shows example nights, heart readings and energy instead of yours, and keeps them until you tap Connect Apple Health. What you log stays saved. Nothing in Apple Health changes.")
+        }
+        .confirmationDialog("Delete all data?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete all data and restart setup", role: .destructive) { deleteAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes everything this app saved on your phone: check-ins, drinks, water, cycle logs, exams and settings. It cancels the app\u{2019}s reminders and turns off the smart alarm, then starts setup again. Your Apple Health data isn\u{2019}t touched.")
+        }
+    }
+
+    // MARK: Profile
+
+    private var profile: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "person.fill")
+                .font(.scaled(size: 24, weight: .semibold))
+                .foregroundStyle(Accent.coral.ink(scheme))
+                .frame(width: 56, height: 56)
+                .background(Accent.coral.fill(scheme).opacity(0.24), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(store.data.name.map { $0.isEmpty ? "Your profile" : $0 } ?? (model.usingSampleData ? "Sample profile" : "Your profile"))
+                    .font(.scaled(size: 20, weight: .bold))
+                Text(profileDetail).font(.scaled(size: 13)).secondaryText()
+            }
+        }
+        .padding(.top, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var profileDetail: String {
+        if model.prefersSampleData { return "Showing example data (you chose this)" }
+        if model.usingSampleData { return "Showing example data until Apple Health has \(AppModel.nightsNeeded) nights" }
+        let nights = model.nights.count
+        return "Learning your normal from \(nights) night\(nights == 1 ? "" : "s") of sleep"
+    }
+
+    private var nameBinding: Binding<String> {
+        Binding(get: { store.data.name ?? "" },
+                set: { store.data.name = $0.isEmpty ? nil : $0 })
+    }
+
+    private var ageBinding: Binding<Int> {
+        Binding(get: { store.data.ageYears ?? 0 },
+                set: { store.data.ageYears = $0 > 0 ? $0 : nil })
+    }
+
+    private var profileCard: some View {
+        Card(padding: 14) {
+            HStack(spacing: 12) {
+                Text("Name").font(.scaled(size: 15, weight: .bold))
+                TextField("Your first name", text: nameBinding)
+                    .font(.scaled(size: 15))
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    .focused($nameFocused)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Your name")
+            }
+            Divider().overlay(Palette(scheme: scheme).cardBorder)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Age").font(.scaled(size: 15, weight: .bold))
+                    Text("Optional. Compares your fitness with your own age group.").font(.scaled(size: 13)).secondaryText()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Picker("Age", selection: ageBinding) {
+                    Text("Not set").tag(0)
+                    ForEach(13...90, id: \.self) { age in Text("\(age)").tag(age) }
+                }
+                .pickerStyle(.menu)
+                .tint(Accent.indigo.ink(scheme))
+            }
+            .frame(minHeight: 44)
+            Divider().overlay(Palette(scheme: scheme).cardBorder)
+            SexPickerRow()
+        }
+    }
+
+    // MARK: Appearance
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Appearance")
+            HStack(spacing: 10) {
+                ForEach(modes) { mode in
+                    appearanceCard(mode)
+                }
+            }
+            Text(modes.first(where: { $0.id == appearance })?.note ?? modes[0].note)
+                .font(.scaled(size: 13))
+                .secondaryText()
+        }
+    }
+
+    private func appearanceCard(_ mode: Mode) -> some View {
+        let p = Palette(scheme: scheme)
+        let on = appearance == mode.id
+        let accent = Accent.indigo.ink(scheme)
+        return Button { appearance = mode.id } label: {
+            VStack(spacing: 8) {
+                AppearanceThumb(mode: mode.id)
+                Text(mode.name)
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                ZStack {
+                    Circle().strokeBorder(on ? accent : p.tertiary, lineWidth: 2)
+                    Circle().fill(on ? accent : Color.clear).frame(width: 10, height: 10)
+                }
+                .frame(width: 20, height: 20)
+                .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 6)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
+            .background(on ? Accent.indigo.fill(scheme).opacity(scheme == .dark ? 0.2 : 0.1) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(on ? accent : p.cardBorder, lineWidth: 2))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(mode.name) appearance")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    // MARK: Your body
+
+    static func setupName(_ setup: AppData.CycleSetup) -> String {
+        switch setup {
+        case .natural: return "Natural cycle"
+        case .hormonal: return "Birth control"
+        case .irregular: return "Irregular or not sure"
+        case .notTracking: return "Not tracking"
+        }
+    }
+
+    private var birthControlBinding: Binding<String> {
+        Binding(get: { store.data.birthControl ?? "" },
+                set: { store.data.birthControl = $0.isEmpty ? nil : $0 })
+    }
+
+    private var method: BirthControl? { store.data.birthControl.flatMap(BirthControl.init(rawValue:)) }
+
+    private func ovulationLine(_ bc: BirthControl) -> String {
+        switch bc.ovulation {
+        case .stopped: return "This method stops ovulation, so the app doesn't show ovulation or luteal phases for you."
+        case .sometimes: return "Ovulation may or may not happen on this method, so cycle phases are shown as rough estimates."
+        case .mostStill: return "Most people still ovulate on this method, so the app still shows your cycle phases."
+        case .natural: return "You ovulate as normal on this method, so the app shows your cycle phases."
+        }
+    }
+
+    private var bodySection: some View {
+        let p = Palette(scheme: scheme)
+        return VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Cycle & birth control")
+            Card(padding: 12) {
+                HStack(spacing: 12) {
+                    settingIcon("drop.fill", accent: .pink)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Cycle").font(.scaled(size: 15, weight: .bold))
+                        Text("What the cycle screens show").font(.scaled(size: 13)).secondaryText()
+                    }
+                    Spacer(minLength: 8)
+                    Picker("Cycle", selection: $store.data.cycleSetup) {
+                        ForEach(AppData.CycleSetup.allCases, id: \.self) { setup in
+                            Text(Self.setupName(setup)).tag(setup)
+                        }
+                    }
+                    .tint(Accent.pink.ink(scheme))
+                    .accessibilityLabel("Cycle setup")
+                }
+                .frame(minHeight: 44)
+                if let reason = model.irregularReasonText {
+                    Label(reason, systemImage: "info.circle")
+                        .font(.scaled(size: 13, weight: .semibold))
+                        .secondaryText()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if store.data.cycleSetup == .hormonal {
+                    Divider().overlay(p.cardBorder)
+                    HStack(spacing: 12) {
+                        settingIcon("pills.fill", accent: .purple)
+                        Text("Method").font(.scaled(size: 15, weight: .bold))
+                        Spacer(minLength: 8)
+                        Picker("Birth control", selection: birthControlBinding) {
+                            Text("Choose\u{2026}").tag("")
+                            ForEach(BirthControl.allCases, id: \.self) { bc in
+                                Text(bc.rawValue).tag(bc.rawValue)
+                            }
+                        }
+                        .tint(Accent.purple.ink(scheme))
+                        .accessibilityLabel("Birth control method")
+                    }
+                    .frame(minHeight: 44)
+                    if let method {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(method.note).font(.scaled(size: 13)).secondaryText()
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(ovulationLine(method)).font(.scaled(size: 13, weight: .semibold))
+                                .foregroundStyle(Accent.purple.ink(scheme))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        LinkRow(title: "Learn about your method", subtitle: "What it does to your cycle, sleep and heart rate",
+                                systemImage: "book.fill", accent: .purple) {
+                            BirthControlLearnView()
+                        }
+                    } else {
+                        Text("Pick your method so the app knows whether you ovulate and whether you have a pack.")
+                            .font(.scaled(size: 13)).secondaryText()
+                    }
+                }
+                Divider().overlay(p.cardBorder)
+                LinkRow(title: "Health conditions",
+                        subtitle: store.data.conditions.isEmpty ? "None added" : store.data.conditions.joined(separator: ", "),
+                        systemImage: "heart.text.square.fill", accent: .purple) {
+                    ConditionsView()
+                }
+                Divider().overlay(p.cardBorder)
+                actionRow("Redo setup", systemImage: "arrow.counterclockwise", accent: .indigo) {
+                    confirmRedo = true
+                }
+            }
+        }
+    }
+
+    // MARK: Sleep schedule
+
+    private var sleepSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Sleep schedule")
+            Card(padding: 12) {
+                SleepScheduleControl()
+            }
+        }
+    }
+
+    // MARK: Your pack
+
+    private var packSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Your pack")
+            PackCheckCard()
+            Card(padding: 12) {
+                PackSetupControl()
+            }
+        }
+    }
+
+    private func settingIcon(_ systemImage: String, accent: Accent) -> some View {
+        Image(systemName: systemImage)
+            .font(.scaled(size: 16, weight: .semibold))
+            .foregroundStyle(accent.ink(scheme))
+            .frame(width: 36, height: 36)
+            .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    // MARK: Water
+
+    private var waterSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Water")
+            Card(padding: 12) {
+                LinkRow(title: "Bottle size and daily goal",
+                        subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML)) \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))",
+                        systemImage: "drop.fill", accent: .blue) {
+                    WaterView()
+                }
+            }
+        }
+    }
+
+    // MARK: Show in the app
+
+    private var showSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Show in the app")
+            Card(padding: 12) {
+                SettingToggleRow(title: "Calories", detail: caloriesDetail,
+                                 systemImage: "flame.fill", accent: .orange, isOn: caloriesBinding)
+                    .disabled(model.caloriesHiddenByCondition)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when several overnight signals say you may be getting sick.",
+                                 systemImage: "thermometer.medium", accent: .coral, isOn: $store.data.sickAlerts)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                SettingToggleRow(title: "Drinks tracking", detail: "How alcohol affects sleep and recovery. Off hides drinks on the Log tab.",
+                                 systemImage: "wineglass.fill", accent: .purple, isOn: $store.data.drinksTracking)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                SettingToggleRow(title: "Peak and dip nudges", detail: "A notification 15 minutes before your energy peak and your afternoon dip, once your own sleep is in.",
+                                 systemImage: "bolt.fill", accent: .yellow, isOn: $store.data.peakDipNudges)
+                if notificationsBlocked {
+                    notificationsBlockedNote
+                }
+            }
+        }
+    }
+
+    private var caloriesBinding: Binding<Bool> {
+        Binding(get: { store.data.showCalories && !model.caloriesHiddenByCondition },
+                set: { store.data.showCalories = $0 })
+    }
+
+    private var caloriesDetail: String {
+        model.caloriesHiddenByCondition
+            ? "Off because you added an eating-disorder history. Remove it in Health conditions to turn this on."
+            : "Off by default. No targets or food diary."
+    }
+
+    private var notificationsBlockedNote: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Notifications are off for this app", systemImage: "bell.slash.fill")
+                .font(.scaled(size: 14, weight: .bold))
+                .foregroundStyle(Accent.coral.ink(scheme))
+            Text("Turn them on in the iPhone Settings app, under Notifications, so these can reach you.")
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                Link("Open iPhone Settings", destination: url)
+                    .font(.scaled(size: 14, weight: .semibold))
+                    .foregroundStyle(Accent.indigo.ink(scheme))
+                    .frame(minHeight: 44)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// Turning a nudge or alert on asks for notification permission (the
+    /// system prompt only shows the first time).
+    private func notificationToggleChanged(_ on: Bool) {
+        Task {
+            if on { await Nudges.requestPermission() }
+            await checkNotifications()
+        }
+    }
+
+    private func checkNotifications() async {
+        let wanted = store.data.peakDipNudges || store.data.sickAlerts
+        notificationsBlocked = wanted ? !(await Nudges.isAllowed()) : false
+    }
+
+    /// Starting over goes back to setup, which connects Apple Health again
+    /// (not example data).
+    private func deleteAll() {
+        store.data = AppData()
+        Task {
+            await Nudges.cancelPeakDip()
+            await BedtimeReminders.cancelAll()
+        }
+    }
+
+    // MARK: Apple Watch
+
+    private var smartAlarmDetail: String {
+        if let window = model.wakePlan()?.alarmWindow {
+            return "\(window.label) window \u{00B7} up by \(Clock.format(store.data.upBy))"
+        }
+        return "Up by \(Clock.format(store.data.upBy))"
+    }
+
+    private var watchSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Apple Watch")
+            Card(padding: 12) {
+                SettingToggleRow(title: "Smart alarm", detail: smartAlarmDetail, systemImage: "alarm.fill", accent: .purple,
+                                 isOn: $store.data.smartAlarmEnabled)
+                if store.data.smartAlarmEnabled {
+                    Divider().overlay(Palette(scheme: scheme).cardBorder)
+                    SettingToggleRow(title: "Weekdays only", detail: "Skips Saturday and Sunday mornings.",
+                                     systemImage: "calendar", accent: .purple, isOn: $store.data.alarmWeekdaysOnly)
+                }
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                LinkRow(title: "Wake plan", subtitle: "Why tonight's alarm is set when it is",
+                        systemImage: "sunrise.fill", accent: .orange) {
+                    WakePlanView()
+                }
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                LinkRow(title: "Quick-log drinks",
+                        subtitle: store.data.savedDrinks.isEmpty ? "None saved yet" : store.data.savedDrinks.map(\.name).joined(separator: ", "),
+                        systemImage: "cup.and.saucer.fill", accent: .yellow) {
+                    CaffeineView()
+                }
+            }
+        }
+    }
+
+    // MARK: Data
+
+    private var dataStatus: String {
+        if model.loading { return "Loading from Apple Health\u{2026}" }
+        if model.prefersSampleData { return "Example data (you chose this). Tap Connect Apple Health to use your own." }
+        switch model.healthConnection {
+        case .unavailable: return "Apple Health isn\u{2019}t available on this device, so the app shows example data."
+        case .notAsked: return "Showing example data. Connect Apple Health to use your own."
+        case .noSleepYet: return "No sleep from Apple Health yet, so the app shows example data. If you turned off access, open the Settings app, then Health, then Data Access."
+        default: break
+        }
+        return model.usingSampleData
+            ? "Using your Apple Health data. The rest is example data until you have \(AppModel.nightsNeeded) nights (\(min(model.realNightCount, AppModel.nightsNeeded)) so far)."
+            : "Using your Apple Health data."
+    }
+
+    private var dataSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Apple Health & data source")
+            Card(padding: 12) {
+                HStack(spacing: 10) {
+                    if model.loading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: model.usingSampleData ? "doc.text.magnifyingglass" : "checkmark.circle.fill")
+                            .foregroundStyle((model.usingSampleData ? Accent.yellow : Accent.mint).ink(scheme))
+                            .accessibilityHidden(true)
+                    }
+                    Text(dataStatus).font(.scaled(size: 14)).secondaryText()
+                }
+                .padding(.vertical, 4)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                actionRow("Connect Apple Health", systemImage: "heart.fill", accent: .pink) {
+                    Task { await model.connectHealth() }
+                }
+                .disabled(model.loading)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                actionRow("Use example data instead", systemImage: "wand.and.stars", accent: .indigo) {
+                    confirmSample = true
+                }
+                .disabled(model.loading || model.prefersSampleData)
+            }
+        }
+    }
+
+    private func actionRow(_ title: String, systemImage: String, accent: Accent, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.scaled(size: 15, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(title).font(.scaled(size: 15, weight: .semibold))
+                Spacer()
+            }
+            .foregroundStyle(accent.ink(scheme))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Privacy
+
+    private var exportText: String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(store.data), let text = String(data: data, encoding: .utf8) else { return "" }
+        return text
+    }
+
+    private var privacySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Privacy")
+            Card(padding: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "lock.fill")
+                        .font(.scaled(size: 15, weight: .semibold))
+                        .foregroundStyle(Accent.mint.ink(scheme))
+                        .frame(width: 36, height: 36)
+                        .background(Accent.mint.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Everything stays on your phone").font(.scaled(size: 15, weight: .bold))
+                        Text("Your check-ins, drinks and cycle setup are saved only on this iPhone. Health data stays in Apple Health. Nothing is uploaded.")
+                            .font(.scaled(size: 13))
+                            .secondaryText()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                ShareLink(item: exportText) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.scaled(size: 15, weight: .semibold))
+                            .frame(width: 36, height: 36)
+                            .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .accessibilityHidden(true)
+                        Text("Export my data").font(.scaled(size: 15, weight: .semibold))
+                        Spacer()
+                    }
+                    .foregroundStyle(Accent.indigo.ink(scheme))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                actionRow("Delete all data", systemImage: "trash", accent: .pink, role: .destructive) {
+                    confirmDelete = true
+                }
+            }
+        }
+    }
+}
+
+/// "Sex", used only for fitness age. The segmented control sits next to
+/// the label when it fits and under it at large text sizes.
+struct SexPickerRow: View {
+    @EnvironmentObject var store: DataStore
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                label
+                Spacer(minLength: 8)
+                picker.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                label
+                picker
+            }
+        }
+        .frame(minHeight: 44)
+    }
+
+    private var label: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sex").font(.scaled(size: 15, weight: .bold))
+                Text("Used only to work out your fitness age.").font(.scaled(size: 13)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            InfoButton(topic: .fitnessAge)
+        }
+    }
+
+    private var picker: some View {
+        Picker("Sex", selection: $store.data.sex) {
+            Text("Female").tag(FitnessAge.Sex.female)
+            Text("Male").tag(FitnessAge.Sex.male)
+        }
+        .pickerStyle(.segmented)
+    }
+}
+
+/// A tiny phone screen showing what each appearance looks like.
+private struct AppearanceThumb: View {
+    let mode: String
+
+    private var dark: Color { .black }
+    private var light: Color { Color(hex: 0xF6F6FA) }
+
+    private var background: LinearGradient {
+        switch mode {
+        case "light":
+            return LinearGradient(colors: [light, light], startPoint: .leading, endPoint: .trailing)
+        case "system":
+            return LinearGradient(stops: [.init(color: dark, location: 0.5), .init(color: light, location: 0.5)],
+                                  startPoint: .leading, endPoint: .trailing)
+        default:
+            return LinearGradient(colors: [dark, dark], startPoint: .leading, endPoint: .trailing)
+        }
+    }
+
+    private var tile: Color {
+        switch mode {
+        case "light": return .white
+        case "system": return Color(hex: 0xA0A0B4, alpha: 0.45)
+        default: return Color.white.opacity(0.18)
+        }
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        VStack(spacing: 6) {
+            Circle()
+                .strokeBorder(Color(hex: 0x5B6BE8), lineWidth: 4)
+                .frame(width: 22, height: 22)
+            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(tile)
+            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(tile)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 8)
+        .frame(width: 64, height: 92)
+        .background(background, in: shape)
+        .overlay(shape.strokeBorder(Color(hex: 0x9A9DB5, alpha: 0.4)))
+        .accessibilityHidden(true)
+    }
+}

@@ -1,0 +1,311 @@
+import Foundation
+import HealthCore
+
+/// Derived values for the energy screens' interactive charts, the clock-change
+/// plan, late nights, "why do I feel off?" and achievements. Computed only.
+extension AppModel {
+
+    // MARK: Energy curve, point by point
+
+    /// What a moment on the energy curve means and what to do then.
+    struct EnergyMoment: Hashable {
+        var time: Minutes
+        var level: Int
+        /// The zone it falls in, if any.
+        var kind: EnergyDay.Zone.Kind?
+        /// "Afternoon dip", "Climbing out of the dip"
+        var title: String
+        var meaning: String
+        var action: String
+    }
+
+    /// The curve point nearest to `t`.
+    static func nearestPoint(_ t: Minutes, in e: EnergyDay) -> EnergyDay.Point? {
+        e.curve.min { abs($0.time - t) < abs($1.time - t) }
+    }
+
+    /// The zone a time falls in. Wind-down and melatonin win over the daytime
+    /// zones when they overlap.
+    static func zone(at t: Minutes, in e: EnergyDay) -> EnergyDay.Zone? {
+        let order: [EnergyDay.Zone.Kind] = [.melatonin, .windDown, .grogginess, .morningPeak, .afternoonDip, .secondWind]
+        for k in order {
+            if let z = e.zone(k), z.range.contains(t) { return z }
+        }
+        return nil
+    }
+
+    func energyMoment(at t: Minutes, in e: EnergyDay) -> EnergyMoment {
+        let point = Self.nearestPoint(t, in: e)
+        let time = point?.time ?? t
+        let level = Int((point?.level ?? 0).rounded())
+        if let z = Self.zone(at: time, in: e) {
+            return EnergyMoment(time: time, level: level, kind: z.kind, title: Self.zoneTitle(z),
+                                meaning: Self.zoneMeaning(z.kind), action: Self.zoneAction(z.kind))
+        }
+        let peak = e.zone(.morningPeak)?.range
+        let dip = e.zone(.afternoonDip)?.range
+        let wind = e.zone(.secondWind)?.range
+        let down = e.zone(.windDown)?.range
+        let mel = e.zone(.melatonin)?.range
+        func moment(_ title: String, _ meaning: String, _ action: String) -> EnergyMoment {
+            EnergyMoment(time: time, level: level, kind: nil, title: title, meaning: meaning, action: action)
+        }
+        if let mel, time > mel.end {
+            return moment("Past your melatonin window",
+                          "Your body expected to be asleep by now. Staying up later than this nudges your body clock later, so tomorrow morning feels harder.",
+                          "Head to bed as soon as you can.")
+        }
+        if let down, time < down.start, let wind, time > wind.end {
+            return moment("Evening",
+                          "Energy slowly fades as the day's tiredness catches up with you.",
+                          "Good for lighter work, friends or dinner. Start wrapping up anything intense.")
+        }
+        if let dip, let wind, time > dip.end, time < wind.start {
+            return moment("Climbing out of the dip",
+                          "Your energy is coming back up toward your second wind.",
+                          "Ease back into work that needs some focus.")
+        }
+        if let peak, let dip, time > peak.end, time < dip.start {
+            return moment("Coming off your peak",
+                          "Still fairly sharp, but drifting down toward the afternoon dip.",
+                          "Finish your focused work now and save easy tasks for the dip.")
+        }
+        if let peak, time < peak.start {
+            let peakName = e.zone(.morningPeak).map { Self.zoneTitle($0).lowercased() } ?? "first peak"
+            return moment("Warming up",
+                          "The just-woke-up fog has cleared and your focus is building toward your \(peakName).",
+                          "Start on something that needs focus. It only gets easier from here.")
+        }
+        return moment("Steady stretch", "Your energy is fairly level here.", "Use it for whatever's next on your list.")
+    }
+
+    /// "Melatonin window", "Morning peak", or "First peak" when that peak
+    /// starts after noon (late wake). Names follow the clock, from HealthCore.
+    static func zoneTitle(_ zone: EnergyDay.Zone) -> String {
+        zone.kind == .melatonin ? "Melatonin window" : zone.title
+    }
+
+    /// What the zone is, in one plain sentence or two.
+    static func zoneMeaning(_ kind: EnergyDay.Zone.Kind) -> String {
+        switch kind {
+        case .grogginess: return "The foggy, just-woke-up feeling while your brain switches on."
+        case .morningPeak: return "Your sharpest focus of the day."
+        case .afternoonDip: return "A natural energy drop built into your body clock. It isn't caused by lunch."
+        case .secondWind: return "Your body clock pushes back against the day's tiredness, so your energy lifts again."
+        case .windDown: return "The stretch just before your body starts making its own sleep hormone."
+        case .melatonin: return "Your brain starts releasing its own sleep hormone. It's not about taking melatonin pills; it's the best time to be in bed."
+        }
+    }
+
+    /// What to do in the zone.
+    static func zoneAction(_ kind: EnergyDay.Zone.Kind) -> String {
+        switch kind {
+        case .grogginess: return "Skip big decisions. Daylight, water and moving around clear it faster."
+        case .morningPeak: return "Save it for your hardest studying: problem sets, writing, anything that needs focus."
+        case .afternoonDip: return "Good time for easy tasks or a walk. A 20-minute nap early in the dip is fine."
+        case .secondWind: return "Good for a workout or group study. Wrap up anything intense a couple of hours before bed."
+        case .windDown: return "Dim the lights, put screens down and do something calm."
+        case .melatonin: return "Be in bed in this window. Falling asleep is easiest now; much later and you may lie awake."
+        }
+    }
+
+    /// The one-liner shown next to each zone in the list.
+    static func zoneOneLiner(_ kind: EnergyDay.Zone.Kind) -> String {
+        switch kind {
+        case .grogginess: return "the foggy just-woke-up feeling. Skip big decisions; get daylight and water."
+        case .morningPeak: return "your sharpest focus of the day. Save it for your hardest studying."
+        case .afternoonDip: return "a natural energy drop built into your body clock, not lunch. Plan easy tasks or a walk."
+        case .secondWind: return "your energy lifts again. Good for a workout or group study."
+        case .windDown: return "start getting ready for bed: dim lights, screens down."
+        case .melatonin: return "your brain starts releasing its own sleep hormone. It's not about taking melatonin pills; it's the best time to be in bed."
+        }
+    }
+
+    static func zoneTopic(_ kind: EnergyDay.Zone.Kind) -> Topic {
+        switch kind {
+        case .grogginess: return .grogginess
+        case .morningPeak: return .morningPeak
+        case .afternoonDip: return .afternoonDip
+        case .secondWind: return .secondWind
+        case .windDown: return .windDown
+        case .melatonin: return .melatonin
+        }
+    }
+
+    /// Energy bank level at a time today (wake to bedtime).
+    func energyBank(at t: Minutes) -> Double {
+        EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(t - lastNight.wake, 0)) / 60)
+    }
+
+    // MARK: Clock change
+
+    /// Her usual wake time by the clock, for the clock-change plan.
+    var timeChangeWake: Minutes { wakePlan()?.wake ?? 502 }
+
+    /// The saved clock-change choice. Old saves may hold the other option as
+    /// a default, so it only counts once she has picked it on the screen.
+    func timeChangeStrategy(explicitlyChosen: Bool) -> TimeChangePlanner.Strategy {
+        guard explicitlyChosen, let s = TimeChangePlanner.Strategy(rawValue: store.data.timeChangeStrategy) else { return .keepClockTimes }
+        return s
+    }
+
+    /// TimeChangePlanner's nights, with one guarantee: "keep your usual times"
+    /// never has her up earlier than usual, on any night.
+    func timeChangeNights(_ strategy: TimeChangePlanner.Strategy) -> [TimeChangePlanner.Night] {
+        let wake = timeChangeWake
+        let nights = TimeChangePlanner.plan(bedtime: store.data.bedtime, wake: wake, shiftMinutes: -60, strategy: strategy)
+        guard strategy == .keepClockTimes else { return nights }
+        return nights.map { n in
+            var m = n
+            m.wake = max(n.wake, wake)
+            return m
+        }
+    }
+
+    /// The calendar date of the plan night with this offset (0 = the Saturday
+    /// night before the Sunday change).
+    func timeChangeNightDate(offset: Int, calendar: Calendar = .current) -> Date {
+        calendar.date(byAdding: .day, value: offset - 1, to: nextFallBack) ?? nextFallBack
+    }
+
+    // MARK: Late nights
+
+    /// One recent night: bedtime and how the next day went.
+    struct BedtimePoint: Identifiable, Hashable {
+        var id: Date { day }
+        /// The wake day (the morning after).
+        var day: Date
+        var bedtime: Minutes
+        var asleep: Int
+        var hrvDeltaPct: Double?
+        var restingHRDelta: Double?
+        var checkIn: Double?
+        var energy: Double?
+        var isLate: Bool
+    }
+
+    /// The last 30 nights, oldest first.
+    var recentBedtimes: [BedtimePoint] {
+        let recent = nights.sorted { $0.wakeDay > $1.wakeDay }.prefix(30)
+        let threshold = lateBedtimeThreshold
+        return recent.reversed().map { n in
+            BedtimePoint(day: n.wakeDay, bedtime: n.bedtime, asleep: n.asleepMinutes,
+                         hrvDeltaPct: n.outcome.hrvDeltaPct, restingHRDelta: n.outcome.restingHRDelta,
+                         checkIn: n.outcome.checkIn, energy: n.outcome.energyScore, isLate: n.bedtime >= threshold)
+        }
+    }
+
+    /// The second day after a late night (the morning after the next, normal
+    /// night), compared with other days.
+    var lateNightDayAfterEffect: HabitEffect {
+        let cal = Calendar.current
+        let lateDays = Set(lateNights.map { cal.startOfDay(for: $0.wakeDay) })
+        let threshold = lateBedtimeThreshold
+        return HabitEffect.compare(nights) { n in
+            guard let prev = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: n.wakeDay)) else { return false }
+            return lateDays.contains(prev) && n.bedtime < threshold
+        }
+    }
+
+    /// Sleep lost on late nights before an alarm morning vs. a free morning,
+    /// compared with your normal nights. nil when there are none of that kind.
+    var lateNightSleepCost: (alarm: Int?, free: Int?) {
+        let threshold = lateBedtimeThreshold
+        let normal = nights.filter { $0.bedtime < threshold }.map { Double($0.asleepMinutes) }.mean
+        func cost(_ xs: [NightRecord]) -> Int? {
+            guard let n = normal, let m = xs.map({ Double($0.asleepMinutes) }).mean else { return nil }
+            return Int((m - n).rounded())
+        }
+        return (cost(lateNights.filter(\.alarmUsed)), cost(lateNights.filter { !$0.alarmUsed }))
+    }
+
+    // MARK: Why do I feel off?
+
+    /// A concrete thing to try for one reason.
+    func tryThis(for reason: OffReason) -> String {
+        switch reason.topic {
+        case .sleepDebt?:
+            return "Be in bed by \(Clock.format(store.data.bedtime - 30)) tonight. Paying back 15 to 30 minutes a night for a week clears most of it."
+        case .lateNight?:
+            return "Be in bed by \(Clock.format(store.data.bedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
+        case .luteal?:
+            return hidesEffortTargets
+                ? "Aim for 20 extra minutes of sleep and go easy on yourself. This eases once your period starts."
+                : "Go easier on hard workouts and aim for 20 extra minutes of sleep. This eases once your period starts."
+        case .illness?:
+            return hidesEffortTargets
+                ? "Take an easy day: extra sleep and plenty of fluids. See a doctor if you feel unwell."
+                : "Take an easy day: extra sleep, plenty of fluids, no hard training. See a doctor if you feel unwell."
+        case .stress?:
+            return hidesEffortTargets
+                ? "Try five minutes of slow breathing (in for 4, out for 6), or a few minutes outside."
+                : "Try five minutes of slow breathing (in for 4, out for 6), or a short walk outside."
+        case .caffeineCutoff?:
+            if caffeineCutoffBeforeWake {
+                return "Tomorrow, keep it to one small drink (up to about \(caffeineLargestDoseAtWake) mg) soon after you wake. Caffeine stays in your body about twice as long on your birth control."
+            }
+            return "Have your last caffeine before \(Clock.format(caffeineCutoff)) tomorrow."
+        case .daylight?:
+            return "Get 10 to 20 minutes outside, ideally before noon."
+        default:
+            return "Go easy on yourself today and keep your usual bedtime."
+        }
+    }
+
+    // MARK: Achievements
+
+    struct Badge: Identifiable, Hashable {
+        var id: String { title }
+        var title: String
+        var systemImage: String
+        var accent: Accent
+        var progress: Int
+        var goal: Int
+        /// What earns it, in plain words.
+        var howTo: String
+        var earned: Bool { progress >= goal }
+        var fraction: Double { goal > 0 ? min(Double(progress) / Double(goal), 1) : 0 }
+    }
+
+    /// Badges worked out from what's already tracked and logged.
+    var badges: [Badge] {
+        let cal = Calendar.current
+        let streakList = streaks
+        let onTimeLongest = streakList.first { $0.title == "In bed on time" }?.longest ?? 0
+        let needLongest = streakList.first { $0.title == "Met your sleep need" }?.longest ?? 0
+        let waterByDay = Dictionary(grouping: store.data.waterLog) { cal.startOfDay(for: $0.date) }
+        let waterDays = waterByDay.values.filter { $0.map(\.ml).reduce(0, +) >= store.data.waterGoalML }.count
+        let bed = Clock.format(store.data.bedtime)
+        let test = cutoffTest
+        var out: [Badge] = [
+            Badge(title: "First week tracked", systemImage: "moon.stars.fill", accent: .purple,
+                  progress: min(nights.count, 7), goal: 7, howTo: "Wear your Watch to bed for 7 nights."),
+            Badge(title: "7 nights on time", systemImage: "bed.double.fill", accent: .indigo,
+                  progress: min(onTimeLongest, 7), goal: 7, howTo: "Fall asleep within 20 minutes of your \(bed) bedtime 7 nights in a row."),
+            Badge(title: "14 check-ins", systemImage: "checkmark.circle.fill", accent: .mint,
+                  progress: min(store.data.checkIns.count, 14), goal: 14, howTo: "Do your morning check-in 14 times."),
+            Badge(title: "Slept your need 5 nights running", systemImage: "zzz", accent: .blue,
+                  progress: min(needLongest, 5), goal: 5, howTo: "Get at least your sleep need 5 nights in a row."),
+            Badge(title: "First drink logged", systemImage: "cup.and.saucer.fill", accent: .yellow,
+                  progress: min(store.data.drinkLog.count, 1), goal: 1, howTo: "Log a coffee, tea or energy drink."),
+            Badge(title: "Hydrated week", systemImage: "drop.fill", accent: .blue,
+                  progress: min(waterDays, 7), goal: 7, howTo: "Reach your water goal on 7 days."),
+            Badge(title: "Caffeine scientist", systemImage: "flask.fill", accent: .coral,
+                  progress: min(test.nightsLogged, test.target), goal: test.target,
+                  howTo: "Log your caffeine for \(test.target) days to find your own cutoff time."),
+            Badge(title: "30-night streak", systemImage: "flame.fill", accent: .orange,
+                  progress: min(onTimeLongest, 30), goal: 30, howTo: "Fall asleep on time 30 nights in a row."),
+        ]
+        if store.data.cycleSetup != .notTracking {
+            let starts = Self.mergedPeriodStarts(health: [], logged: store.data.flowLog).count
+            out.insert(Badge(title: "Full cycle tracked", systemImage: "heart.fill", accent: .pink,
+                             progress: min(starts, 2), goal: 2, howTo: "Log the start of two periods in the app."), at: 5)
+        }
+        return out
+    }
+
+    /// The locked badge she's closest to.
+    var nextBadge: Badge? {
+        badges.filter { !$0.earned }.max { $0.fraction < $1.fraction }
+    }
+}
