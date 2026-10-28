@@ -128,7 +128,17 @@ struct CaffeineView: View {
             notes.append(Note(short: "Your \(big.name) was \(big.mg) mg in one go.",
                               full: "Your \(big.name) was \(big.mg) mg in one go: a big single dose. Over \(CaffeineModel.lowerGuideMg) mg at once is more likely to make you jittery; a smaller size or splitting it up helps."))
         }
+        if bleedingToday {
+            // D5: polyphenols in coffee and tea cut non-heme iron absorption.
+            notes.append(Note(short: "Bleeding today: coffee an hour away from meals helps your iron.",
+                              full: "Coffee or tea an hour away from meals lets you absorb more iron from your food. It matters most on bleeding days, when you\u{2019}re losing some."))
+        }
         return notes
+    }
+
+    /// Light, medium or heavy flow logged today (not spotting).
+    private var bleedingToday: Bool {
+        store.data.flowLog.contains { Calendar.current.isDateInToday($0.date) && [.light, .medium, .heavy].contains($0.flow) }
     }
 
     // MARK: Rows
