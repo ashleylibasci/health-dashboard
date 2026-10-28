@@ -110,11 +110,11 @@ struct MissedDoseCard: View {
                         Image(systemName: "exclamationmark.circle.fill")
                             .foregroundStyle(Accent.yellow.ink(scheme))
                             .accessibilityHidden(true)
-                        Text(title).font(.scaled(size: 15, weight: .bold))
+                        Text(title).font(.bodyEmphasis)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         Image(systemName: open ? "chevron.up" : "chevron.down")
-                            .font(.scaled(size: 13, weight: .bold))
+                            .font(.secondary).fontWeight(.bold)
                             .foregroundStyle(Palette(scheme: scheme).tertiary)
                             .accessibilityHidden(true)
                     }
@@ -127,11 +127,11 @@ struct MissedDoseCard: View {
                     ForEach(rules, id: \.self) { line in
                         HStack(alignment: .top, spacing: 8) {
                             Circle().fill(Accent.yellow.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
-                            Text(line).font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                            Text(line).font(.bodyText).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Text("From the CDC\u{2019}s 2024 guidance. Not sure? A pharmacist can tell you what to do, no appointment needed.")
-                        .font(.scaled(size: 12)).secondaryText()
+                        .font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -173,7 +173,7 @@ struct BirthControlMedicinesCard: View {
                 ForEach(lines, id: \.self) { line in
                     HStack(alignment: .top, spacing: 8) {
                         Circle().fill(Accent.indigo.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
-                        Text(line).font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                        Text(line).font(.bodyText).fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -193,26 +193,26 @@ struct CycleCareNotes: View {
     var body: some View {
         if model.showsNoPeriodPrompt {
             Card(accent: .coral) {
-                Text("No period for 3 months").font(.scaled(size: 15, weight: .bold))
+                Text("No period for 3 months").font(.bodyEmphasis)
                     .accessibilityAddTraits(.isHeader)
                 Text(CycleCare.noPeriodThreeMonths)
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
                 Text(CycleCare.redS)
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
         }
         if let note = model.cyclePatternNote {
             Card(accent: .indigo) {
-                Text(note.title).font(.scaled(size: 15, weight: .bold))
+                Text(note.title).font(.bodyEmphasis)
                     .accessibilityAddTraits(.isHeader)
                 Text(note.text)
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
         if model.recentlyChangedMethod {
             Card {
                 Text("Stopped hormonal birth control recently? Cycles can take a few months to settle, and you can get pregnant right away. The app counts your usual length only from cycles since your last change.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
         }
     }

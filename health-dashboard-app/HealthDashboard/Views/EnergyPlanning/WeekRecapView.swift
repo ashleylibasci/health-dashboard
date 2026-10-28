@@ -58,11 +58,11 @@ struct WeekRecapView: View {
         let range = "\(first.formatted(.dateTime.month(.abbreviated).day()))–\(end)"
         return Card {
             VStack(spacing: 2) {
-                Text(range).font(.scaled(size: 17, weight: .bold))
+                Text(range).font(.cardTitle)
                 Text(model.usingSampleData
                      ? "Example week \u{00B7} \(model.weekRecapDays) of 7 nights are yours"
                      : "The last 7 days \u{00B7} \(model.weekRecapDays) of 7 with a recorded night")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)
@@ -84,17 +84,19 @@ struct WeekRecapView: View {
             sub += " \(weekday(dayBefore(recap.worst.date), .wide)) night was " + (late ? "a late one" : "short") + ", which likely played a part."
         }
         return Card(accent: .indigo) {
-            HStack(spacing: 18) {
-                Ring(value: Double(avg) / 100, accent: .indigo, label: "\(avg)", caption: "Week avg", size: 134,
+            // Stacks at the accessibility sizes, so "9 below the starting
+            // point" never breaks a word per line beside the ring (Ortiz F4).
+            AdaptiveStack(spacing: 18) {
+                Ring(value: Double(avg) / 100, accent: .indigo, label: "\(avg)", caption: "Week average", size: 134,
                      accessibilityText: "Week energy average \(avg) out of 100, estimated from your sleep")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 0) {
                         SectionLabel(text: "Energy score", accent: .indigo)
                         InfoButton(topic: .energyScore).padding(.vertical, -12)
                     }
-                    Text(headline).font(.scaled(size: 20, weight: .bold))
+                    Text(headline).font(.section)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(sub).font(.scaled(size: 14)).secondaryText()
+                    Text(sub).font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -114,21 +116,24 @@ struct WeekRecapView: View {
         let labels = bars.map(\.label)
         return Card {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Energy by day").font(.scaled(size: 17, weight: .bold))
+                Text("Energy by day").font(.cardTitle)
                 InfoButton(topic: .energyScore).padding(.vertical, -12)
                 Spacer()
             }
             Text("Estimated from your sleep each night, not measured.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if days.indices.contains(selected) {
                 dayReadout(days[selected], recap: recap, need: need)
-                    .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
             }
             VStack(spacing: 0) {
                 WeekEnergyChart(bars: bars, selection: $chartSelection,
                                 summary: "Energy score by day, estimated from sleep: " + bars.map { "\($0.label) \($0.energy)" }.joined(separator: ", "))
                     .frame(height: 150)
+                    .accessibilityChartDescriptor(DateChartDescriptor(
+                        title: "Energy score by day, estimated from sleep", seriesName: "Energy score", yTitle: "Energy score",
+                        points: days.map { ($0.date, Double($0.energy)) }, yLabel: { "\(Int($0.rounded())) of 100" },
+                        isContinuous: false))
                     .onChange(of: chartSelection) {
                         if let s = chartSelection, let i = labels.firstIndex(of: s) { selectedIndex = i }
                     }
@@ -138,7 +143,7 @@ struct WeekRecapView: View {
                         let tag: String = d == recap.best ? ", best day" : (d == recap.worst ? ", lowest day" : "")
                         Button { selectedIndex = b.id } label: {
                             Text(b.label)
-                                .font(.scaled(size: 12, weight: b.id == selected ? .bold : .semibold))
+                                .font(.secondary).fontWeight(b.id == selected ? .bold : .semibold)
                                 .foregroundStyle(b.id == selected ? Palette(scheme: scheme).primary : Palette(scheme: scheme).secondary)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .contentShape(Rectangle())
@@ -149,11 +154,11 @@ struct WeekRecapView: View {
                     }
                 }
             }
-            ScrubHint(text: "Touch and drag across the bars, or tap a day")
-            HStack(spacing: 14) {
+            ScrubHint(each: "day")
+            FlowLayout(spacing: 14, lineSpacing: 6) {
                 legend(Accent.mint.fill(scheme), "Best day")
                 legend(Accent.coral.fill(scheme), "Lowest day")
-                legend(Accent.indigo.fill(scheme).opacity(0.55), "Other days")
+                legend(otherDay, "Other days")
             }
             if days.indices.contains(selected) {
                 dayPanel(days[selected], recap: recap, need: need)
@@ -168,8 +173,8 @@ struct WeekRecapView: View {
         let sleep = met(d.asleep, need) ? "a full night (\(Clock.duration(d.asleep)))" : "\(Clock.duration(d.asleep)) of sleep, \(Clock.duration(need - d.asleep)) short of your need"
         let wake = d.wokeFromLightSleep ? "woke in light sleep" : "woke from deep sleep, which feels groggier"
         let accent: Accent = d == recap.best ? .mint : (d == recap.worst ? .coral : .indigo)
-        return ChartReadout(title: tag + d.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
-                            value: "Energy score \(d.energy)",
+        return ChartReadout(title: tag + d.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()) + " \u{00B7} energy score",
+                            value: "\(d.energy)",
                             detail: "\(vsAvg.prefix(1).uppercased() + vsAvg.dropFirst()). After \(sleep); \(wake).",
                             accent: accent)
     }
@@ -177,13 +182,17 @@ struct WeekRecapView: View {
     private func barColor(_ d: DaySummary, recap: WeekRecap, selected: Bool) -> Color {
         if d == recap.best { return Accent.mint.fill(scheme) }
         if d == recap.worst { return Accent.coral.fill(scheme) }
-        return selected ? Accent.indigo.ink(scheme) : Accent.indigo.fill(scheme).opacity(0.55)
+        return selected ? Accent.indigo.ink(scheme) : otherDay
     }
+
+    /// Other days: a solid mid indigo that passes 3:1 in both modes, not a
+    /// see-through fill (Tanaka F7).
+    private var otherDay: Color { Color(hex: scheme == .dark ? 0x6670B8 : 0x7A84D9) }
 
     private func legend(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 10, height: 10)
-            Text(text).font(.scaled(size: 12)).secondaryText()
+            Text(text).font(.secondary).secondaryText()
         }
     }
 
@@ -197,15 +206,15 @@ struct WeekRecapView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.scaled(size: 17, weight: .bold))
+                    Text(title).font(.cardTitle)
                     if let tag {
-                        Text(tag).font(.scaled(size: 13, weight: .bold)).foregroundStyle(accent.ink(scheme))
+                        Text(tag).font(.secondary).fontWeight(.bold).foregroundStyle(accent.ink(scheme))
                     }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("Energy").font(.scaled(size: 12)).secondaryText()
-                    Text("\(d.energy)").font(.scaledNumber(30))
+                    Text("Energy").font(.secondary).secondaryText()
+                    Text("\(d.energy)").font(.numberL)
                         .foregroundStyle(isBest || isWorst ? accent.ink(scheme) : Palette(scheme: scheme).primary)
                 }
                 .accessibilityElement(children: .combine)
@@ -213,12 +222,12 @@ struct WeekRecapView: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(facts) { f in RecapFactTile(fact: f) }
             }
-            Text(note(for: d, recap: recap, need: need)).font(.scaled(size: 14))
+            Text(note(for: d, recap: recap, need: need)).font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(accent.fill(scheme).opacity(0.3)))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(accent.fill(scheme).opacity(0.3)))
     }
 
     private func facts(for d: DaySummary, need: Int) -> [RecapDayFact] {
@@ -273,20 +282,20 @@ struct WeekRecapView: View {
         let hi = top.map(\.energy).max() ?? 0
         return Card(accent: .mint) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("What your best days had in common").font(.scaled(size: 17, weight: .bold))
-                Text("\(names) · energy \(lo) to \(hi)").font(.scaled(size: 13)).secondaryText()
+                Text("What your best days had in common").font(.cardTitle)
+                Text("\(names) · energy \(lo) to \(hi)").font(.secondary).secondaryText()
                 Text(recap.habitsFromCheckIns
                      ? "Best days picked by how you said you felt at your check-ins."
                      : "Based on your sleep only. Check in each morning and this also uses how you felt.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text("\(recap.betterDays) better days vs \(recap.lowerDays) lower days" + (recap.enoughForPattern ? "." : ": too few to call it a pattern (that takes \(HabitEffect.minimumNights)+ of each), so treat these as hints."))
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if recap.bestDayHabits.isEmpty {
                 Text("No single habit set your better days apart this week.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
             } else {
                 ForEach(recap.bestDayHabits, id: \.self) { h in RecapHabitRow(ok: true, text: h) }
             }
@@ -305,12 +314,12 @@ struct WeekRecapView: View {
         let date = w.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
         return Card(accent: .coral) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("What your lowest day had").font(.scaled(size: 17, weight: .bold))
-                Text("\(date) · energy \(w.energy)").font(.scaled(size: 13)).secondaryText()
+                Text("What your lowest day had").font(.cardTitle)
+                Text("\(date) · energy \(w.energy)").font(.secondary).secondaryText()
             }
             if recap.worstDayIssues.isEmpty {
                 Text("Nothing obvious stood out. Sometimes a day is just a day.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
             } else {
                 ForEach(recap.worstDayIssues, id: \.self) { issue in RecapHabitRow(ok: false, text: issue) }
             }
@@ -329,7 +338,7 @@ struct WeekRecapView: View {
         let latest = bedtimes.max().map { Clock.format($0) } ?? "–"
         let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Week at a glance").font(.scaled(size: 20, weight: .bold))
+            Text("Week at a glance").font(.section)
                 .padding(.top, 6)
             LazyVGrid(columns: columns, spacing: 12) {
                 NavigationLink { SleepNeedView() } label: {
@@ -395,16 +404,16 @@ struct WeekRecapView: View {
         let worstLabel = "Last \(weekday(recap.worst.date, .abbreviated))"
         return Card(accent: .indigo) {
             SectionLabel(text: "One thing for this week", accent: .indigo)
-            Text(g.title).font(.scaled(size: 20, weight: .bold))
+            Text(g.title).font(.section)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(g.detail).font(.scaled(size: 14)).secondaryText()
+            Text(g.detail).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 8) {
                 BarRow(label: worstLabel, fraction: Double(recap.worst.energy) / 100, valueText: "\(recap.worst.energy)", accent: .coral)
                 BarRow(label: "Week average", fraction: Double(recap.averageEnergy) / 100, valueText: "\(recap.averageEnergy)", accent: .indigo)
             }
             if let current, !isOn {
-                Text("Replaces your current goal: \(current)").font(.scaled(size: 13)).secondaryText()
+                Text("Replaces your current goal: \(current)").font(.secondary).secondaryText()
             }
             PrimaryButton(title: isOn ? "Your goal this week" : "Make it my goal", accent: .indigo, done: isOn) {
                 store.data.weeklyGoal = isOn ? nil : g.title
@@ -412,7 +421,7 @@ struct WeekRecapView: View {
             .accessibilityAddTraits(isOn ? .isSelected : [])
             if isOn {
                 Text("Saved as your goal. It stays here until you change it.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
         }
     }
@@ -437,12 +446,12 @@ struct WeekRecapView: View {
     private var emptyCard: some View {
         Card(accent: .indigo) {
             Image(systemName: "calendar.badge.clock")
-                .font(.scaled(size: 28, weight: .semibold))
+                .font(.detailTitle)
                 .foregroundStyle(Accent.indigo.ink(scheme))
                 .accessibilityHidden(true)
-            Text("Not enough days yet").font(.scaled(size: 20, weight: .bold))
+            Text("Not enough days yet").font(.section)
             Text("Your recap compares the last 7 days to find what your best ones have in common. It needs at least 3 days with a recorded night; so far there \(model.lastWeek.count == 1 ? "is" : "are") \(model.lastWeek.count). Keep wearing your Watch to bed and check in each morning.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Check in for today", systemImage: "checkmark.circle.fill", accent: .indigo) { CheckInView() }
         }
@@ -500,10 +509,9 @@ private struct WeekEnergyChart: View {
         Chart(bars) { b in
             BarMark(x: .value("Day", b.label), y: .value("Energy", b.energy), width: .ratio(0.5))
                 .foregroundStyle(b.color)
-                .opacity(b.dimmed ? 0.45 : 1)
-                .cornerRadius(8)
+                .cornerRadius(Radius.mark * 2)
                 .annotation(position: .top, spacing: 4) {
-                    Text("\(b.energy)").font(.scaledNumber(13))
+                    Text("\(b.energy)").font(.chartLabel(size: 12, weight: .bold)).monospacedDigit()
                 }
         }
         .chartXScale(domain: bars.map(\.label))
@@ -537,15 +545,15 @@ private struct RecapFactTile: View {
         case .none: color = p.primary
         }
         return VStack(alignment: .leading, spacing: 2) {
-            Text(fact.label).font(.scaled(size: 12)).foregroundStyle(p.secondary)
-            Text(fact.value).font(.scaledNumber(18)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.7)
+            Text(fact.label).font(.secondary).foregroundStyle(p.secondary)
+            Text(fact.value).font(.numberM).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.7)
             if !fact.sub.isEmpty {
-                Text(fact.sub).font(.scaled(size: 12)).foregroundStyle(p.secondary).lineLimit(2)
+                Text(fact.sub).font(.secondary).foregroundStyle(p.secondary).lineLimit(2)
             }
         }
-        .padding(10)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.chip, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -559,12 +567,12 @@ private struct RecapHabitRow: View {
         let accent: Accent = ok ? .mint : .coral
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: ok ? "checkmark" : "exclamationmark")
-                .font(.scaled(size: 12, weight: .heavy))
+                .font(.secondary).fontWeight(.bold)
                 .foregroundStyle(accent.ink(scheme))
                 .frame(width: 26, height: 26)
                 .background(accent.tint(scheme), in: Circle())
                 .accessibilityHidden(true)
-            Text(text).font(.scaled(size: 15, weight: .semibold))
+            Text(text).font(.bodyEmphasis)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
         }
@@ -581,20 +589,25 @@ private struct RecapTile: View {
     var accent: Accent
     var systemImage: String
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 14, weight: .bold))
-                if let topic { InfoButton(topic: topic).padding(.vertical, -12) }
+                Text(title).font(.bodyEmphasis)
+                if let topic { InfoButton(topic: topic).padding(.vertical, -12).accessibilityHidden(true) }
                 Spacer(minLength: 0)
                 Image(systemName: systemImage).foregroundStyle(accent.ink(scheme)).accessibilityHidden(true)
             }
-            Text(value).font(.scaledNumber(24)).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
+            Text(note).font(.secondary).fontWeight(.semibold).secondaryText()
         }
-        .padding(14)
+        .padding(Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(value), \(note)")
+        .accessibilityAction(named: "Explain") { explaining = topic?.explanation }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }

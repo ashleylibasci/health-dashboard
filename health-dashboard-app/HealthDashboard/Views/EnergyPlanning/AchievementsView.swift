@@ -13,9 +13,9 @@ struct AchievementsView: View {
 
     var body: some View {
         let badges = model.badges
-        Screen(title: "Streaks and wins", accent: .yellow) {
-            Text("Streaks and wins").font(.scaled(size: 30, weight: .bold))
-                .accessibilityAddTraits(.isHeader)
+        // One title, the nav title, named as everywhere else (Valtonen F8,
+        // Dubois 9).
+        Screen(title: "Streaks and badges", accent: .yellow) {
             SampleDataBanner()
             streaksCard
             badgesCard(badges)
@@ -34,7 +34,7 @@ struct AchievementsView: View {
                 StreakRow(streak: s, accent: accent(for: s.title), meaning: meaning(for: s.title))
             }
             Text("A streak counts days in a row. Until today's night or check-in is in, it runs through yesterday. Miss a day and it starts again, but your longest stays.")
-                .font(.scaled(size: 12)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -71,7 +71,7 @@ struct AchievementsView: View {
             AdaptiveStack(spacing: 4) {
                 SectionLabel(text: "Badges")
                 if !typeSize.isAccessibilitySize { Spacer() }
-                Text("\(earned) of \(badges.count) earned").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                Text("\(earned) of \(badges.count) earned").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(badges) { b in
@@ -83,7 +83,7 @@ struct AchievementsView: View {
             if let selected {
                 badgeDetail(selected)
             } else {
-                Text("Tap a badge to see what earns it.").font(.scaled(size: 13)).secondaryText()
+                Text("Tap a badge to see what earns it.").font(.secondary).secondaryText()
             }
         }
     }
@@ -91,37 +91,40 @@ struct AchievementsView: View {
     private func badgeDetail(_ b: AppModel.Badge) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             AdaptiveStack(spacing: 4) {
-                Text(b.title).font(.scaled(size: 16, weight: .bold))
+                Text(b.title).font(.bodyEmphasis)
                     .fixedSize(horizontal: false, vertical: true)
                 if !typeSize.isAccessibilitySize { Spacer() }
                 Text(b.earned ? "Earned" : "\(b.progress) / \(b.goal)")
-                    .font(.scaled(size: 13, weight: .bold))
+                    .font(.secondary).fontWeight(.bold)
                     .foregroundStyle(b.earned ? Accent.mint.ink(scheme) : Palette(scheme: scheme).secondary)
             }
-            Text(b.howTo).font(.scaled(size: 14)).secondaryText()
+            Text(b.howTo).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if !b.earned {
                 BarRow(label: "Progress", fraction: b.fraction, valueText: "\(Int((b.fraction * 100).rounded()))%", accent: b.accent)
             }
         }
-        .padding(12)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(b.accent.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityElement(children: .combine)
+        .background(b.accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(b.title), \(b.earned ? "earned" : "\(b.progress) of \(b.goal)"). \(b.howTo)")
     }
 
     private func nextCard(_ b: AppModel.Badge) -> some View {
         Card(accent: .yellow) {
             SectionLabel(text: "Next up", accent: .yellow)
             AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
-                Text(b.title).font(.scaled(size: 18, weight: .bold))
+                Text(b.title).font(.cardTitle)
                     .fixedSize(horizontal: false, vertical: true)
                 if !typeSize.isAccessibilitySize { Spacer() }
-                Text("\(b.progress) / \(b.goal)").font(.scaledNumber(18)).foregroundStyle(Accent.yellow.ink(scheme))
+                Text("\(b.progress) / \(b.goal)").font(.numberM).foregroundStyle(Accent.yellow.ink(scheme))
                     .keepsOnOneLine()
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(b.title), \(b.progress) of \(b.goal)")
             BarRow(label: "Progress", fraction: b.fraction, valueText: "\(Int((b.fraction * 100).rounded()))%", accent: .yellow)
-            Text(b.howTo).font(.scaled(size: 14)).secondaryText()
+            Text(b.howTo).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -134,28 +137,36 @@ private struct StreakRow: View {
     var accent: Accent
     var meaning: (String, String)
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining = false
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(spacing: 0) {
-                Text("\(streak.current)").font(.scaledNumber(26)).foregroundStyle(accent.ink(scheme))
+                Text("\(streak.current)").font(.numberL).foregroundStyle(accent.ink(scheme))
                     .keepsOnOneLine()
-                Image(systemName: "flame.fill").font(.scaled(size: 11)).foregroundStyle(accent.ink(scheme))
+                Image(systemName: "flame.fill").font(.small).foregroundStyle(accent.ink(scheme))
                     .accessibilityHidden(true)
             }
             .frame(width: 56, height: 56)
-            .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 0) {
-                    Text(streak.title).font(.scaled(size: 15, weight: .bold))
+                    Text(streak.title).font(.bodyEmphasis)
                     InfoButton(title: streak.title, meaning: meaning.0, forYou: meaning.1).padding(.vertical, -12)
+                        .accessibilityHidden(true)
                 }
                 Text("\(streak.current) \(streak.unit) in a row · longest \(streak.longest)")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .contain)
+        // One stop per streak; its explanation is an action (Ortiz F9).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(streak.title), \(streak.current) \(streak.unit) in a row, longest \(streak.longest)")
+        .accessibilityAction(named: "Explain") { explaining = true }
+        .sheet(isPresented: $explaining) {
+            ExplanationSheet(explanation: Explanation(id: streak.title, title: streak.title, meaning: meaning.0, forYou: meaning.1))
+        }
     }
 }
 
@@ -179,18 +190,18 @@ private struct BadgeCell: View {
                         Circle().strokeBorder(p.tertiary.opacity(0.5), style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: [4, 3]))
                     }
                     Image(systemName: earned ? badge.systemImage : "lock.fill")
-                        .font(.scaled(size: 20, weight: .semibold))
+                        .font(.section)
                         .foregroundStyle(earned ? badge.accent.ink(scheme) : p.tertiary)
                 }
                 .frame(width: 60, height: 60)
                 Text(badge.title)
-                    .font(.scaled(size: 12, weight: earned ? .bold : .semibold))
+                    .font(.secondary).fontWeight(earned ? .bold : .semibold)
                     .foregroundStyle(earned ? p.primary : p.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 if !earned {
-                    Text("\(badge.progress) / \(badge.goal)").font(.scaled(size: 11)).foregroundStyle(p.secondary)
+                    Text("\(badge.progress) / \(badge.goal)").font(.small).foregroundStyle(p.secondary)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 44)

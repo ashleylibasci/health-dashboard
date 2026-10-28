@@ -41,9 +41,9 @@ struct FitnessView: View {
                 }
             } else {
                 Card(accent: .mint) {
-                    Text("No VO\u{2082} max yet").font(.scaled(size: 18, weight: .bold))
+                    Text("No VO\u{2082} max yet").font(.cardTitle)
                     Text("Your Apple Watch estimates it during outdoor walks, runs or hikes of 20 minutes or more. It usually appears after a few of those.")
-                        .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                        .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
                 }
             }
             HowWeGotThisLink(title: "Fitness age",
@@ -59,10 +59,10 @@ struct FitnessView: View {
             // break across lines ("38 / .2").
             AdaptiveStack(spacing: 12, alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(format: "%.1f", vo2)).font(.scaledNumber(48)).foregroundStyle(Accent.mint.ink(scheme))
+                    Text(String(format: "%.1f", vo2)).font(.display).foregroundStyle(Accent.mint.ink(scheme))
                         .keepsOnOneLine()
                     HStack(spacing: 0) {
-                        Text("VO\u{2082} MAX").font(.scaled(size: 12, weight: .bold)).secondaryText()
+                        Text("VO\u{2082} MAX").font(.secondary).fontWeight(.bold).secondaryText()
                         InfoButton(title: "VO\u{2082} max",
                                    meaning: "How much oxygen your body can use during hard exercise, in ml per kg per minute. It's the best single measure of how fit your heart and lungs are.",
                                    forYou: "Higher is better. It rises with regular cardio (brisk walks, runs, cycling) and drops with time off. It changes over weeks, not days.")
@@ -71,11 +71,11 @@ struct FitnessView: View {
                     if hidesTargets {
                         // No "below average" ranking with an eating-disorder history.
                         HStack(spacing: 0) {
-                            Text("Your Watch\u{2019}s latest estimate").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                            Text("Your Watch\u{2019}s latest estimate").font(.secondary).fontWeight(.semibold).secondaryText()
                             InfoButton(explanation: Self.noComparisonsExplanation).padding(.vertical, -12)
                         }
                     } else {
-                        Text(model.fitnessLevelShown ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                        Text(model.fitnessLevelShown ?? "").font(.secondary).fontWeight(.semibold).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -83,26 +83,26 @@ struct FitnessView: View {
                 if let fa = model.fitnessAgeText, !hidesTargets {
                     VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                         HStack(spacing: 0) {
-                            Text("FITNESS AGE").font(.scaled(size: 12, weight: .bold)).secondaryText()
+                            CapsLabel("Fitness age")
                             InfoButton(topic: .fitnessAge).padding(.vertical, -12)
                         }
-                        Text(fa).font(.scaledNumber(fa.count > 3 ? 28 : 40)).keepsOnOneLine()
+                        Text(fa).font(fa.count > 3 ? TypeRole.numberL : TypeRole.display).keepsOnOneLine()
                         if age > 0 {
-                            Text("Real age \(age)").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                            Text("Real age \(age)").font(.secondary).fontWeight(.semibold).secondaryText()
                         }
                     }
                 }
             }
             if age > 0, !hidesTargets {
                 Text(ageComparison(vo2: vo2))
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
             if hidesTargets {
                 Text("Shown as a number only, with no rankings or ups and downs. It\u{2019}s a rough estimate from your Watch, not a score to beat.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             } else if let peak = model.vo2MaxPeak, peak.value > vo2 + 0.5 {
                 Text("Your peak was \(String(format: "%.1f", peak.value)) in \(peak.date.formatted(.dateTime.year())). VO\u{2082} max comes back fast, often 3\u{2013}5 points in 8 weeks of regular cardio.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -156,10 +156,11 @@ struct FitnessView: View {
             SectionLabel(text: "VO\u{2082} max since \(points.first?.date.formatted(.dateTime.year()) ?? "")")
             if let p = shown {
                 ChartReadout(title: selected == nil ? "Latest \u{00B7} \(p.date.formatted(.dateTime.month(.abbreviated).year()))" : p.date.formatted(.dateTime.month(.abbreviated).day().year()),
-                             value: String(format: "%.1f", p.value), detail: readoutDetail, accent: .mint)
+                             value: String(format: "%.1f", p.value), detail: readoutDetail, accent: .mint,
+                             onClear: selected == nil ? nil : { selected = nil })
             }
             chart
-            ScrubHint()
+            ScrubHint(each: "reading")
         }
     }
 
@@ -188,6 +189,9 @@ struct FitnessView: View {
         .chartYScale(domain: yDomain)
         .chartScrub($selected, snapped: selected == nil ? nil : shown?.date, steps: points.map(\.date))
         .frame(height: 170)
+        .accessibilityChartDescriptor(DateChartDescriptor(
+            title: "VO2 max history", seriesName: "VO2 max", yTitle: "VO2 max",
+            points: points.map { ($0.date, $0.value) }, yLabel: { String(format: "%.1f", $0) }))
         .accessibilityLabel("VO2 max history: " + points.map { "\($0.date.formatted(.dateTime.month(.abbreviated).year())) \(String(format: "%.1f", $0.value))" }.joined(separator: ", "))
     }
 
@@ -197,12 +201,12 @@ struct FitnessView: View {
         Card(accent: .mint) {
             SectionLabel(text: "What moves it", accent: .mint)
             Text(tipText)
-                .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             // On hormonal birth control the bleed can't flag under-fuelling
             // (RED-S), so say what to watch for instead (Ruiz F2).
             if let bc = store.birthControl, bc != .copperIUD {
                 Text(bc.hasBreakWeek ? CycleCare.packBleedCantShowFuel : CycleCare.methodBleedCantShowFuel)
-                    .font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.secondary).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             if !model.hidesEffortTargets {
                 LinkRow(title: "Today's energy", subtitle: "When you have the most energy today", systemImage: "bolt.fill", accent: .yellow) {
@@ -231,9 +235,9 @@ struct FitnessView: View {
         Card {
             LabeledControlRow {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(age == 0 ? "Add your age (optional)" : "Your age").font(.scaled(size: 15, weight: .bold))
+                    Text(age == 0 ? "Add your age (optional)" : "Your age").font(.bodyEmphasis)
                     Text("Compares your fitness with women your age. Stays on your phone.")
-                        .font(.scaled(size: 12)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                        .font(.secondary).secondaryText().fixedSize(horizontal: false, vertical: true)
                 }
             } control: {
                 Picker("Age", selection: ageBinding) {

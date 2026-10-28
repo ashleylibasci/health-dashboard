@@ -45,7 +45,9 @@ struct DrinksView: View {
     }
 
     var body: some View {
-        Screen(title: "Alcohol", accent: .purple) {
+        // One title, the nav title; "alcohol", since "drink" means caffeine
+        // elsewhere in the app (Valtonen F8, Dubois 3).
+        Screen(title: "Alcohol and your sleep", accent: .purple) {
             SampleDataBanner()
             header
             logCard
@@ -68,14 +70,12 @@ struct DrinksView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 0) {
-                Text("Alcohol and your sleep").font(.detailTitle).accessibilityAddTraits(.isHeader)
-                InfoButton(topic: .alcohol)
-            }
+        HStack(alignment: .top, spacing: 0) {
             Text("No judgment, just what your own data shows the morning after.")
-                .font(.scaled(size: 15)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            InfoButton(topic: .alcohol).padding(.vertical, -10)
         }
         .padding(.top, 4)
     }
@@ -108,15 +108,15 @@ struct DrinksView: View {
                 }
             }
             HStack(spacing: 12) {
-                Text("How many").font(.scaled(size: 15, weight: .semibold))
+                Text("How many").font(.bodyEmphasis)
                 Spacer()
                 countButton("minus", label: "One fewer") { count = max(1, count - 1) }
-                Text("\(count)").font(.scaledNumber(24)).frame(minWidth: 32)
+                Text("\(count)").font(.numberM).frame(minWidth: 32)
                     .accessibilityLabel(count == 1 ? "1 drink" : "\(count) drinks")
                 countButton("plus", label: "One more") { count = min(15, count + 1) }
             }
             Text(Self.standardDrinkLine)
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LogTimeSelector(time: $time, accent: .purple, title: "When?")
             PrimaryButton(title: "Log \(Self.phrase(count: count, kind: kind))", accent: .purple, action: logDrinks)
@@ -132,7 +132,7 @@ struct DrinksView: View {
         let on = kind == k
         return Button { withMotion(.select) { kind = k } } label: {
             Label(k, systemImage: Self.symbol(for: k))
-                .font(.scaled(size: 14, weight: .bold))
+                .font(.bodyEmphasis)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .foregroundStyle(on ? Color(hex: 0x14002E) : p.primary)
@@ -147,7 +147,7 @@ struct DrinksView: View {
     private func countButton(_ systemImage: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 16, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.purple.ink(scheme))
                 .frame(width: 44, height: 44)
                 .background(Accent.purple.fill(scheme).opacity(0.18), in: Circle())
@@ -193,13 +193,13 @@ struct DrinksView: View {
                 if model.usingSampleData { ExampleTag() }
                 Spacer()
                 Text("\(effect.withCount) night\(effect.withCount == 1 ? "" : "s")")
-                    .font(.scaled(size: 13, weight: .bold))
+                    .font(.secondary).fontWeight(.bold)
                     .foregroundStyle(Accent.purple.ink(scheme))
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Accent.purple.fill(scheme).opacity(0.18), in: Capsule())
             }
             if effect.enoughData {
-                Text(effectSentence).font(.scaled(size: 16, weight: .semibold))
+                Text(effectSentence).font(.bodyEmphasis)
                     .fixedSize(horizontal: false, vertical: true)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     EffectTile(title: "Sleep", value: signed(effect.asleepDelta, unit: " min"),
@@ -223,12 +223,12 @@ struct DrinksView: View {
                     }
                 }
                 Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Not enough nights yet").font(.scaled(size: 16, weight: .semibold))
+                Text("Not enough nights yet").font(.bodyEmphasis)
                 Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -272,23 +272,27 @@ struct DrinksView: View {
             detail += " HRV \(Int(abs(h).rounded()))% \(h < 0 ? "below" : "above") your usual."
         }
         if let c = p.night.outcome.checkIn { detail += " You felt \(Int(c)) of 5." }
-        return ("Night before \(day)", "\(Clock.duration(p.asleep)) asleep", detail)
+        return ("Night before \(day) \u{00B7} asleep", Clock.duration(p.asleep), detail)
     }
 
     private var nightsCard: some View {
         Card(accent: .purple) {
             HStack {
-                Text("Your recent nights").font(.scaled(size: 15, weight: .bold))
+                Text("Your recent nights").font(.bodyEmphasis)
                 if model.usingSampleData { ExampleTag() }
             }
             let r = nightsReadout
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .purple)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .purple,
+                         onClear: selected == nil ? nil : { selected = nil })
             DrinkNightsChart(points: points, selected: selectedPoint?.index, selection: $selected)
                 .frame(height: 170)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Hours asleep over the last \(points.count) nights. \(points.filter(\.afterDrinks).count) followed drinks.")
-            ScrubHint()
+                .accessibilityLabel("Hours asleep over the last \(points.count) nights. \(points.filter(\.afterDrinks).count) followed alcohol.")
+                .accessibilityChartDescriptor(DateChartDescriptor(
+                    title: "Time asleep, last \(points.count) nights", seriesName: "Time asleep", yTitle: "Time asleep",
+                    points: points.map { ($0.night.wakeDay, Double($0.asleep)) },
+                    yLabel: { Clock.duration(Int($0.rounded())) }, isContinuous: false))
+            ScrubHint(each: "night")
             HStack(spacing: 14) {
                 legend("After alcohol", color: Self.drinkBar(scheme))
                 legend("Other nights", color: Palette(scheme: scheme).tertiary)
@@ -306,7 +310,7 @@ struct DrinksView: View {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
             Text(text)
         }
-        .font(.scaled(size: 12))
+        .font(.secondary)
         .secondaryText()
     }
 
@@ -319,10 +323,10 @@ struct DrinksView: View {
             HStack {
                 Text("Logged alcohol").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("Last 2 weeks").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                Text("Last 2 weeks").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             if recent.isEmpty {
-                Text("Nothing logged in the last two weeks.").font(.scaled(size: 14)).secondaryText()
+                Text("Nothing logged in the last two weeks.").font(.bodyText).secondaryText()
             } else {
                 LogEntryList(items: recent, onTap: { editing = $0 },
                              onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in
@@ -332,7 +336,7 @@ struct DrinksView: View {
                                 time: LogFormat.time(entry.date))
                 }
                 Text("Tap an entry to change it. Swipe left to delete.")
-                    .font(.scaled(size: 12)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
         }
     }
@@ -340,13 +344,13 @@ struct DrinksView: View {
     private var tipsCard: some View {
         Card(accent: .mint) {
             Label("What helps most", systemImage: "lightbulb.fill")
-                .font(.scaled(size: 15, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.mint.ink(scheme))
             Text("Finish your last drink 3 or more hours before bed, and have a glass of water between drinks. A standard drink takes most women about 2 hours to clear, and nothing speeds it up: not coffee, water or sleep. Cocktails are often 2 or more.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text("Energy drinks and alcohol in the same evening can hide how drunk you feel, so they\u{2019}re best kept apart.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Water", subtitle: "Log a bottle", systemImage: "drop.fill", accent: .blue) {
                 WaterView()
@@ -368,21 +372,21 @@ struct AlcoholSafetyNote: View {
         if model.showsAlcoholSafetyLine {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Looking out for you and your friends", systemImage: "heart.fill")
-                    .font(.scaled(size: 14, weight: .bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.pink.ink(scheme))
                 Text("4 or more drinks in an evening is a lot for most women, and blood alcohol keeps rising for a while after the last one. Signs of alcohol poisoning: confusion, throwing up, slow or uneven breathing, pale or bluish skin, or can\u{2019}t be woken. If you see any, call 911. Don\u{2019}t leave a friend alone to sleep it off; keep her on her side.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Link(destination: URL(string: "tel:911")!) {
                     Label("Call 911", systemImage: "phone.fill")
-                        .font(.scaled(size: 14, weight: .bold))
+                        .font(.bodyEmphasis)
                         .foregroundStyle(Accent.pink.ink(scheme))
                         .frame(minHeight: 44)
                 }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Accent.pink.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Accent.pink.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             .accessibilityElement(children: .contain)
         }
     }
@@ -393,7 +397,7 @@ struct ExampleTag: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         Text("Example")
-            .font(.scaled(size: 11, weight: .bold))
+            .font(.small).fontWeight(.bold)
             .foregroundStyle(Accent.yellow.ink(scheme))
             .padding(.horizontal, 8).padding(.vertical, 3)
             .background(Accent.yellow.tint(scheme), in: Capsule())
@@ -428,20 +432,20 @@ private struct EffectTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 0) {
-                Text(title.uppercased()).font(.scaled(size: 12, weight: .bold)).secondaryText()
+                Text(title.uppercased()).font(.secondary).fontWeight(.bold).secondaryText()
                 Spacer(minLength: 0)
                 InfoButton(explanation: explanation).padding(.vertical, -12).padding(.trailing, -10)
             }
-            Text(value).font(.scaledNumber(22))
+            Text(value).font(.numberM)
                 .foregroundStyle(color)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
             // In words too, so color is never the only cue.
-            Text(verdict).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(verdict).font(.secondary).fontWeight(.semibold).secondaryText()
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
     }
 }
 
@@ -514,13 +518,13 @@ private struct AlcoholEntryEditor: View {
                      onSave: { date, n in save(date: date, count: Int(n.rounded())) },
                      onDelete: { store.data.alcoholLog.removeAll { $0.id == entry.id } }) {
             Card {
-                Text("Kind").font(.scaled(size: 15, weight: .bold))
+                Text("Kind").font(.bodyEmphasis)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(DrinksView.kinds, id: \.self) { k in
                             Button { kind = k } label: {
                                 Text(k)
-                                    .font(.scaled(size: 14, weight: .bold))
+                                    .font(.bodyEmphasis)
                                     .padding(.horizontal, 14)
                                     .frame(minHeight: 44)
                                     .foregroundStyle(kind == k ? Color(hex: 0x14002E) : Palette(scheme: scheme).primary)

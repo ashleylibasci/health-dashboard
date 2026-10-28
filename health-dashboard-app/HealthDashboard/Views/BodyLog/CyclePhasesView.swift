@@ -10,22 +10,16 @@ struct CyclePhasesView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Screen(title: model.usesPackWording ? "Your pack" : "Phases", accent: .purple) {
+        // One title, the nav title, named like the link that opens it
+        // (Valtonen F8). Pill, ring and patch: her month is a pack, not a cycle.
+        Screen(title: model.usesPackWording ? "How your pack affects you" : "How your cycle affects you", accent: .pink) {
             SampleDataBanner()
-            VStack(alignment: .leading, spacing: 0) {
-                // Pill, ring and patch: her month is a pack, not a cycle.
-                Text(model.usesPackWording ? "How your pack" : "How your cycle")
-                Text("affects you").foregroundStyle(Accent.purple.ink(scheme))
-            }
-            .font(.scaled(size: 32, weight: .bold))
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
 
             content
             termsCard
 
             Text("Patterns, not medical advice. If something feels off, talk to a doctor.")
-                .font(.scaled(size: 12))
+                .font(.secondary)
                 .secondaryText()
             HowWeGotThisLink(title: "Cycle patterns",
                              method: "The typical effects come from studies of heart rate, HRV, temperature and sleep across the menstrual cycle. When you have at least two cycles of Apple Watch nights, we line each night up with its cycle day and compare your sleep, HRV and resting heart rate in each phase with your overall average.")
@@ -44,7 +38,7 @@ struct CyclePhasesView: View {
                 intro("Your cycles vary, so phases don't land on the same days each month. These are the usual effects of each phase whenever it comes.")
                 if let d = model.daysSinceLastPeriodStart {
                     Text(d == 0 ? "Your period started today." : "\(d) day\(d == 1 ? "" : "s") since your last period started.")
-                        .font(.scaled(size: 14, weight: .semibold)).secondaryText()
+                        .font(.bodyEmphasis).secondaryText()
                 }
                 phaseCards(length: nil, today: nil)
             case let .overdue(day, typical):
@@ -58,7 +52,7 @@ struct CyclePhasesView: View {
     }
 
     private func intro(_ text: String) -> some View {
-        Text(text).font(.scaled(size: 16)).secondaryText().fixedSize(horizontal: false, vertical: true)
+        Text(text).font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Natural phases
@@ -74,7 +68,7 @@ struct CyclePhasesView: View {
         if store.birthControl == .miniPill {
             Card(accent: .yellow) {
                 Text("On the mini pill some people release an egg each cycle and some don't, so these phases are a rough guide for you.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
         Card {
@@ -94,7 +88,7 @@ struct CyclePhasesView: View {
 
     private func tipPill(_ text: String, systemImage: String, accent: Accent) -> some View {
         Label(text, systemImage: systemImage)
-            .font(.scaled(size: 13, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .foregroundStyle(accent.ink(scheme))
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
@@ -137,7 +131,7 @@ struct CyclePhasesView: View {
             let length = store.data.packLength
             effectsCard(title: "Active days", subtitle: "Days 1\u{2013}\(active)", accent: .indigo, effects: CycleCopy.packEffects(isBreak: false), topic: .pillPack)
             if active < length {
-                effectsCard(title: model.packBreakName, subtitle: "Days \(active + 1)\u{2013}\(length) \u{00B7} withdrawal bleed", accent: .coral, effects: CycleCopy.packEffects(isBreak: true), topic: .withdrawalBleed)
+                effectsCard(title: model.packBreakName, subtitle: "Days \(active + 1)\u{2013}\(length) \u{00B7} withdrawal bleed", accent: .pink, effects: CycleCopy.packEffects(isBreak: true), topic: .withdrawalBleed)
             }
         } else {
             effectsCard(title: "All month", subtitle: "No phases", accent: .indigo,
@@ -158,8 +152,8 @@ struct CyclePhasesView: View {
         Card(accent: accent) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.scaled(size: 18, weight: .bold)).foregroundStyle(accent.ink(scheme))
-                    Text(subtitle).font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    Text(title).font(.cardTitle).foregroundStyle(accent.ink(scheme))
+                    Text(subtitle).font(.secondary).fontWeight(.semibold).secondaryText()
                 }
                 Spacer()
                 if let topic { InfoButton(topic: topic).padding(.vertical, -10) }
@@ -216,23 +210,23 @@ private struct PhaseCard: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        Text(BodyLogStyle.phaseName(phase, birthControl: birthControl)).font(.scaled(size: 18, weight: .bold))
+                        Text(BodyLogStyle.phaseName(phase, birthControl: birthControl)).font(.cardTitle)
                         if isNow, let today {
                             Text("Now \u{00B7} day \(today)")
-                                .font(.scaled(size: 11, weight: .bold))
+                                .font(.small).fontWeight(.bold)
                                 .foregroundStyle(BodyLogStyle.phaseOnFill(phase, scheme))
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(BodyLogStyle.phaseFill(phase, scheme), in: Capsule())
                         }
                     }
-                    Text(daysText).font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    Text(daysText).font(.secondary).fontWeight(.semibold).secondaryText()
                 }
                 Spacer()
                 InfoButton(topic: topic).padding(.vertical, -10)
             }
             if let average { averageRow(average, accent: accent) }
             if phase == .ovulation, birthControl?.ovulation == .sometimes {
-                Text("On the mini pill this may not happen every cycle.").font(.scaled(size: 13)).secondaryText()
+                Text("On the mini pill this may not happen every cycle.").font(.secondary).secondaryText()
             }
             EffectRows(effects: CycleCopy.effects(phase), showsExercise: showsExercise)
         }
@@ -262,12 +256,12 @@ private struct PhaseCard: View {
 
     private func stat(_ label: String, _ value: String, _ accent: Accent) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased()).font(.scaled(size: 10, weight: .bold)).secondaryText()
-            Text(value).font(.scaledNumber(17)).foregroundStyle(accent.ink(scheme))
+            Text(label.uppercased()).font(.small).fontWeight(.bold).secondaryText()
+            Text(value).font(.cardTitle).monospacedDigit().foregroundStyle(accent.ink(scheme))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
     }
 }
 
@@ -282,7 +276,7 @@ private struct EffectRows: View {
         VStack(alignment: .leading, spacing: 8) {
             row("bolt.fill", "Energy", effects.energy, .yellow)
             row("moon.fill", "Sleep", effects.sleep, .purple)
-            row("waveform.path.ecg", "HRV", effects.hrv, .coral)
+            row("waveform.path.ecg", "HRV", effects.hrv, .indigo)
             row("heart.fill", "Resting HR", effects.restingHR, .pink)
             row("face.smiling", "Mood", effects.mood, .blue)
             if showsExercise { row("figure.run", "Exercise", effects.exercise, .mint) }
@@ -292,13 +286,13 @@ private struct EffectRows: View {
     private func row(_ symbol: String, _ title: String, _ text: String, _ accent: Accent) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol)
-                .font(.scaled(size: 12, weight: .semibold))
+                .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(accent.ink(scheme))
                 .frame(width: 26, height: 26)
                 .background(accent.tint(scheme), in: Circle())
                 .accessibilityHidden(true)
             (Text(title + ": ").bold() + Text(text))
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)

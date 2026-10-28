@@ -13,7 +13,8 @@ struct CutoffTestView: View {
     private var test: CaffeineCutoffTest { model.cutoffTest }
 
     var body: some View {
-        Screen(title: "Caffeine limit", accent: .yellow) {
+        // One title, the nav title; caffeine is yellow (Valtonen F8, Tanaka F4).
+        Screen(title: "Find your caffeine limit", accent: .yellow) {
             SampleDataBanner()
             header
             progressCard
@@ -27,14 +28,12 @@ struct CutoffTestView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 0) {
-                Text("Find your caffeine limit").font(.detailTitle).accessibilityAddTraits(.isHeader)
-                InfoButton(topic: .cutoffTest)
-            }
+        HStack(alignment: .top, spacing: 0) {
             Text("Does a later coffee cost you sleep? Your own nights answer it.")
-                .font(.scaled(size: 15)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            InfoButton(topic: .cutoffTest).padding(.vertical, -10)
         }
         .padding(.top, 4)
     }
@@ -44,18 +43,18 @@ struct CutoffTestView: View {
     private var progress: Double { test.target > 0 ? min(Double(test.nightsLogged) / Double(test.target), 1) : 0 }
 
     private var progressCard: some View {
-        Card(accent: .mint) {
+        Card(accent: .yellow) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(min(test.nightsLogged, test.target)) of \(test.target) nights").font(.scaledNumber(24))
+                Text("\(min(test.nightsLogged, test.target)) of \(test.target) nights").font(.numberM)
                 Spacer()
                 Text(test.nightsLogged >= test.target ? "Done" : "\(test.target - test.nightsLogged) to go")
-                    .font(.scaled(size: 14, weight: .bold))
-                    .foregroundStyle(Accent.mint.ink(scheme))
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(Accent.yellow.ink(scheme))
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Palette(scheme: scheme).track)
-                    Capsule().fill(Accent.mint.fill(scheme)).frame(width: geo.size.width * CGFloat(progress))
+                    Capsule().fill(Accent.yellow.fill(scheme)).frame(width: geo.size.width * CGFloat(progress))
                 }
             }
             .frame(height: 10)
@@ -64,7 +63,7 @@ struct CutoffTestView: View {
             Text(test.nightsLogged >= test.target
                  ? "You've logged enough nights for a solid answer. It keeps updating as you log more."
                  : "A night counts when your watch tracked your sleep. Days you logged no caffeine count too, as \u{201C}No caffeine\u{201D}.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -135,27 +134,31 @@ struct CutoffTestView: View {
         Card {
             let c = conclusion
             HStack {
-                Text(c.title).font(.scaled(size: 17, weight: .bold))
+                Text(c.title).font(.cardTitle)
                 if model.usingSampleData { ExampleTag() }
             }
-            Text(c.detail).font(.scaled(size: 14)).secondaryText()
+            Text(c.detail).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if !test.groups.isEmpty {
                 let r = readout
-                ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .mint)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .yellow,
+                             onClear: selected == nil ? nil : { selected = nil })
                 CutoffBarChart(groups: test.groups, selected: selectedGroup?.label, selection: $selected)
                     .frame(height: 190)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(test.groups.map { "\($0.label): \(Clock.duration($0.averageAsleep)) over \($0.nights) nights" }.joined(separator: ". "))
-                ScrubHint(text: "Touch a bar to see that group")
+                    .accessibilityChartDescriptor(CategoryChartDescriptor(
+                        title: "Average sleep by time of last caffeine", seriesName: "Last caffeine", yTitle: "Average sleep",
+                        points: test.groups.map { ($0.label, Double($0.averageAsleep)) },
+                        yLabel: { Clock.duration(Int($0.rounded())) }))
+                ScrubHint(each: "group")
             }
         }
     }
 
     private var howCard: some View {
         Card(accent: .yellow) {
-            Text("How to do the test").font(.scaled(size: 15, weight: .bold))
+            Text("How to do the test").font(.bodyEmphasis)
             VStack(alignment: .leading, spacing: 8) {
                 step(1, "Log every caffeinated drink at the time you had it. You can change times later on the Caffeine screen.")
                 step(2, "Mix it up a little: some days stop before noon, some days a bit later.")
@@ -170,10 +173,10 @@ struct CutoffTestView: View {
     private func step(_ n: Int, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(n)")
-                .font(.scaled(size: 13, weight: .bold))
+                .font(.secondary).fontWeight(.bold)
                 .frame(width: 24, height: 24)
-                .background(Accent.yellow.fill(scheme).opacity(0.25), in: Circle())
-            Text(text).font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                .background(Accent.yellow.tint(scheme), in: Circle())
+            Text(text).font(.bodyText).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
@@ -186,7 +189,7 @@ private struct CutoffBarChart: View {
     @Environment(\.colorScheme) private var scheme
 
     private func color(_ g: CaffeineCutoffTest.Group) -> Color {
-        let base = Accent.mint.fill(scheme)
+        let base = Accent.yellow.fill(scheme)
         guard let selected else { return base }
         return g.label == selected ? base : base.opacity(0.35)
     }

@@ -56,7 +56,7 @@ struct TimeChangeView: View {
                         systemImage: "clock.fill", accent: .orange) { ChronotypeView() }
             }
             Text("Your phone and Watch switch to the new time on their own at 2:00am Sunday. Times on this page are by the clock you'll be using that day.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
         }
@@ -125,41 +125,41 @@ struct TimeChangeView: View {
                 SectionLabel(text: "Daylight saving ends", accent: .orange)
                 Spacer()
                 Label(ctx.shortDate(ctx.fallBack), systemImage: "calendar")
-                    .font(.scaled(size: 13, weight: .bold))
-                    .foregroundStyle(Accent.orange.ink(scheme))
+                    .font(.secondary).fontWeight(.bold)
+                    .foregroundStyle(Accent.orange.onTint(scheme))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Accent.orange.tint(scheme), in: Capsule())
             }
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 24, weight: .bold))
+                Text(title).font(.detailTitle)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 InfoButton(topic: .timeChange)
             }
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("2:00")
-                    .font(.scaledNumber(30))
+                    .font(.numberL)
                     .strikethrough()
                     .foregroundStyle(Palette(scheme: scheme).tertiary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 Image(systemName: "arrow.right")
-                    .font(.scaled(size: 18, weight: .bold))
+                    .font(.cardTitle)
                     .foregroundStyle(Accent.orange.ink(scheme))
                 Text("1:00")
-                    .font(.scaledNumber(30))
+                    .font(.numberL)
                     .foregroundStyle(Color(hex: 0x1A0E00))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Accent.orange.fill(scheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                Text("am").font(.scaled(size: 15, weight: .bold)).secondaryText()
+                    .background(Accent.orange.fill(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                Text("am").font(.bodyEmphasis).secondaryText()
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("At 2:00am the clock goes back to 1:00am")
             Text(heroBody)
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -175,7 +175,7 @@ struct TimeChangeView: View {
         let keepDetail = "Same bedtime (\(bed)) and wake time (\(wake)) by the clock, every night. \(extraHour) For a few evenings you may feel sleepy about an hour earlier than usual; that fades in 3 or 4 days."
         let earlierDetail = "Your body keeps its own timing, so from Sunday you'd wake at \(Clock.format(ctx.wake - 60)) by the new clock (it'll feel like \(wake)) and go to bed at \(Clock.format(ctx.bedtime - 60)). Only worth it if you'd like to become an earlier riser."
         return Card {
-            Text("What do you want to do with the extra hour?").font(.scaled(size: 17, weight: .bold))
+            Text("What do you want to do with the extra hour?").font(.cardTitle)
                 .fixedSize(horizontal: false, vertical: true)
             ClockStrategyOption(title: "Keep your usual times", detail: keepDetail, badge: "Recommended",
                                 prominent: true, selected: strategy == .keepClockTimes) {
@@ -188,11 +188,11 @@ struct TimeChangeView: View {
                 picked = .useItToWakeEarlier
             }
             Text(why(ctx))
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(12)
+                .padding(Space.m)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Accent.orange.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Accent.orange.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         }
     }
 
@@ -226,9 +226,9 @@ struct TimeChangeView: View {
             ?? ctx.nights.first { $0.dayOffset == 0 }
         return Card {
             HStack(alignment: .firstTextBaseline) {
-                Text("Night by night").font(.scaled(size: 17, weight: .bold))
+                Text("Night by night").font(.cardTitle)
                 Spacer()
-                Text("\(first) – \(last)").font(.scaled(size: 13)).secondaryText()
+                Text("\(first) – \(last)").font(.secondary).secondaryText()
             }
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
@@ -236,7 +236,7 @@ struct TimeChangeView: View {
                     Text("Bed").frame(width: Font.scaledSize(72), alignment: .leading)
                     Text("Up next day").frame(width: Font.scaledSize(100), alignment: .leading)
                 }
-                .font(.scaled(size: 12, weight: .semibold))
+                .font(.secondary).fontWeight(.semibold)
                 .secondaryText()
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
@@ -247,9 +247,9 @@ struct TimeChangeView: View {
             }
 
             HStack(alignment: .firstTextBaseline) {
-                Text("Wake time by the clock").font(.scaled(size: 15, weight: .bold))
+                Text("Wake time by the clock").font(.bodyEmphasis)
                 Spacer()
-                Text("morning after each night").font(.scaled(size: 13)).secondaryText()
+                Text("morning after each night").font(.secondary).secondaryText()
             }
             .padding(.top, 4)
             if let selected {
@@ -258,20 +258,20 @@ struct TimeChangeView: View {
             WakeByClockChart(dots: dots, changeLabel: ctx.weekday(offset: 0),
                              selectedLabel: selectedNight, selection: $selectedNight, summary: summary)
                 .frame(height: 150)
-            ScrubHint()
+            ScrubHint(each: "night")
             Text("Either way you get the same \(Clock.duration(asleep)) asleep on a normal night: \(cycles) full sleep cycles, starting about 12 minutes after bed." + (asleepBeforeChange(ctx) ? " Saturday night gets an hour on top." : " Saturday night is an hour longer, but with your bedtime that hour comes before you fall asleep."))
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "moon.stars.fill")
                     .foregroundStyle(Accent.purple.ink(scheme))
                     .accessibilityHidden(true)
-                Text(saturdayNote(ctx)).font(.scaled(size: 14))
+                Text(saturdayNote(ctx)).font(.bodyText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(12)
+            .padding(Space.m)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         }
     }
 
@@ -293,8 +293,9 @@ struct TimeChangeView: View {
         } else {
             detail = "On the new clock, \(Clock.duration(abs(diff))) earlier than now. Feels like \(Clock.format(ctx.wake))."
         }
-        return ChartReadout(title: "\(night) night → \(morning) morning", value: "Up \(Clock.format(n.wake))",
-                            detail: "Bed \(Clock.format(n.bedtime)). \(detail)", accent: .orange)
+        return ChartReadout(title: "\(night) night → \(morning) morning \u{00B7} up", value: Clock.format(n.wake),
+                            detail: "Bed \(Clock.format(n.bedtime)). \(detail)", accent: .orange,
+                            onClear: { selectedNight = nil })
     }
 
     private func nightRow(_ n: TimeChangePlanner.Night, _ ctx: ClockChangeContext) -> some View {
@@ -320,26 +321,26 @@ struct TimeChangeView: View {
         }
         return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(ctx.shortDate(date)).font(.scaled(size: 14, weight: .bold))
+                Text(ctx.shortDate(date)).font(.bodyEmphasis)
                 Text(sub)
-                    .font(.scaled(size: 12, weight: isChange ? .bold : .regular))
+                    .font(.secondary).fontWeight(isChange ? .bold : .regular)
                     .foregroundStyle(isChange ? Accent.orange.ink(scheme) : Palette(scheme: scheme).secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(Clock.format(n.bedtime))
-                .font(.scaled(size: 14, weight: .bold))
+                .font(.bodyEmphasis)
                 .frame(width: Font.scaledSize(72), alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
-                Text(Clock.format(n.wake)).font(.scaled(size: 14, weight: .bold))
-                Text(wakeSub).font(.scaled(size: 12)).secondaryText()
+                Text(Clock.format(n.wake)).font(.bodyEmphasis)
+                Text(wakeSub).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(width: Font.scaledSize(100), alignment: .leading)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
-        .background(isChange ? Accent.orange.tint(scheme) : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(isChange ? Accent.orange.tint(scheme) : Color.clear, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(ctx.shortDate(date)) night, \(sub). Bed \(Clock.format(n.bedtime)). Up \(Clock.format(n.wake)), \(wakeSub).")
     }
@@ -367,7 +368,7 @@ struct TimeChangeView: View {
             ? "Bed by \(Clock.format(ctx.bedtime - 60)) and up by \(Clock.format(ctx.wake - 60)) every day, weekends too. Sleeping in gives the head start back."
             : "For 3 or 4 evenings, 10pm will feel more like 11pm. Dim the lights, but try to stay up until your usual \(Clock.format(ctx.bedtime)) so your body settles onto the new clock."
         return Card {
-            Text("Make it easy").font(.scaled(size: 17, weight: .bold))
+            Text("Make it easy").font(.cardTitle)
             ClockStickRow(systemImage: "sun.max.fill", accent: .yellow, title: "Morning light Sun and Mon", detail: lightTip)
             ClockStickRow(systemImage: "moon.fill", accent: .purple, title: eveningTitle, detail: eveningTip)
             if let cutoff = model.caffeineCutoffShown {
@@ -388,9 +389,9 @@ struct TimeChangeView: View {
         Card {
             Toggle(isOn: remindersBinding) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Remind me at bedtime").font(.scaled(size: 15, weight: .bold))
+                    Text("Remind me at bedtime").font(.bodyEmphasis)
                     Text("A notification 30 minutes before bed on each night of the plan.")
-                        .font(.scaled(size: 13)).secondaryText()
+                        .font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -399,21 +400,21 @@ struct TimeChangeView: View {
             .disabled(hasUnsavedPick)
             if hasUnsavedPick {
                 Text("Tap \"Use this plan\" first. Reminders follow the plan you save.")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
             if store.data.timeChangeReminders && remindersLeft.isEmpty {
                 Text("Nothing left to remind you about: every bedtime in this plan has already passed.")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             Label("Only a reminder. Nothing changes your alarms.", systemImage: "bell")
-                .font(.scaled(size: 12)).secondaryText()
+                .font(.secondary).secondaryText()
             if reminderDenied {
                 Text("Notifications are off for this app. You can turn them on in the Settings app under Notifications.")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.coral.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -529,6 +530,9 @@ private struct WakeByClockChart: View {
         }
         .chartScrub($selection, snapped: selectedLabel, steps: dots.map(\.label))
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(CategoryChartDescriptor(
+            title: "Wake time by the clock, each morning", seriesName: "Night", yTitle: "Up at",
+            points: dots.map { ($0.label, Double($0.wake)) }, yLabel: { Clock.format(Int($0.rounded())) }))
     }
 }
 
@@ -550,25 +554,25 @@ private struct ClockStrategyOption: View {
                     Circle()
                         .strokeBorder(selected ? Accent.orange.fill(scheme) : p.tertiary, lineWidth: selected ? 6 : 2)
                         .frame(width: 20, height: 20)
-                    Text(title).font(.scaled(size: prominent ? 16 : 14, weight: .bold))
+                    Text(title).font(prominent ? TypeRole.cardTitle : TypeRole.bodyEmphasis)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
                     Text(badge)
-                        .font(.scaled(size: 12, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle(prominent ? badgeAccent.ink(scheme) : p.secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(prominent ? badgeAccent.tint(scheme) : p.chip, in: Capsule())
                 }
-                Text(detail).font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                Text(detail).font(.secondary).foregroundStyle(p.secondary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, prominent ? 14 : 10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(selected ? Accent.orange.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .background(selected ? Accent.orange.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
                 .strokeBorder(selected ? Accent.orange.fill(scheme) : p.cardBorder, lineWidth: 1.5))
             .contentShape(Rectangle())
         }
@@ -588,14 +592,14 @@ private struct ClockStickRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 36, height: 36)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.scaled(size: 15, weight: .bold))
-                Text(detail).font(.scaled(size: 13)).secondaryText()
+                Text(title).font(.bodyEmphasis)
+                Text(detail).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

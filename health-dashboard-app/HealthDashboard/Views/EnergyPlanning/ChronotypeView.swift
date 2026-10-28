@@ -24,9 +24,9 @@ struct ChronotypeView: View {
                 timeChangeCard
             } else {
                 Card {
-                    Text("Still learning your body clock").font(.scaled(size: 17, weight: .bold))
+                    Text("Still learning your body clock").font(.cardTitle)
                     Text("We need school nights (with an alarm) and free nights (no alarm) tracked by your Watch. So far: \(model.workNights.count) school, \(model.freeNights.count) free. Check back after a weekend.")
-                        .font(.scaled(size: 14)).secondaryText()
+                        .font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -43,30 +43,31 @@ struct ChronotypeView: View {
                 SectionLabel(text: "Your body clock type", accent: .orange)
                 InfoButton(topic: .bodyClock).padding(.vertical, -12)
             }
-            Text(c.category.rawValue).font(.scaled(size: 28, weight: .bold))
-            Text(Self.plain(c.category)).font(.scaled(size: 15, weight: .semibold))
+            Text(c.category.rawValue).font(.detailTitle)
+            Text(Self.plain(c.category)).font(.bodyEmphasis)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(Self.forAgeGroup(c.category)).font(.scaled(size: 14)).secondaryText()
+            Text(Self.forAgeGroup(c.category)).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(c.midSleepFreeCorrected == c.midSleepFree ? "Middle of your sleep on free days" : "Body clock time (free-day middle, minus catch-up sleep)")
-                    .font(.scaled(size: 14, weight: .semibold)).secondaryText()
+                Text(c.midSleepFreeCorrected == c.midSleepFree ? "Middle of your sleep on free nights" : "Body clock time (free-day middle, minus catch-up sleep)")
+                    .font(.bodyEmphasis).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 InfoButton(title: "Body clock time",
-                           meaning: "The halfway point between falling asleep and waking up on days with no alarm. It's the simplest way to tell how early or late your body naturally runs. When you sleep longer on free days to catch up, that extra sleep pushes the raw middle later, so we take it out." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your raw free-day middle is \(Clock.format(c.midSleepFree)); without the catch-up sleep it's \(Clock.format(c.midSleepFreeCorrected))."),
-                           forYou: "The later it is, the more of an evening type you are, and the harder early classes feel. Morning daylight and a steady wake time pull it earlier.")
+                           meaning: "The halfway point between falling asleep and waking up on days with no alarm: the simplest way to tell how early or late your body naturally runs.",
+                           forYou: "The later it is, the more of an evening type you are, and the harder early classes feel. Morning daylight and a steady wake time pull it earlier.",
+                           howWeGotIt: "When you sleep longer on free days to catch up, that extra sleep pushes the raw middle later, so we take it out." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your raw free-day middle is \(Clock.format(c.midSleepFree)); without the catch-up sleep it's \(Clock.format(c.midSleepFreeCorrected))."))
                     .padding(.vertical, -12)
                 }
                 if !typeSize.isAccessibilitySize { Spacer() }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(Clock.format(msfsc, suffix: false)).font(.scaledNumber(34)).keepsOnOneLine()
-                    Text(suffix).font(.scaled(size: 15, weight: .bold)).foregroundStyle(Accent.orange.ink(scheme)).keepsOnOneLine()
+                    Text(Clock.format(msfsc, suffix: false)).font(.display).keepsOnOneLine()
+                    Text(suffix).font(.bodyEmphasis).foregroundStyle(Accent.orange.ink(scheme)).keepsOnOneLine()
                 }
                 .fixedSize()
             }
             ChronotypeSpectrum(msfsc: msfsc, category: c.category)
-            Text(why(c)).font(.scaled(size: 14)).secondaryText()
+            Text(why(c)).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Your body clock", method: method(c))
         }
@@ -127,55 +128,57 @@ struct ChronotypeView: View {
         let badgeAccent: Accent = over ? .coral : .mint
         return Card {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Social jet lag").font(.scaled(size: 17, weight: .bold))
+                // One name, "Weekend shift"; the ⓘ says it's also called
+                // social jet lag (Dubois 8).
+                Text("Weekend shift").font(.cardTitle)
                 InfoButton(topic: .socialJetlag).padding(.vertical, -12)
                 Spacer()
-                Text("goal: under 1 hour").font(.scaled(size: 13)).secondaryText()
+                Text("goal: under 1 hour").font(.secondary).secondaryText()
             }
-            Text("How much later you sleep on free days than on school nights. It's like flying to a different time zone every weekend and back on Monday.")
-                .font(.scaled(size: 13)).secondaryText()
+            Text("How much later you sleep on free nights than on school nights. It's like flying to a different time zone every weekend and back on Monday.")
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .center, spacing: 10) {
-                Text(Clock.duration(sjl)).font(.scaledNumber(34)).keepsOnOneLine()
+                Text(Clock.duration(sjl)).font(.display).keepsOnOneLine()
                 Text(over ? "Above goal" : "Under goal")
-                    .font(.scaled(size: 13, weight: .bold))
-                    .foregroundStyle(badgeAccent.ink(scheme))
+                    .font(.secondary).fontWeight(.bold)
+                    .foregroundStyle(badgeAccent.onTint(scheme))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(badgeAccent.tint(scheme), in: Capsule())
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Weekend shift, \(Clock.duration(sjl)), \(over ? "above" : "under") the 1 hour goal")
             if let work = model.workNightWindow, let free = model.freeNightWindow {
                 windowsReadout(work: work, free: free, c: c)
-                    .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
                 SleepWindowsChart(work: work, free: free, selected: windowSelection, selection: $windowSelection)
                     .frame(height: 110)
-                    .accessibilityLabel("School nights asleep \(work.label), free days asleep \(free.label). A \(Clock.duration(sjl)) gap in the middle of your sleep.")
-                ScrubHint()
+                    .accessibilityLabel("School nights asleep \(work.label.replacingOccurrences(of: "\u{2013}", with: " to ")), free nights asleep \(free.label.replacingOccurrences(of: "\u{2013}", with: " to ")). A \(Clock.duration(sjl)) gap in the middle of your sleep.")
+                ScrubHint(each: "hour of the night")
                 VStack(spacing: 6) {
                     legendRow(accent: .indigo, name: "School nights", detail: "\(work.label) · middle \(Clock.format(c.midSleepWork))")
-                    legendRow(accent: .orange, name: "Free days", detail: "\(free.label) · middle \(Clock.format(c.midSleepFree))" + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " (raw)"))
+                    legendRow(accent: .orange, name: "Free nights", detail: "\(free.label) · middle \(Clock.format(c.midSleepFree))" + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " (raw)"))
                 }
             }
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "airplane")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .accessibilityHidden(true)
-                Text(jetlagWhy(sjl)).font(.scaled(size: 14))
+                Text(jetlagWhy(sjl)).font(.bodyText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(12)
+            .padding(Space.m)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Accent.orange.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Accent.orange.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         }
     }
 
     private func windowsReadout(work: TimeRange, free: TimeRange, c: Chronotype) -> some View {
         guard let raw = windowSelection else {
-            return ChartReadout(title: "Middle of your sleep",
-                                value: "\(Clock.duration(c.socialJetlag)) later on free days",
-                                detail: "School nights \(Clock.format(c.midSleepWork)), free days \(Clock.format(c.midSleepFree))." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your body clock time, \(Clock.format(c.midSleepFreeCorrected)), takes out the catch-up sleep."),
+            return ChartReadout(title: "Middle of your sleep \u{00B7} later on free nights",
+                                value: Clock.duration(c.socialJetlag),
+                                detail: "School nights \(Clock.format(c.midSleepWork)), free nights \(Clock.format(c.midSleepFree))." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your body clock time, \(Clock.format(c.midSleepFreeCorrected)), takes out the catch-up sleep."),
                                 accent: .orange)
         }
         let t = Int((Double(raw) / 5).rounded()) * 5
@@ -188,20 +191,21 @@ struct ChronotypeView: View {
         let value: String
         switch (inWork, inFree) {
         case (true, true): value = "Asleep either way"
-        case (false, true): value = "Asleep only on free days"
+        case (false, true): value = "Asleep only on free nights"
         case (true, false): value = "Asleep only on school nights"
         case (false, false): value = "Awake either way"
         }
         return ChartReadout(title: Clock.format(t), value: value,
-                            detail: "School nights: \(state(work)). Free days: \(state(free)).", accent: .orange)
+                            detail: "School nights: \(state(work)). Free nights: \(state(free)).", accent: .orange,
+                            onClear: { windowSelection = nil })
     }
 
     private func legendRow(accent: Accent, name: String, detail: String) -> some View {
         HStack {
             Circle().fill(accent.fill(scheme)).frame(width: 10, height: 10).accessibilityHidden(true)
-            Text(name).font(.scaled(size: 14)).secondaryText()
+            Text(name).font(.bodyText).secondaryText()
             Spacer()
-            Text(detail).font(.scaled(size: 14, weight: .semibold))
+            Text(detail).font(.bodyEmphasis)
         }
         .accessibilityElement(children: .combine)
     }
@@ -234,9 +238,9 @@ struct ChronotypeView: View {
         let melatonin = e.zone(.melatonin)?.range.label ?? "Late evening"
         return Card {
             HStack(alignment: .firstTextBaseline) {
-                Text("What it means for your day").font(.scaled(size: 17, weight: .bold))
+                Text("What it means for your day").font(.cardTitle)
                 Spacer()
-                Text("school days").font(.scaled(size: 13)).secondaryText()
+                Text("school days").font(.secondary).secondaryText()
             }
             ChronoInfoRow(systemImage: "bolt.fill", accent: .mint, label: "Sharpest focus", value: sharpest + peakRange,
                           note: "Save it for your hardest studying.", topic: .morningPeak)
@@ -273,7 +277,7 @@ struct ChronotypeView: View {
             let onset = roundUp15(work.start)
             let newGap = abs((onset + target) / 2 - (work.start + work.end) / 2)
             if c.socialJetlag > newGap + 10 {
-                shiftDetail = "Asleep by \(Clock.format(onset)) and up by \(Clock.format(target)) on Fri and Sat cuts your social jet lag from \(Clock.duration(c.socialJetlag)) to about \(Clock.duration(newGap))."
+                shiftDetail = "Asleep by \(Clock.format(onset)) and up by \(Clock.format(target)) on Fri and Sat cuts your weekend shift from \(Clock.duration(c.socialJetlag)) to about \(Clock.duration(newGap))."
             } else {
                 shiftDetail = "Your weekend shift is already small. Keeping it under an hour protects Monday mornings."
             }
@@ -284,10 +288,10 @@ struct ChronotypeView: View {
         let daylightDetail = "The strongest signal your clock gets. \(daylightText). Time outside before noon, day after day, moves your peak earlier."
         return Card {
             HStack(alignment: .firstTextBaseline) {
-                Text("What can shift it").font(.scaled(size: 17, weight: .bold))
+                Text("What can shift it").font(.cardTitle)
                 Spacer()
                 Text(model.isEveningLeaning ? "earlier, a little at a time" : "a little at a time")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
             ChronoDetailRow(systemImage: "sun.max.fill", accent: .yellow, title: "Morning daylight", detail: daylightDetail)
             ChronoDetailRow(systemImage: "alarm.fill", accent: .orange, title: "A steady wake time", detail: wakeDetail)
@@ -348,21 +352,21 @@ private struct ChronotypeSpectrum: View {
     private var readout: ChartReadout {
         guard let f = dragFraction else {
             return ChartReadout(title: "You", value: category.rawValue,
-                                detail: "Drag along the bar to compare the types.", accent: .orange)
+                                detail: ChronotypeView.plain(category), accent: .orange)
         }
         let mid = 120 + Int((Double(f) * 360).rounded())
         let cat = Chronotype.category(for: mid)
         let you = cat == category ? " That's you." : ""
         return ChartReadout(title: "Middle of sleep around \(Clock.format(Int((Double(mid) / 15).rounded()) * 15))",
                             value: cat.rawValue,
-                            detail: ChronotypeView.plain(cat) + you, accent: .orange)
+                            detail: ChronotypeView.plain(cat) + you, accent: .orange,
+                            onClear: { dragFraction = nil })
     }
 
     var body: some View {
         let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: 6) {
             readout
-                .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
             GeometryReader { geo in
                 let x = geo.size.width * fraction
                 ZStack(alignment: .topLeading) {
@@ -376,7 +380,7 @@ private struct ChronotypeSpectrum: View {
                     }
                     .offset(y: 24)
                     Text("You")
-                        .font(.scaled(size: 12, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .position(x: x, y: 7)
                     Circle()
                         .fill(Color.white)
@@ -391,7 +395,7 @@ private struct ChronotypeSpectrum: View {
                     }
                     ForEach(1..<6) { i in
                         Text("\(i + 2)am")
-                            .font(.scaled(size: 11, weight: .semibold))
+                            .font(.small).fontWeight(.semibold)
                             .foregroundStyle(p.tertiary)
                             .position(x: geo.size.width * CGFloat(i) / 6, y: 56)
                     }
@@ -410,9 +414,9 @@ private struct ChronotypeSpectrum: View {
                 Spacer()
                 Text("Very late")
             }
-            .font(.scaled(size: 12, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .foregroundStyle(p.secondary)
-            ScrubHint(text: "Touch and drag along the bar")
+            ScrubHint(each: "type")
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Body clock spectrum from very early to very late. Your body clock time (free-day sleep middle, minus catch-up sleep) is \(Clock.format(msfsc)), a \(category.rawValue.lowercased()).")
@@ -442,7 +446,10 @@ private struct SleepWindowsChart: View {
         }
         .chartXScale(domain: lo...hi)
         .chartYAxis(.hidden)
-        .accessibilityLabel("School nights asleep \(work.label), free days asleep \(free.label).")
+        .accessibilityChartDescriptor(ClockChartDescriptor(
+            title: "Sleep on school and free nights", seriesName: "Asleep", yTitle: "Night",
+            points: [(work.start, 0), (work.end, 0), (free.start, 1), (free.end, 1)],
+            yLabel: { $0 < 0.5 ? "School nights" : "Free nights" }))
         .chartXAxis {
             AxisMarks(values: ticks) { value in
                 AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
@@ -460,7 +467,7 @@ private struct SleepWindowsChart: View {
         BarMark(xStart: .value("Asleep", work.start), xEnd: .value("Woke", work.end), y: .value("Night", "School nights"))
             .foregroundStyle(Accent.indigo.fill(scheme))
             .cornerRadius(6)
-        BarMark(xStart: .value("Asleep", free.start), xEnd: .value("Woke", free.end), y: .value("Night", "Free days"))
+        BarMark(xStart: .value("Asleep", free.start), xEnd: .value("Woke", free.end), y: .value("Night", "Free nights"))
             .foregroundStyle(Accent.orange.fill(scheme))
             .cornerRadius(6)
     }
@@ -495,15 +502,15 @@ private struct ChronoInfoRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 36, height: 36)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.scaled(size: 13)).secondaryText()
-                Text(value).font(.scaled(size: 15, weight: .bold))
-                Text(note).font(.scaled(size: 13)).secondaryText()
+                Text(label).font(.secondary).secondaryText()
+                Text(value).font(.bodyEmphasis)
+                Text(note).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -522,14 +529,14 @@ private struct ChronoDetailRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 36, height: 36)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.scaled(size: 15, weight: .bold))
-                Text(detail).font(.scaled(size: 13)).secondaryText()
+                Text(title).font(.bodyEmphasis)
+                Text(detail).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

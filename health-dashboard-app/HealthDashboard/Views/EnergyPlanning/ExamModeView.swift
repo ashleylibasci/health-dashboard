@@ -58,10 +58,10 @@ struct ExamModeView: View {
     private var sickCard: some View {
         Card(accent: .coral) {
             Label("Sick before an exam?", systemImage: "cross.case.fill")
-                .font(.scaled(size: 17, weight: .bold))
+                .font(.cardTitle)
                 .foregroundStyle(Accent.coral.ink(scheme))
             Text("Your body signals look like you may be fighting something off. Rest comes before study blocks, so the plan below drops them. Campus health can document that you're sick; ask your instructor or dean about a make-up.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Sick check", subtitle: "What your body is showing", systemImage: "thermometer.medium", accent: .coral) { SickView() }
         }
@@ -70,18 +70,18 @@ struct ExamModeView: View {
     /// Where to turn when exam week is too much (Laurent F13).
     private var supportCard: some View {
         Card {
-            Text("Feeling overwhelmed?").font(.scaled(size: 17, weight: .bold))
+            Text("Feeling overwhelmed?").font(.cardTitle)
             Text("Exam weeks are hard, and you don't have to get through them alone. Your campus counseling center can help. If you're sick, dealing with something at home or just can't keep up, your dean of students or accessibility office can talk to you about extensions or a make-up. In a crisis, call or text 988 (US) any time.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var noExamsCard: some View {
         Card(accent: .yellow) {
-            Text("No exams on your list").font(.scaled(size: 17, weight: .bold))
+            Text("No exams on your list").font(.cardTitle)
             Text("Add an exam and exam mode plans your sleep, study blocks and exam-morning alarm around it.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Add an exam", systemImage: "plus.circle.fill", accent: .yellow) { ExamListView() }
         }
@@ -95,15 +95,15 @@ struct ExamModeView: View {
             Toggle(isOn: $store.data.examModeOn) {
                 HStack(spacing: 12) {
                     Image(systemName: "graduationcap.fill")
-                        .font(.scaled(size: 17, weight: .semibold))
+                        .font(.cardTitle)
                         .foregroundStyle(Accent.yellow.ink(scheme))
                         .frame(width: 40, height: 40)
-                        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Exam mode").font(.scaled(size: 17, weight: .bold))
+                        Text("Exam mode").font(.cardTitle)
                         Text(on ? "On · planning for \(exam.course)" : "Off")
-                            .font(.scaled(size: 13, weight: .semibold))
+                            .font(.secondary).fontWeight(.semibold)
                             .foregroundStyle(on ? Accent.yellow.ink(scheme) : Palette(scheme: scheme).secondary)
                     }
                 }
@@ -111,12 +111,12 @@ struct ExamModeView: View {
             .tint(Accent.yellow.fill(scheme))
             .frame(minHeight: 44)
             Text("Plans your sleep and study blocks around your exam, and can send a one-off smart alarm window for exam morning to your Watch.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if exam.isExample {
                 HStack(spacing: 8) {
                     ExamExampleTag()
-                    Text("Add your own exams to plan for them.").font(.scaled(size: 13)).secondaryText()
+                    Text("Add your own exams to plan for them.").font(.secondary).secondaryText()
                 }
             }
         }
@@ -126,9 +126,9 @@ struct ExamModeView: View {
         let list = all.map { "\($0.course) on \(shortDate($0.date))" }
         let joined = list.count > 1 ? list.dropLast().joined(separator: ", ") + " and " + (list.last ?? "") : (list.first ?? "")
         return Card {
-            Text("Exam mode is off").font(.scaled(size: 17, weight: .bold))
+            Text("Exam mode is off").font(.cardTitle)
             Text("\(joined) \(all.count == 1 ? "is" : "are") on your list. Turn exam mode on to plan sleep and study around \(all.count == 1 ? "it" : "them").")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -138,7 +138,7 @@ struct ExamModeView: View {
     private func examPicker(_ all: [UpcomingExam], selected: UpcomingExam) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Upcoming exams".uppercased(), systemImage: "calendar")
-                .font(.scaled(size: 12, weight: .bold))
+                .font(.secondary).fontWeight(.bold)
                 .secondaryText()
             HStack(spacing: 10) {
                 ForEach(all.prefix(3)) { x in
@@ -152,7 +152,7 @@ struct ExamModeView: View {
             }
             NavigationLink { ExamListView() } label: {
                 Text(selected.isExample ? "Add your exams" : "Add or change exams")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.yellow.ink(scheme))
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
@@ -201,12 +201,12 @@ struct ExamModeView: View {
         return Card(accent: .yellow) {
             SectionLabel(text: "Countdown", accent: .yellow)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(big).font(.scaledNumber(48))
-                Text(unit).font(.scaled(size: 17, weight: .bold)).foregroundStyle(Accent.yellow.ink(scheme))
+                Text(big).font(.display)
+                Text(unit).font(.cardTitle).foregroundStyle(Accent.yellow.ink(scheme))
             }
             .accessibilityElement(children: .combine)
             Text("Until your \(exam.title), \(shortDate(exam.date)) at \(Clock.format(exam.start)).")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
             HStack(spacing: 10) {
                 ExamCountTile(value: t1Value, label: t1Label)
                 ExamCountTile(value: t2Value, label: t2Label)
@@ -232,9 +232,9 @@ struct ExamModeView: View {
         let last = plan.last.map { shortDate(dayDate(exam, $0.dayOffset)) } ?? ""
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Plan to exam day").font(.scaled(size: 20, weight: .bold))
+                Text("Plan to exam day").font(.section)
                 Spacer()
-                Text(first == last ? first : "\(first) – \(last)").font(.scaled(size: 13)).secondaryText()
+                Text(first == last ? first : "\(first) – \(last)").font(.secondary).secondaryText()
             }
             .padding(.top, 6)
             HStack(spacing: 8) {
@@ -325,12 +325,12 @@ struct ExamModeView: View {
         return Card {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(date.formatted(.dateTime.weekday(.wide))).font(.scaled(size: 17, weight: .bold))
-                    Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.scaled(size: 13)).secondaryText()
+                    Text(date.formatted(.dateTime.weekday(.wide))).font(.cardTitle)
+                    Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.secondary).secondaryText()
                 }
                 Spacer()
                 Text(tagText)
-                    .font(.scaled(size: 12, weight: .bold))
+                    .font(.secondary).fontWeight(.bold)
                     .foregroundStyle(tagForeground)
                     .padding(.horizontal, 10)
                     .frame(minHeight: Font.scaledSize(26))
@@ -352,17 +352,17 @@ struct ExamModeView: View {
                         }
                         .frame(height: 8)
                         Text("\(Clock.duration(sleep)) of \(Clock.duration(need))")
-                            .font(.scaled(size: 13, weight: .bold))
+                            .font(.secondary).fontWeight(.bold)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(Clock.duration(sleep)) asleep against a need of \(Clock.duration(need))")
                 }
-                Text(noteText).font(.scaled(size: 13)).secondaryText()
+                Text(noteText).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(boxAccent.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(boxAccent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             ForEach(rows) { r in ExamPlanRowView(row: r) }
         }
     }
@@ -445,18 +445,17 @@ struct ExamModeView: View {
         return Card(accent: .orange) {
             SectionLabel(text: "Exam morning · \(date)", accent: .orange)
             Text("Up \(Clock.format(d.wake)), clear-headed by \(Clock.format(d.wake + grogginess))")
-                .font(.scaled(size: 20, weight: .bold))
+                .font(.section)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Your smart alarm wakes you when you start stirring between \(Clock.format(window.start)) and \(Clock.format(window.end)). Grogginess usually fades within about \(grogginess) minutes (up to an hour after deep sleep), well before \(Clock.format(exam.start)).")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             morningReadout(exam, day: d)
-                .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
             ExamMorningChart(window: window, wake: d.wake, groggyEnd: d.wake + grogginess, examStart: exam.start,
                              selected: morningSelection, selection: $morningSelection,
                              summary: "Exam morning: smart alarm window \(window.label), wake at \(Clock.format(d.wake)), grogginess for about \(grogginess) minutes, \(exam.title) at \(Clock.format(exam.start))")
                 .frame(height: 90)
-            ScrubHint()
+            ScrubHint(each: "moment")
             HStack(spacing: 0) {
                 swatch(Accent.orange.fill(scheme).opacity(0.55), "Smart alarm window")
                 InfoButton(topic: .smartAlarm)
@@ -466,7 +465,7 @@ struct ExamModeView: View {
             }
             if exam.isExample {
                 Text("This is an example exam. Add your own to send its window to your Watch.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else if Calendar.current.isDate(exam.date, inSameDayAs: model.nextWakeDay) {
                 PrimaryButton(title: isSet ? "Sent to your Watch: \(window.label)" : "Use this window on my Watch tonight",
@@ -478,7 +477,7 @@ struct ExamModeView: View {
                 }
             } else {
                 Text("You can send this window to your Watch's smart alarm the night before.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             LinkRow(title: "How your wake window works", systemImage: "alarm.fill", accent: .orange) { WakePlanView() }
@@ -513,13 +512,14 @@ struct ExamModeView: View {
             detail = "\(exam.start - d.wake) minutes after waking: well past grogginess."
             accent = .yellow
         }
-        return ChartReadout(title: Clock.format(t), value: value, detail: detail, accent: accent)
+        return ChartReadout(title: Clock.format(t), value: value, detail: detail, accent: accent,
+                            onClear: morningSelection == nil ? nil : { morningSelection = nil })
     }
 
     private func swatch(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
-            Text(text).font(.scaled(size: 12)).secondaryText().lineLimit(1)
+            Text(text).font(.secondary).secondaryText().lineLimit(1)
         }
     }
 
@@ -530,7 +530,7 @@ struct ExamModeView: View {
         let lastNight = model.lastNight.asleep
         let scale = Double(max(need, lastNight, 1))
         return Card(accent: .purple) {
-            Text("Why it matters").font(.scaled(size: 17, weight: .bold))
+            Text("Why it matters").font(.cardTitle)
             ExamWhyRow(systemImage: "brain.head.profile", accent: .purple, title: "Short nights cost recall",
                    detail: "After a short night, memory and focus drop. Sleep is when what you studied gets stored, so an all-nighter takes back more than it gives.",
                    topic: .rem)
@@ -640,15 +640,15 @@ private struct ExamPlanRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(label.uppercased())
-                        .font(.scaled(size: 11, weight: .bold))
+                        .font(.small).fontWeight(.bold)
                         .tracking(0.4)
                         .foregroundStyle(color)
                     Text(row.time)
-                        .font(.scaled(size: 15, weight: .bold))
+                        .font(.bodyEmphasis)
                         .strikethrough(passed)
                         .foregroundStyle(passed ? Palette(scheme: scheme).tertiary : Palette(scheme: scheme).primary)
                 }
-                Text(row.note).font(.scaled(size: 13)).secondaryText()
+                Text(row.note).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -716,6 +716,10 @@ private struct ExamMorningChart: View {
             }
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ClockChartDescriptor(
+            title: "Exam morning", seriesName: "Morning", yTitle: "Step",
+            points: [(window.start, 0), (wake, 1), (groggyEnd, 2), (examStart, 3)],
+            yLabel: { ["Smart alarm window opens", "Up", "Clear-headed", "Exam starts"][min(max(Int($0.rounded()), 0), 3)] }))
     }
 }
 
@@ -731,17 +735,17 @@ private struct ExamOption: View {
         let p = Palette(scheme: scheme)
         Button(action: action) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(course).font(.scaled(size: 16, weight: .bold))
-                Text(kind).font(.scaled(size: 13, weight: .semibold))
+                Text(course).font(.bodyEmphasis)
+                Text(kind).font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(selected ? Accent.yellow.ink(scheme) : p.secondary)
-                Text(when).font(.scaled(size: 12)).foregroundStyle(p.secondary)
+                Text(when).font(.secondary).foregroundStyle(p.secondary)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .background(selected ? Accent.yellow.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .background(selected ? Accent.yellow.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
                 .strokeBorder(selected ? Accent.yellow.fill(scheme) : p.cardBorder, lineWidth: 1.5))
             .contentShape(Rectangle())
         }
@@ -765,16 +769,16 @@ private struct ExamDayTab: View {
         let accent: Accent = isExam ? .yellow : .purple
         Button(action: action) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(day).font(.scaled(size: 15, weight: .bold))
-                Text(date).font(.scaled(size: 12)).foregroundStyle(p.secondary)
-                Text(key).font(.scaled(size: 12, weight: .bold)).foregroundStyle(accent.ink(scheme))
+                Text(day).font(.bodyEmphasis)
+                Text(date).font(.secondary).foregroundStyle(p.secondary)
+                Text(key).font(.secondary).fontWeight(.bold).foregroundStyle(accent.ink(scheme))
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .background(selected ? accent.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .background(selected ? accent.tint(scheme) : p.chip, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
                 .strokeBorder(selected ? accent.fill(scheme) : p.cardBorder, lineWidth: 1.5))
             .contentShape(Rectangle())
         }
@@ -791,13 +795,13 @@ private struct ExamCountTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.scaled(size: 16, weight: .bold)).lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).font(.scaled(size: 12)).secondaryText()
+            Text(value).font(.bodyEmphasis).lineLimit(1).minimumScaleFactor(0.7)
+            Text(label).font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -808,8 +812,8 @@ private struct ExamLabeledValue: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.scaled(size: 12)).secondaryText()
-            Text(value).font(.scaledNumber(22))
+            Text(label).font(.secondary).secondaryText()
+            Text(value).font(.numberM)
         }
         .accessibilityElement(children: .combine)
     }
@@ -826,17 +830,17 @@ private struct ExamWhyRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 36, height: 36)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 0) {
-                    Text(title).font(.scaled(size: 15, weight: .bold))
+                    Text(title).font(.bodyEmphasis)
                     InfoButton(topic: topic).padding(.vertical, -12)
                 }
-                Text(detail).font(.scaled(size: 13)).secondaryText()
+                Text(detail).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

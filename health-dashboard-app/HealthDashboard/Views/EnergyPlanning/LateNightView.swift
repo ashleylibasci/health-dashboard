@@ -53,12 +53,12 @@ struct LateNightView: View {
                 SectionLabel(text: "Late nights", accent: .purple)
                 InfoButton(topic: .lateNight).padding(.vertical, -12)
             }
-            Text("What a late night costs you").font(.scaled(size: 26, weight: .bold))
+            Text("What a late night costs you").font(.detailTitle)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(sub).font(.scaled(size: 14)).secondaryText()
+            Text(sub).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text("A late night can cost more than that night's sleep. Your resting heart rate and HRV the next day or two show how hard your body is working to recover.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Late-night cost",
                              method: "A late night is a bedtime \(LateNights.marginMinutes) minutes or more past your usual (middle) bedtime over your last 60 nights, or 2am until there are \(LateNights.minimumNights) nights to learn it from. We compare like for like over the same 60 nights: late nights before an alarm morning with your other alarm mornings, and late nights before a free morning with your other free mornings, so weekend sleep-ins don't skew it. We look at how long you slept, and your resting heart rate and HRV the next morning and the morning after, each against your own usual. We need at least \(needed) late nights and \(needed) other nights before showing a comparison.")
@@ -68,12 +68,12 @@ struct LateNightView: View {
     private func notEnoughCard(_ effect: HabitEffect) -> some View {
         Card {
             Label("Not enough data yet", systemImage: "hourglass")
-                .font(.scaled(size: 17, weight: .bold))
+                .font(.cardTitle)
             Text("To show what late nights do to you, we need at least \(needed) late nights and \(needed) other nights. So far: \(effect.withCount) late, \(effect.withoutCount) other.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text("The chart below still shows your recent bedtimes, so you can see how close you get to \(thresholdText).")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -85,12 +85,12 @@ struct LateNightView: View {
         let afterOK = after.enoughData
         return VStack(alignment: .leading, spacing: 10) {
             Text("From \(effect.withCount) late nights and \(effect.withoutCount) other nights.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
             HStack(alignment: .top, spacing: 10) {
                 LateCostTile(eyebrow: "That night", value: signedDuration(effect.asleepDelta), unit: "sleep",
                              lines: [], accent: .purple)
                 LateCostTile(eyebrow: "Next day", value: bpm(effect.restingHRDelta), unit: "resting heart rate",
-                             lines: [hrvText(effect.hrvDeltaPct)].compactMap { $0 }, accent: .coral)
+                             lines: [hrvText(effect.hrvDeltaPct)].compactMap { $0 }, accent: .pink)
                 LateCostTile(eyebrow: "Day after", value: afterOK ? bpm(after.restingHRDelta) : "\u{2013}",
                              unit: afterOK ? "resting heart rate" : "not enough nights yet (\(after.withCount) of \(needed))",
                              lines: afterOK ? [hrvText(after.hrvDeltaPct)].compactMap { $0 } : [], accent: .orange)
@@ -98,7 +98,7 @@ struct LateNightView: View {
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 0) {
                 Text("Resting heart rate up and HRV down mean your body is working harder than usual to recover.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .restingHR)
                 InfoButton(topic: .hrv)
@@ -107,7 +107,7 @@ struct LateNightView: View {
                 Text(c < 0
                      ? "You also rate your mornings \(String(format: "%.1f", -c)) points lower (out of 5) after a late night."
                      : "Your morning check-ins aren't lower after late nights, but your body numbers are.")
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -116,24 +116,24 @@ struct LateNightView: View {
     private var splitCard: some View {
         let split = model.lateNightSleepCost
         return Card {
-            Text("Alarm mornings vs free mornings").font(.scaled(size: 17, weight: .bold))
+            Text("Alarm mornings vs free mornings").font(.cardTitle)
             if let a = split.alarm {
-                splitRow("Alarm the next morning", value: signedDuration(a), accent: .coral)
+                splitRow("Alarm the next morning", value: signedDuration(a), accent: .orange)
             }
             if let f = split.free {
                 splitRow("Free next morning", value: signedDuration(f), accent: .purple)
             }
             Text("Sleep lost on a late night compared with your other nights, split by whether an alarm woke you the next morning. Late nights before an alarm cost more because you can't sleep in afterward.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func splitRow(_ label: String, value: String, accent: Accent) -> some View {
         HStack {
-            Text(label).font(.scaled(size: 15, weight: .semibold))
+            Text(label).font(.bodyEmphasis)
             Spacer()
-            Text(value).font(.scaledNumber(20)).foregroundStyle(accent.ink(scheme))
+            Text(value).font(.numberM).foregroundStyle(accent.ink(scheme))
         }
         .frame(minHeight: 36)
         .accessibilityElement(children: .combine)
@@ -145,18 +145,17 @@ struct LateNightView: View {
         let points = model.recentBedtimes
         let selected = nearest(selectedDay, in: points) ?? points.last { $0.isLate } ?? points.last
         return Card {
-            Text("Your recent bedtimes").font(.scaled(size: 17, weight: .bold))
+            Text("Your recent bedtimes").font(.cardTitle)
             Text("Each dot is a night. On or above the dashed line (\(thresholdText)) counts as a late night.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
             if let selected {
                 readout(selected)
-                    .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
             }
             BedtimeChart(points: points, threshold: model.lateBedtimeThreshold,
                          selected: selectedDay == nil ? nil : selected?.day, selection: $selectedDay,
                          summary: chartSummary(points))
                 .frame(height: 180)
-            ScrubHint()
+            ScrubHint(each: "night")
         }
     }
 
@@ -173,10 +172,11 @@ struct LateNightView: View {
         if let c = p.checkIn { next.append("check-in \(Int(c.rounded())) of 5") }
         let nextText = next.isEmpty ? "" : " Next day: " + next.joined(separator: ", ") + "."
         let lead = p.isLate ? "A late night." : "A normal night."
-        return ChartReadout(title: "\(night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) night",
-                            value: "Bed \(Clock.format(p.bedtime))",
+        return ChartReadout(title: "\(night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) night \u{00B7} bed",
+                            value: Clock.format(p.bedtime),
                             detail: "\(lead) Slept \(Clock.duration(p.asleep)).\(nextText)",
-                            accent: p.isLate ? .coral : .purple)
+                            accent: p.isLate ? .coral : .purple,
+                            onClear: selectedDay == nil ? nil : { selectedDay = nil })
     }
 
     private func chartSummary(_ points: [AppModel.BedtimePoint]) -> String {
@@ -195,17 +195,17 @@ struct LateNightView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(Clock.format(n.bedtime))")
-                            .font(.scaled(size: 15, weight: .bold))
+                            .font(.bodyEmphasis)
                         Text(n.outcome.hrvDeltaPct.map { "HRV \(signedPct($0)) the next day" } ?? "Slept \(Clock.duration(n.asleepMinutes))")
-                            .font(.scaled(size: 13)).secondaryText()
+                            .font(.secondary).secondaryText()
                     }
                     Spacer()
                     Text(n.alarmUsed ? "Alarm next day" : "Free morning")
-                        .font(.scaled(size: 12, weight: .bold))
-                        .foregroundStyle((n.alarmUsed ? Accent.coral : Accent.purple).ink(scheme))
+                        .font(.secondary).fontWeight(.bold)
+                        .foregroundStyle((n.alarmUsed ? Accent.orange : Accent.purple).onTint(scheme))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background((n.alarmUsed ? Accent.coral : Accent.purple).tint(scheme), in: Capsule())
+                        .background((n.alarmUsed ? Accent.orange : Accent.purple).tint(scheme), in: Capsule())
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -214,15 +214,15 @@ struct LateNightView: View {
 
     private var tonightCard: some View {
         Card(accent: .indigo) {
-            Text("Got a late one coming up?").font(.scaled(size: 17, weight: .bold))
+            Text("Got a late one coming up?").font(.cardTitle)
             Text("Keep the next night at your planned \(Clock.format(store.data.bedtime)) bedtime and get morning daylight. That usually helps you bounce back faster than sleeping in.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             // Moreno F7: 24 hours awake impairs driving about as much as a
             // 0.10% blood alcohol level.
             Label("Up all night or only a few hours' sleep? Don't drive the next day. Being awake 24 hours affects driving about as much as being drunk. Get a ride.",
                   systemImage: "car.fill")
-                .font(.scaled(size: 14, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.coral.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Why do I feel off?", subtitle: "Your likeliest reasons today", systemImage: "questionmark.circle.fill", accent: .coral) { WhyOffView() }
@@ -261,16 +261,16 @@ private struct LateCostTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             SectionLabel(text: eyebrow, accent: accent)
-            Text(value).font(.scaledNumber(19)).minimumScaleFactor(0.6).lineLimit(1)
-            Text(unit).font(.scaled(size: 12)).secondaryText()
+            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
+            Text(unit).font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(lines, id: \.self) { l in
-                Text(l).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
+                Text(l).font(.secondary).fontWeight(.semibold).foregroundStyle(accent.ink(scheme))
             }
         }
-        .padding(12)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -311,6 +311,10 @@ private struct BedtimeChart: View {
         }
         .chartScrub($selection, snapped: selected, steps: points.map(\.day).sorted())
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(DateChartDescriptor(
+            title: "Bedtimes, last \(points.count) nights", seriesName: "Bedtime", yTitle: "Bedtime",
+            points: points.map { ($0.day, Double($0.bedtime)) }, yLabel: { Clock.format(Int($0.rounded())) },
+            isContinuous: false))
     }
 
     @ChartContentBuilder private var lateLine: some ChartContent {

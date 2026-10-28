@@ -20,14 +20,17 @@ enum StageStyle {
         }
     }
 
-    /// Bar and segment fill.
+    /// Bar and segment fill. Deep and core are two depths of indigo, REM
+    /// the sleep purple, Awake coral (its only other use is "worse"). Every
+    /// light fill is 3:1 or more on white; dark Awake is the softer #FFB199
+    /// so it doesn't shout over the night (Tanaka F4, F10).
     static func color(_ stage: SleepStage, _ scheme: ColorScheme) -> Color {
         let dark = scheme == .dark
         switch stage {
         case .deep: return Color(hex: dark ? 0x5B6BE8 : 0x2E3AA8)
         case .core: return Color(hex: dark ? 0x7C8BFF : 0x6574EA)
-        case .rem: return Color(hex: dark ? 0xB9A9FF : 0xB79BF5)
-        case .awake: return Color(hex: dark ? 0xFF9A7A : 0xF08A68)
+        case .rem: return Accent.purple.fill(scheme)
+        case .awake: return dark ? Color(hex: 0xFFB199) : Accent.coral.fill(.light)
         }
     }
 
@@ -153,7 +156,7 @@ struct SleepArcDial: View {
                 Text(label).font(.scaledNumber(labelSize)).minimumScaleFactor(0.35).lineLimit(1)
                 if let caption {
                     Text(caption)
-                        .font(.scaled(size: 12, weight: .semibold))
+                        .font(.secondary).fontWeight(.semibold)
                         .foregroundStyle(p.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.45)
@@ -168,16 +171,21 @@ struct SleepArcDial: View {
     }
 }
 
-/// Last night's stages as one row per stage: names in a fixed column on the
-/// left (each with an info button), bars in the remaining width. Touch and
-/// drag across the bars to see the time, the stage and what it does.
+/// Last night's stages as one row per stage: each name and its minutes in a
+/// column on the left, bars in the remaining width. At the accessibility
+/// sizes the names sit above full-width lanes instead, so neither the
+/// names nor the clock times break mid-word (Ortiz F4). Touch and drag
+/// across the bars to see the time, the stage and what it does.
 struct StageTimeline: View {
     var segments: [StageSegment]
     @State private var selected: Date? = nil
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var stacked: Bool { typeSize.isAccessibilitySize }
 
     // The label column and rows grow with the text size so stage names aren't cut off.
-    private var labelWidth: CGFloat { min(max(84, Font.scaledSize(84)), 150) }
+    private var labelWidth: CGFloat { min(max(112, Font.scaledSize(112)), 170) }
     private var rowHeight: CGFloat { min(max(28, Font.scaledSize(24)), 48) }
     private let rowGap: CGFloat = 6
     private var barHeight: CGFloat { max(18, rowHeight - 10) }
@@ -191,6 +199,10 @@ struct StageTimeline: View {
     private var start: Date { segments.first?.start ?? .now }
     private var end: Date { segments.last?.end ?? .now }
     private var span: TimeInterval { max(end.timeIntervalSince(start), 60) }
+
+    private func stageMinutes(_ stage: SleepStage) -> Int {
+        segments.filter { $0.stage == stage }.map(\.minutes).reduce(0, +)
+    }
     private var lanesHeight: CGFloat { CGFloat(StageStyle.lanes.count) * rowHeight + CGFloat(StageStyle.lanes.count - 1) * rowGap }
 
     private func laneIndex(_ stage: SleepStage) -> Int { StageStyle.lanes.firstIndex(of: stage) ?? 0 }
@@ -225,33 +237,87 @@ struct StageTimeline: View {
             ChartReadout(title: "\(clock(selected)) \u{00B7} \(SleepText.compact(seg.minutes)) stretch",
                          value: StageStyle.name(seg.stage),
                          detail: StageStyle.oneLiner(seg.stage),
-                         accent: StageStyle.accent(seg.stage))
+                         accent: StageStyle.accent(seg.stage),
+                         onClear: { self.selected = nil })
         } else {
-            ChartReadout(title: "Last night \u{00B7} \(clock(start)) to \(clock(end))",
-                         value: "Touch a bar",
+            // At rest: the night's span and time asleep, not a "touch" hint
+            // (Valtonen F13).
+            let asleep = segments.filter { $0.stage != .awake }.map(\.minutes).reduce(0, +)
+            ChartReadout(title: "Asleep \u{00B7} \(clock(start)) to \(clock(end))",
+                         value: Clock.duration(asleep),
                          detail: "Deep sleep comes early in the night, REM toward morning. Brief wake-ups are normal.",
                          accent: .purple)
         }
     }
 
+    /// Name and minutes for one lane (Tanaka F10: the minutes in the label
+    /// column, in lane order). The card title's ⓘ explains the stages.
+    private func laneLabel(_ stage: SleepStage) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+            Text(StageStyle.name(stage))
+                .font(.secondary).fontWeight(.bold)
+                .foregroundStyle(StageStyle.ink(stage, scheme))
+            Spacer(minLength: 0)
+            Text(SleepText.compact(stageMinutes(stage)))
+                .font(.secondary).fontWeight(.semibold)
+                .monospacedDigit()
+                .secondaryText()
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(stacked ? 1 : 0.7)
+    }
+
     private var labelColumn: some View {
         VStack(alignment: .leading, spacing: rowGap) {
             ForEach(StageStyle.lanes, id: \.self) { stage in
-                HStack(spacing: 0) {
-                    Text(StageStyle.name(stage))
-                        .font(.scaled(size: 13, weight: .bold))
-                        .foregroundStyle(StageStyle.ink(stage, scheme))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Spacer(minLength: 0)
-                    InfoButton(topic: StageStyle.topic(stage))
-                        .padding(.vertical, -8)
-                        .padding(.horizontal, -6)
-                }
-                .frame(width: labelWidth, height: rowHeight)
+                laneLabel(stage)
+                    .frame(width: labelWidth, height: rowHeight)
             }
         }
         .frame(width: labelWidth)
+    }
+
+    /// One full-width lane, for the stacked layout.
+    private func lane(_ stage: SleepStage, _ width: CGFloat) -> some View {
+        let p = Palette(scheme: scheme)
+        return ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(p.track.opacity(0.6))
+                .frame(width: width, height: barHeight)
+            ForEach(items.filter { $0.segment.stage == stage }) { item in
+                let seg = item.segment
+                let x0 = x(seg.start, width)
+                let w = max(x(seg.end, width) - x0, 2)
+                let dim = selected != nil && segment(at: selected ?? .now) != seg
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(StageStyle.color(seg.stage, scheme))
+                    .opacity(dim ? 0.45 : 1)
+                    .frame(width: w, height: barHeight)
+                    .offset(x: x0)
+            }
+            if let selected {
+                Rectangle()
+                    .fill(p.primary.opacity(0.7))
+                    .frame(width: 2, height: barHeight)
+                    .offset(x: x(selected, width) - 1)
+            }
+        }
+        .frame(width: width, height: barHeight, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .overlay(ScrubSurface { location in selected = date(atX: location.x, width) })
+    }
+
+    private var stackedLanes: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            ForEach(StageStyle.lanes, id: \.self) { stage in
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    laneLabel(stage)
+                    GeometryReader { geo in lane(stage, geo.size.width) }
+                        .frame(height: barHeight)
+                }
+            }
+        }
+        .scrubFeedback(selected.flatMap { segment(at: $0) })
     }
 
     private func bars(_ width: CGFloat) -> some View {
@@ -296,32 +362,40 @@ struct StageTimeline: View {
     private var axis: some View {
         let mid = start.addingTimeInterval(span / 2)
         return HStack {
-            Text(clock(start))
-            Spacer()
-            Text(clock(mid))
-            Spacer()
-            Text(clock(end))
+            Text(clock(start)).keepsOnOneLine(minimumScale: 0.8)
+            Spacer(minLength: Space.s)
+            if !stacked {
+                Text(clock(mid)).keepsOnOneLine(minimumScale: 0.8)
+                Spacer(minLength: Space.s)
+            }
+            Text(clock(end)).keepsOnOneLine(minimumScale: 0.8)
         }
-        .font(.scaled(size: 11, weight: .semibold))
+        .font(.small).fontWeight(.semibold)
         .secondaryText()
-        .padding(.leading, labelWidth + 8)
+        .padding(.leading, stacked ? 0 : labelWidth + 8)
         .accessibilityHidden(true)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             readout
-            HStack(alignment: .top, spacing: 8) {
-                labelColumn
-                GeometryReader { geo in
-                    bars(geo.size.width)
+            if stacked {
+                stackedLanes
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(summary)
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    labelColumn.accessibilityHidden(true)
+                    GeometryReader { geo in
+                        bars(geo.size.width)
+                    }
+                    .frame(height: lanesHeight)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(summary)
                 }
-                .frame(height: lanesHeight)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(summary)
             }
             axis
-            ScrubHint(text: "Touch and drag across the bars to see each stage")
+            ScrubHint(each: "stage")
         }
     }
 }
@@ -396,10 +470,10 @@ struct StageLegendItem: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 5) {
                 Circle().fill(StageStyle.color(stage, scheme)).frame(width: 8, height: 8)
-                Text(StageStyle.name(stage)).font(.scaled(size: 12, weight: .bold)).foregroundStyle(StageStyle.ink(stage, scheme))
+                Text(StageStyle.name(stage)).font(.secondary).fontWeight(.bold).foregroundStyle(StageStyle.ink(stage, scheme))
                     .fixedSize()
             }
-            Text(SleepText.compact(minutes)).font(.scaled(size: 15, weight: .bold)).fixedSize()
+            Text(SleepText.compact(minutes)).font(.bodyEmphasis).fontWeight(.bold).monospacedDigit().fixedSize()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

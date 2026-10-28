@@ -9,33 +9,28 @@ struct BirthControlLearnView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Screen(title: "Learn", accent: .indigo) {
+        // One title, the nav title, named like the link that opens it
+        // (Valtonen F8).
+        Screen(title: "Birth control and your Watch", accent: .indigo) {
             if let bc = store.birthControl {
                 yourMethod(bc)
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Birth control and")
-                    Text("your Watch data").foregroundStyle(Accent.indigo.ink(scheme))
-                }
-                .font(.scaled(size: 30, weight: .bold))
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
                 Text("You haven't added a birth control method. If you use one (hormonal or a copper IUD), add it in Settings and the app adjusts what it shows.")
-                    .font(.scaled(size: 16)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
                 Card {
                     LinkRow(title: "Cycle & birth control settings", systemImage: "slider.horizontal.3", accent: .purple) { SettingsView() }
                 }
             }
             comparison
             Card(accent: .coral) {
-                Text("Never change your birth control because of this app").font(.scaled(size: 15, weight: .bold))
+                Text("Never change your birth control because of this app").font(.bodyEmphasis)
                 Text("Talk to your doctor or nurse before starting, stopping or switching. This app is not birth control.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             if let url = URL(string: "https://www.nhs.uk/contraception/") {
                 Link(destination: url) {
                     Label("Learn more from the NHS", systemImage: "arrow.up.right.square")
-                        .font(.scaled(size: 15, weight: .semibold))
+                        .font(.bodyEmphasis)
                         .foregroundStyle(Accent.indigo.ink(scheme))
                         .frame(minHeight: 44)
                 }
@@ -61,14 +56,14 @@ struct BirthControlLearnView: View {
             Text(bc.inSentence).foregroundStyle(Accent.indigo.ink(scheme))
             Text("works in your body")
         }
-        .font(.scaled(size: 30, weight: .bold))
+        .font(.detailTitle)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
 
         Card {
             SectionLabel(text: "Your cycle")
-            Text(ovulationLine(bc)).font(.scaled(size: 16, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
-            Text(bc.note).font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+            Text(ovulationLine(bc)).font(.bodyEmphasis).fixedSize(horizontal: false, vertical: true)
+            Text(bc.note).font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             if bc.hasBreakWeek { packBar(bc) }
         }
 
@@ -78,7 +73,7 @@ struct BirthControlLearnView: View {
             Card {
                 SectionLabel(text: "What the app turns off, and why")
                 Text("Egg-release estimates, fertile days and phase-based predictions. Your method changes your natural temperature pattern, so those wouldn't mean anything. Apple's Health app does the same.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
 
@@ -89,11 +84,11 @@ struct BirthControlLearnView: View {
         if bc == .combinedPill || bc == .ring || bc == .patch {
             // ACHES in full, and migraine with aura (Okafor G).
             Card(accent: .pink) {
-                Text("Get care right away if").font(.scaled(size: 15, weight: .bold)).foregroundStyle(Accent.pink.ink(scheme))
+                Text("Get care right away if").font(.bodyEmphasis).foregroundStyle(Accent.pink.ink(scheme))
                 Text("Severe belly pain, chest pain or sudden shortness of breath, a severe headache, vision changes or loss, or leg pain or swelling. These can be signs of a blood clot or stroke, rare risks with estrogen.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
                 Text("New migraines with aura (flashing lights, zigzags or blind spots before the headache)? Contact your doctor before your next dose, and use condoms meanwhile.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -121,11 +116,11 @@ struct BirthControlLearnView: View {
                 Spacer()
                 Text(hasBreak ? "Break \u{00B7} \(store.data.packLength - store.data.packActiveDays) days" : "No break")
             }
-            .font(.scaled(size: 12, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .secondaryText()
             HStack(alignment: .top, spacing: 0) {
                 Text("The bleed in your break week is a withdrawal bleed, caused by the hormones pausing. It isn't a true period. Skipping the break on purpose is fine for most rings and patches, and for pills whose active pills are all the same color (you can mark it in your pack settings). If your active pills come in more than one color, ask a pharmacist how.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .withdrawalBleed).padding(.vertical, -10)
             }
         }
@@ -191,10 +186,10 @@ struct BirthControlLearnView: View {
             SectionLabel(text: "Other things people notice")
             ForEach(notices(bc), id: \.self) { n in
                 HStack {
-                    Text(n.text).font(.scaled(size: 15))
+                    Text(n.text).font(.bodyText)
                     Spacer()
                     Text(n.evidence)
-                        .font(.scaled(size: 12, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle(n.accent.ink(scheme))
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .background(n.accent.tint(scheme), in: Capsule())
@@ -204,7 +199,7 @@ struct BirthControlLearnView: View {
             // Every hormonal method (Laurent F8).
             if bc != .copperIUD {
                 Text(CycleCare.moodOnHormones)
-                    .font(.scaled(size: 13)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -213,7 +208,7 @@ struct BirthControlLearnView: View {
     private func bullet(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Circle().fill(Accent.indigo.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
-            Text(text).font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+            Text(text).font(.bodyText).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -254,19 +249,19 @@ struct BirthControlLearnView: View {
         let mine = store.birthControl == bc
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text(bc.rawValue).font(.scaled(size: 15, weight: .bold))
+                Text(bc.rawValue).font(.bodyEmphasis)
                 if mine {
-                    Text("Yours").font(.scaled(size: 11, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
+                    Text("Yours").font(.small).fontWeight(.bold).foregroundStyle(Accent.indigo.ink(scheme))
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(Accent.indigo.tint(scheme), in: Capsule())
                 }
                 Spacer()
-                Text(label).font(.scaled(size: 11, weight: .bold)).foregroundStyle(accent.ink(scheme))
+                Text(label).font(.small).fontWeight(.bold).foregroundStyle(accent.ink(scheme))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(accent.tint(scheme), in: Capsule())
             }
-            Text(bc.note).font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
-            Text(appShows(bc)).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
+            Text(bc.note).font(.secondary).secondaryText().fixedSize(horizontal: false, vertical: true)
+            Text(appShows(bc)).font(.secondary).fontWeight(.semibold).foregroundStyle(accent.ink(scheme))
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)

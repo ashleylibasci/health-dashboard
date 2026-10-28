@@ -48,7 +48,7 @@ extension AppModel {
     /// your own usual (7 days)."
     var recoveryUsualNote: String {
         recoveryUsualIsPersonal ? "Your usual is \(recoveryUsual)."
-            : "Starting point \(recoveryUsual) until your own usual (7 days)."
+            : "Compared with a starting point of \(recoveryUsual) until your Watch learns your usual (7 days)."
     }
 
     // MARK: Exams

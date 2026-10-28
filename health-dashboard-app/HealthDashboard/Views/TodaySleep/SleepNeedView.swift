@@ -12,6 +12,7 @@ struct SleepNeedView: View {
     // only there when the app has one for that day.
     @State private var metric: NeedMetric = .hrv
     @State private var selectedHours: Double? = nil
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         let need = model.sleepNeed
@@ -24,10 +25,11 @@ struct SleepNeedView: View {
             accuracyCard
             adjustCard(need)
             Text("An estimate from your own data, not a medical test. If you often need more than 10 hours or feel exhausted however long you sleep, talk to a doctor.")
-                .font(.scaled(size: 12))
+                .font(.secondary)
                 .secondaryText()
                 .padding(.horizontal, 4)
         }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 
     // MARK: Hero
@@ -71,13 +73,13 @@ struct SleepNeedView: View {
             ? "Example \u{00B7} \(min(model.realNightCount, AppModel.nightsNeeded)) of \(AppModel.nightsNeeded) nights"
             : "\(word) \u{00B7} \(model.sleepNeedNightsUsed) nights"
         let badge = HStack(spacing: 5) {
-            Image(systemName: example ? "hourglass" : "checkmark").font(.scaled(size: 10, weight: .heavy)).accessibilityHidden(true)
-            Text(badgeText).font(.scaled(size: 12, weight: .bold))
+            Image(systemName: example ? "hourglass" : "checkmark").font(.small).fontWeight(.bold).accessibilityHidden(true)
+            Text(badgeText).font(.secondary).fontWeight(.bold)
         }
-        .foregroundStyle((example ? Accent.yellow : badgeAccent).ink(scheme))
+        .foregroundStyle((example ? Accent.yellow : badgeAccent).onTint(scheme))
         .padding(.horizontal, 10)
         .frame(minHeight: Font.scaledSize(26))
-        .background((example ? Accent.yellow : badgeAccent).fill(scheme).opacity(0.18), in: Capsule())
+        .background((example ? Accent.yellow : badgeAccent).tint(scheme), in: Capsule())
         let title = HStack(spacing: 0) {
             SectionLabel(text: "Your body needs", accent: .purple)
             InfoButton(topic: .sleepNeed).padding(.vertical, -14)
@@ -96,27 +98,27 @@ struct SleepNeedView: View {
             }
             if example {
                 Text("Example until \(AppModel.nightsNeeded) nights (\(min(model.realNightCount, AppModel.nightsNeeded)) of \(AppModel.nightsNeeded) so far). After that it's learned from your own nights.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(Clock.duration(need.minutes))
-                    .font(.scaledNumber(58))
+                    .font(.displayXL)
                     .tracking(-1)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                Text("a night").font(.scaled(size: 15, weight: .semibold)).foregroundStyle(p.secondary)
+                Text("a night").font(.bodyEmphasis).foregroundStyle(p.secondary)
             }
             .accessibilityElement(children: .combine)
             HowWeGotThisLink(title: "Your sleep need", method: methodText(need))
             NeedRangeBar(need: need.minutes, range: need.range)
             Text("Purple band: the range of the clues, \(Clock.duration(need.range.start)) to \(Clock.duration(need.range.end)). Grey band: the 7 to 9 hours most adults need.")
-                .font(.scaled(size: 12))
+                .font(.secondary)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text(needNote(need))
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -137,6 +139,15 @@ struct SleepNeedView: View {
         return "\(model.tonightBedUpLine): about \(Clock.duration(plan.asleep)) asleep, which covers it."
     }
 
+    private func partTopic(_ part: TonightNeed.Part) -> Topic? {
+        let label = part.label.lowercased()
+        if label.contains("debt") { return .sleepDebt }
+        if label.contains("period") { return .tonightNeed }
+        if label.contains("fighting") { return .illness }
+        if label.contains("base") { return .sleepNeed }
+        return nil
+    }
+
     private var tonightCard: some View {
         let p = Palette(scheme: scheme)
         let tonight = model.tonightNeed
@@ -145,30 +156,31 @@ struct SleepNeedView: View {
             HStack(alignment: .firstTextBaseline) {
                 ExplainedTitle(text: "Tonight you need", topic: .tonightNeed)
                 Spacer()
-                Text(model.tonightNeedText).font(.scaledNumber(22))
+                Text(model.tonightNeedText).font(.numberM)
             }
             ForEach(Array(tonight.parts.enumerated()), id: \.offset) { index, part in
+                let topic = partTopic(part)
                 HStack(spacing: 0) {
-                    Text(partLabel(part)).font(.scaled(size: 14)).foregroundStyle(p.secondary)
-                    if part.label.lowercased().contains("debt") {
-                        InfoButton(topic: .sleepDebt).padding(.vertical, -14)
-                    } else if part.label.lowercased().contains("period") {
-                        InfoButton(topic: .tonightNeed).padding(.vertical, -14)
-                    } else if part.label.lowercased().contains("fighting") {
-                        InfoButton(topic: .illness).padding(.vertical, -14)
-                    } else if part.label.lowercased().contains("base") {
-                        InfoButton(topic: .sleepNeed).padding(.vertical, -14)
+                    Text(partLabel(part)).font(.bodyText).foregroundStyle(p.secondary)
+                    if let topic {
+                        InfoButton(topic: topic).padding(.vertical, -14)
+                            .accessibilityHidden(true)
                     }
                     Spacer()
+                    // Additions are part of the plan, not a warning: no coral
+                    // (Valtonen F4).
                     Text(index == 0 ? Clock.duration(part.minutes) : SleepText.signedCompact(part.minutes))
-                        .font(.scaled(size: 14, weight: .bold))
-                        .foregroundStyle(index == 0 ? p.primary : (part.minutes > 0 ? Accent.coral.ink(scheme) : p.secondary))
+                        .font(.bodyEmphasis)
+                        .foregroundStyle(index == 0 ? p.primary : p.secondary)
                 }
-                .accessibilityElement(children: .combine)
+                // Label and value read together, the ⓘ as an action (Ortiz F8, F9).
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(partLabel(part)), \(index == 0 ? Clock.duration(part.minutes) : (part.minutes < 0 ? "minus " : "plus ") + Clock.duration(abs(part.minutes)))")
+                .accessibilityAction(named: "Explain") { if let topic { explaining = topic.explanation } }
             }
             if let plan {
                 Text(planSentence(plan))
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -176,8 +188,8 @@ struct SleepNeedView: View {
                 WakePlanView()
             } label: {
                 HStack(spacing: 6) {
-                    Text("See tonight's wake plan").font(.scaled(size: 15, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
+                    Text("See tonight's wake plan").font(.bodyEmphasis)
+                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
                 }
                 .foregroundStyle(Accent.purple.ink(scheme))
                 .frame(minHeight: 44)
@@ -229,12 +241,14 @@ struct SleepNeedView: View {
         return points.min { abs($0.hours - selectedHours) < abs($1.hours - selectedHours) }
     }
 
+    /// A short value for the readout's big number, then what it is
+    /// (Hale F8): "63 · energy score next day".
     private func valueText(_ value: Double) -> String {
         switch metric {
-        case .energy: return "Energy score \(Int(value.rounded())) next day"
-        case .hrv: return "HRV \(SleepText.signed(value))% vs usual"
-        case .restingHR: return "Resting HR \(SleepText.signed(value, decimals: 1)) bpm"
-        case .felt: return "Felt " + String(format: "%.1f", value) + " of 5"
+        case .energy: return "\(Int(value.rounded())) \u{00B7} energy score next day"
+        case .hrv: return "\(SleepText.signed(value))% \u{00B7} HRV vs usual"
+        case .restingHR: return "\(SleepText.signed(value, decimals: 1)) bpm \u{00B7} resting heart rate"
+        case .felt: return String(format: "%.1f", value) + " of 5 \u{00B7} how you felt"
         }
     }
 
@@ -254,13 +268,16 @@ struct SleepNeedView: View {
     private func doseReadout(_ points: [DosePoint], fit: KneeFit?) -> some View {
         if let point = nearestDose(points) {
             ChartReadout(title: "\(point.day.formatted(.dateTime.month(.abbreviated).day())) \u{00B7} \(Clock.duration(Int((point.hours * 60).rounded()))) asleep",
-                         value: valueText(point.value), detail: doseDetail(point, fit: fit), accent: metric.accent)
+                         value: valueText(point.value), detail: doseDetail(point, fit: fit), accent: metric.accent,
+                         onClear: { selectedHours = nil })
         } else if let fit {
+            // At rest: the answer, not a "touch" hint (Valtonen F13).
             ChartReadout(title: "Where more sleep stops helping", value: Clock.duration(Int(fit.knee)),
-                         detail: "Touch a dot to see that night.", accent: metric.accent)
+                         detail: "From \(points.count) nights of \(metric.noun). Nights to the left of the dashed line cost you the next day.",
+                         accent: metric.accent)
         } else {
             ChartReadout(title: "\(points.count) nights", value: metric.label,
-                         detail: "Touch a dot to see that night.", accent: metric.accent)
+                         detail: "Not enough nights yet to see where more sleep stops helping.", accent: metric.accent)
         }
     }
 
@@ -276,7 +293,7 @@ struct SleepNeedView: View {
                                                     forYou: "That point is your sleep need. Nights to the left of it cost you the next day, even if you felt fine."),
                            size: 17)
             Text("Each dot is one night: how long you slept, and what your body did the next day.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ViewThatFits(in: .horizontal) {
@@ -289,14 +306,15 @@ struct SleepNeedView: View {
             DoseResponseChart(points: points, fit: fit, metric: metric, needRange: need.range,
                               selected: nearestDose(points), selection: $selectedHours)
                 .frame(height: 220)
-            ScrubHint()
+                .motion(.dataSwap, value: metric)
+            ScrubHint(each: "night")
             Text(insight(fit, need: need))
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(insightAccent.tint(scheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(insightAccent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         }
     }
 
@@ -340,7 +358,7 @@ struct SleepNeedView: View {
                 }
             }
             Text((hasStats ? "That's you after a night of 6h 30m or less. " : "") + study)
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -378,13 +396,13 @@ struct SleepNeedView: View {
     private var accuracyCard: some View {
         let p = Palette(scheme: scheme)
         return Card {
-            Text("Make it more accurate").font(.scaled(size: 17, weight: .bold))
+            Text("Make it more accurate").font(.cardTitle)
             NavigationLink {
                 CheckInView()
             } label: {
                 HStack(spacing: 6) {
-                    Text("Do the 10-second morning check-in").font(.scaled(size: 15, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
+                    Text("Do the 10-second morning check-in").font(.bodyEmphasis)
+                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
                 }
                 .foregroundStyle(Accent.mint.ink(scheme))
                 .frame(minHeight: 44)
@@ -392,21 +410,21 @@ struct SleepNeedView: View {
             }
             .buttonStyle(.plain)
             Text("How awake you feel each morning is a cross-check on the numbers from your Watch.")
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Divider()
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "calendar.badge.clock")
-                    .font(.scaled(size: 16, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.purple.ink(scheme))
-                    .frame(width: 36, height: 36)
-                    .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sleep-need check on your next break").font(.scaled(size: 15, weight: .bold))
+                    Text("Sleep-need check on your next break").font(.bodyEmphasis)
                     Text("Sleep without an alarm for a week, like on a break. The last few nights get close to your need, though it's a clue that tends to run a little high while you catch up.")
-                        .font(.scaled(size: 13))
+                        .font(.secondary)
                         .foregroundStyle(p.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -432,7 +450,7 @@ struct SleepNeedView: View {
             adjust(by: delta)
         } label: {
             Image(systemName: systemImage)
-                .font(.scaled(size: 18, weight: .bold))
+                .font(.cardTitle)
                 .frame(width: 48, height: 48)
                 .background(p.chip, in: Circle())
                 .overlay(Circle().strokeBorder(p.cardBorder))
@@ -453,8 +471,8 @@ struct SleepNeedView: View {
         return Card {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Think it's off?").font(.scaled(size: 15, weight: .bold))
-                    Text(note).font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                    Text("Think it's off?").font(.bodyEmphasis)
+                    Text(note).font(.secondary).foregroundStyle(p.secondary)
                 }
                 .accessibilityElement(children: .combine)
                 Spacer()
@@ -620,7 +638,9 @@ private struct DoseResponseChart: View {
     }
 
     var body: some View {
-        let dotColor = metric.accent.fill(scheme).opacity(selected == nil ? 0.55 : 0.3)
+        // Light dots stay at 3:1 or more on white when nothing is picked
+        // (Tanaka F7).
+        let dotColor = metric.accent.fill(scheme).opacity(selected == nil ? (scheme == .dark ? 0.6 : 0.85) : 0.3)
         let lineColor = metric.accent.ink(scheme)
         Chart {
             bandMark
@@ -654,6 +674,12 @@ private struct DoseResponseChart: View {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ValueChartDescriptor(
+            title: "\(metric.label) the next day against hours asleep", seriesName: "Nights",
+            xTitle: "Hours asleep", yTitle: metric.label,
+            points: points.map { ($0.hours, $0.value) },
+            xLabel: { Clock.duration(Int(($0 * 60).rounded())) },
+            yLabel: { String(format: "%.1f", $0) }))
     }
 }
 
@@ -691,7 +717,7 @@ private struct NeedRangeBar: View {
                 let w = geo.size.width
                 ForEach([360, 420, 540, 660], id: \.self) { m in
                     Text("\(m / 60)h")
-                        .font(.scaled(size: 11, weight: .semibold))
+                        .font(.small).fontWeight(.semibold)
                         .foregroundStyle(p.tertiary)
                         .position(x: min(max(w * fraction(m), 10), w - 10), y: 8)
                 }
@@ -714,13 +740,15 @@ private struct FeelStat: View {
     var body: some View {
         let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
-            Text(value).font(.scaledNumber(22)).minimumScaleFactor(0.7).lineLimit(1)
-            Text(note).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
+            Text(title).font(.secondary).fontWeight(.semibold).foregroundStyle(p.secondary)
+            Text(value).font(.numberM).minimumScaleFactor(0.7).lineLimit(1)
+            Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(accent.ink(scheme))
         }
-        .padding(12)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityElement(children: .combine)
+        .background(p.card, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        // "3.4 of 5", not "3.4 slash 5" (Ortiz F8).
+        .accessibilityLabel("\(title), \(value.replacingOccurrences(of: "/", with: " of ")), \(note)")
     }
 }

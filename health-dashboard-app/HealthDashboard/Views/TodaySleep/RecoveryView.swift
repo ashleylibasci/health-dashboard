@@ -7,6 +7,7 @@ struct RecoveryView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedDay: Date? = nil
     @State private var heartMetric: HeartMetric = .hrv
     @State private var selectedHeartDay: Date? = nil
@@ -83,11 +84,11 @@ struct RecoveryView: View {
                         ExampleTag()
                     }
                 } else {
-                    Text("No recovery yet today").font(.scaled(size: 22, weight: .bold))
+                    Text("No recovery yet today").font(.heading)
                         .accessibilityAddTraits(.isHeader)
                 }
                 Text(summary)
-                    .font(.scaled(size: 15))
+                    .font(.bodyText)
                     .multilineTextAlignment(.center)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
@@ -130,8 +131,9 @@ struct RecoveryView: View {
     @ViewBuilder
     private func historyReadout(_ history: [AppModel.RecoveryNight]) -> some View {
         if let night = nearestNight(history) {
-            ChartReadout(title: dayText(night.day), value: "\(night.score) \u{00B7} \(model.recoveryLabel(for: night.score))",
-                         detail: nightDetail(night), accent: night.bedtime >= lateBedtime ? .coral : .indigo)
+            ChartReadout(title: "\(dayText(night.day)) \u{00B7} \(model.recoveryLabel(for: night.score))", value: "\(night.score)",
+                         detail: nightDetail(night), accent: night.bedtime >= lateBedtime ? .coral : .indigo,
+                         onClear: { selectedDay = nil })
         } else if let low = history.min(by: { $0.score < $1.score }) {
             ChartReadout(title: "Lowest day \u{00B7} \(dayText(low.day))", value: "\(low.score)",
                          detail: nightDetail(low), accent: .coral)
@@ -143,7 +145,7 @@ struct RecoveryView: View {
         let history = model.recoveryHistory(days: 14)
         if !history.isEmpty {
             Card {
-                Text("Last \(history.count) days").font(.scaled(size: 17, weight: .bold))
+                Text("Last \(history.count) days").font(.cardTitle)
                 historyReadout(history)
                 RecoveryHistoryChart(history: history, usual: model.recoveryUsual, lateBedtime: lateBedtime,
                                      selected: nearestNight(history)?.day, selection: $selectedDay)
@@ -153,12 +155,12 @@ struct RecoveryView: View {
                     Spacer()
                     Text("Today")
                 }
-                .font(.scaled(size: 11, weight: .semibold))
+                .font(.small).fontWeight(.semibold)
                 .secondaryText()
                 .accessibilityHidden(true)
-                ScrubHint()
+                ScrubHint(each: "day")
                 Text(historyCaption(history))
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -177,23 +179,42 @@ struct RecoveryView: View {
 
     // MARK: HRV and resting heart rate
 
-    private var heartCard: some View {
-        let history = model.heartTrend(days: 14)
-        let points = history.compactMap { n -> HeartPoint? in
+    private var heartPoints: [NightTrendPoint] {
+        model.heartTrend(days: 14).compactMap { n -> NightTrendPoint? in
             guard let v = heartMetric == .hrv ? n.hrv : n.restingHR else { return nil }
-            return HeartPoint(day: n.day, value: v)
+            return NightTrendPoint(date: n.day, value: v)
         }
-        let usual = heartMetric == .hrv ? model.baselineHRV : model.baselineRestingHR
-        let selected = selectedHeartDay.flatMap { d in points.min { abs($0.day.timeIntervalSince(d)) < abs($1.day.timeIntervalSince(d)) } }
+    }
+
+    private var heartUsual: Double { heartMetric == .hrv ? model.baselineHRV : model.baselineRestingHR }
+
+    /// Her usual spread (one standard deviation), or ±12% / ±3 bpm until
+    /// there's enough to know it.
+    private var heartBand: ClosedRange<Double> {
+        let usual = heartUsual
+        if heartMetric == .hrv {
+            let pct = (model.hrvSpreadPct ?? 12) / 100
+            return usual * (1 - pct)...usual * (1 + pct)
+        }
+        let sd = model.restingHRSpread ?? 3
+        return (usual - sd)...(usual + sd)
+    }
+
+    private func heartFormat(_ v: Double) -> String { "\(Int(v.rounded())) \(heartMetric.unit)" }
+
+    private var heartCard: some View {
+        let points = heartPoints
+        let usual = heartUsual
+        let selected = selectedHeartDay.flatMap { d in points.min { abs($0.date.timeIntervalSince(d)) < abs($1.date.timeIntervalSince(d)) } }
         return Card {
             HStack(spacing: 0) {
-                Text("HRV and resting heart rate").font(.scaled(size: 17, weight: .bold))
+                Text("HRV and resting heart rate").font(.cardTitle)
                 Spacer(minLength: 0)
                 InfoButton(explanation: heartMetric == .hrv ? model.hrvExplanation : model.restingHRExplanation).padding(.vertical, -12)
             }
             HStack(spacing: 6) {
                 ForEach(HeartMetric.allCases) { m in
-                    Chip(title: m.label, selected: heartMetric == m, accent: .indigo) {
+                    Chip(title: m.label, selected: heartMetric == m, accent: m == .hrv ? .indigo : .pink) {
                         heartMetric = m
                         selectedHeartDay = nil
                     }
@@ -201,17 +222,22 @@ struct RecoveryView: View {
             }
             if points.isEmpty {
                 Text("Not enough mornings with \(heartMetric.label) yet. Wear your Watch to bed.")
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
             } else {
                 heartReadout(selected: selected, latest: points.last, usual: usual)
-                HeartTrendChart(points: points, usual: usual, metric: heartMetric, selected: selected?.day, selection: $selectedHeartDay)
-                    .frame(height: 160)
-                ScrubHint()
+                NightTrendChart(points: points, usual: usual, band: heartBand,
+                                scale: heartMetric == .hrv ? .percent(0.25) : .points(8),
+                                accent: heartMetric == .hrv ? .indigo : .pink,
+                                seriesName: heartMetric == .hrv ? "HRV" : "Resting heart rate",
+                                format: heartFormat, selected: selected?.date, selection: $selectedHeartDay)
+                    .frame(height: 170)
+                    .motion(.dataSwap, value: heartMetric)
+                ScrubHint(each: "morning")
                 Text(heartMetric == .hrv
-                     ? "Higher than your usual (dashed line) means your body is relaxed and recovered."
-                     : "Lower than your usual (dashed line) is better. \(Int(HeartBands.restingHRUp)) or more beats up can mean short sleep, stress, drinks or getting sick\(model.heartCycleCause).")
-                    .font(.scaled(size: 13))
+                     ? "Higher than your usual (dashed line) means your body is relaxed and recovered. The shaded band is your normal range."
+                     : "Lower than your usual (dashed line) is better. \(Int(HeartBands.restingHRUp)) or more beats up can mean short sleep, stress, drinks or getting sick\(model.heartCycleCause). The shaded band is your normal range.")
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -228,13 +254,24 @@ struct RecoveryView: View {
         return "\(SleepText.signed(d)) bpm vs usual. " + model.restingHRMeaning(d)
     }
 
+    /// Coral only for a reading worth acting on (Valtonen F4).
+    private func heartIsWorse(_ value: Double, usual: Double) -> Bool {
+        if heartMetric == .hrv {
+            let pct = usual > 0 ? (value - usual) / usual * 100 : 0
+            return HeartBands.hrv(deltaPct: pct, spreadPct: model.hrvSpreadPct) == .wellBelow
+        }
+        let level = HeartBands.restingHR(delta: value - usual)
+        return level == .above || level == .wellBelow
+    }
+
     @ViewBuilder
-    private func heartReadout(selected: HeartPoint?, latest: HeartPoint?, usual: Double) -> some View {
+    private func heartReadout(selected: NightTrendPoint?, latest: NightTrendPoint?, usual: Double) -> some View {
         if let point = selected ?? latest {
-            ChartReadout(title: selected == nil ? "Latest \u{00B7} \(dayText(point.day))" : dayText(point.day),
-                         value: "\(Int(point.value.rounded())) \(heartMetric.unit)",
+            ChartReadout(title: selected == nil ? "Latest \u{00B7} \(dayText(point.date))" : dayText(point.date),
+                         value: heartFormat(point.value),
                          detail: heartMeaning(point.value, usual: usual),
-                         accent: heartMetric == .hrv ? .indigo : .pink)
+                         accent: heartIsWorse(point.value, usual: usual) ? .coral : (heartMetric == .hrv ? .indigo : .pink),
+                         onClear: selected == nil ? nil : { selectedHeartDay = nil })
         }
     }
 
@@ -242,24 +279,34 @@ struct RecoveryView: View {
 
     private var movedCard: some View {
         let sleepGap = model.lastNight.asleep - model.sleepNeed.minutes
+        let sleepText = SleepText.signedCompact(sleepGap)
+        let rows = [
+            MovedDriver(label: "HRV", spoken: "HRV",
+                        valueText: model.hasHeartData ? SleepText.signed(model.hrvDeltaPct) + "%" : "No reading yet",
+                        spokenValue: model.hasHeartData ? SleepText.signed(model.hrvDeltaPct) + " percent" : "No reading yet",
+                        points: model.hasHeartData ? model.recoveryPointsFromHRV : 0,
+                        explanation: model.hrvExplanation),
+            MovedDriver(label: "Resting HR", spoken: "Resting heart rate",
+                        valueText: model.hasHeartData ? SleepText.signed(model.restingHRDelta) + " bpm" : "No reading yet",
+                        spokenValue: model.hasHeartData ? SleepText.signed(model.restingHRDelta) + " beats a minute" : "No reading yet",
+                        points: model.hasHeartData ? model.recoveryPointsFromRestingHR : 0,
+                        explanation: model.restingHRExplanation),
+            MovedDriver(label: "Sleep", spoken: "Sleep",
+                        valueText: model.lastNightIsFresh ? sleepText : "None recorded",
+                        spokenValue: model.lastNightIsFresh ? sleepText.replacingOccurrences(of: "\u{2212}", with: "minus ") : "None recorded",
+                        points: model.lastNightIsFresh ? model.recoveryPointsFromSleep : 0,
+                        explanation: Topic.sleepNeed.explanation),
+        ]
         return Card {
-            HStack(alignment: .firstTextBaseline) {
-                Text("What moved today").font(.scaled(size: 17, weight: .bold))
-                Spacer()
-                Text("vs your last 4 weeks").font(.scaled(size: 13)).secondaryText()
+            AdaptiveStack(spacing: Space.xs, alignment: .firstTextBaseline) {
+                Text("What moved today").font(.cardTitle)
+                if !typeSize.isAccessibilitySize { Spacer() }
+                Text("vs your last 4 weeks").font(.secondary).secondaryText()
             }
-            MovedRow(label: "HRV", valueText: model.hasHeartData ? SleepText.signed(model.hrvDeltaPct) + "%" : "No reading yet",
-                     points: model.hasHeartData ? model.recoveryPointsFromHRV : 0,
-                     explanation: model.hrvExplanation)
-            MovedRow(label: "Resting HR", valueText: model.hasHeartData ? SleepText.signed(model.restingHRDelta) + " bpm" : "No reading yet",
-                     points: model.hasHeartData ? model.recoveryPointsFromRestingHR : 0,
-                     explanation: model.restingHRExplanation)
-            MovedRow(label: "Sleep", valueText: model.lastNightIsFresh ? SleepText.signedCompact(sleepGap) : "None recorded",
-                     points: model.lastNightIsFresh ? model.recoveryPointsFromSleep : 0,
-                     explanation: Topic.sleepNeed.explanation)
+            MovedDrivers(rows: rows)
             Text("Bars to the left of the line pulled today down; bars to the right lifted it."
                  + (model.hasHeartData && model.cycleHeartShift != .none ? " The bars allow for your cycle; the numbers are the raw change." : ""))
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -311,6 +358,9 @@ private struct RecoveryHistoryChart: View {
             AxisMarks(position: .leading, values: [0, 50, 100])
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(DateChartDescriptor(
+            title: "Recovery, last \(history.count) days", seriesName: "Recovery", yTitle: "Recovery",
+            points: history.map { ($0.day, Double($0.score)) }, yLabel: { "\(Int($0.rounded()))" }, isContinuous: false))
     }
 }
 
@@ -321,129 +371,120 @@ private enum HeartMetric: String, CaseIterable, Identifiable {
     var unit: String { self == .hrv ? "ms" : "bpm" }
 }
 
-private struct HeartPoint: Identifiable, Hashable {
-    var id: Date { day }
-    let day: Date
-    let value: Double
-}
-
-private struct HeartTrendChart: View {
-    let points: [HeartPoint]
-    let usual: Double
-    let metric: HeartMetric
-    let selected: Date?
-    @Binding var selection: Date?
-    @Environment(\.colorScheme) private var scheme
-
-    private var accent: Accent { metric == .hrv ? .indigo : .pink }
-
-    private var yDomain: ClosedRange<Double> {
-        let values = points.map(\.value) + [usual]
-        let lo = values.min() ?? 0
-        let hi = values.max() ?? 1
-        let pad = max((hi - lo) * 0.15, 2)
-        return (lo - pad)...(hi + pad)
-    }
-
-    private var summary: String {
-        let values = points.map { "\(Int($0.value.rounded()))" }.joined(separator: ", ")
-        return "\(metric.label) for \(points.count) mornings, oldest first: \(values) \(metric.unit). Usual is \(Int(usual.rounded()))."
-    }
-
-    @ChartContentBuilder
-    private var usualLine: some ChartContent {
-        RuleMark(y: .value(metric.label, usual))
-            .foregroundStyle(Palette(scheme: scheme).secondary)
-            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-    }
-
-    @ChartContentBuilder
-    private var selectionMarks: some ChartContent {
-        if let selected, let point = points.first(where: { Calendar.current.isDate($0.day, inSameDayAs: selected) }) {
-            RuleMark(x: .value("Day", point.day, unit: .day))
-                .foregroundStyle(Palette(scheme: scheme).primary.opacity(0.3))
-            PointMark(x: .value("Day", point.day, unit: .day), y: .value(metric.label, point.value))
-                .foregroundStyle(accent.ink(scheme))
-                .symbolSize(90)
-        }
-    }
-
-    var body: some View {
-        let line = accent.fill(scheme)
-        Chart {
-            // VoiceOver reads the chart's summary instead (round 3, A9).
-            usualLine.accessibilityHidden(true)
-            ForEach(points) { point in
-                LineMark(x: .value("Day", point.day, unit: .day), y: .value(metric.label, point.value))
-                    .foregroundStyle(line)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .interpolationMethod(.monotone)
-                PointMark(x: .value("Day", point.day, unit: .day), y: .value(metric.label, point.value))
-                    .foregroundStyle(line)
-                    .symbolSize(24)
-            }
-            .accessibilityHidden(true)
-            selectionMarks.accessibilityHidden(true)
-        }
-        .chartScrub($selection, snapped: selected, steps: points.map(\.day).sorted())
-        .chartYScale(domain: yDomain)
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .day, count: 3)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
-        }
-        .accessibilityLabel(summary)
-    }
-}
-
-/// A bar that grows left (pulled recovery down) or right (pushed it up)
-/// from a center line.
-private struct MovedRow: View {
+/// One row of "What moved today".
+private struct MovedDriver: Identifiable {
+    var id: String { label }
     var label: String
+    var spoken: String
     var valueText: String
+    var spokenValue: String
     var points: Int
     var explanation: Explanation
-    @Environment(\.colorScheme) private var scheme
 
     /// Ten points fills half the track.
-    private var fraction: CGFloat { CGFloat(min(Double(abs(points)) / 10, 1)) }
+    var fraction: CGFloat { CGFloat(min(Double(abs(points)) / 10, 1)) }
 
-    private var effectDescription: String {
+    var effectDescription: String {
         let n = abs(points) == 1 ? "1 point" : "\(abs(points)) points"
         if points < 0 { return "pulled recovery down \(n)" }
         if points > 0 { return "lifted recovery \(n)" }
         return "no change"
     }
 
+    var accessibilityText: String { "\(spoken), \(spokenValue), \(effectDescription)" }
+}
+
+/// Bars that grow left (pulled recovery down) or right (lifted it) from a
+/// centre line. A grid at standard sizes, so the label and value columns
+/// take only the room their text needs and every centre line lines up; at
+/// accessibility sizes, label and value on one line with the bar full width
+/// below (Ortiz B1: fixed columns pushed the screen sideways). Each row is
+/// one VoiceOver element, and its ⓘ is an "Explain" action (Ortiz F8/F9).
+private struct MovedDrivers: View {
+    var rows: [MovedDriver]
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var explaining: Explanation? = nil
+
     var body: some View {
-        let p = Palette(scheme: scheme)
-        let accent: Accent = points < 0 ? .coral : .mint
-        HStack(spacing: 10) {
-            HStack(spacing: 0) {
-                Text(label).font(.scaled(size: 14, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-                InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -10)
-            }
-            .frame(width: Font.scaledSize(104), alignment: .leading)
-            GeometryReader { geo in
-                let half = geo.size.width / 2
-                let barWidth = max(points == 0 ? 0 : 4, half * fraction)
-                ZStack(alignment: .leading) {
-                    Capsule().fill(p.track).frame(height: 10)
-                    Capsule().fill(accent.fill(scheme))
-                        .frame(width: barWidth, height: 10)
-                        .offset(x: points < 0 ? half - barWidth : half)
-                    Rectangle().fill(p.secondary).frame(width: 2, height: 18).offset(x: half - 1)
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Space.l) {
+                    ForEach(rows) { row in
+                        VStack(alignment: .leading, spacing: Space.s) {
+                            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                                label(row)
+                                Spacer(minLength: Space.s)
+                                value(row)
+                            }
+                            bar(row)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(row.accessibilityText)
+                        .accessibilityAction(named: "Explain") { explaining = row.explanation }
+                    }
                 }
-                .frame(width: geo.size.width, height: 18)
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: Space.m) {
+                    ForEach(rows) { row in
+                        GridRow {
+                            label(row)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(row.accessibilityText)
+                                .accessibilityAction(named: "Explain") { explaining = row.explanation }
+                            bar(row).accessibilityHidden(true)
+                            value(row)
+                                .gridColumnAlignment(.trailing)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                }
             }
-            .frame(height: 18)
-            Text(valueText).font(.scaled(size: 14, weight: .bold)).frame(width: Font.scaledSize(64), alignment: .trailing)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(label) \(valueText), \(effectDescription)")
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
+    }
+
+    private func label(_ row: MovedDriver) -> some View {
+        HStack(spacing: 0) {
+            Text(row.label).font(.bodyEmphasis)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { explaining = row.explanation } label: {
+                Image(systemName: "info.circle")
+                    .font(.secondary).fontWeight(.semibold)
+                    .foregroundStyle(Palette(scheme: scheme).tertiary)
+                    .frame(width: Sizes.minTap, height: Sizes.minTap)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, -14).padding(.horizontal, -8)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func value(_ row: MovedDriver) -> some View {
+        Text(row.valueText).font(.bodyEmphasis).fontWeight(.bold)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
+    private func bar(_ row: MovedDriver) -> some View {
+        let p = Palette(scheme: scheme)
+        // Coral when it pulled recovery down, mint when it lifted it.
+        let accent: Accent = row.points < 0 ? .coral : .mint
+        return GeometryReader { geo in
+            let half = geo.size.width / 2
+            let barWidth = max(row.points == 0 ? 0 : 4, half * row.fraction)
+            ZStack(alignment: .leading) {
+                Capsule().fill(p.track).frame(height: 10)
+                Capsule().fill(accent.fill(scheme))
+                    .frame(width: barWidth, height: 10)
+                    .offset(x: row.points < 0 ? half - barWidth : half)
+                    .motion(.fill, value: row.points)
+                Rectangle().fill(p.secondary).frame(width: 2, height: 18).offset(x: half - 1)
+            }
+            .frame(width: geo.size.width, height: 18)
+        }
+        .frame(minWidth: 80, maxWidth: .infinity)
+        .frame(height: 18)
     }
 }
