@@ -43,13 +43,20 @@ struct SampleDataBanner: View {
     }
 
     var body: some View {
-        if model.usingSampleData {
-            if typeSize.isAccessibilitySize {
-                compactBanner
-            } else {
-                fullBanner
+        // Fades out (and the page closes up) when her own numbers take over.
+        Group {
+            if model.usingSampleData {
+                Group {
+                    if typeSize.isAccessibilitySize {
+                        compactBanner
+                    } else {
+                        fullBanner
+                    }
+                }
+                .motionTransition(.commit)
             }
         }
+        .motion(.commit, value: model.usingSampleData)
     }
 
     /// The full banner: icon, title, why, and the access note.

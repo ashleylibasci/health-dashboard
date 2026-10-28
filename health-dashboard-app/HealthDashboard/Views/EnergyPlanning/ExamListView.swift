@@ -66,6 +66,9 @@ struct ExamListView: View {
     @Environment(\.colorScheme) private var scheme
 
     @State private var editing: ExamDraft? = nil
+    /// An exam she just saved that's within 10 days, while exam-week mode
+    /// is off: the list offers to turn it on, right here (Whitfield F9).
+    @State private var offer: AppData.Exam? = nil
 
     /// Counted from the app day, like `upcomingExams` (at 1am it's still the evening before).
     private var upcoming: [AppData.Exam] {
@@ -84,6 +87,10 @@ struct ExamListView: View {
             Text("Add your exams and the app plans your sleep, study blocks and exam-morning alarm around them. They stay on your phone.")
                 .font(.scaled(size: 14)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            if let offer {
+                examModeOffer(offer)
+                    .motionTransition(.reveal, edge: .top)
+            }
             if upcoming.isEmpty {
                 Card {
                     Text("No exams yet").font(.scaled(size: 17, weight: .bold))
@@ -115,8 +122,48 @@ struct ExamListView: View {
             }
         }
         .sheet(item: $editing) { draft in
-            ExamEditorSheet(draft: draft)
+            ExamEditorSheet(draft: draft) { saved in
+                let days = Calendar.current.dateComponents([.day], from: AppDay.day(), to: saved.date).day ?? 99
+                if !store.data.examModeOn, (0...10).contains(days) {
+                    withMotion(.reveal) { offer = saved }
+                }
+            }
         }
+        .motion(.reveal, value: offer?.id)
+    }
+
+    private func examModeOffer(_ exam: AppData.Exam) -> some View {
+        Card(accent: .yellow) {
+            if store.data.examModeOn {
+                Label("Exam-week mode is on", systemImage: "checkmark.circle.fill")
+                    .font(.cardTitle)
+                    .foregroundStyle(Accent.yellow.onTint(scheme))
+                LinkRow(title: "Open exam-week mode", subtitle: "Sleep, study blocks and an exam-morning alarm",
+                        systemImage: "graduationcap.fill", accent: .yellow) {
+                    ExamModeView()
+                }
+            } else {
+                Text("Turn on exam-week mode?").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                Text("\(exam.title) is \(Self.when(exam.date)). Exam-week mode plans your sleep, study blocks and exam-morning alarm around it.")
+                    .font(.bodyText).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                PrimaryButton(title: "Turn it on", accent: .yellow) {
+                    withMotion(.reveal) { store.data.examModeOn = true }
+                }
+                Button("Not now") { withMotion(.reveal) { offer = nil } }
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(Accent.indigo.ink(scheme))
+                    .frame(maxWidth: .infinity, minHeight: Sizes.minTap)
+            }
+        }
+    }
+
+    /// "today", "tomorrow", "on Thursday".
+    private static func when(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDate(date, inSameDayAs: AppDay.day()) { return "today" }
+        if let t = cal.date(byAdding: .day, value: 1, to: AppDay.day()), cal.isDate(date, inSameDayAs: t) { return "tomorrow" }
+        return "on " + date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
     }
 }
 
@@ -155,6 +202,7 @@ private struct ExamEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
     @State var draft: ExamDraft
+    var onSaved: (AppData.Exam) -> Void = { _ in }
 
     private let kinds = ["Quiz", "Test", "Midterm", "Final", "Exam"]
 
@@ -230,6 +278,7 @@ private struct ExamEditorSheet: View {
             store.data.exams[i] = exam
         } else {
             store.data.exams.append(exam)
+            onSaved(exam)
         }
         dismiss()
     }

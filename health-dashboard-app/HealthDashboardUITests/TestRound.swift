@@ -136,8 +136,6 @@ final class TestRound: XCTestCase {
         shot("1-welcome")
         tap("Connect Apple Health")
         sleep(1)
-        shot("2-about")
-        tap("Continue")
         shot("3-cycle")
         tap("Birth control")
         tap("Continue")
@@ -158,44 +156,44 @@ final class TestRound: XCTestCase {
             XCTFail("No pack day picker")
         }
         tap("Continue")
-        shot("6-conditions")
-        tap("Continue")
         shot("7-sleep")
         tap("Continue")
-        shot("8-prefs")
-        tap("Start learning my normal")
-        sleep(2)
-        // Notification permission.
+        shot("8-done")
+        // Notification permission, asked on the last step.
+        tap("Allow alerts")
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         if springboard.buttons["Allow"].waitForExistence(timeout: 3) { springboard.buttons["Allow"].tap() }
+        sleep(1)
+        shot("8b-alerts-on")
+        tap("Start tracking")
         sleep(2)
         shot("9-first-screen")
     }
 
     /// A beginner's first run at the largest text size: natural cycle, no
-    /// conditions, every screen of setup page by page.
+    /// alerts, every screen of setup page by page.
     func test0OnboardingBeginner() {
         prefix = "xxxl-onb-"
         launch(textSize: Self.largestText, args: ["-resetData"])
         shotPage("1-welcome", maxPages: 3)
         tap("Connect Apple Health")
         sleep(1)
-        shotPage("2-about", maxPages: 3)
-        tap("Continue")
         shotPage("3-cycle", maxPages: 4)
+        // Back to the top: the step bar stays over the page, so a card scrolled
+        // under it reads as hittable but the tap lands on the bar.
+        app.swipeDown(); app.swipeDown(); app.swipeDown()
         tap("Natural cycle")
         shot("3b-picked")
         tap("Continue")
-        shotPage("4-conditions", maxPages: 6)
-        tap("Continue")
         shotPage("5-sleep", maxPages: 5)
         tap("Continue")
-        shotPage("6-prefs", maxPages: 5)
-        tap("Start learning my normal")
+        shotPage("6-done", maxPages: 5)
+        // Skips "Allow alerts": no system prompt should appear.
+        tap("Start tracking")
         sleep(2)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        if springboard.buttons["Allow"].waitForExistence(timeout: 3) { springboard.buttons["Allow"].tap() }
-        sleep(2)
+        XCTAssertFalse(springboard.buttons["Allow"].waitForExistence(timeout: 2), "Asked for notifications without Allow alerts")
+        sleep(1)
         shotPage("7-first-today", maxPages: 4)
         goTab("Log")
         shotPage("8-first-log", maxPages: 6)
@@ -308,6 +306,17 @@ final class TestRound: XCTestCase {
         if drink.exists { drink.tap() } else { XCTFail("No coffee button") }
         sleep(1)
         shot("coffee-4-logged")
+
+        // The rest of the Log tab: flow (one tap saves), symptoms, water,
+        // stress, and Undo on the toast.
+        if tap("Light flow") { sleep(1); shot("log-1-flow-saved") }
+        if tap("Add symptoms") { sleep(1); shot("log-2-symptoms-open") }
+        if tap("Cramps") { sleep(1); shot("log-3-symptom-added") }
+        if tap("Undo") { sleep(1); shot("log-4-undone") }
+        if tap("Add 1 bottle of water") { sleep(1); shot("log-5-water") }
+        if tap("Stress 3") { sleep(1); shot("log-6-stress") }
+        sleep(5)
+        shotPage("log-7-after", maxPages: 6)
         goTab("Today")
         tap("Caffeine")
         sleep(1)

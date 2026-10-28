@@ -31,9 +31,9 @@ struct CycleLogView: View {
     private var cal: Calendar { Calendar.current }
 
     var body: some View {
-        Screen(title: "Log", accent: .coral) {
+        Screen(title: "Log", accent: .pink) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Bleeding & symptoms").font(.scaled(size: 28, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text(model.usesBleedingWording || model.usesPackWording ? "Bleeding & symptoms" : "Period & symptoms").font(.detailTitle).accessibilityAddTraits(.isHeader)
                 Text(introText).font(.scaled(size: 15)).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             if model.usingSampleData {
@@ -44,7 +44,7 @@ struct CycleLogView: View {
             dateCard
             flowCard
             symptomsCard
-            PrimaryButton(title: saveTitle, accent: .coral, done: justSaved) { save() }
+            PrimaryButton(title: saveTitle, accent: .pink, done: justSaved) { save() }
             recentSection
         }
         .onAppear { load() }
@@ -97,12 +97,12 @@ struct CycleLogView: View {
         Card {
             DatePicker("Day", selection: dateBinding, in: ...Date.now, displayedComponents: .date)
                 .font(.scaled(size: 15, weight: .bold))
-                .tint(Accent.coral.ink(scheme))
+                .tint(Accent.pink.ink(scheme))
                 .frame(minHeight: 44)
             if hasEntry(on: date) {
                 Label("Already logged. Saving replaces it.", systemImage: "pencil")
                     .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.coral.ink(scheme))
+                    .foregroundStyle(Accent.pink.ink(scheme))
             }
         }
     }
@@ -121,7 +121,7 @@ struct CycleLogView: View {
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(AppData.Flow.allCases, id: \.self) { f in
-                    Chip(title: f.rawValue, selected: flow == f, accent: .coral) {
+                    Chip(title: f.rawValue, selected: flow == f, accent: .pink) {
                         flow = flow == f ? nil : f
                     }
                 }
@@ -157,7 +157,7 @@ struct CycleLogView: View {
             SectionLabel(text: "Symptoms")
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(options, id: \.self) { s in
-                    Chip(title: s, selected: symptoms.contains(s), accent: .purple) {
+                    Chip(title: s, selected: symptoms.contains(s), accent: .pink) {
                         if symptoms.contains(s) { symptoms.remove(s) } else { symptoms.insert(s) }
                     }
                 }
@@ -211,9 +211,9 @@ struct CycleLogView: View {
             Button { pick(item.day) } label: {
                 HStack(spacing: 10) {
                     Image(systemName: item.flow.map { $0 == .none ? "circle" : "drop.fill" } ?? "list.bullet")
-                        .foregroundStyle(Accent.coral.ink(scheme))
+                        .foregroundStyle(Accent.pink.ink(scheme))
                         .frame(width: 32, height: 32)
-                        .background(Accent.coral.tint(scheme), in: Circle())
+                        .background(Accent.pink.tint(scheme), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))

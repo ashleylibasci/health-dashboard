@@ -9,8 +9,11 @@ import HealthCore
 struct Screen<Content: View>: View {
     var title: String? = nil
     var accent: Accent = .indigo
+    /// Pull down to re-read Apple Health (off for onboarding).
+    var refreshes = true
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @EnvironmentObject private var model: AppModel
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -27,8 +30,24 @@ struct Screen<Content: View>: View {
             .ignoresSafeArea()
         }
         .foregroundStyle(p.primary)
+        .modifier(PullToRefresh(enabled: refreshes) { await model.becameActive() })
         .navigationTitle(title ?? "")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// `.refreshable` when `enabled`: the same refresh the app runs when it
+/// comes to the front (Apple Health, then the Watch).
+private struct PullToRefresh: ViewModifier {
+    var enabled: Bool
+    var action: () async -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.refreshable { await action() }
+        } else {
+            content
+        }
     }
 }
 
@@ -296,25 +315,38 @@ struct Chip: View {
     private var selectedText: Color { scheme == .dark ? Color(hex: 0x1A0E00) : .white }
 }
 
-/// The big rounded primary button.
+/// The big rounded primary button. When `done` turns on ("Saved"), the
+/// label swaps with a checkmark and a success haptic.
 struct PrimaryButton: View {
     var title: String
     var accent: Accent = .indigo
     var done = false
     var action: () -> Void
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.cardTitle)
-                .frame(maxWidth: .infinity, minHeight: Sizes.tallRow)
-                .foregroundStyle(done ? Accent.mint.ink(scheme) : (scheme == .dark ? Color(hex: 0x0E1136) : .white))
-                .background(done ? Accent.mint.tint(scheme) : (scheme == .dark ? accent.ink(.dark) : accent.ink(.light)),
-                            in: Capsule())
-                .motion(.select, value: done)
+            HStack(spacing: Space.s) {
+                if done {
+                    Image(systemName: "checkmark")
+                        .font(.scaled(size: 15, weight: .bold))
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.4).combined(with: .opacity))
+                        .accessibilityHidden(true)
+                }
+                Text(title)
+                    .contentTransition(.opacity)
+            }
+            .font(.cardTitle)
+            .frame(maxWidth: .infinity, minHeight: Sizes.tallRow)
+            .foregroundStyle(done ? Accent.mint.ink(scheme) : (scheme == .dark ? Color(hex: 0x0E1136) : .white))
+            .background(done ? Accent.mint.tint(scheme) : (scheme == .dark ? accent.ink(.dark) : accent.ink(.light)),
+                        in: Capsule())
+            .motion(.select, value: done)
+            .motion(.select, value: title)
         }
         .buttonStyle(.pressable)
+        .sensoryFeedback(.success, trigger: done) { old, new in !old && new }
     }
 }
 

@@ -6,6 +6,7 @@ struct SleepView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let plan = model.wakePlan()
@@ -32,12 +33,12 @@ struct SleepView: View {
     /// When it's more than a bad week (Park 13).
     private var troubleSleepingCard: some View {
         Card {
-            Text("Trouble sleeping?").font(.scaled(size: 17, weight: .bold))
+            Text("Trouble sleeping?").font(.cardTitle).accessibilityAddTraits(.isHeader)
             Text("Trouble falling or staying asleep 3 or more nights a week, for months? That's insomnia, and it's very treatable. CBT-I, a short program that changes sleep habits and thoughts, is the first-line treatment, and many campuses offer it. Ask your campus health or counseling center.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).lineSpacing(2).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text("An urge to move your legs at night can be restless legs, which is linked to low iron. Sleep that gets much worse every month before your period is worth mentioning to a clinician too.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.bodyText).lineSpacing(2).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -72,24 +73,24 @@ struct SleepView: View {
     private var lastNightStats: some View {
         let night = model.lastNight
         return VStack(alignment: .leading, spacing: 14) {
-            statBlock("Fell asleep", Clock.format(night.onset))
-            statBlock("Woke up", Clock.format(night.wake))
+            statBlock("Fell asleep", night.onset)
+            statBlock("Woke up", night.wake)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 0) {
                     SectionLabel(text: "Regularity")
                     InfoButton(topic: .regularity).padding(.vertical, -14).padding(.horizontal, -8)
                 }
-                Text(model.sleepRegularityScore.map { "\($0)" } ?? "\u{2014}").font(.scaledNumber(22))
+                Text(model.sleepRegularityScore.map { "\($0)" } ?? "\u{2014}").font(.numberM)
             }
         }
     }
 
     private var noSleepCard: some View {
         Card {
-            Text("No sleep recorded last night").font(.scaled(size: 20, weight: .bold))
+            Text("No sleep recorded last night").font(.section)
                 .accessibilityAddTraits(.isHeader)
             Text("Your Watch didn't record a night that ended this morning. Wear it to bed with at least 30% battery and turn on Sleep Focus.")
-                .font(.scaled(size: 14))
+                .font(.bodyText).lineSpacing(2)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "How to get your sleep recorded", systemImage: "applewatch", accent: .purple) {
@@ -98,10 +99,10 @@ struct SleepView: View {
         }
     }
 
-    private func statBlock(_ title: String, _ value: String) -> some View {
+    private func statBlock(_ title: String, _ time: Minutes) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             SectionLabel(text: title)
-            Text(value).font(.scaledNumber(22))
+            ClockText(minutes: time, role: .numberM)
         }
         .accessibilityElement(children: .combine)
     }
@@ -120,7 +121,7 @@ struct SleepView: View {
     // MARK: Smart alarm
 
     private var alarmBinding: Binding<Bool> {
-        Binding(
+        let binding = Binding<Bool>(
             get: { store.data.smartAlarmEnabled },
             set: { on in
                 if on, let plan = model.wakePlan() {
@@ -130,6 +131,7 @@ struct SleepView: View {
                     model.pushToWatch()
                 }
             })
+        return binding.animation(Motion.reveal.animation(reduceMotion: reduceMotion))
     }
 
     private func smartAlarmCard(_ plan: WakePlan?) -> some View {
@@ -139,21 +141,27 @@ struct SleepView: View {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     ExplainedTitle(text: "Smart alarm", topic: .smartAlarm, size: 17)
-                    Text("On your Watch").font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                    Text(store.data.smartAlarmEnabled ? "On your Watch" : "Off")
+                        .font(.secondary).foregroundStyle(p.secondary)
+                        .contentTransition(.opacity)
                 }
                 Spacer()
                 Toggle("Smart alarm", isOn: alarmBinding)
                     .labelsHidden()
-                    .tint(Accent.orange.fill(scheme))
+                    .tint(Accent.purple.fill(scheme))
             }
             if let plan {
-                // Stacks at large sizes so the time never splits ("8:2 / 5").
-                AdaptiveStack(spacing: 6, alignment: .firstTextBaseline) {
-                    Text(Clock.format(plan.alarmWindow.end, suffix: false)).font(.scaledNumber(40)).keepsOnOneLine()
-                    Text("\(SleepText.meridiem(plan.alarmWindow.end)) latest \u{00B7} listens from \(Clock.format(plan.alarmWindow.start)) \u{00B7} up by \(Clock.format(store.data.upBy))")
-                        .font(.scaled(size: 14, weight: .semibold))
+                // "8:00–8:25am", then the latest wake-up (Dubois 7). Dimmed
+                // while the alarm is off (Valtonen F14).
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    ClockText(minutes: plan.alarmWindow.end, role: .numberL, from: plan.alarmWindow.start)
+                        .keepsOnOneLine()
+                    Text("Never after \(Clock.format(store.data.upBy)), your latest wake-up.")
+                        .font(.secondary)
                         .foregroundStyle(p.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .opacity(store.data.smartAlarmEnabled ? 1 : 0.5)
                 .accessibilityElement(children: .combine)
             }
             if model.lastNightIsFresh {
@@ -162,7 +170,7 @@ struct SleepView: View {
                         .foregroundStyle((night.wokeFromLight ? Accent.mint : Accent.coral).ink(scheme))
                         .accessibilityHidden(true)
                     Text("This morning you woke at \(Clock.format(night.wake)), " + (night.wokeFromLight ? "in light sleep." : "from deep or REM sleep."))
-                        .font(.scaled(size: 14))
+                        .font(.bodyText)
                         .foregroundStyle(p.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -170,13 +178,14 @@ struct SleepView: View {
             if store.data.smartAlarmEnabled {
                 Toggle(isOn: $store.data.alarmWeekdaysOnly) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Weekdays only").font(.scaled(size: 15, weight: .semibold))
+                        Text("Weekdays only").font(.bodyEmphasis)
                         Text("No smart alarm on Saturday and Sunday mornings.")
-                            .font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                            .font(.secondary).foregroundStyle(p.secondary)
                     }
                 }
-                .tint(Accent.orange.fill(scheme))
+                .tint(Accent.purple.fill(scheme))
                 .frame(minHeight: 44)
+                .motionTransition(.reveal, edge: .top)
             }
             if let plan {
                 NavigationLink {
@@ -184,16 +193,17 @@ struct SleepView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text("Best time to wake \(model.nextWakeDayLabel.lowercased()): \(Clock.format(plan.wake))")
-                            .font(.scaled(size: 15, weight: .bold))
+                            .font(.bodyEmphasis)
                         Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
                     }
-                    .foregroundStyle(Accent.orange.ink(scheme))
+                    .foregroundStyle(Accent.purple.ink(scheme))
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
+        .sensoryFeedback(.success, trigger: store.data.smartAlarmEnabled) { old, new in !old && new }
     }
 
     // MARK: Links
@@ -203,11 +213,11 @@ struct SleepView: View {
         let showClockChange = model.daysUntilFallBack <= 28
         return Card {
             HStack(spacing: 0) {
-                Text("Sleep debt").font(.scaled(size: 15, weight: .bold))
+                Text("Sleep debt").font(.bodyEmphasis)
                 InfoButton(topic: .sleepDebt).padding(.vertical, -12)
                 Spacer()
                 Text(model.sleepDebt > 0 ? Clock.duration(model.sleepDebt) : "None")
-                    .font(.scaled(size: 15, weight: .bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle((model.sleepDebt >= 60 ? Accent.coral : Accent.mint).ink(scheme))
             }
             .padding(.horizontal, 4)
@@ -285,15 +295,16 @@ struct SleepView: View {
                     ExplainedTitle(text: "Weekend shift", topic: .weekendShift)
                     Spacer()
                     Text("\(Clock.duration(shift)) later")
-                        .font(.scaled(size: 15, weight: .bold))
-                        .foregroundStyle(Accent.coral.ink(scheme))
+                        .font(.bodyEmphasis)
+                        .foregroundStyle(shift >= 60 ? Accent.coral.ink(scheme) : Palette(scheme: scheme).secondary)
                 }
                 ShiftBar(title: "School nights", range: work, color: Accent.purple.fill(scheme))
-                ShiftBar(title: "Free nights", range: free, color: Accent.coral.fill(scheme))
+                ShiftBar(title: "Free nights", range: free,
+                         color: shift >= 60 ? Accent.coral.fill(scheme) : Accent.purple.ink(scheme).opacity(0.6))
                 Text(shift >= 60
                      ? "Like flying a time zone west every weekend. Keeping free days within an hour of school days makes Mondays easier."
                      : "Under an hour, which is the goal. Your body clock stays steady through the week.")
-                    .font(.scaled(size: 13))
+                    .font(.bodyText).lineSpacing(2)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
