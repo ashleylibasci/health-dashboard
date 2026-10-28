@@ -21,8 +21,17 @@ struct SleepNeedView: View {
             heroCard(need)
             tonightCard
             responseCard(need)
-            feelingCard
-            accuracyCard
+            RowCard {
+                ExpandRow(title: "Feeling fine isn't the whole story", summary: "How short nights feel against what they cost",
+                          systemImage: "face.smiling", accent: .yellow) {
+                    feeling
+                }
+                RowDivider()
+                ExpandRow(title: "Make it more accurate", summary: "Morning check-ins and a week without alarms",
+                          systemImage: "scope", accent: .mint) {
+                    accuracy
+                }
+            }
             adjustCard(need)
             Text("An estimate from your own data, not a medical test. If you often need more than 10 hours or feel exhausted however long you sleep, talk to a doctor.")
                 .font(.secondary)
@@ -184,18 +193,6 @@ struct SleepNeedView: View {
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            NavigationLink {
-                WakePlanView()
-            } label: {
-                HStack(spacing: 6) {
-                    Text("See tonight's wake plan").font(.bodyEmphasis)
-                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
-                }
-                .foregroundStyle(Accent.purple.ink(scheme))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -266,18 +263,20 @@ struct SleepNeedView: View {
 
     @ViewBuilder
     private func doseReadout(_ points: [DosePoint], fit: KneeFit?) -> some View {
+        let idle = fit == nil ? "Not enough nights yet to see where more sleep stops helping."
+            : "From \(points.count) nights of \(metric.noun). Nights to the left of the dashed line cost you the next day."
+        let slots = [idle] + points.map { doseDetail($0, fit: fit) }
         if let point = nearestDose(points) {
             ChartReadout(title: "\(point.day.formatted(.dateTime.month(.abbreviated).day())) \u{00B7} \(Clock.duration(Int((point.hours * 60).rounded()))) asleep",
                          value: valueText(point.value), detail: doseDetail(point, fit: fit), accent: metric.accent,
-                         onClear: { selectedHours = nil })
+                         onClear: { selectedHours = nil }, detailSlots: slots)
         } else if let fit {
             // At rest: the answer, not a "touch" hint (Valtonen F13).
             ChartReadout(title: "Where more sleep stops helping", value: Clock.duration(Int(fit.knee)),
-                         detail: "From \(points.count) nights of \(metric.noun). Nights to the left of the dashed line cost you the next day.",
-                         accent: metric.accent)
+                         detail: idle, accent: metric.accent, detailSlots: slots)
         } else {
             ChartReadout(title: "\(points.count) nights", value: metric.label,
-                         detail: "Not enough nights yet to see where more sleep stops helping.", accent: metric.accent)
+                         detail: idle, accent: metric.accent, detailSlots: slots)
         }
     }
 
@@ -304,7 +303,8 @@ struct SleepNeedView: View {
             }
             doseReadout(points, fit: fit)
             DoseResponseChart(points: points, fit: fit, metric: metric, needRange: need.range,
-                              selected: nearestDose(points), selection: $selectedHours)
+                              selected: nearestDose(points),
+                              selection: $selectedHours.snapping { raw in points.min { abs($0.hours - raw) < abs($1.hours - raw) }?.hours })
                 .frame(height: 220)
                 .motion(.dataSwap, value: metric)
             ScrubHint(each: "night")
@@ -329,39 +329,36 @@ struct SleepNeedView: View {
 
     // MARK: Feeling fine
 
-    private var feelingCard: some View {
-        let p = Palette(scheme: scheme)
+    /// Short nights against how they felt: her own numbers, then why the
+    /// app trusts the body's numbers more.
+    @ViewBuilder
+    private var feeling: some View {
         let short = model.nights.filter { $0.asleepMinutes <= 390 }
         let felt = short.compactMap { $0.outcome.checkIn }.mean
         let hrv = short.compactMap { $0.outcome.hrvDeltaPct }.mean
         let rhr = short.compactMap { $0.outcome.restingHRDelta }.mean
         let hasStats = felt != nil || hrv != nil
         let study = "After short nights, people often feel nearly normal while their body is still paying for it. That's why the app trusts your body's numbers more than how you feel."
-        return Card {
-            ExplainedTitle(text: "Feeling fine isn't the whole story",
-                           explanation: Explanation(id: "feelingFine", title: "Feeling fine after short sleep",
-                                                    meaning: "When you sleep less than you need for several nights, you get used to the tired feeling. Your body and focus keep slipping even though you stop noticing.",
-                                                    forYou: "Don't judge your sleep only by how you feel. If your HRV or energy dips after short nights, the short nights are costing you."),
-                           size: 17)
-            if hasStats {
-                HStack(spacing: 8) {
-                    if let felt {
-                        FeelStat(title: "You felt", value: String(format: "%.1f/5", felt),
-                                 note: felt >= 3.3 ? "almost normal" : "a bit rough", accent: .yellow)
-                    }
-                    if let hrv {
-                        FeelStat(title: "HRV", value: SleepText.signed(hrv) + "%", note: hrv < 0 ? "lower" : "higher", accent: .indigo)
-                    }
-                    if let rhr {
-                        FeelStat(title: "Resting HR", value: SleepText.signed(rhr), note: rhr > 0 ? "higher" : "lower", accent: .pink)
-                    }
+        Text("When you sleep less than you need for several nights, you get used to the tired feeling. Your body and focus keep slipping even though you stop noticing.")
+            .fixedSize(horizontal: false, vertical: true)
+        if hasStats {
+            HStack(spacing: 8) {
+                if let felt {
+                    FeelStat(title: "You felt", value: String(format: "%.1f/5", felt),
+                             note: felt >= 3.3 ? "almost normal" : "a bit rough", accent: .yellow)
+                }
+                if let hrv {
+                    FeelStat(title: "HRV", value: SleepText.signed(hrv) + "%", note: hrv < 0 ? "lower" : "higher", accent: .indigo)
+                }
+                if let rhr {
+                    FeelStat(title: "Resting HR", value: SleepText.signed(rhr), note: rhr > 0 ? "higher" : "lower", accent: .pink)
                 }
             }
-            Text((hasStats ? "That's you after a night of 6h 30m or less. " : "") + study)
-                .font(.bodyText)
-                .foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
+        Text((hasStats ? "That's you after a night of 6h 30m or less. " : "") + study)
+            .fixedSize(horizontal: false, vertical: true)
+        Text("Don't judge your sleep only by how you feel. If your HRV or energy dips after short nights, the short nights are costing you.")
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Method (behind the link)
@@ -393,49 +390,26 @@ struct SleepNeedView: View {
 
     // MARK: Accuracy
 
-    private var accuracyCard: some View {
-        let p = Palette(scheme: scheme)
-        return Card {
-            Text("Make it more accurate").font(.cardTitle)
-            NavigationLink {
-                CheckInView()
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Do the 10-second morning check-in").font(.bodyEmphasis)
-                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
-                }
-                .foregroundStyle(Accent.mint.ink(scheme))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+    @ViewBuilder
+    private var accuracy: some View {
+        NavigationLink {
+            CheckInView()
+        } label: {
+            HStack(spacing: 6) {
+                Text("Do the 10-second morning check-in").font(.bodyEmphasis)
+                Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            Text("How awake you feel each morning is a cross-check on the numbers from your Watch.")
-                .font(.secondary)
-                .foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Divider()
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(Accent.purple.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Sleep-need check on your next break").font(.bodyEmphasis)
-                    Text("Sleep without an alarm for a week, like on a break. The last few nights get close to your need, though it's a clue that tends to run a little high while you catch up.")
-                        .font(.secondary)
-                        .foregroundStyle(p.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            Divider()
-            LinkRow(title: "More ways to get accurate numbers", subtitle: "A checklist for your Watch and habits",
-                    systemImage: "checklist", accent: .indigo) {
-                AccuracyTipsView()
-            }
+            .foregroundStyle(Accent.mint.ink(scheme))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        Text("How awake you feel each morning is a cross-check on the numbers from your Watch.")
+            .fixedSize(horizontal: false, vertical: true)
+        Text("Sleep-need check on your next break").font(.bodyEmphasis)
+            .foregroundStyle(Palette(scheme: scheme).primary)
+        Text("Sleep without an alarm for a week, like on a break. The last few nights get close to your need, though it's a clue that tends to run a little high while you catch up.")
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Adjust

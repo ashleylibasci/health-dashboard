@@ -17,9 +17,23 @@ struct SleepStagesView: View {
             // One title: the inline nav title, then the hero (Valtonen F8).
             if model.lastNightIsFresh {
                 donutCard
-                lanesCard
-                stageRows
-                meaningCard
+                RowCard {
+                    ExpandRow(title: "Through the night",
+                              summary: "\(Clock.format(model.lastNight.onset)) to \(Clock.format(model.lastNight.wake)), stage by stage",
+                              systemImage: "waveform.path", accent: .purple) {
+                        lanes
+                    }
+                    RowDivider()
+                    ExpandRow(title: "Each stage against your usual", summary: "Deep, REM, core and awake",
+                              systemImage: "list.bullet", accent: .purple) {
+                        stageRows
+                    }
+                    RowDivider()
+                    ExpandRow(title: "What it means", summary: meaningSummary,
+                              systemImage: "text.bubble.fill", accent: .purple) {
+                        meaningContent
+                    }
+                }
             } else {
                 Card {
                     Text("No sleep recorded last night").font(.cardTitle)
@@ -32,18 +46,6 @@ struct SleepStagesView: View {
                     }
                 }
             }
-            NavigationLink {
-                SleepHistoryView()
-            } label: {
-                HStack(spacing: 6) {
-                    Text("See your week and month").font(.bodyEmphasis)
-                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
-                }
-                .foregroundStyle(Accent.purple.ink(scheme))
-                .frame(minHeight: Sizes.minTap)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
         .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
@@ -224,26 +226,22 @@ struct SleepStagesView: View {
 
     // MARK: Lanes
 
-    private var lanesCard: some View {
-        let night = model.lastNight
+    @ViewBuilder
+    private var lanes: some View {
         let timeline = model.lastNightTimeline
-        return Card {
-            ExplainedTitle(text: "Through the night", topic: .sleepStages)
-            if timeline.isEmpty {
-                StageStackBar(minutes: night.stageMinutes, height: 24)
-                Text("Stage-by-stage timing shows up once your Watch records a night in Apple Health.")
-                    .font(.secondary)
-                    .secondaryText()
-            } else {
-                StageTimeline(segments: timeline)
-            }
+        if timeline.isEmpty {
+            StageStackBar(minutes: model.lastNight.stageMinutes, height: 24)
+            Text("Stage-by-stage timing shows up once your Watch records a night in Apple Health.")
+                .font(.secondary)
+        } else {
+            StageTimeline(segments: timeline)
         }
     }
 
     // MARK: Rows
 
     private var stageRows: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.m) {
             ForEach([SleepStage.deep, .rem, .core, .awake], id: \.self) { stage in
                 stageRow(stage)
             }
@@ -304,9 +302,6 @@ struct SleepStagesView: View {
             Spacer(minLength: Space.s)
             Text(SleepText.compact(value)).font(.numberM).keepsOnOneLine(minimumScale: 0.7)
         }
-        .padding(Space.l)
-        .background(p.card, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(p.cardBorder))
         // One element per stage; its explanation is an action, not a
         // separate ⓘ stop (Valtonen F5, Ortiz F9).
         .accessibilityElement(children: .ignore)
@@ -341,14 +336,24 @@ struct SleepStagesView: View {
         return text
     }
 
-    private var meaningCard: some View {
-        Card(accent: .purple) {
-            SectionLabel(text: "What it means", accent: .purple)
-            Text(meaning)
-                .font(.bodyText)
-                .fixedSize(horizontal: false, vertical: true)
-            HowWeGotThisLink(title: "Your usual stages",
-                             method: "Your usual for each stage is the average of your last 30 tracked nights once you have at least a week of them. Before that, each stage is shown as a share of your sleep next to a typical range for adults your age; women tend to get a little more deep sleep, and the pill can mean a little less. A difference under 25 minutes is called about usual: the Watch estimates stages from movement and heart rate, so single nights are rough. Look at the trend.")
+    /// The first verdict for the collapsed row: "Both held up last night."
+    private var meaningSummary: String {
+        guard usual(.deep) != nil || usual(.rem) != nil else { return "Deep sleep, REM and what they do" }
+        let deepOK = usual(.deep).map { minutes(.deep) > $0 - meaningfulGap } ?? true
+        let remOK = usual(.rem).map { minutes(.rem) > $0 - meaningfulGap } ?? true
+        switch (deepOK, remOK) {
+        case (true, true): return "Deep sleep and REM held up"
+        case (false, false): return "Deep sleep and REM ran short"
+        case (true, false): return "REM ran short"
+        case (false, true): return "Deep sleep ran short"
         }
+    }
+
+    @ViewBuilder
+    private var meaningContent: some View {
+        Text(meaning)
+            .fixedSize(horizontal: false, vertical: true)
+        HowWeGotThisLink(title: "Your usual stages",
+                         method: "Your usual for each stage is the average of your last 30 tracked nights once you have at least a week of them. Before that, each stage is shown as a share of your sleep next to a typical range for adults your age; women tend to get a little more deep sleep, and the pill can mean a little less. A difference under 25 minutes is called about usual: the Watch estimates stages from movement and heart rate, so single nights are rough. Look at the trend.")
     }
 }
