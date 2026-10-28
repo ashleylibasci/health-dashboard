@@ -746,7 +746,7 @@ struct WaterQuickLog: View {
                     .contentTransition(reduceMotion ? .opacity : .numericText())
                     .motion(.log, value: model.waterTodayML)
                 if !model.hidesEffortTargets {
-                    Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.secondary).secondaryText()
+                    Text("of \(LogFormat.oz(model.waterGoalTodayML))").font(.secondary).secondaryText()
                 }
             }
         }
@@ -757,10 +757,10 @@ struct WaterQuickLog: View {
     private func addWater(_ bottles: Double) {
         let id = UUID()
         let ml = store.data.bottleSizeML * bottles
-        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        let wasUnderGoal = model.waterTodayML < model.waterGoalTodayML
         withMotion(.log) { model.addWater(ml: ml, id: id) }
         var message = "Added \(LogFormat.oz(ml)) at \(Clock.format(model.now))."
-        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= model.waterGoalTodayML {
             message += " That\u{2019}s today\u{2019}s goal."
             goalCount += 1
         } else {

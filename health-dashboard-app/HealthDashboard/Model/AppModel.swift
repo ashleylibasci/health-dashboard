@@ -550,6 +550,10 @@ final class AppModel: ObservableObject {
         activeCalories = SampleData.activeCalories; restingCalories = SampleData.restingCalories
         activeCaloriesYesterday = nil
         activeCaloriesEarlier = []
+        if DemoMode.fuel {
+            // A hard training day (the water goal goes up).
+            activeCalories = 650
+        }
         if DemoMode.sick {
             // Resting HR up, HRV down, breathing and wrist temperature up.
             restingHRDelta = 6; hrvDeltaPct = -24
@@ -1161,7 +1165,7 @@ final class AppModel: ObservableObject {
             pushToWatch()
         } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
                     || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
-                    || old.waterGoalML != new.waterGoalML || old.conditions != new.conditions {
+                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions {
             // Widgets show today's water, caffeine and cycle (and hide the
             // water goal with an eating-disorder history).
             Task { @MainActor in self.publishWidgetSnapshot() }
@@ -1375,7 +1379,7 @@ final class AppModel: ObservableObject {
             caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime,
             waterTodayML: waterTodayML,
             // No goal on the Watch under eating-disorder history: total only.
-            waterGoalML: hidesActivityNumbers ? nil : store.data.waterGoalML,
+            waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
             todayWaterIDs: todaysWater.map(\.id)))
     }

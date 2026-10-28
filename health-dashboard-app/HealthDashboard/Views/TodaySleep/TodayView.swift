@@ -612,7 +612,7 @@ struct TodayView: View {
     }
 
     private var waterTile: some View {
-        WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
+        WaterTile(todayML: model.waterTodayML, goalML: model.waterGoalTodayML,
                   bottleML: store.data.bottleSizeML, showsGoal: !model.hidesEffortTargets) {
             withMotion(.log) { model.addWater() }
         }

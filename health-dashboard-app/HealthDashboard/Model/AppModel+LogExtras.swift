@@ -104,8 +104,38 @@ extension AppModel {
     }
 
     var waterGoalBottles: Double {
-        store.data.bottleSizeML > 0 ? store.data.waterGoalML / store.data.bottleSizeML : 0
+        store.data.bottleSizeML > 0 ? waterGoalTodayML / store.data.bottleSizeML : 0
     }
+
+    /// Extra water on a hard training day and on a hot day (D6; Ruiz U1).
+    /// The health team said about 12–16 oz: the top for training (roughly
+    /// a training hour's extra sweat), the bottom for heat; both add up.
+    static let trainingExtraML = 16 * LogFormat.mlPerOunce
+    static let hotDayExtraML = 12 * LogFormat.mlPerOunce
+
+    /// Today's active energy so far is a hard training day for her (the
+    /// sick check's rule: 1.5× her usual and 5 kcal per kg).
+    var hardTrainingToday: Bool {
+        IllnessSignal.isHardTraining(yesterdayKcal: activeCalories,
+                                     earlierDaysKcal: activeCaloriesEarlier + [activeCaloriesYesterday].compactMap { $0 },
+                                     bodyMassKg: bodyMassKg)
+    }
+
+    /// She said "hot day today" on Water.
+    var hotDayToday: Bool { store.data.hotDay.map { AppDay.contains($0) } ?? false }
+
+    /// What today's goal adds, and why. None without a goal (eating-disorder
+    /// history).
+    var waterExtraToday: (ml: Double, reasons: [String]) {
+        guard !hidesEffortTargets else { return (0, []) }
+        var ml = 0.0, reasons: [String] = []
+        if hardTrainingToday { ml += Self.trainingExtraML; reasons.append("training") }
+        if hotDayToday { ml += Self.hotDayExtraML; reasons.append("the heat") }
+        return (ml, reasons)
+    }
+
+    /// Her water goal for today: her usual goal plus any extra.
+    var waterGoalTodayML: Double { store.data.waterGoalML + waterExtraToday.ml }
 
     /// Minutes of a date in the app day (after midnight runs past 1440).
     func appDayMinutes(_ date: Date) -> Minutes { Clock.minutes(date, relativeTo: appDayStart) }
@@ -141,9 +171,9 @@ extension AppModel {
     func waterPace(at t: Minutes) -> Double {
         let start = lastNight.wake
         let end = 1440 + tonightBedtime - 60
-        guard end > start else { return store.data.waterGoalML }
+        guard end > start else { return waterGoalTodayML }
         let f = min(max(Double(t - start) / Double(end - start), 0), 1)
-        return store.data.waterGoalML * f
+        return waterGoalTodayML * f
     }
 
     // MARK: Iron

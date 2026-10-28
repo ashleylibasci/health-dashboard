@@ -145,6 +145,9 @@ struct AppData: Codable {
     /// The goal before 72 oz. Saves keep whatever goal they had.
     static let previousWaterGoalML: Double = 64 * 29.5735
     var waterLog: [WaterEntry] = []
+    /// When she last said "hot day today" on Water: the water goal goes up
+    /// for that app day (D6).
+    var hotDay: Date?
     /// Caffeine and water entries from Apple Health she deleted here, so
     /// they aren't read back in (ones another app saved can't be deleted
     /// from Health by this app).
@@ -204,6 +207,7 @@ struct AppData: Codable {
         // 1,500 ml was the old metric default; it moved to 64 oz back then.
         if waterGoalML == 1500 { waterGoalML = Self.previousWaterGoalML }
         waterLog = get(.waterLog, d.waterLog)
+        hotDay = get(.hotDay, d.hotDay)
         removedHealthLogIDs = get(.removedHealthLogIDs, d.removedHealthLogIDs)
         alcoholLog = get(.alcoholLog, d.alcoholLog)
         flowLog = get(.flowLog, d.flowLog)

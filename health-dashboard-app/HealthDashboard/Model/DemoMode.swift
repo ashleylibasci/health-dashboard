@@ -15,8 +15,8 @@ import HealthCore
 /// - `-demoConditions "PCOS,PMDD"`: health conditions, by their names in
 ///   Settings.
 /// - `-resetData`: starts from a fresh install (setup, no logs).
-/// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs and
-///   a big night last night.
+/// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
+///   big night last night and a hard training day today.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
