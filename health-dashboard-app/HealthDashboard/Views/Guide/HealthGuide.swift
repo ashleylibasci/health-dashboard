@@ -1,9 +1,9 @@
 import Foundation
 import HealthCore
 
-/// The Health guide: the app's longer health reading (when to get care,
-/// missed pills, insomnia, alcohol poisoning signs…), moved off the main
-/// screens so each screen answers "how am I?" first. Opened from Settings
+/// The Health guide: the app's longer health reading (missed pills, being
+/// sick on the pill, insomnia, alcohol poisoning signs…), moved off the
+/// main screens so each screen answers "how am I?" first. Opened from Settings
 /// (first row) and from the one `LearnMoreRow` at the bottom of a screen.
 ///
 /// Each section's articles live in their own file (`Guide+Sleep.swift`:

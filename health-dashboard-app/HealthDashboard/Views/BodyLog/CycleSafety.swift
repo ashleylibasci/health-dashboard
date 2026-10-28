@@ -1,7 +1,7 @@
 import SwiftUI
 import HealthCore
 
-// When to get care, missed pills and medicines that affect birth control.
+// Bleeding care lines, missed pills and medicines that affect birth control.
 // One wording for each, used by the Cycle, Log and Learn screens, so the
 // same question never gets two different answers (women's health review).
 
@@ -54,19 +54,12 @@ enum CycleCare {
 
 // MARK: - Missed, late or sick
 
-/// "Missed or late?" rules for her method, folded away until she opens it
-/// (CDC US SPR 2024; Okafor A, D; Shah F4). Shows nothing for methods with
-/// nothing to miss day to day (IUDs, implant, shot).
-struct MissedDoseCard: View {
-    let method: BirthControl
-    @Environment(\.colorScheme) private var scheme
-    @State private var open = false
+extension CycleCare {
+    /// Methods with a pill, ring or patch to miss or be late with.
+    static let missedDoseMethods: [BirthControl] = [.combinedPill, .miniPill, .ring, .patch]
 
-    static func applies(to method: BirthControl) -> Bool {
-        [.combinedPill, .miniPill, .ring, .patch].contains(method)
-    }
-
-    private var title: String {
+    /// "Missed or late pill?", "Ring out, or put in late?"…
+    static func missedDoseTitle(_ method: BirthControl) -> String {
         switch method {
         case .ring: "Ring out, or put in late?"
         case .patch: "Patch off, or put on late?"
@@ -74,7 +67,9 @@ struct MissedDoseCard: View {
         }
     }
 
-    private var rules: [String] {
+    /// What to do when it's missed or late (CDC US SPR 2024; Okafor A, D;
+    /// Shah F4). Empty for methods with nothing to miss day to day.
+    static func missedDoseRules(_ method: BirthControl) -> [String] {
         switch method {
         case .combinedPill:
             return ["Up to a day late, or one pill missed: take it now, even if that means two today. Keep going. No backup needed.",
@@ -100,8 +95,41 @@ struct MissedDoseCard: View {
         }
     }
 
+    static let missedDoseSource = "From the CDC\u{2019}s 2024 guidance. Not sure? A pharmacist can tell you what to do, no appointment needed."
+
+    /// Methods some medicines make work less well (Shah F4). Nothing for
+    /// IUDs or the shot.
+    static let medicineMethods: [BirthControl] = [.combinedPill, .miniPill, .ring, .patch, .implant]
+
+    /// "Medicines and your pill", "Medicines and your ring"…
+    static func medicinesTitle(_ method: BirthControl) -> String {
+        "Medicines and your \(method == .combinedPill || method == .miniPill ? "pill" : method.inSentence)"
+    }
+
+    static func medicineLines(_ method: BirthControl) -> [String] {
+        var out = ["Can make it work less well: rifampin or rifabutin (for TB), some seizure medicines (carbamazepine, oxcarbazepine, phenytoin, phenobarbital, primidone, topiramate at 200 mg a day or more), St John\u{2019}s wort, efavirenz (HIV), griseofulvin (fungal infections) and modafinil or armodafinil. Use condoms too while you take them and for 4 weeks after, and ask about a method they don\u{2019}t affect."]
+        if method == .combinedPill || method == .miniPill {
+            out.append("Tirzepatide (Mounjaro, Zepbound): use condoms for 4 weeks after starting and after each dose increase.")
+        }
+        out.append("Most antibiotics don\u{2019}t affect it. Rifampin is the exception.")
+        if method.hasBreakWeek {
+            out.append("It can lower lamotrigine levels, so tell whoever prescribes lamotrigine.")
+        }
+        out.append("Tell any doctor or pharmacist that you use it.")
+        return out
+    }
+}
+
+/// "Missed or late?" rules for her method, folded away until she opens it.
+/// Shows nothing for methods with nothing to miss day to day (IUDs,
+/// implant, shot). The same rules are a Health guide article.
+struct MissedDoseCard: View {
+    let method: BirthControl
+    @Environment(\.colorScheme) private var scheme
+    @State private var open = false
+
     var body: some View {
-        if Self.applies(to: method) {
+        if CycleCare.missedDoseMethods.contains(method) {
             Card(accent: .yellow) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { open.toggle() }
@@ -110,7 +138,7 @@ struct MissedDoseCard: View {
                         Image(systemName: "exclamationmark.circle.fill")
                             .foregroundStyle(Accent.yellow.ink(scheme))
                             .accessibilityHidden(true)
-                        Text(title).font(.bodyEmphasis)
+                        Text(CycleCare.missedDoseTitle(method)).font(.bodyEmphasis)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         Image(systemName: open ? "chevron.up" : "chevron.down")
@@ -124,13 +152,13 @@ struct MissedDoseCard: View {
                 .buttonStyle(.plain)
                 .accessibilityHint(open ? "Hides what to do" : "Shows what to do")
                 if open {
-                    ForEach(rules, id: \.self) { line in
+                    ForEach(CycleCare.missedDoseRules(method), id: \.self) { line in
                         HStack(alignment: .top, spacing: 8) {
                             Circle().fill(Accent.yellow.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
                             Text(line).font(.bodyText).fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    Text("From the CDC\u{2019}s 2024 guidance. Not sure? A pharmacist can tell you what to do, no appointment needed.")
+                    Text(CycleCare.missedDoseSource)
                         .font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -147,30 +175,11 @@ struct BirthControlMedicinesCard: View {
     let method: BirthControl
     @Environment(\.colorScheme) private var scheme
 
-    static func applies(to method: BirthControl) -> Bool {
-        [.combinedPill, .miniPill, .ring, .patch, .implant].contains(method)
-    }
-
-    private var hasEstrogen: Bool { method.hasBreakWeek }
-
-    private var lines: [String] {
-        var out = ["Can make it work less well: rifampin or rifabutin (for TB), some seizure medicines (carbamazepine, oxcarbazepine, phenytoin, phenobarbital, primidone, topiramate at 200 mg a day or more), St John\u{2019}s wort, efavirenz (HIV), griseofulvin (fungal infections) and modafinil or armodafinil. Use condoms too while you take them and for 4 weeks after, and ask about a method they don\u{2019}t affect."]
-        if method == .combinedPill || method == .miniPill {
-            out.append("Tirzepatide (Mounjaro, Zepbound): use condoms for 4 weeks after starting and after each dose increase.")
-        }
-        out.append("Most antibiotics don\u{2019}t affect it. Rifampin is the exception.")
-        if hasEstrogen {
-            out.append("It can lower lamotrigine levels, so tell whoever prescribes lamotrigine.")
-        }
-        out.append("Tell any doctor or pharmacist that you use it.")
-        return out
-    }
-
     var body: some View {
-        if Self.applies(to: method) {
+        if CycleCare.medicineMethods.contains(method) {
             Card {
-                SectionLabel(text: "Medicines and your \(method == .combinedPill || method == .miniPill ? "pill" : method.inSentence)")
-                ForEach(lines, id: \.self) { line in
+                SectionLabel(text: CycleCare.medicinesTitle(method))
+                ForEach(CycleCare.medicineLines(method), id: \.self) { line in
                     HStack(alignment: .top, spacing: 8) {
                         Circle().fill(Accent.indigo.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
                         Text(line).font(.bodyText).fixedSize(horizontal: false, vertical: true)
@@ -181,26 +190,95 @@ struct BirthControlMedicinesCard: View {
     }
 }
 
-// MARK: - Cycle patterns
+// MARK: - Safety rows
 
-/// "Worth mentioning to a clinician": short or long cycles, a wide spread,
-/// or few periods a year (Okafor L), and 3 months without a period (Okafor
-/// E, Ruiz F1). Natural cycles only (no method, or the copper IUD).
-struct CycleCareNotes: View {
+/// Her method's safety reading as one card of rows, each opening its
+/// Health guide article: missed or late, being sick, medicines, eating
+/// enough for training, what isn't shown, when to get bleeding checked.
+/// Only the rows that apply to her method.
+struct MethodSafetyRows: View {
+    let method: BirthControl
+
+    /// One row and the article it opens.
+    private struct Row: Identifiable {
+        var id: String { article.id }
+        var article: GuideArticle
+        var systemImage: String
+        var accent: Accent
+    }
+
+    private var rows: [Row] {
+        [
+            GuideArticle.missedDose(for: method).map { Row(article: $0, systemImage: "exclamationmark.circle.fill", accent: .yellow) },
+            GuideArticle.sickOnMethod(for: method).map { Row(article: $0, systemImage: "cross.case.fill", accent: .pink) },
+            GuideArticle.medicines(for: method).map { Row(article: $0, systemImage: "pills.fill", accent: .indigo) },
+            GuideArticle.eatingEnough(for: method).map { Row(article: $0, systemImage: "fork.knife", accent: .mint) },
+            GuideArticle.notShown(for: method).map { Row(article: $0, systemImage: "nosign", accent: .purple) },
+            GuideArticle.bleedingCheck(for: method).map { Row(article: $0, systemImage: "drop.fill", accent: .coral) },
+        ].compactMap { $0 }
+    }
+
+    /// "Pill safety and info", "Ring safety and info"…
+    private var heading: String {
+        switch method {
+        case .combinedPill, .miniPill: "Pill safety and info"
+        case .ring: "Ring safety and info"
+        case .patch: "Patch safety and info"
+        default: "Birth control safety and info"
+        }
+    }
+
+    var body: some View {
+        let shown = rows
+        if !shown.isEmpty {
+            VStack(alignment: .leading, spacing: Space.m) {
+                SectionHeading(heading)
+                RowCard {
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, row in
+                        if i > 0 { RowDivider() }
+                        MetricRow(title: row.article.title, note: row.article.summary,
+                                  systemImage: row.systemImage, accent: row.accent) {
+                            GuideArticleView(article: row.article)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// "No period for 3 months": one line at the top of Cycle while it's true,
+/// the full note in a sheet (Okafor E, Ruiz F1). Natural cycles only.
+struct NoPeriodCallout: View {
     @EnvironmentObject var model: AppModel
-    @Environment(\.colorScheme) private var scheme
+    @State private var showing = false
 
     var body: some View {
         if model.showsNoPeriodPrompt {
-            Card(accent: .coral) {
-                Text("No period for 3 months").font(.bodyEmphasis)
-                    .accessibilityAddTraits(.isHeader)
+            CalloutBar(text: "No period for 3 months: worth seeing a clinician.", systemImage: "drop.fill") {
+                showing = true
+            }
+            .bottomSheet(isPresented: $showing, title: "No period for 3 months") {
                 Text(CycleCare.noPeriodThreeMonths)
                     .font(.bodyText).fixedSize(horizontal: false, vertical: true)
                 Text(CycleCare.redS)
                     .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+// MARK: - Cycle patterns
+
+/// "Worth mentioning to a clinician": short or long cycles, a wide spread,
+/// or few periods a year (Okafor L), and a note after stopping hormonal
+/// birth control. Natural cycles only (no method, or the copper IUD). Three
+/// months without a period is `NoPeriodCallout`, at the top of Cycle.
+struct CycleCareNotes: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
         if let note = model.cyclePatternNote {
             Card(accent: .indigo) {
                 Text(note.title).font(.bodyEmphasis)

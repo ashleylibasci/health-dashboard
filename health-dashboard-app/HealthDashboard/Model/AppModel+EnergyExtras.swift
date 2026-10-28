@@ -211,8 +211,8 @@ extension AppModel {
             return sleep + (hidesEffortTargets ? "Go easy on yourself. " : "Train as planned, easier if you feel flat. ") + lutealEasesLine
         case .illness?:
             return hidesEffortTargets
-                ? "Take an easy day: extra sleep and plenty of fluids. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse."
-                : "Take an easy day: extra sleep, plenty of fluids, no hard training. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse."
+                ? "Take an easy day: extra sleep and plenty of fluids."
+                : "Take an easy day: extra sleep, plenty of fluids, no hard training."
         case .stress?:
             return hidesEffortTargets
                 ? "Try five minutes of slow breathing (in for 4, out for 6), or a few minutes outside."

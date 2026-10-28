@@ -5,21 +5,16 @@ import HealthCore
 struct ConditionsView: View {
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
-    /// PMDD or an eating-disorder history: removing it asks first.
+    /// An eating-disorder history: removing it asks first.
     @State private var confirmRemove: String? = nil
-    @AppStorage("crisisLineCompact") private var crisisCompact = false
 
-    private static let confirmFirst: Set<String> = ["PMDD", "Eating-disorder history"]
+    private static let confirmFirst: Set<String> = ["Eating-disorder history"]
 
     private var removeBinding: Binding<Bool> {
         Binding(get: { confirmRemove != nil }, set: { if !$0 { confirmRemove = nil } })
     }
 
-    private var removeMessage: String {
-        confirmRemove == "PMDD"
-            ? "The 988 Lifeline will no longer show on the Body and Cycle screens. If it just takes up too much room, you can keep it as one line instead."
-            : "Calories, step counts, exercise targets and your water goal will show again in the app."
-    }
+    private let removeMessage = "Calories, step counts, exercise targets and your water goal will show again in the app."
 
     private func remove(_ name: String) {
         store.data.conditions.removeAll { $0 == name }
@@ -83,12 +78,6 @@ struct ConditionsView: View {
             Button("Remove", role: .destructive) {
                 if let name = confirmRemove { remove(name) }
                 confirmRemove = nil
-            }
-            if confirmRemove == "PMDD" {
-                Button("Keep it, show 988 as one line") {
-                    crisisCompact = true
-                    confirmRemove = nil
-                }
             }
             Button("Cancel", role: .cancel) { confirmRemove = nil }
         } message: {

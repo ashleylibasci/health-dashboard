@@ -147,7 +147,7 @@ enum ConditionCatalog {
              change: "Saved for your records. Doesn\u{2019}t change the app yet. Log pain, cramps and bleeding on the Cycle screen.",
              meaning: "Tissue like the lining of the uterus grows elsewhere, which can cause painful periods and pelvic pain."),
         Item(name: "PMDD",
-             change: "Keeps the 988 Suicide & Crisis Lifeline (call or text 988) on the Body and Cycle screens.",
+             change: "Saved for your records. Doesn\u{2019}t change the app yet. Log mood and symptoms on the Cycle screen to keep them by date.",
              meaning: "Premenstrual dysphoric disorder: severe mood changes, such as low mood, anxiety or irritability, in the final week before a period, that ease within a few days of it starting. On the pill, they can come around the break week instead. It\u{2019}s treatable: some antidepressants and a drospirenone pill are approved for it."),
         Item(name: "Thyroid condition",
              change: "Saved for your records. Doesn\u{2019}t change the app: your usual heart rate and HRV already follow your last 30 days, so they catch up after a dose change.",
