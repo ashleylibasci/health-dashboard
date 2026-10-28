@@ -190,6 +190,26 @@ struct SleepView: View {
         }
     }
 
+    /// Morning daylight against 20 minutes before 11am (H-C5), with a
+    /// small ring of progress inside.
+    @ViewBuilder
+    private var morningLightRow: some View {
+        if model.showsMorningLight {
+            let got = model.morningDaylightToday, goal = AppModel.morningLightGoal
+            RowDivider()
+            ExpandRow(title: "Morning light", summary: model.morningLightSummary,
+                      systemImage: "sun.max.fill", accent: .yellow) {
+                HStack(spacing: Space.m) {
+                    Ring(value: Double(got) / Double(goal), accent: .yellow, lineWidth: 6,
+                         label: "\(got)", size: 48)
+                        .accessibilityHidden(true)
+                    Text("20 minutes outside before 11am helps you fall asleep earlier. Morning light moves your body clock earlier, and college schedules pull it later.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
     /// "A 20-min nap before 3:10pm won't hurt tonight" (H-C2), from her
     /// wake time and tonight's bedtime; after the cutoff, that it's passed.
     @ViewBuilder
@@ -232,6 +252,7 @@ struct SleepView: View {
                 SleepNeedView()
             }
             weekendRow
+            morningLightRow
             napRow
             if model.daysUntilFallBack <= 28 {
                 RowDivider()

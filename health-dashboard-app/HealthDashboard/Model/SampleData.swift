@@ -87,6 +87,8 @@ enum SampleData {
     static let hrvDeltaPct = -6.0, restingHRDelta = 2.0
     static let hrv = baselineHRV * (1 + hrvDeltaPct / 100), restingHR = 70.0
     static let daylightToday = 18, stepsToday = 7820
+    /// Of today's daylight, the minutes before 11am.
+    static let morningDaylightToday = 12
     static let caffeineToday = [CaffeineDose(time: 580, mg: 130)]
     static let cycleDay = 22, cycleLength = 29
     static let workNights = [Chronotype.Night(onset: 34, wake: 490)]
