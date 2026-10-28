@@ -75,6 +75,10 @@ struct WhyOffView: View {
             Text("Try a glass of water, something to eat and 10 minutes outside.")
                 .font(.scaled(size: 14, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
+            // Low mood is something a watch can't see (Laurent F6).
+            Text("Feeling low or down most days for two weeks or more? That\u{2019}s worth talking about. Your campus counseling center can help, or call or text 988 any time (US).")
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

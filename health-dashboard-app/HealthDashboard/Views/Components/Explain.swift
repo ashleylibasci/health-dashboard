@@ -80,6 +80,36 @@ extension HowWeGotThisLink {
     }
 }
 
+/// Eating-disorder history is on: explanations leave out "push" and
+/// workout advice (Ruiz F13, Cole 5). Set once at the app's root.
+private struct HidesEffortTargetsKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    var hidesEffortTargets: Bool {
+        get { self[HidesEffortTargetsKey.self] }
+        set { self[HidesEffortTargetsKey.self] = newValue }
+    }
+}
+
+extension Explanation {
+    /// The same explanation without effort or workout advice, for an
+    /// eating-disorder history. Most are unchanged.
+    var withoutEffortAdvice: Explanation {
+        let forYou: String
+        switch id {
+        case Topic.recovery.rawValue:
+            forYou = "Lower than usual means your body is still catching up (from short sleep, stress, illness or alcohol), so go gently. Higher means you\u{2019}re well rested."
+        case Topic.effort.rawValue:
+            forYou = "Go by how you feel. Rest is fine on any day."
+        case Topic.follicular.rawValue:
+            forYou = "Many women notice no difference across their cycle. Go by how you feel."
+        default:
+            return self
+        }
+        return Explanation(id: id, title: title, meaning: meaning, forYou: forYou, howWeGotIt: howWeGotIt)
+    }
+}
+
 struct ExplanationSheet: View {
     var explanation: Explanation
     var method = false
@@ -87,9 +117,10 @@ struct ExplanationSheet: View {
     init(explanation: Explanation, method: Bool = false) { self.explanation = explanation; self.method = method }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.hidesEffortTargets) private var hidesEffortTargets
 
     var body: some View {
-        let e = explanation
+        let e = hidesEffortTargets ? explanation.withoutEffortAdvice : explanation
         let p = Palette(scheme: scheme)
         NavigationStack {
             ScrollView {

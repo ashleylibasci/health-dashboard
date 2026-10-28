@@ -129,8 +129,11 @@ struct AppData: Codable {
     var drinkLog: [LoggedDrink] = []
     /// 24 oz for new installs (Priya U1). Stored in ml like Apple Health.
     var bottleSizeML: Double = 24 * 29.5735
-    /// 64 oz. Shown in ounces; stored in ml like Apple Health.
-    var waterGoalML: Double = 64 * 29.5735
+    /// 72 oz for new installs: about 9 cups, US guidance for women from
+    /// drinks (Cole 4, Ruiz F9). Shown in ounces; stored in ml like Apple Health.
+    var waterGoalML: Double = 72 * 29.5735
+    /// The goal before 72 oz. Saves keep whatever goal they had.
+    static let previousWaterGoalML: Double = 64 * 29.5735
     var waterLog: [WaterEntry] = []
     var alcoholLog: [AlcoholEntry] = []
     var flowLog: [FlowEntry] = []
@@ -178,9 +181,11 @@ struct AppData: Codable {
         // A save without a bottle size predates the setting: it was 500 ml
         // then, so keep that rather than switching her to the new default.
         bottleSizeML = get(.bottleSizeML, 500)
-        waterGoalML = get(.waterGoalML, d.waterGoalML)
-        // 1,500 ml was the old metric default; move it to the new 64 oz one.
-        if waterGoalML == 1500 { waterGoalML = d.waterGoalML }
+        // A save without a goal had the old 64 oz default; keep it rather
+        // than switching her to the new one.
+        waterGoalML = get(.waterGoalML, Self.previousWaterGoalML)
+        // 1,500 ml was the old metric default; it moved to 64 oz back then.
+        if waterGoalML == 1500 { waterGoalML = Self.previousWaterGoalML }
         waterLog = get(.waterLog, d.waterLog)
         alcoholLog = get(.alcoholLog, d.alcoholLog)
         flowLog = get(.flowLog, d.flowLog)

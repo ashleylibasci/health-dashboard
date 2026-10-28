@@ -197,7 +197,7 @@ private struct CaffeineComplicationView: View {
                 Text("Today\(s.map(sampleTag) ?? "")").font(.caption2.weight(.semibold))
                     .foregroundStyle(Accent.yellow.ink(.dark))
                 Text("\(mg) mg caffeine").font(.headline)
-                Text("\(oz(water)) of \(oz(s?.waterGoalML ?? 0)) water").font(.caption2)
+                Text(s?.showsWaterGoal == true ? "\(oz(water)) of \(oz(s?.waterGoalML ?? 0)) water" : "\(oz(water)) water").font(.caption2)
             }
             .accessibilityElement(children: .combine)
         }

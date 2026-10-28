@@ -13,12 +13,21 @@ public struct Drink: Hashable, Codable, Sendable, Identifiable {
         self.id = id; self.name = name; self.sizeLabel = sizeLabel; self.caffeineMg = caffeineMg; self.icon = icon; self.isCustom = isCustom
     }
 
+    /// Typical amounts. Coffee-shop brewed coffee is much stronger than
+    /// home drip (a Starbucks tall is about 235 mg), and energy drinks and
+    /// pre-workouts vary a lot (150 to 300 mg), so their labels win.
     public static let common: [Drink] = [
         Drink(name: "Latte", sizeLabel: "Double shot", caffeineMg: 130, icon: .latte),
         Drink(name: "Drip coffee", sizeLabel: "12 oz", caffeineMg: 140, icon: .latte),
+        Drink(name: "Coffee-shop brewed", sizeLabel: "Tall, 12 oz", caffeineMg: 235, icon: .latte),
         Drink(name: "Espresso", sizeLabel: "Single", caffeineMg: 64, icon: .shot),
         Drink(name: "Black tea", sizeLabel: "8 oz", caffeineMg: 47, icon: .tea),
+        Drink(name: "Matcha", sizeLabel: "1 tsp powder", caffeineMg: 70, icon: .tea),
+        Drink(name: "Diet Coke", sizeLabel: "12 oz can", caffeineMg: 46, icon: .can),
+        Drink(name: "Red Bull", sizeLabel: "8.4 oz can", caffeineMg: 80, icon: .can),
         Drink(name: "Energy drink", sizeLabel: "16 oz can", caffeineMg: 160, icon: .can),
+        Drink(name: "Celsius or Alani Nu", sizeLabel: "12 oz can", caffeineMg: 200, icon: .can),
+        Drink(name: "Pre-workout", sizeLabel: "1 scoop, check your label", caffeineMg: 200, icon: .shot),
     ]
 }
 
@@ -30,13 +39,23 @@ public struct CaffeineDose: Hashable, Codable, Sendable {
 
 /// Caffeine in the body over time: absorbed over ~45 minutes, then cleared
 /// with a half-life of about 5 hours (it varies from roughly 3 to 7). The
-/// combined pill, ring and patch slow clearance (CYP1A2), roughly doubling it;
-/// every function takes the half-life so callers can pass hers.
+/// combined pill slows clearance (estrogen slows the liver enzyme CYP1A2) to
+/// about one and a half times as long, about 8 hours (one small study of pill
+/// users: 7.9 vs 5.4 hours, Abernethy & Todd 1985); the ring and patch
+/// probably do the same. Every function takes the half-life so callers can
+/// pass hers.
 public enum CaffeineModel {
     public static let absorption = 45.0
-    /// The usual half-life, and the one with estrogen-containing birth control.
+    /// The usual half-life, without estrogen-containing birth control.
     public static let typicalHalfLifeHours = 5.0
-    public static let estrogenHalfLifeHours = 9.0
+    /// With the combined pill, ring or patch: about one and a half times as long.
+    public static let estrogenHalfLifeHours = 8.0
+    /// More than this in a day is more than is generally fine for healthy
+    /// adults (FDA, EFSA).
+    public static let dailyGuideMg = 400
+    /// The daily amount to stay under when you could be pregnant or are
+    /// trying (ACOG), and the most in one go that's generally fine (EFSA).
+    public static let lowerGuideMg = 200
     /// Under this much at bedtime barely affects sleep.
     public static let bedtimeLimitMg = 25.0
 
@@ -139,13 +158,13 @@ public enum CaffeineModel {
             note = "Even a typical coffee right after you wake would leave some caffeine at bedtime. If you have one, keep it small and early; daylight and water help too."
         } else if let first = firstDrinkAt {
             note = first < groggyEnd
-                ? "Your first drink came while you were still groggy. Waiting until \(Clock.format(groggyEnd)) helps it work better."
-                : "Your \(Clock.format(first)) drink landed after your grogginess cleared, when it helps most."
+                ? "Your first caffeine came while you were still groggy. Waiting until \(Clock.format(groggyEnd)) helps it work better."
+                : "Your \(Clock.format(first)) caffeine landed after your grogginess cleared, when it helps most."
         } else {
-            note = "Have your first drink after \(Clock.format(groggyEnd)), once grogginess clears."
+            note = "Have your first coffee or tea after \(Clock.format(groggyEnd)), once grogginess clears."
         }
         if let nap {
-            note += " Your dip starts before your cutoff, so a coffee nap fits: a small coffee at \(Clock.format(nap)), then 20 minutes' sleep."
+            note += " Your dip starts before your cutoff, so a coffee nap fits: a regular coffee at \(Clock.format(nap)), then 20 minutes' sleep."
         } else if let dipStart, !noWindow {
             note += " Your dip starts at \(Clock.format(dipStart)), after your cutoff, so skip the coffee nap. Daylight or a short break works better."
         }

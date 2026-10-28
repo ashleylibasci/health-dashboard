@@ -131,21 +131,24 @@ final class Round2SignalTests: XCTestCase {
 final class Round2CaffeineTests: XCTestCase {
     // Maya N2 / Sam N11: no "latest time" that has already gone by.
     func testLatestTimeIsNilWhenItHasPassed() {
-        // 9h half-life, 12:30am bedtime: a latte must be had before ~5:30am.
-        let latest = try! XCTUnwrap(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 9))
+        // 8h half-life (the pill), 12:30am bedtime: a latte must be had before ~5am.
+        let latest = try! XCTUnwrap(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 8))
         XCTAssertLessThan(latest, 480)
-        XCTAssertNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 9, notBefore: 480))
+        XCTAssertNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 8, notBefore: 480))
         XCTAssertNotNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, notBefore: 480))
-        // The pill's cutoff for a typical drink lands before she's up.
-        XCTAssertLessThan(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 9), 480)
+        // The pill's cutoff for the reference coffee (140 mg) lands before she's up.
+        XCTAssertLessThan(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 8, mg: 140), 480)
+        // Pill users aren't told "none today" for every drink: a smaller one
+        // early in the day still fits.
+        XCTAssertNotNil(CaffeineModel.latestTime(forMg: 64, bedtime: 1470, halfLifeHours: 8, notBefore: 480))
     }
 
     func testLargestDoseFits() {
-        let mg = CaffeineModel.largestDose(at: 480, bedtime: 1470, halfLifeHours: 9)
+        let mg = CaffeineModel.largestDose(at: 480, bedtime: 1470, halfLifeHours: 8)
         XCTAssertGreaterThan(mg, 0)
         XCTAssertEqual(mg % 5, 0)
-        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg)], halfLifeHours: 9), 25)
-        XCTAssertGreaterThanOrEqual(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg + 10)], halfLifeHours: 9), 25)
+        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg)], halfLifeHours: 8), 25)
+        XCTAssertGreaterThanOrEqual(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg + 10)], halfLifeHours: 8), 25)
         XCTAssertEqual(CaffeineModel.largestDose(at: 480, bedtime: 1470, existing: [CaffeineDose(time: 1200, mg: 200)]), 0)
     }
 
@@ -158,7 +161,7 @@ final class Round2CaffeineTests: XCTestCase {
     // Maya N2: no "you woke late" note when the cutoff is before her window.
     func testTimingWithoutAWindow() {
         let e = EnergyModel.day(.init(wake: 450, asleepMinutes: 460, sleepDebt: 0, habitualMidSleep: 262, habitualSleepOnset: 1482, bedtime: 1470))
-        let t = CaffeineModel.timing(energy: e, cutoff: CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 9), firstDrinkAt: nil)
+        let t = CaffeineModel.timing(energy: e, cutoff: CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 8, mg: 140), firstDrinkAt: nil)
         XCTAssertTrue(t.cutoffBeforeWindow)
         XCTAssertEqual(t.bestWindow.length, 0)
         XCTAssertFalse(t.note.lowercased().contains("woke late"))

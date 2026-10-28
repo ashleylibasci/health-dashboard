@@ -30,10 +30,10 @@ struct CustomDrinkView: View {
     private let mgRange = 0...600
 
     var body: some View {
-        Screen(title: "New drink", accent: .yellow) {
+        Screen(title: "New caffeine drink", accent: .yellow) {
             HStack(spacing: 8) {
                 Text("New")
-                Text("drink").foregroundStyle(Accent.yellow.ink(scheme))
+                Text("caffeine drink").foregroundStyle(Accent.yellow.ink(scheme))
             }
             .font(.scaled(size: 34, weight: .bold))
             .accessibilityElement(children: .combine)
@@ -74,7 +74,8 @@ struct CustomDrinkView: View {
               caffeineMg: mg, icon: icon, isCustom: true)
     }
 
-    private var canSave: Bool { !trimmedName.isEmpty && mg > 0 && (saveToMine || logIt) }
+    /// 0 mg is allowed, for decaf (Cole 9).
+    private var canSave: Bool { !trimmedName.isEmpty && mg >= 0 && (saveToMine || logIt) }
 
     private var primaryTitle: String {
         if saveToMine && logIt { return "Save and log" }
@@ -203,7 +204,7 @@ struct CustomDrinkView: View {
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Check the cafe\u{2019}s menu or the can. Your daily limit is 400 mg.")
+            Text("Check the cafe\u{2019}s menu or the can. Decaf? Set it to 0 mg. Up to \(CaffeineModel.dailyGuideMg) mg a day is generally fine for healthy adults.")
                 .font(.scaled(size: 13))
                 .secondaryText()
         }
@@ -242,11 +243,11 @@ struct CustomDrinkView: View {
                 }
             }
             Divider().overlay(Palette(scheme: scheme).cardBorder)
-            SettingToggleRow(title: "Save to My drinks", detail: "Shows up as a one-tap button", isOn: $saveToMine)
+            SettingToggleRow(title: "Save to My caffeine drinks", detail: "Shows up as a one-tap button", isOn: $saveToMine)
             Divider().overlay(Palette(scheme: scheme).cardBorder)
             SettingToggleRow(title: "Log it too", detail: "Adds it to today's caffeine at the time you pick", accent: .yellow, isOn: $logIt)
 
-            fieldLabel("Preview in My drinks").padding(.top, 4)
+            fieldLabel("Preview in My caffeine drinks").padding(.top, 4)
             SavedDrinkRow(drink: draft, trailingSystemImage: nil)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Preview: \(draft.name), \(draft.sizeLabel ?? "no size"), \(draft.caffeineMg) mg, custom")
@@ -312,8 +313,7 @@ struct CustomDrinkView: View {
 
     private var hint: String {
         if trimmedName.isEmpty { return "Add a name to save this drink." }
-        if mg <= 0 { return "Add the caffeine amount to save this drink." }
-        return "Turn on Save to My drinks or Log it too."
+        return "Turn on Save to My caffeine drinks or Log it too."
     }
 
     // MARK: Helpers

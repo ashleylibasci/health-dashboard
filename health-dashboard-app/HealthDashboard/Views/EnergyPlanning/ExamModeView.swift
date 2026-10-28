@@ -349,7 +349,7 @@ struct ExamModeView: View {
                 afterNote = "Nothing after \(Clock.format(cutoff))."
             } else {
                 afterNote = "Keep it to one small drink (up to about \(model.caffeineLargestDoseAtWake) mg)"
-                    + (model.caffeineLastsLonger ? ": on your birth control it lasts about twice as long." : ".")
+                    + (model.caffeineLastsLonger ? ": on your birth control it lasts \(model.caffeineLongerPhrase)." : ".")
             }
             rows.append(ExamPlanRow(id: 1, kind: .caffeine, time: "Coffee around \(Clock.format(d.caffeineBy))",
                                 note: "So it's working by \(Clock.format(exam.start)). \(afterNote)", topic: .caffeineCutoff))
@@ -387,7 +387,7 @@ struct ExamModeView: View {
                                 note: "Light review only: flashcards and notes. No new material this late."))
         }
         // When the cutoff for a typical drink falls before she's up (the pill
-        // doubles caffeine's half-life), there's no clock time to print.
+        // makes caffeine last about one and a half times as long), there's no clock time to print.
         let cutoffBeforeWake = model.caffeineCutoffBeforeWake
         if isToday && model.caffeineMgToday > 0 {
             let after = cutoffBeforeWake ? "No more today." : "Nothing after \(Clock.format(d.caffeineBy))."

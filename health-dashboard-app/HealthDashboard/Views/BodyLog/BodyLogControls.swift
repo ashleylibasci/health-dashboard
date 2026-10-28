@@ -484,8 +484,9 @@ struct SleepScheduleControl: View {
 
 // MARK: - 988
 
-/// One line under the stress scale when PMDD is on and she picks 4 or 5:
-/// the 988 Lifeline, with call and text. Shows nothing otherwise.
+/// A row under the stress scale for anyone who logs 5 today, or 4 or 5 on 3
+/// of the last 5 days (4 or 5 today with PMDD): campus counseling, the 988
+/// Lifeline with call and text, and 911. Shows nothing otherwise.
 struct StressCrisisRow: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
@@ -493,30 +494,35 @@ struct StressCrisisRow: View {
     let level: Int?
 
     var body: some View {
-        if model.showsCrisisLine, let level, level >= 4 {
-            HStack(spacing: 10) {
-                Image(systemName: "phone.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.pink.ink(scheme))
-                    .accessibilityHidden(true)
-                Text("Rough day? Call or text 988, any time (US).")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                Link(destination: URL(string: "tel:988")!) {
-                    Image(systemName: "phone.fill").font(.scaled(size: 14, weight: .bold))
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(onFill)
-                        .background(fill, in: Circle())
+        if model.showsStressCrisisRow(level: level) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "phone.fill")
+                        .font(.scaled(size: 13, weight: .semibold))
+                        .foregroundStyle(Accent.pink.ink(scheme))
+                        .accessibilityHidden(true)
+                    Text("Lots on your plate? Talking helps. Your campus counseling center, or call or text 988 any time (US). In danger now: 911.")
+                        .font(.scaled(size: 13, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityLabel("Call 988")
-                Link(destination: URL(string: "sms:988")!) {
-                    Image(systemName: "message.fill").font(.scaled(size: 14, weight: .bold))
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(onFill)
-                        .background(fill, in: Circle())
+                .padding(.top, 8)
+                HStack(spacing: 10) {
+                    Link(destination: URL(string: "tel:988")!) {
+                        Image(systemName: "phone.fill").font(.scaled(size: 14, weight: .bold))
+                            .frame(width: 44, height: 44)
+                            .foregroundStyle(onFill)
+                            .background(fill, in: Circle())
+                    }
+                    .accessibilityLabel("Call 988")
+                    Link(destination: URL(string: "sms:988")!) {
+                        Image(systemName: "message.fill").font(.scaled(size: 14, weight: .bold))
+                            .frame(width: 44, height: 44)
+                            .foregroundStyle(onFill)
+                            .background(fill, in: Circle())
+                    }
+                    .accessibilityLabel("Text 988")
+                    Spacer(minLength: 0)
                 }
-                .accessibilityLabel("Text 988")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 4)

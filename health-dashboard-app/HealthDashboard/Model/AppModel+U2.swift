@@ -123,6 +123,30 @@ extension AppModel {
     /// PMDD: the 988 crisis line stays on the Body and Cycle screens.
     var showsCrisisLine: Bool { store.data.conditions.contains("PMDD") }
 
+    /// The 988 row under the stress scale, for everyone (Laurent F1, Moreno
+    /// F6): stress 5 today, or 4 or 5 on 3 of the last 5 days. With PMDD it
+    /// also shows at 4 today, as before.
+    func showsStressCrisisRow(level: Int?) -> Bool {
+        if let level, level >= 5 || (showsCrisisLine && level >= 4) { return true }
+        return highStressDaysRecently >= 3
+    }
+
+    /// Of the last 5 app days (today included), how many ended on a logged
+    /// stress of 4 or 5 (the day's last rating counts).
+    var highStressDaysRecently: Int {
+        let cal = Calendar.current
+        let today = appDayDate
+        guard let first = cal.date(byAdding: .day, value: -4, to: today) else { return 0 }
+        var lastByDay: [Date: AppData.MoodEntry] = [:]
+        for entry in store.data.moodLog {
+            let day = AppDay.day(containing: entry.date)
+            guard day >= first, day <= today else { continue }
+            if let kept = lastByDay[day], kept.date > entry.date { continue }
+            lastByDay[day] = entry
+        }
+        return lastByDay.values.filter { $0.stress >= 4 }.count
+    }
+
     /// Eating-disorder history: no calories, step counts or exercise targets.
     var hidesActivityNumbers: Bool { store.data.conditions.contains("Eating-disorder history") }
 }

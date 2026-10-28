@@ -31,6 +31,10 @@ struct WidgetSnapshot: Codable, Equatable {
     var caffeineNote: String
     var waterML: Double
     var waterGoalML: Double
+    /// True with an eating-disorder history: widgets show the water total
+    /// only, never "of" a goal or a progress bar. Optional so a snapshot
+    /// saved before it existed still decodes.
+    var waterGoalHidden: Bool? = nil
     var bottleML: Double
     /// Tonight's planned bedtime.
     var bedtime: Date?
@@ -83,6 +87,7 @@ struct WidgetSnapshot: Codable, Equatable {
     func caffeineMg(at date: Date) -> Int { isCurrent(at: date) ? caffeineMg : 0 }
     func waterML(at date: Date) -> Double { isCurrent(at: date) ? waterML : 0 }
     func isCurrent(at date: Date) -> Bool { date.timeIntervalSince(appDayStart) < 24 * 3600 }
+    var showsWaterGoal: Bool { waterGoalHidden != true && waterGoalML > 0 }
 
     /// A believable example for widget galleries and previews.
     static let example = WidgetSnapshot(

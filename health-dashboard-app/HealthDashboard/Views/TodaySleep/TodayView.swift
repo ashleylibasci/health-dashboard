@@ -499,8 +499,8 @@ struct TodayView: View {
 
     private var caffeineNote: String {
         let count = model.todaysDrinks.count
-        if count == 0 { return "Tap to log a drink" }
-        return (count == 1 ? "1 drink" : "\(count) drinks") + " \u{00B7} tap to edit"
+        if count == 0 { return "Tap to log coffee or tea" }
+        return (count == 1 ? "1 caffeine drink" : "\(count) caffeine drinks") + " \u{00B7} tap to edit"
     }
 
     private var stressValue: String {
@@ -573,12 +573,12 @@ struct TodayView: View {
                                accent: .yellow, systemImage: "cup.and.saucer.fill")
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Opens caffeine, where you can log drinks and change their times")
+                .accessibilityHint("Opens caffeine, where you can log coffee or tea and change the times")
     }
 
     private var waterTile: some View {
                 WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
-                          bottleML: store.data.bottleSizeML) {
+                          bottleML: store.data.bottleSizeML, showsGoal: !model.hidesEffortTargets) {
                     model.addWater()
                 }
     }
@@ -632,14 +632,21 @@ private struct WaterTile: View {
     var todayML: Double
     var goalML: Double
     var bottleML: Double
+    /// False with an eating-disorder history: the total only, no goal.
+    var showsGoal: Bool
     var add: () -> Void
     @Environment(\.colorScheme) private var scheme
 
     private var bottlesNote: String {
         guard bottleML > 0 else { return "" }
         let had = todayML / bottleML
+        guard showsGoal else { return "\(LogFormat.bottlesPhrase(had)) today" }
         let goal = goalML / bottleML
         return "\(LogFormat.bottles(had)) of \(LogFormat.bottlesPhrase(goal))"
+    }
+
+    private var amount: String {
+        showsGoal ? "\(LogFormat.ozNumber(todayML)) of \(LogFormat.oz(goalML))" : LogFormat.oz(todayML)
     }
 
     var body: some View {
@@ -654,7 +661,7 @@ private struct WaterTile: View {
                         Spacer()
                         Image(systemName: "drop.fill").foregroundStyle(Accent.blue.ink(scheme)).accessibilityHidden(true)
                     }
-                    Text("\(LogFormat.ozNumber(todayML)) of \(LogFormat.oz(goalML))")
+                    Text(amount)
                         .font(.scaledNumber(24)).minimumScaleFactor(0.6).lineLimit(1)
                     Text(bottlesNote).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
                 }
@@ -662,8 +669,8 @@ private struct WaterTile: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML)), \(bottlesNote)")
-            .accessibilityHint("Opens water, where you can change your bottle size and goal")
+            .accessibilityLabel(showsGoal ? "Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML)), \(bottlesNote)" : "Water: \(LogFormat.oz(todayML)), \(bottlesNote)")
+            .accessibilityHint(showsGoal ? "Opens water, where you can change your bottle size and goal" : "Opens water, where you can change your bottle size")
             Button(action: add) {
                 Label("1 bottle", systemImage: "plus")
                     .font(.scaled(size: 13, weight: .bold))

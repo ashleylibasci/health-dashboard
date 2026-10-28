@@ -419,14 +419,20 @@ final class AppModel: ObservableObject {
 
     // MARK: Caffeine and water today
 
-    /// Caffeine clears about twice as slowly on the combined pill, ring or
-    /// patch (estrogen slows the liver enzyme CYP1A2): about 9 hours instead
-    /// of 5.
+    /// Caffeine stays about one and a half times as long on the combined pill
+    /// (estrogen slows the liver enzyme CYP1A2), and probably on the ring and
+    /// patch: about 8 hours instead of 5.
     var caffeineHalfLifeHours: Double {
         switch store.birthControl {
-        case .combinedPill?, .ring?, .patch?: return 9
-        default: return 5
+        case .combinedPill?, .ring?, .patch?: return CaffeineModel.estrogenHalfLifeHours
+        default: return CaffeineModel.typicalHalfLifeHours
         }
+    }
+
+    /// "about one and a half times as long", hedged with "probably" on the
+    /// ring and patch (the study was of pill users).
+    var caffeineLongerPhrase: String {
+        store.birthControl == .combinedPill ? "about one and a half times as long" : "probably about one and a half times as long"
     }
 
     /// Drinks logged today (since 4am), oldest first.
@@ -1011,8 +1017,9 @@ final class AppModel: ObservableObject {
             pushToWatch()
         } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
                     || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
-                    || old.waterGoalML != new.waterGoalML {
-            // Widgets show today's water, caffeine and cycle.
+                    || old.waterGoalML != new.waterGoalML || old.conditions != new.conditions {
+            // Widgets show today's water, caffeine and cycle (and hide the
+            // water goal with an eating-disorder history).
             Task { @MainActor in self.publishWidgetSnapshot() }
         }
         if planRelevant || old.alarmOverride != new.alarmOverride { Task { await updateAlarmNudge() } }

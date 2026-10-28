@@ -35,7 +35,7 @@ struct WaterView: View {
             chartCard
             entriesCard
             bottleCard
-            goalCard
+            if !hidesGoal { goalCard }
         }
         .sheet(item: $editing) { entry in
             editor(entry)
@@ -56,23 +56,50 @@ struct WaterView: View {
 
     private var bottleML: Double { store.data.bottleSizeML }
     private var goalML: Double { store.data.waterGoalML }
+    /// Eating-disorder history: no goal, percentage, "goal reached" or pace
+    /// anywhere, just the total (Cole 5, Ruiz F13).
+    private var hidesGoal: Bool { model.hidesEffortTargets }
+    /// Over about 135 oz (4 L) a day is a lot for most women (Ruiz F10).
+    private static let highGoalOz = 135.0
 
     // MARK: Hero
 
     private var status: String {
         let have = model.waterTodayML
+        // No goal or "behind" with an eating-disorder history: just what's logged.
+        if hidesGoal { return "\(LogFormat.oz(have)) logged so far today." }
         if have >= goalML { return "Goal reached. Nice." }
         let pace = model.waterPace(at: model.now)
         let gap = pace - have
-        // No "behind" with an eating-disorder history: just what's logged.
-        if model.hidesEffortTargets { return "\(LogFormat.oz(have)) logged so far today." }
         if gap <= bottleML * 0.25 { return "On track for this time of day." }
-        if gap < bottleML { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up." }
+        // Never a catch-up faster than about 1 liter an hour (Ruiz F10).
+        if gap < min(bottleML, 1000) { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up over the next hour or two." }
         let behind = gap / bottleML
-        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day."
+        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 1 liter (34 oz) an hour."
     }
 
+    @ViewBuilder
     private var hero: some View {
+        if hidesGoal { totalHero } else { goalHero }
+    }
+
+    /// With an eating-disorder history: the total only, no ring or goal.
+    private var totalHero: some View {
+        Card(padding: 18) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(LogFormat.oz(model.waterTodayML)).font(.scaledNumber(34))
+                InfoButton(title: "Water today",
+                           meaning: "The water you logged today, added up. Bottles are counted with your own bottle size, which you can change below.",
+                           forYou: "Drink to thirst, and a bit more on hot days. Drinks like tea, milk and juice count too, and food adds more.")
+                    .padding(.vertical, -12)
+            }
+            Text("\(LogFormat.bottlesPhrase(model.waterBottlesToday)) logged today")
+                .font(.scaled(size: 14, weight: .semibold))
+                .foregroundStyle(Accent.blue.ink(scheme))
+        }
+    }
+
+    private var goalHero: some View {
         Card(padding: 18) {
             AdaptiveStack(spacing: 16) {
                 Ring(value: goalML > 0 ? model.waterTodayML / goalML : 0, accent: .blue,
@@ -84,7 +111,7 @@ struct WaterView: View {
                         Text("of \(LogFormat.oz(goalML)) goal").font(.scaled(size: 13, weight: .semibold)).secondaryText()
                         InfoButton(title: "Daily water goal",
                                    meaning: "How much you want to drink across the day. Bottles are counted with your own bottle size, which you can change below.",
-                                   forYou: "About 50 to 70 oz a day from drinks is a common target for adults (food adds more). Drink more on hot days, workout days, and after alcohol. Pale yellow pee usually means you're drinking enough.")
+                                   forYou: "For women, US guidance is about 9 cups (74 oz) a day from drinks; food adds more. You need more if you\u{2019}re pregnant or breastfeeding, and on hot days and workout days. These are averages, not requirements: drink to thirst, and pale yellow pee usually means you\u{2019}re drinking enough. During long workouts, don\u{2019}t drink much more than you sweat out; far too much water can be dangerous.")
                             .padding(.vertical, -12)
                     }
                     Text(status).font(.scaled(size: 13, weight: .semibold))
@@ -224,9 +251,9 @@ struct WaterView: View {
         let have = model.waterML(by: t)
         let pct = goalML > 0 ? Int((have / goalML * 100).rounded()) : 0
         let atThatTime = model.todaysWater.filter { model.appDayMinutes($0.date) == t }.map(\.ml).reduce(0, +)
-        var detail = "\(pct)% of your goal."
+        var detail = hidesGoal ? "Your total by then." : "\(pct)% of your goal."
         if atThatTime > 0 { detail = "You drank \(LogFormat.oz(atThatTime)) here. " + detail }
-        if model.hidesActivityNumbers {
+        if hidesGoal {
             if t > model.now { detail = "Later today." }
         } else if t > model.now {
             detail = "Later today. A steady pace reaches \(LogFormat.oz(model.waterPace(at: t))) by then."
@@ -242,24 +269,29 @@ struct WaterView: View {
             let r = readout
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .blue)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            WaterDayChart(run: run, pace: paceLine, goal: goalML, start: chartStart, end: chartEnd,
+            WaterDayChart(run: run, pace: paceLine, goal: hidesGoal ? nil : goalML, start: chartStart, end: chartEnd,
                           now: model.now, selected: selected.map(snap), selectedML: selected.map { model.waterML(by: snap($0)) },
                           selection: $selected)
                 .frame(height: 180)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Water today: \(LogFormat.oz(model.waterTodayML)) so far of a \(LogFormat.oz(goalML)) goal. \(status)")
+                .accessibilityLabel(hidesGoal ? "Water today: \(LogFormat.oz(model.waterTodayML)) so far."
+                                    : "Water today: \(LogFormat.oz(model.waterTodayML)) so far of a \(LogFormat.oz(goalML)) goal. \(status)")
                 .accessibilityChartDescriptor(ClockChartDescriptor(
                     title: "Water today", seriesName: "Water so far", yTitle: "Ounces",
                     points: run.map { ($0.time, $0.ml / LogFormat.mlPerOunce) },
                     yLabel: { "\(Int($0.rounded())) oz" }))
             ScrubHint()
-            HStack(spacing: 14) {
-                legend("You", color: Accent.blue.fill(scheme), dashed: false)
-                legend("Steady pace", color: Palette(scheme: scheme).tertiary, dashed: true)
+            if !hidesGoal {
+                HStack(spacing: 14) {
+                    legend("You", color: Accent.blue.fill(scheme), dashed: false)
+                    legend("Steady pace", color: Palette(scheme: scheme).tertiary, dashed: true)
+                }
+                .accessibilityHidden(true)
             }
-            .accessibilityHidden(true)
             HowWeGotThisLink(title: "Water through the day",
-                             method: "The blue line adds up every drink you log, at the time you logged it. The dashed steady-pace line spreads your daily goal evenly from when you woke up to an hour before your bedtime, so you can see whether you're ahead or behind for the time of day.")
+                             method: hidesGoal
+                                ? "The blue line adds up every drink you log, at the time you logged it."
+                                : "The blue line adds up every drink you log, at the time you logged it. The dashed steady-pace line spreads your daily goal evenly from when you woke up to an hour before your bedtime, so you can see whether you're ahead or behind for the time of day.")
         }
     }
 
@@ -419,7 +451,10 @@ struct WaterView: View {
                 }
             }
             .frame(minHeight: 52)
-            Text("Drinks like tea, milk and juice count too. Food adds more on top.")
+            if goalML / LogFormat.mlPerOunce > Self.highGoalOz {
+                rangeNote("Over about 135 oz (4 liters) a day is a lot for most women, and drinking far more than your body needs can be dangerous. Unless a doctor told you to, a lower goal is safer.")
+            }
+            Text("For women, US guidance is about 9 cups (74 oz) a day from drinks. Drinks like tea, milk and juice count too, and food adds more on top.")
                 .font(.scaled(size: 13)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -431,7 +466,8 @@ struct WaterView: View {
 private struct WaterDayChart: View {
     let run: [WaterRunPoint]
     let pace: [WaterRunPoint]
-    let goal: Double
+    /// Nil with an eating-disorder history: no goal line.
+    let goal: Double?
     let start: Minutes
     let end: Minutes
     let now: Minutes
@@ -448,7 +484,7 @@ private struct WaterDayChart: View {
         return Array(stride(from: first, through: end, by: step))
     }
 
-    private var yMax: Double { max(goal, run.map(\.ml).max() ?? 0) * 1.15 }
+    private var yMax: Double { max(goal ?? 16 * LogFormat.mlPerOunce, run.map(\.ml).max() ?? 0) * 1.15 }
 
     /// Gridlines every 16 oz (stored values are ml).
     private var ozTicks: [Double] { Array(stride(from: 0, through: yMax, by: 16 * LogFormat.mlPerOunce)) }
@@ -498,13 +534,16 @@ private struct WaterDayChart: View {
         }
     }
 
+    @ChartContentBuilder
     private var goalRule: some ChartContent {
-        RuleMark(y: .value("Goal", goal))
-            .foregroundStyle(Accent.mint.fill(scheme))
-            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            .annotation(position: .top, alignment: .leading) {
-                Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
-            }
+        if let goal {
+            RuleMark(y: .value("Goal", goal))
+                .foregroundStyle(Accent.mint.fill(scheme))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                .annotation(position: .top, alignment: .leading) {
+                    Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
+                }
+        }
     }
 
     @ChartContentBuilder

@@ -58,9 +58,9 @@ extension AppModel {
     /// when it was recorded, else her "up by" time.
     var caffeineWakeTime: Minutes { lastNightIsFresh ? lastNight.wake : store.data.upBy }
 
-    /// Her cutoff for a typical drink falls before she's even up (9-hour
-    /// half-life on the combined pill, ring or patch: 6:00am for a 12:30am
-    /// bedtime). Screens must not print `caffeineCutoff` as a time then;
+    /// Her cutoff for a typical drink falls before she's even up (8-hour
+    /// half-life on the combined pill, ring or patch: about 4:00am for a
+    /// 12:30am bedtime). Screens must not print `caffeineCutoff` as a time then;
     /// use `caffeineCutoffShown` and the "one small drink early" copy.
     var caffeineCutoffBeforeWake: Bool { caffeineCutoff <= caffeineWakeTime }
 
@@ -68,8 +68,8 @@ extension AppModel {
     var caffeineCutoffShown: Minutes? { caffeineCutoffBeforeWake ? nil : caffeineCutoff }
 
     /// The biggest drink (mg, in 5s) she could have at her wake time and
-    /// still be under 25 mg at bedtime. With a 9-hour half-life and a
-    /// 12:30am bedtime that's about 85 mg at 7:30am.
+    /// still be under 25 mg at bedtime. With an 8-hour half-life and a
+    /// 12:30am bedtime that's about 100 mg at 7:30am.
     var caffeineLargestDoseAtWake: Int {
         CaffeineModel.largestDose(at: caffeineWakeTime, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
     }
@@ -151,6 +151,17 @@ extension AppModel {
         let since = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .distantPast
         return store.data.alcoholLog.filter { $0.date >= since }.sorted { $0.date > $1.date }
     }
+
+    /// Drinks logged in the last 6 hours, each counted (an evening out, or
+    /// an afternoon party).
+    var alcoholRecentCount: Int {
+        let since = Date.now.addingTimeInterval(-6 * 3600)
+        return store.data.alcoholLog.filter { $0.date >= since && $0.date <= .now }.map(\.count).reduce(0, +)
+    }
+
+    /// 4 or more drinks in one evening is binge drinking for women (NIAAA):
+    /// screens show the calm alcohol-poisoning safety line.
+    var showsAlcoholSafetyLine: Bool { alcoholRecentCount >= 4 }
 
     /// Drinks logged the evening before `night`: 5pm the day before to 5am
     /// that morning, the same window `followedDrinks` uses.

@@ -230,12 +230,16 @@ struct OnboardingFlow: View {
                         .background(Accent.indigo.tint(scheme), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Your cycle data never leaves your phone.").font(.scaled(size: 14, weight: .bold))
-                        Text("We can\u{2019}t see it, and neither can anyone else.").font(.scaled(size: 14)).secondaryText()
+                        Text("Your cycle data stays on your phone.").font(.scaled(size: 14, weight: .bold))
+                        Text("Never uploaded by this app. Widgets you add can show it on your screen.").font(.scaled(size: 14)).secondaryText()
                     }
                 }
                 .accessibilityElement(children: .combine)
             }
+            Text("Not a medical device. In an emergency call 911.")
+                .font(.scaled(size: 13, weight: .semibold))
+                .secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -266,7 +270,7 @@ struct OnboardingFlow: View {
         return Screen(accent: .purple) {
             topBar()
             heading("First,", "about you")
-            intro("All optional, and it stays on your phone. Age and sex are used only for your fitness age.")
+            intro("All optional, and it stays on your phone. Your age is used only for your fitness age.")
             Card(padding: 14) {
                 AdaptiveStack(spacing: 4) {
                     Text("Name").font(.scaled(size: 15, weight: .bold))
