@@ -600,7 +600,7 @@ private struct PackSection: View {
         packCard
         RowCard {
             ExpandRow(title: "Not right? Set your pack day",
-                      summary: model.packSummaryLineShown ?? "Pack type and today\u{2019}s \(unit)",
+                      summary: model.packNextShort ?? "Pack type and today\u{2019}s \(unit)",
                       systemImage: "slider.horizontal.3", accent: .indigo, isExpanded: $editing) {
                 PackSetupControl()
                     .foregroundStyle(Palette(scheme: scheme).primary)
@@ -657,16 +657,38 @@ private struct PackSection: View {
 
     // MARK: Pack
 
+    /// At rest the readout says what's next, not what the header already
+    /// says (F19): "Next · Break week Nov 1–7", or in the break "Break week
+    /// now · New pack Nov 8".
+    private var restReadout: CycleReadout {
+        let style: Date.FormatStyle = .dateTime.month(.abbreviated).day()
+        let newPack = model.nextPackStart.map { "New pack \($0.formatted(style))" } ?? "New pack soon"
+        if isBreak {
+            return CycleReadout(title: "\(model.packBreakName) now", value: newPack, accent: .pink)
+        }
+        guard hasBreak, !skipping, let start = position.breakStart,
+              let end = Calendar.current.date(byAdding: .day, value: packLength - activeDays - 1, to: start) else {
+            return CycleReadout(title: "Next", value: newPack, accent: .indigo)
+        }
+        let cal = Calendar.current
+        let endText = cal.isDate(start, equalTo: end, toGranularity: .month)
+            ? end.formatted(.dateTime.day()) : end.formatted(style)
+        return CycleReadout(title: "Next", value: "\(model.packBreakName) \(start.formatted(style))\u{2013}\(endText)", accent: .pink)
+    }
+
     private var packCard: some View {
-        let r = CycleCopy.packReadout(day: shown, activeDays: activeDays, packLength: packLength, isToday: shown == day,
-                                      activeName: model.packActiveName, breakName: model.packBreakName)
+        let r = selected == nil ? restReadout
+            : CycleCopy.packReadout(day: shown, activeDays: activeDays, packLength: packLength, isToday: shown == day,
+                                    activeName: model.packActiveName, breakName: model.packBreakName)
         return Card {
             // Title and value only: what each part of the pack does to
             // energy, sleep and mood is on "How your pack affects you".
-            ChartReadout(title: r.title, value: r.value, accent: r.accent)
+            ChartReadout(title: r.title, value: r.value, accent: r.accent,
+                         onClear: selected == nil ? nil : { selected = nil })
             PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping,
                      selected: $selected)
-            ScrubHint(each: "day of the pack")
+            // It's a pack, not a chart (F21).
+            ScrubHint(text: method == .combinedPill ? "Tap a pill to see its day." : "Tap a day to see it.")
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Circle().fill(BodyLogStyle.packFill(isBreak: false, scheme)).frame(width: 10, height: 10)
