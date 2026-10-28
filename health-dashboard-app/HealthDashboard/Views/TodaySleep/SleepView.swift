@@ -210,6 +210,22 @@ struct SleepView: View {
         }
     }
 
+    /// Two or three nights before an early exam (or during exam-week mode):
+    /// "Bed 20 minutes earlier tonight gives you a cushion" (H-C3).
+    @ViewBuilder
+    private var cushionRow: some View {
+        if let exam = model.cushionExam {
+            let day = exam.date.formatted(.dateTime.weekday(.wide))
+            RowDivider()
+            ExpandRow(title: "A cushion before \(exam.title)",
+                      summary: "Bed \(AppModel.cushionMinutes) minutes earlier tonight gives you a cushion",
+                      systemImage: "moon.zzz.fill", accent: .indigo) {
+                Text("\(exam.title) on \(day) means a short night before it. Going to bed about \(AppModel.cushionMinutes) minutes earlier on the two or three nights before softens the hit. It won\u{2019}t make up for the short night; it just gives you a cushion.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     /// "A 20-min nap before 3:10pm won't hurt tonight" (H-C2), from her
     /// wake time and tonight's bedtime; after the cutoff, that it's passed.
     @ViewBuilder
@@ -254,6 +270,7 @@ struct SleepView: View {
             weekendRow
             morningLightRow
             napRow
+            cushionRow
             if model.daysUntilFallBack <= 28 {
                 RowDivider()
                 MetricRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
