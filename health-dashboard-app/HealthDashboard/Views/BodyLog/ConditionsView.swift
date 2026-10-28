@@ -65,7 +65,7 @@ struct ConditionsView: View {
 
             if !available.isEmpty {
                 SectionLabel(text: added.isEmpty ? "Conditions you can add" : "More you can add").padding(.top, 6)
-                Card(padding: 12) {
+                Card(density: .compact) {
                     ForEach(Array(available.enumerated()), id: \.element.id) { index, item in
                         if index > 0 { Divider().overlay(Palette(scheme: scheme).cardBorder) }
                         availableRow(item)

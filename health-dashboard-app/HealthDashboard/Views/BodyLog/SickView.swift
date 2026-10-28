@@ -43,7 +43,7 @@ struct SickView: View {
                 Text("A fever over \(TempFormat.usesFahrenheit ? "100.4\u{00B0}F (38\u{00B0}C)" : "38\u{00B0}C (100.4\u{00B0}F)"), trouble breathing, or feeling worse after 3 days: contact your campus health center or your doctor.")
                     .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
-            Card(padding: 12) {
+            Card(density: .compact) {
                 SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when the check says Possible or Likely.",
                                  systemImage: "bell.fill", accent: .pink, isOn: $store.data.sickAlerts)
             }

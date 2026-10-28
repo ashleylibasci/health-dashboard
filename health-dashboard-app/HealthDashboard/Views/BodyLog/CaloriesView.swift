@@ -23,7 +23,7 @@ struct CaloriesView: View {
                 splitCard
                 cycleCard
                 framingCard
-                Card(padding: 12) {
+                Card(density: .compact) {
                     SettingToggleRow(title: "Show calories on Body", detail: "Turn off anytime. No targets, no food diary.",
                                      systemImage: "flame.fill", accent: .orange, isOn: $store.data.showCalories)
                 }

@@ -107,7 +107,7 @@ struct SettingsView: View {
     }
 
     private var profileCard: some View {
-        Card(padding: 14) {
+        Card {
             AdaptiveStack(spacing: 4) {
                 Text("Name").font(.scaled(size: 15, weight: .bold))
                 TextField("Your first name", text: nameBinding)
@@ -213,7 +213,7 @@ struct SettingsView: View {
         let p = Palette(scheme: scheme)
         return VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Cycle & birth control")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 // Stacked at large text sizes: beside the label, the menu's
                 // value was squeezed to one letter per line (round 3, A2).
                 LabeledControlRow {
@@ -302,7 +302,7 @@ struct SettingsView: View {
     private var sleepSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Sleep schedule")
-            Card(padding: 12) {
+            Card {
                 SleepScheduleControl()
             }
         }
@@ -323,7 +323,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Your pack")
             PackCheckCard()
-            Card(padding: 12) {
+            Card {
                 PackSetupControl()
             }
         }
@@ -343,7 +343,7 @@ struct SettingsView: View {
     private var waterSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Water")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 LinkRow(title: "Bottle size and daily goal",
                         subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML)) \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))",
                         systemImage: "drop.fill", accent: .blue) {
@@ -358,7 +358,7 @@ struct SettingsView: View {
     private var showSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Show in the app")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 SettingToggleRow(title: "Calories", detail: caloriesDetail,
                                  systemImage: "flame.fill", accent: .orange, isOn: caloriesBinding)
                     .disabled(model.caloriesHiddenByCondition)
@@ -465,7 +465,7 @@ struct SettingsView: View {
     private var watchSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Apple Watch")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 SettingToggleRow(title: "Smart alarm", detail: smartAlarmDetail, systemImage: "alarm.fill", accent: .purple,
                                  isOn: $store.data.smartAlarmEnabled)
                 if store.data.smartAlarmEnabled {
@@ -512,7 +512,7 @@ struct SettingsView: View {
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Apple Health & data source")
-            Card(padding: 12) {
+            Card {
                 HStack(spacing: 10) {
                     if model.loading {
                         ProgressView()
@@ -569,7 +569,7 @@ struct SettingsView: View {
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Privacy")
-            Card(padding: 12) {
+            Card {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lock.fill")
                         .font(.scaled(size: 15, weight: .semibold))

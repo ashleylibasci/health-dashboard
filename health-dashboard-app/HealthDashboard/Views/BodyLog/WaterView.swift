@@ -73,11 +73,11 @@ struct WaterView: View {
     }
 
     private var hero: some View {
-        Card(padding: 18) {
+        Card {
             AdaptiveStack(spacing: 16) {
                 Ring(value: goalML > 0 ? model.waterTodayML / goalML : 0, accent: .blue,
                      label: LogFormat.bottles(model.waterBottlesToday),
-                     caption: "of \(LogFormat.bottlesPhrase(model.waterGoalBottles))", size: 132)
+                     caption: "of \(LogFormat.bottlesPhrase(model.waterGoalBottles))", size: 146)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(LogFormat.oz(model.waterTodayML)).font(.scaledNumber(26))
                     HStack(spacing: 0) {

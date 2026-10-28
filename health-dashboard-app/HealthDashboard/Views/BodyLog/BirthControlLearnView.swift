@@ -227,7 +227,7 @@ struct BirthControlLearnView: View {
     private var comparison: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "All methods compared").padding(.top, 6)
-            Card(padding: 12) {
+            Card(density: .compact) {
                 ForEach(Array(BirthControl.allCases.enumerated()), id: \.element) { index, bc in
                     if index > 0 { Divider().overlay(Palette(scheme: scheme).cardBorder) }
                     methodRow(bc)

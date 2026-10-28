@@ -47,7 +47,7 @@ struct BodyView: View {
             NavigationLink { RecoveryView() } label: {
                 AdaptiveStack(spacing: 16) {
                     Ring(value: Double(model.recoveryShown ?? 0) / 100, accent: .indigo, lineWidth: 12,
-                         label: model.recoveryShown.map { "\($0)" } ?? "\u{2013}", caption: "Recovery", size: 100)
+                         label: model.recoveryShown.map { "\($0)" } ?? "\u{2013}", caption: "Recovery", size: 112)
                     VStack(alignment: .leading, spacing: 6) {
                         FlowLayout(spacing: 6) {
                             Text(model.recoveryShown == nil ? "No reading yet" : model.recoveryLabel)
@@ -604,7 +604,7 @@ private struct BodyTrendCard: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .chartScrub($selected)
+        .chartScrub($selected, snapped: selected == nil ? nil : shown?.date, steps: points.map(\.date))
         .frame(height: 160)
         .accessibilityLabel("\(metric.rawValue) over the last 14 nights. Latest \(points.last.map { format($0.value) } ?? "none").")
     }
@@ -702,7 +702,7 @@ private struct BodyTile: View {
             .frame(minHeight: 20)
             if let ring {
                 HStack(spacing: 10) {
-                    Ring(value: ring, accent: accent, lineWidth: 7, label: ringLabel, caption: ringCaption, size: 60)
+                    Ring(value: ring, accent: accent, lineWidth: 7, label: ringLabel, caption: ringCaption, size: 67)
                     Text(value)
                         .font(.scaledNumber(18))
                         .lineLimit(2)

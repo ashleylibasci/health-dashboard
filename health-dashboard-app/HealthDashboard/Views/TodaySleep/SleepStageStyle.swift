@@ -290,6 +290,7 @@ struct StageTimeline: View {
         .frame(width: width, height: lanesHeight, alignment: .topLeading)
         .contentShape(Rectangle())
         .overlay(ScrubSurface { location in selected = date(atX: location.x, width) })
+        .scrubFeedback(selected.flatMap { segment(at: $0) })
     }
 
     private var axis: some View {

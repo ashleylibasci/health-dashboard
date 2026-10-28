@@ -191,7 +191,7 @@ struct CycleLogView: View {
                     .font(.scaled(size: 14)).secondaryText()
             }
         } else {
-            Card(padding: 12) {
+            Card(density: .compact) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { Divider().overlay(Palette(scheme: scheme).cardBorder) }
                     recentRow(item)

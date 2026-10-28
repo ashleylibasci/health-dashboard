@@ -184,7 +184,7 @@ struct OnboardingFlow: View {
             ZStack {
                 // Example numbers, labeled as such: nothing is hers yet.
                 Ring(value: Double(model.recoveryShown ?? AppModel.recoveryAnchor) / 100, accent: .indigo, lineWidth: 16,
-                     label: "\(model.recoveryShown ?? AppModel.recoveryAnchor)", caption: "Example", size: 180)
+                     label: "\(model.recoveryShown ?? AppModel.recoveryAnchor)", caption: "Example", size: 196)
                 VStack {
                     HStack {
                         Spacer()
@@ -267,7 +267,7 @@ struct OnboardingFlow: View {
             topBar()
             heading("First,", "about you")
             intro("All optional, and it stays on your phone. Age and sex are used only for your fitness age.")
-            Card(padding: 14) {
+            Card {
                 AdaptiveStack(spacing: 4) {
                     Text("Name").font(.scaled(size: 15, weight: .bold))
                     TextField("Your first name", text: nameBinding)
@@ -632,7 +632,7 @@ struct OnboardingFlow: View {
             topBar(trailing: (title: "Skip", action: { next() }))
             heading("Where are you", "in your pack?")
             intro("Look at your pack: which \(packUnit) is today\u{2019}s? Then the break week and your withdrawal bleed land on the right days.")
-            Card(padding: 14) {
+            Card {
                 PackSetupControl(showsSkip: false)
             }
             HStack(spacing: 0) {
@@ -664,7 +664,7 @@ struct OnboardingFlow: View {
             heading("Any health", "conditions?")
             intro("Optional. Pick any that apply. Each one says exactly what it changes in the app. You can add or remove these anytime.")
             privacyPill("Private and stays on your phone")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 ForEach(Array(ConditionCatalog.all.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { Divider().overlay(Palette(scheme: scheme).cardBorder) }
                     conditionRow(item)
@@ -724,11 +724,11 @@ struct OnboardingFlow: View {
             topBar()
             heading("Your", "sleep")
             intro("When do you usually go to bed, and what\u{2019}s the latest you can get up? Pick any times. These set your caffeine cutoff, wake plan and smart alarm. Change them anytime in Settings.")
-            Card(padding: 14) {
+            Card {
                 SleepScheduleControl()
             }
             SectionLabel(text: "Set up sleep tracking").padding(.top, 4)
-            Card(padding: 14) {
+            Card {
                 setupTip("bed.double.fill", .purple, "Turn on a sleep schedule or Sleep Focus",
                          "In the Health app, under Sleep. Apple Watch only tracks sleep when one is set up.")
                 setupTip("applewatch", .indigo, "Wear your Watch to bed, snug",
@@ -791,7 +791,7 @@ struct OnboardingFlow: View {
             topBar()
             heading("Make it", "yours")
             intro("Some things aren\u{2019}t helpful for everyone. Turn on only what you want to see.")
-            Card(padding: 12) {
+            Card(density: .compact) {
                 SettingToggleRow(title: "Show calories", detail: caloriesDetail,
                                  systemImage: "flame.fill", accent: .orange, isOn: caloriesBinding)
                     .disabled(model.caloriesHiddenByCondition)

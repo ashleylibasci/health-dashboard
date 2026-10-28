@@ -53,6 +53,8 @@ struct HealthDashboardApp: App {
 }
 
 struct RootTabView: View {
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         TabView {
             NavigationStack { TodayView() }
@@ -64,5 +66,7 @@ struct RootTabView: View {
             NavigationStack { LogView() }
                 .tabItem { Label("Log", systemImage: "plus") }
         }
+        // The app's chrome colour, not system blue.
+        .tint(Accent.indigo.ink(scheme))
     }
 }

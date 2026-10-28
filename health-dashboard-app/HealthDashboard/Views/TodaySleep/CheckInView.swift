@@ -280,7 +280,7 @@ private struct CheckInHistoryChart: View {
                     .cornerRadius(4)
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: history.map(\.date).sorted())
         .chartYScale(domain: 0...5)
         .chartYAxis {
             AxisMarks(position: .leading, values: [1, 3, 5])

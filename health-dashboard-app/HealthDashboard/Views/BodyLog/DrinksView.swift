@@ -431,7 +431,7 @@ private struct DrinkNightsChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 1))
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: points.map(\.index))
         .chartXScale(domain: -1...max(points.count, 1))
         .chartYScale(domain: 0.0...10.0)
         .chartXAxis {

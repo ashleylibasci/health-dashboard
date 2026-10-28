@@ -633,7 +633,7 @@ private struct DoseResponseChart: View {
             kneeMark
             selectionMarks
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected?.hours, steps: Array(Set(points.map(\.hours))).sorted())
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
         .chartXAxis {

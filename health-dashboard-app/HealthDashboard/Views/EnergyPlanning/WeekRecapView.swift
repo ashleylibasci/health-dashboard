@@ -85,7 +85,7 @@ struct WeekRecapView: View {
         }
         return Card(accent: .indigo) {
             HStack(spacing: 18) {
-                Ring(value: Double(avg) / 100, accent: .indigo, label: "\(avg)", caption: "Week avg", size: 120,
+                Ring(value: Double(avg) / 100, accent: .indigo, label: "\(avg)", caption: "Week avg", size: 134,
                      accessibilityText: "Week energy average \(avg) out of 100, estimated from your sleep")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 0) {
@@ -508,7 +508,7 @@ private struct WeekEnergyChart: View {
         .chartYScale(domain: 0...100)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selection, steps: bars.map(\.label))
         .accessibilityLabel(summary)
     }
 }
