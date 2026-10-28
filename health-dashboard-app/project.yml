@@ -40,7 +40,7 @@ targets:
         CFBundleDisplayName: Health Dashboard
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone."
+        NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve, and, if you turn it on, the pill doses you log so a pill you've taken gets no reminder. Everything stays on your phone."
         NSHealthUpdateUsageDescription: "Saves the caffeine and water you log to Apple Health."
         NSCalendarsFullAccessUsageDescription: "Health Dashboard looks for exams on your calendar (events with exam, midterm, final, quiz or test in the title) so it can plan your sleep around them. It never changes your calendar, and events stay on your phone."
         NSAlarmKitUsageDescription: "Health Dashboard sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you."

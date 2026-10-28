@@ -45,6 +45,12 @@ final class AppModel: ObservableObject {
     /// Period starts read from Apple Health. Logged bleeds are merged in on
     /// the fly (`mergedPeriodStarts`).
     @Published var healthPeriodStarts: [Date] = []
+    /// Pill doses marked taken in Apple Health (Apple's Medications or
+    /// another app), when she turned that on (`AppModel+Pill.swift`).
+    @Published var healthPillDoses: [Date] = []
+    /// Apple's Medications has a reminder schedule for her pill, so this app
+    /// sends only the repeat (never two reminders at once).
+    @Published var healthPillHasSchedule = false
 
     /// Where Apple Health stands, for the accuracy and settings screens.
     enum HealthConnection: Equatable {
@@ -914,6 +920,7 @@ final class AppModel: ObservableObject {
         Task {
             await updateHealthConnection()
             await updateNudges()
+            await updatePill()
         }
     }
 
@@ -1162,6 +1169,8 @@ final class AppModel: ObservableObject {
 
         // A logged or edited bleed moves the cycle day straight away.
         if old.flowLog != new.flowLog { recomputeCycle() }
+
+        if Self.pillRelevantChange(old, new) { Task { await updatePill(readHealth: old.pillReadsHealth != new.pillReadsHealth) } }
 
         // A new method: the old pack type and start don't carry over.
         let oldMethod = old.cycleSetup == .hormonal ? old.birthControl : nil

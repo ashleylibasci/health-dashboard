@@ -17,6 +17,8 @@ struct HealthDashboardApp: App {
         DemoMode.applySetup(store: store, model: model)
         // Apple Health wakes the app with new data (also when it's closed).
         BackgroundHealth.shared.start(model)
+        // Pill doses logged in Apple Health cancel that pill's reminders.
+        PillHealth.startWatching(model)
         // Lattes from Siri or the widget: straight into the log when the
         // intent runs in this process, otherwise on the next activation.
         PendingDrinks.onAdded = { model.importPendingDrinks() }

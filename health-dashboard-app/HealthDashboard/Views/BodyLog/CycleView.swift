@@ -596,6 +596,9 @@ private struct PackSection: View {
             }
         }
         header
+        if model.pillToday != nil {
+            RowCard { PillTodayRow() }
+        }
         if skipping { skipNote }
         packCard
         RowCard {
@@ -676,17 +679,28 @@ private struct PackSection: View {
         return CycleReadout(title: "Next", value: "\(model.packBreakName) \(start.formatted(style))\u{2013}\(endText)", accent: .pink)
     }
 
+    /// A picked pill's readout, with whether it was taken (H-A1).
+    private func pickedReadout(_ d: Int, marks: AppModel.PillMarks) -> CycleReadout {
+        var r = CycleCopy.packReadout(day: d, activeDays: activeDays, packLength: packLength, isToday: d == day,
+                                      activeName: model.packActiveName, breakName: model.packBreakName)
+        if marks.taken.contains(d) {
+            r.title += " \u{00B7} taken"
+        } else if marks.notLogged.contains(d) {
+            r.title += " \u{00B7} not logged"
+        }
+        return r
+    }
+
     private var packCard: some View {
-        let r = selected == nil ? restReadout
-            : CycleCopy.packReadout(day: shown, activeDays: activeDays, packLength: packLength, isToday: shown == day,
-                                    activeName: model.packActiveName, breakName: model.packBreakName)
+        let marks = model.pillMarks
+        let r = selected.map { pickedReadout($0, marks: marks) } ?? restReadout
         return Card {
             // Title and value only: what each part of the pack does to
             // energy, sleep and mood is on "How your pack affects you".
             ChartReadout(title: r.title, value: r.value, accent: r.accent,
                          onClear: selected == nil ? nil : { selected = nil })
             PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping,
-                     selected: $selected)
+                     marks: marks, selected: $selected)
             // It's a pack, not a chart (F21).
             ScrubHint(text: method == .combinedPill ? "Tap a pill to see its day." : "Tap a day to see it.")
             VStack(alignment: .leading, spacing: 0) {
@@ -694,6 +708,13 @@ private struct PackSection: View {
                     Circle().fill(BodyLogStyle.packFill(isBreak: false, scheme)).frame(width: 10, height: 10)
                     Text("\(model.packActiveName) \u{00B7} days 1\u{2013}\(activeDays)").font(.secondary).fontWeight(.semibold)
                     InfoButton(topic: .pillPack).padding(.vertical, -10)
+                }
+                if !marks.notLogged.isEmpty {
+                    HStack(spacing: 6) {
+                        Circle().strokeBorder(BodyLogStyle.packFill(isBreak: false, scheme), lineWidth: 2).frame(width: 10, height: 10)
+                        Text("Not marked taken").font(.secondary).fontWeight(.semibold)
+                    }
+                    .frame(minHeight: 28)
                 }
                 if hasBreak {
                     HStack(spacing: 6) {
@@ -713,12 +734,15 @@ private struct PackSection: View {
 }
 
 /// The 28-day pack as a 7-column grid. Drag across it to see each day.
+/// Pills she marked taken are filled in; active days since she started
+/// marking them with nothing logged stay outlined (H-A1).
 private struct PillGrid: View {
     let day: Int
     let activeDays: Int
     let packLength: Int
     /// She's skipping this pack's break: those days are shown greyed out.
     var skipped = false
+    var marks = AppModel.PillMarks()
     @Binding var selected: Int?
     @Environment(\.colorScheme) private var scheme
 
@@ -750,9 +774,10 @@ private struct PillGrid: View {
         .scrubFeedback(selected)
         .frame(height: CGFloat(rows) * rowHeight + CGFloat(rows - 1) * spacing)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(activeDays < packLength
+        .accessibilityLabel((activeDays < packLength
                             ? "Pack: day \(day) of \(packLength). Days 1 to \(activeDays) active, then the break\(skipped ? ", skipped this time" : "")."
                             : "Pack: day \(day) of \(packLength), all active.")
+                            + (marks.taken.isEmpty ? "" : " \(marks.taken.count) marked taken\(marks.notLogged.isEmpty ? "" : ", \(marks.notLogged.count) not")."))
         .accessibilityAdjustableAction { direction in
             let current = selected ?? day
             switch direction {
@@ -778,8 +803,13 @@ private struct PillGrid: View {
         ZStack {
             if d > packLength {
                 Color.clear
+            } else if d == day && marks.taken.contains(d) {
+                shape.fill(fill).overlay(shape.strokeBorder(Color.white, lineWidth: 3).padding(-3))
+                    .overlay(Image(systemName: "checkmark").font(.scaled(size: 14, weight: .heavy)).foregroundStyle(Color(hex: 0x0B0B14)))
             } else if d == day {
                 shape.fill(Color.white).overlay(shape.strokeBorder(fill, lineWidth: 3).padding(-3))
+            } else if marks.notLogged.contains(d) {
+                shape.fill(fill.opacity(0.14)).overlay(shape.strokeBorder(fill, lineWidth: 2))
             } else if isBreak && skipped {
                 shape.strokeBorder(Palette(scheme: scheme).tertiary, style: StrokeStyle(lineWidth: 1.5, dash: [2, 3]))
             } else if isBreak {

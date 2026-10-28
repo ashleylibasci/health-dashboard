@@ -61,6 +61,12 @@ enum DemoMode {
             data.packActiveDays = 21
             data.packLength = 28
             data.packStartDate = cal.date(byAdding: .day, value: -17, to: today)
+            // Pills 1–17 marked taken at about 9pm, except pill 11, and the
+            // 9pm reminder on (H-A1).
+            data.pillReminder = true
+            data.pillsTaken = (1...17).filter { $0 != 11 }.compactMap { day in
+                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - 18, to: today) ?? today)
+            }
         case "hormonalIUD":
             data.cycleSetup = .hormonal
             data.birthControl = BirthControl.hormonalIUD.rawValue
