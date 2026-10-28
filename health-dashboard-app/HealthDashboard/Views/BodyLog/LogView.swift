@@ -253,8 +253,24 @@ struct LogView: View {
                         stressButton(level)
                     }
                 }
+                if model.feltStressedToday {
+                    // B6: caffeine raises anxiety, more so in big doses.
+                    Text(stressCaffeineLine)
+                        .font(.secondary).secondaryText()
+                        .fixedSize(horizontal: false, vertical: true)
+                        .motionTransition(.reveal, edge: .top)
+                }
             }
+            .motion(.reveal, value: model.feltStressedToday)
         }
+    }
+
+    /// Today's caffeine beside a stressed check-in: "Caffeine today:
+    /// 230 mg. Big doses can feel like anxiety."
+    private var stressCaffeineLine: String {
+        let mg = model.caffeineMgToday
+        if mg > CaffeineModel.lowerGuideMg { return "Caffeine today: \(mg) mg. Big doses can feel like anxiety." }
+        return mg == 0 ? "No caffeine today." : "Caffeine today: \(mg) mg."
     }
 
     static func stressWord(_ level: Int) -> String {
