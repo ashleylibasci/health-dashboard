@@ -323,7 +323,9 @@ struct HeartMetricView: View {
                     SectionLabel(text: "This morning", accent: accent)
                     InfoButton(explanation: explanation).padding(.vertical, -12)
                     Spacer()
-                    if model.hasHeartData && !model.heartIsReal { ExampleTag() }
+                    // Only when her sleep is real but the heart readings aren't yet;
+                    // otherwise the screen's Example data capsule already says so.
+                    if model.hasHeartData && !model.heartIsReal && !model.usingSampleData { ExampleTag() }
                 }
                 Text(value).font(model.hasHeartData ? .display : .detailTitle)
                     .contentTransition(.numericText())
