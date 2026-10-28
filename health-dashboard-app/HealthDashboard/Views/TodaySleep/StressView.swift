@@ -181,12 +181,13 @@ struct StressView: View {
                 ChartReadout(title: Self.hourText(hour.hour), value: "No reading", detail: slots[3],
                              accent: .indigo, onClear: { selectedHour = nil }, detailSlots: slots)
             }
-        } else if let peak = day.peak, let level = peak.level {
-            // At rest the readout sums up the day; the hint under the chart
-            // says how to explore it (Valtonen F13).
-            ChartReadout(title: "Highest today \u{00B7} \(Self.hourText(peak.hour))", value: Self.band(level).name,
-                         detail: "Today overall: \(day.label?.rawValue.lowercased() ?? "no band yet"), from \(day.countedHours) still \(day.countedHours == 1 ? "hour" : "hours").",
-                         accent: Self.band(level).accent, detailSlots: slots)
+        } else if let latest = day.hours.last(where: { $0.level != nil }), let level = latest.level {
+            // At rest: the latest counted hour, not the peak the summary
+            // already shows (F15).
+            let b = Self.band(level)
+            let isNow = latest.hour == (model.now / 60) % 24
+            ChartReadout(title: "\(isNow ? "Now" : "Latest") \u{00B7} \(Self.hourText(latest.hour))", value: b.name,
+                         detail: Self.meaning(level), accent: b.accent, detailSlots: slots)
         } else {
             ChartReadout(title: "Today", value: "No readings yet",
                          detail: "Hours fill in as your Watch measures your heart rate.", accent: .orange, detailSlots: slots)
@@ -213,20 +214,43 @@ struct StressView: View {
                 StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
                     .frame(height: 170)
                 ScrubHint(each: "hour")
-                // Wraps (one per line at the largest sizes) instead of breaking
-                // the words into letters.
-                FlowLayout(spacing: 12, lineSpacing: 6) {
-                    swatch(StressLevelColor.fill(0, scheme), "Low")
-                    swatch(StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue)
-                    swatch(StressLevelColor.fill(2, scheme), "Raised \u{25CF}")
-                    swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
-                    swatch(p.tertiary, "Active")
-                }
+                legend
             } else {
                 // No empty grid: one line until the first hour comes in.
                 Label("Fills in as your Watch measures your heart rate.", systemImage: "applewatch")
                     .font(.bodyText).foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// One line when it fits, else two equal columns; a swatch before every
+    /// label and no stray glyphs (the ▲ and ● are in the card's ⓘ, F16).
+    private var legend: some View {
+        let items: [(Color, String)] = [
+            (StressLevelColor.fill(0, scheme), "Low"),
+            (StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue),
+            (StressLevelColor.fill(2, scheme), "Raised"),
+            (StressLevelColor.fill(3, scheme), "High"),
+            (Palette(scheme: scheme).tertiary, "Active"),
+        ]
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                ForEach(items, id: \.1) { swatch($0.0, $0.1).fixedSize() }
+            }
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { i in
+                    GridRow {
+                        swatch(items[i].0, items[i].1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if i + 1 < items.count {
+                            swatch(items[i + 1].0, items[i + 1].1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                        }
+                    }
+                }
             }
         }
     }
