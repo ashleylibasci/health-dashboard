@@ -56,7 +56,7 @@ struct SleepView: View {
 
     private var lastNightDial: some View {
         let night = model.lastNight
-        return SleepArcDial(start: night.onset, end: night.wake, size: 124, lineWidth: 12,
+        return SleepArcDial(start: night.onset, end: night.wake, size: typeSize.isAccessibilitySize ? 180 : 124, lineWidth: 12,
                             colors: [Accent.purple.ink(scheme), Accent.purple.fill(scheme)],
                             label: Clock.duration(night.asleep), labelSize: 22,
                             caption: "last night", showHours: true)
@@ -207,7 +207,7 @@ struct SleepView: View {
             }
             RowDivider()
             MetricRow(title: "Sleep need & debt",
-                      note: "Need \(Clock.duration(model.sleepNeed.minutes)) \u{00B7} tonight \(model.tonightNeedText)",
+                      note: "You need \(Clock.duration(model.sleepNeed.minutes)) a night",
                       value: debt >= 15 ? Clock.duration(debt) : nil,
                       verdict: RowVerdict(text: debt >= 15 ? "Debt" : "No debt", accent: debt >= 60 ? .coral : .mint),
                       systemImage: "bed.double.fill", accent: .purple) {
