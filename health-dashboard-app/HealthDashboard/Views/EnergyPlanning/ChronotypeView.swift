@@ -403,6 +403,8 @@ private struct ChronotypeSpectrum: View {
                 })
             }
             .frame(height: 64)
+            // A tick every 15 minutes of mid-sleep, as the readout rounds.
+            .scrubFeedback(dragFraction.map { Int((Double($0) * 360 / 15).rounded()) })
             HStack {
                 Text("Very early")
                 Spacer()

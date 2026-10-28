@@ -215,7 +215,7 @@ private struct HistoryBars: View {
             }
             needLine
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
         .chartYAxis {
             AxisMarks(position: .leading, values: [0.0, 4.0, 6.0, 8.0, 10.0]) { value in

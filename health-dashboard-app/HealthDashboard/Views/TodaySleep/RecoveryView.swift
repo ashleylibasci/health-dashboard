@@ -18,7 +18,7 @@ struct RecoveryView: View {
             historyCard
             movedCard
             heartCard
-            Card(padding: 12) {
+            Card(density: .compact) {
                 LinkRow(title: "Getting accurate numbers", subtitle: "A checklist of ways to help your Watch",
                         systemImage: "checklist", accent: .indigo) {
                     AccuracyTipsView()
@@ -77,7 +77,7 @@ struct RecoveryView: View {
             VStack(spacing: 14) {
                 if let score = model.recoveryShown {
                     Ring(value: Double(score) / 100, accent: .indigo, lineWidth: 18,
-                         label: "\(score)", caption: model.recoveryLabel(for: score), size: 190,
+                         label: "\(score)", caption: model.recoveryLabel(for: score), size: 208,
                          accessibilityText: "Recovery \(score), \(model.recoveryLabel(for: score))")
                     if model.recoveryIsExample {
                         ExampleTag()
@@ -304,7 +304,7 @@ private struct RecoveryHistoryChart: View {
             .accessibilityHidden(true)   // VoiceOver reads the summary (round 3, A9)
             usualLine.accessibilityHidden(true)
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: history.map(\.day).sorted())
         .chartYScale(domain: 0...100)
         .chartXAxis(.hidden)
         .chartYAxis {
@@ -385,7 +385,7 @@ private struct HeartTrendChart: View {
             .accessibilityHidden(true)
             selectionMarks.accessibilityHidden(true)
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: points.map(\.day).sorted())
         .chartYScale(domain: yDomain)
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: 3)) { _ in

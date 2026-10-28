@@ -109,7 +109,7 @@ struct SleepView: View {
     // MARK: Week & month
 
     private var historyLink: some View {
-        Card(padding: 12) {
+        Card(density: .compact) {
             LinkRow(title: "Week & month", subtitle: "Every night, your averages and how steady your sleep is",
                     systemImage: "chart.bar.fill", accent: .purple) {
                 SleepHistoryView()
@@ -201,7 +201,7 @@ struct SleepView: View {
     private var linksCard: some View {
         let need = model.sleepNeed
         let showClockChange = model.daysUntilFallBack <= 28
-        return Card(padding: 12) {
+        return Card {
             HStack(spacing: 0) {
                 Text("Sleep debt").font(.scaled(size: 15, weight: .bold))
                 InfoButton(topic: .sleepDebt).padding(.vertical, -12)

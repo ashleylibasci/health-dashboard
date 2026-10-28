@@ -60,15 +60,15 @@ struct SampleDataBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.subheadline.weight(.bold))
+                        .font(.bodyEmphasis)
                         .foregroundStyle(Accent.yellow.ink(scheme))
                     Text(why)
-                        .font(.footnote)
+                        .font(.secondary)
                         .foregroundStyle(p.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if let accessNote {
                         Text(accessNote)
-                            .font(.footnote)
+                            .font(.secondary)
                             .foregroundStyle(p.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -81,9 +81,9 @@ struct SampleDataBanner: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
@@ -94,7 +94,7 @@ struct SampleDataBanner: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 4) {
                 Text(prominent ? title : "Example data")
-                    .font(.subheadline.weight(.bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.yellow.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -105,16 +105,16 @@ struct SampleDataBanner: View {
             }
             settingsLink
         }
-        .padding(.leading, 12)
+        .padding(.leading, Space.l)
         .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
     private var icon: some View {
         Image(systemName: "doc.text.magnifyingglass")
-            .font(.body.weight(.semibold))
+            .font(.scaled(size: 17, weight: .semibold))
             .foregroundStyle(Accent.yellow.ink(scheme))
             .accessibilityHidden(true)
     }
@@ -128,7 +128,7 @@ struct SampleDataBanner: View {
         if accessNote != nil, let url = URL(string: UIApplication.openSettingsURLString) {
             Link(destination: url) {
                 Text("Open Settings")
-                    .font(.footnote.weight(.bold))
+                    .font(.scaled(size: 13, weight: .semibold))
                     .foregroundStyle(Accent.yellow.ink(scheme))
                     .frame(minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())

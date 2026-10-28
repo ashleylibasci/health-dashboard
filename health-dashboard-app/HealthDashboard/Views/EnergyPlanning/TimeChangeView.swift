@@ -527,7 +527,7 @@ private struct WakeByClockChart: View {
                 AxisValueLabel().font(.chartLabel(size: 11))
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selectedLabel, steps: dots.map(\.label))
         .accessibilityLabel(summary)
     }
 }

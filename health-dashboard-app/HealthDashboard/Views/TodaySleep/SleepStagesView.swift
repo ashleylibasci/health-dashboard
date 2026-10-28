@@ -123,7 +123,8 @@ struct SleepStagesView: View {
                 ChartReadout(title: "\(StageStyle.name(slice.stage)) \u{00B7} \(Int((Double(slice.minutes) / Double(total) * 100).rounded()))% of the night",
                              value: Clock.duration(slice.minutes),
                              detail: StageStyle.oneLiner(slice.stage),
-                             accent: StageStyle.accent(slice.stage))
+                             accent: StageStyle.accent(slice.stage),
+                             onClear: { selectedAngle = nil })
             } else {
                 ChartReadout(title: "Last night", value: "\(Clock.duration(night.asleep)) asleep",
                              detail: "Touch a slice to see each stage.", accent: .purple)
@@ -140,6 +141,7 @@ struct SleepStagesView: View {
         }
         .chartLegend(.hidden)
         .chartAngleScrub($selectedAngle, total: slices.reduce(0) { $0 + $1.minutes })
+        .scrubFeedback(selectedSlice?.stage)
         .accessibilityLabel("Sleep stages last night: " + slices.map { "\(StageStyle.name($0.stage)) \(Clock.duration($0.minutes))" }.joined(separator: ", "))
     }
 

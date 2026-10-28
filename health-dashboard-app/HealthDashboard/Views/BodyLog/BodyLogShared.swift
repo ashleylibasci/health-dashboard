@@ -307,16 +307,16 @@ struct BodyLogTabHeader: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Space.xxs) {
             Text(BodyLogStyle.todayLine)
                 .font(.scaled(size: 13, weight: .semibold))
-                .tracking(0.3)
+                .tracking(0.5)
                 .secondaryText()
             Text(title)
-                .font(.scaled(size: 34, weight: .bold))
+                .font(.screenTitle)
                 .accessibilityAddTraits(.isHeader)
         }
-        .padding(.top, 4)
+        .padding(.top, Space.xs)
     }
 }
 
@@ -473,7 +473,8 @@ struct CycleStrip: View {
     var body: some View {
         let r = readout(shown)
         VStack(alignment: .leading, spacing: 8) {
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent)
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent,
+                         onClear: selected == nil ? nil : { selected = nil })
                 .frame(maxWidth: .infinity, alignment: .leading)
             strip
             letterRow
@@ -497,16 +498,20 @@ struct CycleStrip: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Rectangle())
-            .overlay(ScrubSurface { location in
-                let w = max(geo.size.width, 1)
-                let d = Int((location.x / w) * CGFloat(length)) + 1
-                selected = min(max(d, 1), length)
-            })
+            .overlay(ScrubSurface(onChange: { location in
+                selected = day(at: location, width: geo.size.width)
+            }, onTap: { location in
+                // Tapping the selected day again goes back to today.
+                let d = day(at: location, width: geo.size.width)
+                selected = d == selected ? nil : d
+            }))
         }
         .frame(height: 40)
+        .scrubFeedback(selected)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityAdjustableAction { direction in
+            ChartScrubVoiceOver.noteStep()
             let current = selected ?? today ?? 1
             switch direction {
             case .increment: selected = min(current + 1, length)
@@ -514,6 +519,11 @@ struct CycleStrip: View {
             @unknown default: break
             }
         }
+    }
+
+    private func day(at location: CGPoint, width: CGFloat) -> Int {
+        let d = Int((location.x / max(width, 1)) * CGFloat(length)) + 1
+        return min(max(d, 1), length)
     }
 
     private struct Segment: Identifiable {

@@ -92,7 +92,7 @@ struct ExamListView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
-                Card(padding: 12) {
+                Card(density: .compact) {
                     ForEach(upcoming) { exam in
                         ExamListRow(exam: UpcomingExam(exam: exam)) { editing = ExamDraft(exam) }
                         if exam.id != upcoming.last?.id { Divider() }

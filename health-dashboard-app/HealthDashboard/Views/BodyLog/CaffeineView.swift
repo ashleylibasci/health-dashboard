@@ -82,10 +82,10 @@ struct CaffeineView: View {
     }
 
     private var hero: some View {
-        Card(padding: 18) {
+        Card {
             AdaptiveStack(spacing: 16) {
                 Ring(value: Double(model.caffeineMgToday) / Double(dailyLimit), accent: .yellow,
-                     label: "\(model.caffeineMgToday)", caption: "mg today", size: 132)
+                     label: "\(model.caffeineMgToday)", caption: "mg today", size: 146)
                 VStack(alignment: .leading, spacing: 8) {
                     if let last = model.caffeineDoses.last {
                         heroStat(label: lastDrinkName, value: Clock.format(last.time), accent: .yellow)
@@ -153,7 +153,7 @@ struct CaffeineView: View {
                 Text("Logs \(logTime.phrase)").font(.scaled(size: 13, weight: .semibold)).secondaryText()
             }
             .padding(.top, 4)
-            Card(padding: 14) {
+            Card {
                 LogTimeSelector(time: $logTime, accent: .yellow, title: "When did you have it?")
             }
             ForEach(Array(store.data.savedDrinks.enumerated()), id: \.element.id) { index, drink in
@@ -661,7 +661,7 @@ private struct CaffeineFalloffChart: View {
             guides.accessibilityHidden(true)
             markers.accessibilityHidden(true)
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected?.time, steps: points.map(\.time))
         .chartXScale(domain: start...end)
         .chartYScale(domain: 0...yMax)
         .chartXAxis {

@@ -204,7 +204,7 @@ private struct CutoffBarChart: View {
                     }
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: groups.map(\.label))
         .chartYScale(domain: 0.0...yMax)
         .chartYAxis {
             AxisMarks(position: .leading, values: [0.0, 4.0, 8.0]) { value in

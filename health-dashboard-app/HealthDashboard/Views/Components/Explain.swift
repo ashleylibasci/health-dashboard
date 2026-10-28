@@ -19,11 +19,12 @@ struct InfoButton: View {
         .sheet(isPresented: $showing) { ExplanationSheet(explanation: explanation) }
     }
 
-    /// "What is HRV?", but a title that's already a question reads
-    /// "Explain: How stressed do you feel?" (not "What is How…??").
+    /// "About HRV" (it opens what it is, what to do and how it's worked
+    /// out, not only a definition), but a title that's already a question
+    /// reads "Explain: How stressed do you feel?".
     private var spokenLabel: String {
         let title = explanation.title.trimmingCharacters(in: .whitespaces)
-        return title.hasSuffix("?") ? "Explain: \(title)" : "What is \(title)?"
+        return title.hasSuffix("?") ? "Explain: \(title)" : "About \(title)"
     }
 }
 
@@ -44,10 +45,23 @@ struct ExplainedTitle: View {
     init(text: String, explanation: Explanation, size: CGFloat = 15) { self.text = text; self.explanation = explanation; self.size = size }
     var body: some View {
         HStack(spacing: 0) {
-            Text(text).font(.scaled(size: size, weight: .bold))
+            Text(text).font(font).tracking(role?.tracking ?? 0)
             InfoButton(explanation: explanation).padding(.vertical, -12)
         }
     }
+
+    /// The type-scale role for the design sizes in use (17 is a card title,
+    /// 15 an emphasised line, 22 a headline); other sizes stay bold.
+    private var role: TypeRole? {
+        switch size {
+        case 22: .heading
+        case 17: .cardTitle
+        case 15: .bodyEmphasis
+        default: nil
+        }
+    }
+
+    private var font: Font { role?.font ?? .scaled(size: size, weight: .bold) }
 }
 
 /// "How we got this number" link that opens the method behind a number.
@@ -60,14 +74,17 @@ struct HowWeGotThisLink: View {
     var body: some View {
         Button { showing = true } label: {
             HStack(spacing: 6) {
-                Image(systemName: "questionmark.circle")
+                Image(systemName: "questionmark.circle").accessibilityHidden(true)
                 Text(label)
             }
-            .font(.scaled(size: 14, weight: .semibold))
+            .font(.bodyEmphasis)
             .foregroundStyle(Accent.indigo.ink(scheme))
-            .frame(minHeight: 44)
+            .textLinkHitArea()
         }
         .buttonStyle(.plain)
+        // The negative padding keeps the 44pt target without the gap; keep
+        // the link clear of whatever sits above and below it.
+        .padding(.vertical, Space.xs)
         .sheet(isPresented: $showing) { ExplanationSheet(explanation: explanation, method: true) }
     }
 }
@@ -133,10 +150,10 @@ struct ExplanationSheet: View {
                         if !e.forYou.isEmpty { section("What it means for you", e.forYou) }
                         if let how = e.howWeGotIt {
                             DisclosureGroup("How we got this number") {
-                                Text(how).font(.scaled(size: 15)).foregroundStyle(p.secondary)
+                                Text(how).font(.bodyText).foregroundStyle(p.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
                             }
-                            .font(.scaled(size: 15, weight: .semibold))
+                            .font(.bodyEmphasis)
                             .tint(Accent.indigo.ink(scheme))
                         }
                     }
@@ -154,38 +171,130 @@ struct ExplanationSheet: View {
     private func section(_ title: String, _ body: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             SectionLabel(text: title)
-            Text(body).font(.scaled(size: 16)).frame(maxWidth: .infinity, alignment: .leading)
+            Text(body).font(.bodyText).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
 
-/// The bubble that follows your finger on interactive charts.
+/// The callout above an interactive chart: what the touched point is
+/// (title), its value, and a short note.
+///
+/// - Full width, so it never changes width while you scrub.
+/// - The value is one big tabular number. A value written "72 · Take it
+///   steady" shows "72" big and "Take it steady" beside it.
+/// - The note always keeps room for three lines, so the chart under it
+///   doesn't jump as notes of different lengths come and go (a longer
+///   note still shows in full).
+/// - Pass `onClear` while something is selected: tapping the readout then
+///   clears the selection, back to the summary.
+/// - When VoiceOver steps the chart, the new readout is spoken.
 struct ChartReadout: View {
     var title: String
     var value: String
     var detail: String? = nil
     var accent: Accent = .indigo
+    var onClear: (() -> Void)? = nil
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Lines the note always keeps room for.
+    private let detailLines = 3
+
+    private var parts: (number: String, qualifier: String?) {
+        guard let r = value.range(of: " \u{00B7} ") else { return (value, nil) }
+        return (String(value[..<r.lowerBound]), String(value[r.upperBound...]))
+    }
+
+    private var spoken: String {
+        [title, value, detail].compactMap { $0 }.joined(separator: ", ")
+    }
 
     var body: some View {
         let p = Palette(scheme: scheme)
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
-            Text(value).font(.scaledNumber(18)).foregroundStyle(accent.ink(scheme))
-            if let detail { Text(detail).font(.scaled(size: 12)).foregroundStyle(p.secondary).fixedSize(horizontal: false, vertical: true) }
+        let ax = typeSize.isAccessibilitySize
+        let shape = RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            Text(title)
+                .font(.secondary).fontWeight(.semibold)
+                .foregroundStyle(p.secondary)
+                .lineLimit(ax ? nil : 1)
+                .minimumScaleFactor(ax ? 1 : 0.8)
+            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                Text(parts.number)
+                    .font(.numberM)
+                    .foregroundStyle(accent.ink(scheme))
+                    .lineLimit(ax ? nil : 1)
+                    .minimumScaleFactor(ax ? 1 : 0.6)
+                    .contentTransition(reduceMotion ? .opacity : .numericText())
+                    .motion(.select, value: value)
+                if let qualifier = parts.qualifier {
+                    Text(qualifier)
+                        .font(.secondary).fontWeight(.semibold)
+                        .foregroundStyle(accent.ink(scheme))
+                        .lineLimit(ax ? nil : 1)
+                        .minimumScaleFactor(ax ? 1 : 0.8)
+                }
+            }
+            if let detail {
+                ZStack(alignment: .topLeading) {
+                    if !ax {
+                        // Holds the height of three lines.
+                        Text(Array(repeating: " ", count: detailLines).joined(separator: "\n"))
+                            .font(.secondary)
+                            .hidden()
+                    }
+                    Text(detail)
+                        .font(.secondary)
+                        .foregroundStyle(p.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .padding(.horizontal, 10).padding(.vertical, 8)
-        .background(scheme == .dark ? Color(hex: 0x1C1E30) : .white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(p.cardBorder))
-        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
-        .frame(maxWidth: 220, alignment: .leading)
+        .padding(.horizontal, Space.m).padding(.vertical, Space.s + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(scheme == .dark ? Color(hex: 0x1C1E30) : .white, in: shape)
+        .overlay(shape.strokeBorder(p.cardBorder))
+        .shadow(color: .black.opacity(scheme == .dark ? 0.15 : 0.06), radius: 6, y: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityAddTraits(onClear == nil ? [] : .isButton)
+        .accessibilityHint(onClear == nil ? "" : "Clears the selection")
+        .modifier(ClearOnTap(shape: shape, action: onClear))
+        .onChange(of: spoken) { _, text in
+            if ChartScrubVoiceOver.justStepped {
+                AccessibilityNotification.Announcement(text).post()
+            }
+        }
     }
 }
 
-/// Default hint under interactive charts.
+/// Tapping the readout clears the chart's selection, only when the readout
+/// was given a way to (otherwise taps pass through untouched).
+private struct ClearOnTap: ViewModifier {
+    var shape: RoundedRectangle
+    var action: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content
+                .contentShape(shape)
+                .onTapGesture { withMotion(.select) { action() } }
+                .accessibilityAction { action() }
+        } else {
+            content
+        }
+    }
+}
+
+/// Default hint under interactive charts. Hidden from VoiceOver, where
+/// the chart itself is adjustable (swipe up or down).
 struct ScrubHint: View {
     var text = "Tap or slide along the chart to see details"
     var body: some View {
-        Label(text, systemImage: "hand.point.up.left").font(.scaled(size: 12)).secondaryText()
+        Label(text, systemImage: "hand.point.up.left")
+            .font(.scaled(size: 12))
+            .secondaryText()
+            .accessibilityHidden(true)
     }
 }

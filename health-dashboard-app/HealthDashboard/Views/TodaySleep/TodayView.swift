@@ -393,7 +393,7 @@ struct TodayView: View {
     }
 
     private var whyOffLink: some View {
-        Card(padding: 12) {
+        Card(density: .compact) {
             LinkRow(title: "Why do I feel off?", subtitle: whyOffSubtitle,
                     systemImage: "questionmark.bubble.fill", accent: .coral) {
                 WhyOffView()
@@ -424,7 +424,7 @@ struct TodayView: View {
         } else {
             alarmText = "Plan your wake time"
         }
-        return Card(accent: .purple, padding: 14) {
+        return Card(accent: .purple) {
             AdaptiveStack(spacing: 14) {
                 SleepArcDial(start: bed, end: wake, size: 88, lineWidth: 10,
                              colors: [Accent.purple.fill(scheme), Accent.orange.fill(scheme)],
@@ -603,7 +603,7 @@ struct TodayView: View {
     // MARK: More
 
     private var moreCard: some View {
-        Card(padding: 12) {
+        Card(density: .compact) {
             SectionLabel(text: "More").padding(.horizontal, 4)
             if !showWhyOffUpTop {
                 LinkRow(title: "Why do I feel off?", subtitle: "Check what might be behind a rough day",

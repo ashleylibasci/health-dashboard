@@ -219,10 +219,10 @@ private struct PhasesSection: View {
     }
 
     private var hero: some View {
-        Card(padding: 18) {
+        Card {
             AdaptiveStack(spacing: 16) {
                 Ring(value: min(Double(day) / Double(max(length, 1)), 1), accent: accent,
-                     label: "\(day)", caption: "Day of ~\(length)", size: 124,
+                     label: "\(day)", caption: "Day of ~\(length)", size: 138,
                      accessibilityText: "Cycle day \(day) of about \(length)")
                 VStack(alignment: .leading, spacing: 6) {
                     Text(BodyLogStyle.todayLine)
@@ -697,7 +697,7 @@ private struct PackSection: View {
     private var packCard: some View {
         let r = CycleCopy.packReadout(day: shown, activeDays: activeDays, packLength: packLength, isToday: shown == day,
                                       activeName: model.packActiveName, breakName: model.packBreakName)
-        return Card(padding: 18) {
+        return Card {
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent)
             PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping, selected: $selected)
             ScrubHint(text: "Touch and drag across the pack to see each day")
@@ -837,6 +837,7 @@ private struct PillGrid: View {
             .contentShape(Rectangle())
             .overlay(ScrubSurface { location in selected = index(at: location, width: geo.size.width) })
         }
+        .scrubFeedback(selected)
         .frame(height: CGFloat(rows) * rowHeight + CGFloat(rows - 1) * spacing)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(activeDays < packLength
@@ -919,7 +920,7 @@ private struct SuppressedSection: View {
     private var recentStarts: [Date] { Array(model.allPeriodStarts.suffix(4).reversed()) }
 
     var body: some View {
-        Card(padding: 18) {
+        Card {
             Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
             Text("On the \(name)").font(.scaled(size: 26, weight: .bold)).accessibilityAddTraits(.isHeader)
             Text(heroText)
@@ -1018,7 +1019,7 @@ private struct PackUnknownSection: View {
     private var unit: String { method == .combinedPill ? "pill" : "day" }
 
     var body: some View {
-        Card(padding: 18) {
+        Card {
             Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
             Text("Set where you are in your pack").font(.scaled(size: 24, weight: .bold)).accessibilityAddTraits(.isHeader)
             Text("The app doesn\u{2019}t know which \(unit) you\u{2019}re on yet, so it can\u{2019}t show your active days and break week. Pick today\u{2019}s \(unit) from your pack.")
@@ -1060,7 +1061,7 @@ private struct OverdueSection: View {
     }
 
     var body: some View {
-        Card(padding: 18) {
+        Card {
             Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("Day \(day)").font(.scaledNumber(44))
@@ -1155,7 +1156,7 @@ private struct IrregularSection: View {
     private var chartBars: [CycleBar] { bars + (currentBar.map { [$0] } ?? []) }
 
     var body: some View {
-        Card(padding: 18) {
+        Card {
             Text("Your cycle, your way").font(.scaled(size: 26, weight: .bold)).accessibilityAddTraits(.isHeader)
             if let days = model.daysSinceLastPeriodStart {
                 if days == 0 {
@@ -1284,7 +1285,7 @@ private struct IrregularSection: View {
         }
         .chartXScale(domain: chartBars.map(\.label))
         .chartYScale(domain: 0...(Double(top) * 1.2))
-        .chartScrub($selectedLabel)
+        .chartScrub($selectedLabel, snapped: selectedLabel == nil ? nil : shownBar?.label, steps: chartBars.map(\.label))
         .chartXAxis {
             AxisMarks { _ in
                 AxisValueLabel().font(.scaled(size: 11, weight: .semibold))

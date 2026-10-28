@@ -54,7 +54,7 @@ struct FitnessView: View {
     // MARK: Hero
 
     private func hero(vo2: Double) -> some View {
-        Card(padding: 18) {
+        Card {
             // VO2 max above fitness age at large text sizes; numbers never
             // break across lines ("38 / .2").
             AdaptiveStack(spacing: 12, alignment: .top) {
@@ -186,7 +186,7 @@ struct FitnessView: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .chartScrub($selected)
+        .chartScrub($selected, snapped: selected == nil ? nil : shown?.date, steps: points.map(\.date))
         .frame(height: 170)
         .accessibilityLabel("VO2 max history: " + points.map { "\($0.date.formatted(.dateTime.month(.abbreviated).year())) \(String(format: "%.1f", $0.value))" }.joined(separator: ", "))
     }

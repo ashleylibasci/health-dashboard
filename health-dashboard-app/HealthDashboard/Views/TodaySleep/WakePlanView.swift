@@ -436,7 +436,7 @@ struct WakePlanView: View {
 
     private var linksCard: some View {
         let showClockChange = model.daysUntilFallBack <= 28
-        return Card(padding: 12) {
+        return Card(density: .compact) {
             LinkRow(title: "Your sleep need",
                     subtitle: "\(Clock.duration(model.sleepNeed.minutes)) base, \(Clock.duration(model.tonightNeed.total)) tonight",
                     systemImage: "bed.double.fill", accent: .purple) {
@@ -581,6 +581,7 @@ private struct CycleTimeline: View {
                 .frame(width: w, height: 44, alignment: .topLeading)
                 .contentShape(Rectangle())
                 .overlay(ScrubSurface { location in selected = minutes(atX: location.x, w) })
+                .scrubFeedback(selected.map { describe($0).title })
             }
             .frame(height: 44)
             GeometryReader { geo in
@@ -675,7 +676,7 @@ private struct WakeHistoryChart: View {
             }
             selectionMarks
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected?.hours, steps: Array(Set(dots.map(\.hours))).sorted())
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
         .chartXAxis {

@@ -309,7 +309,7 @@ private struct BedtimeChart: View {
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: points.map(\.day).sorted())
         .accessibilityLabel(summary)
     }
 

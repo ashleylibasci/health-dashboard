@@ -48,7 +48,7 @@ struct SickView: View {
             helpCard
             if !feelsSick { careCard }
             pillCard
-            Card(padding: 12) {
+            Card(density: .compact) {
                 SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when the check finds a couple of signs or several.",
                                  systemImage: "bell.fill", accent: .pink, isOn: $store.data.sickAlerts)
             }

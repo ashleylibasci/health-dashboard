@@ -135,7 +135,7 @@ struct AccuracyTipsView: View {
         let fraction = known.isEmpty ? 0 : Double(done) / Double(known.count)
         return Card(accent: .indigo) {
             AdaptiveStack(spacing: 16) {
-                Ring(value: fraction, accent: .indigo, lineWidth: 10, label: "\(done)/\(known.count)", size: 84,
+                Ring(value: fraction, accent: .indigo, lineWidth: 10, label: "\(done)/\(known.count)", size: 94,
                      accessibilityText: "\(done) of \(known.count) checks done")
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Things the app can check").font(.scaled(size: 17, weight: .bold))
@@ -196,7 +196,7 @@ struct AccuracyTipsView: View {
     private func section(_ title: String, _ tips: [Tip]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: title).padding(.horizontal, 4).padding(.top, 6)
-            Card(padding: 14) {
+            Card(density: .compact) {
                 ForEach(Array(tips.enumerated()), id: \.offset) { index, tip in
                     if index > 0 { Divider() }
                     tipRow(tip)

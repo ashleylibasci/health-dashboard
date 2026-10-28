@@ -423,7 +423,7 @@ private struct StressHoursChart: View {
             .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             selectionMarks.accessibilityHidden(true)
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: bars.map(\.hour).sorted())
         .chartXScale(domain: domain)
         .chartYScale(domain: 0...115)  // room above 100 for the labels
         .chartXAxis {

@@ -104,7 +104,7 @@ struct EnergyView: View {
             }
             HStack(spacing: 18) {
                 Ring(value: Double(e.score) / 100, accent: .mint, label: "\(e.score)",
-                     caption: day == .today ? "Today" : "Forecast", size: 120, accessibilityText: ringLabel)
+                     caption: day == .today ? "Today" : "Forecast", size: 134, accessibilityText: ringLabel)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(headline(e)).font(.scaled(size: 20, weight: .bold))
                         .fixedSize(horizontal: false, vertical: true)
@@ -666,7 +666,7 @@ private struct EnergyCurveChart: View {
                 }
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, steps: energy.curve.map(\.time))
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(ClockChartDescriptor(
             title: "Energy through the day", seriesName: "Energy", yTitle: "Energy, 0 to 100",
