@@ -1266,8 +1266,8 @@ final class AppModel: ObservableObject {
         return nil
     }
 
-    /// The Watch can only arm the alarm while its app is open, at most 36
-    /// hours ahead. When the next alarm isn't armed (the Watch says so, or
+    /// The Watch can only turn the alarm on while its app is open, at most 36
+    /// hours ahead. When the next alarm isn't on (the Watch says so, or
     /// it follows a skipped weekend), a phone notification the evening
     /// before, an hour before bedtime, asks her to open the Watch app.
     func updateAlarmNudge() async {

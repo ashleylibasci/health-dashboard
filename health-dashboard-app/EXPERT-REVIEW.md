@@ -74,7 +74,7 @@ Features (biggest value first):
 - Words: one name per thing (Alcohol, Weekend shift, Streaks, Your week, Sick check, Example data, focus peak, "your usual"), times as "8:15am", ranges "8:00–8:25am", the logged confirmation echoes the time she picked.
 - Accessibility: no sideways scrolling or mid-word breaks at the largest text size; section headings are headings; 44pt targets on text links; VoiceOver labels say "About …" and read symbols as words.
 - Watch: titles in the clock row; logging without scrolling, with Undo on the tile; Tonight leads with "Bed by"; a "now" point on the Energy curve; a water tile; text follows her text size; "no numbers for today yet" after the 4am rollover instead of yesterday's; opens on the page that fits the time of day.
-- Widgets and complications: tinted and accented rendering, empty states sized for each family, stale numbers greyed with the day shown, the latte button shows when it's past the cutoff, and the bedtime complication rises in the Smart Stack before bed and says whether the alarm is armed.
+- Widgets and complications: tinted and accented rendering, empty states sized for each family, stale numbers greyed with the day shown, the latte button shows when it's past the cutoff, and the bedtime complication rises in the Smart Stack before bed and says whether the Watch alarm is on.
 
 ## Design: recommendations not built yet
 - Show the Energy curve inline on Body (today it's a tile that opens it) and an Energy complication / Smart Stack widget with a "now" dot.

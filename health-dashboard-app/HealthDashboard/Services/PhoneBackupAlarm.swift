@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 /// A regular iPhone alarm at the smart alarm's latest time, for mornings the
-/// Watch can't wake her (not worn, flat, or the alarm never got armed). It
+/// Watch can't wake her (not worn, flat, or the Watch alarm never turned on). It
 /// rings like the Clock app, even on silent. When she stops the Watch's
 /// alarm, the Watch tells the phone, which cancels this one.
 ///

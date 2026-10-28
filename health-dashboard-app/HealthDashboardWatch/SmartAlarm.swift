@@ -54,8 +54,8 @@ final class SmartAlarmManager: NSObject, ObservableObject {
         didSet { if pendingChange != oldValue { saveForComplication() } }
     }
 
-    /// Tells the Bedtime complication whether tomorrow's alarm is armed, or
-    /// needs the app opened ("Tap to arm").
+    /// Tells the Bedtime complication whether tomorrow's alarm is on, or
+    /// needs the app opened ("Tap to turn on Watch alarm").
     private func saveForComplication() {
         var state = WatchAlarmState(armedEnd: nil, needsOpen: pendingChange)
         switch status {
@@ -79,9 +79,9 @@ final class SmartAlarmManager: NSObject, ObservableObject {
     /// The last alarm state the phone heard about, so it isn't resent.
     private var reported: (end: Date?, off: Bool)?
 
-    /// Tells the phone which window is armed (nil: none) and whether the
+    /// Tells the phone which window is on (nil: none) and whether the
     /// alarm is off on this Watch, so it can remind her to open this app
-    /// when tomorrow's alarm still needs arming.
+    /// when tomorrow's alarm still needs turning on.
     func reportStatus(force: Bool = false) {
         let end: Date?
         switch status {

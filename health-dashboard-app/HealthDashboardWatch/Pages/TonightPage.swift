@@ -138,7 +138,7 @@ private struct SleepDial: View {
     }
 }
 
-/// The smart alarm in one row: its switch and where it stands ("Armed ·
+/// The smart alarm in one row: its switch and where it stands ("On ·
 /// wakes by 7:45am"), with how it works underneath.
 private struct SmartAlarmRow: View {
     let snapshot: WatchSnapshot
@@ -166,12 +166,12 @@ private struct SmartAlarmRow: View {
         case .noWindow:
             return "Waiting for your iPhone"
         case let .scheduled(_, end):
-            return alarm.pendingChange ? "Open again to update" : "Armed \u{00B7} wakes by \(when(end))"
+            return alarm.pendingChange ? "Open again to update" : "On \u{00B7} wakes by \(when(end))"
         case let .later(_, end):
             let weekend = snapshot.alarmWeekdaysOnly == true && Calendar.current.isDateInWeekend(Date().addingTimeInterval(24 * 3600))
             return weekend ? "Off for the weekend" : "Next: \(when(end)) latest"
         case .needsForeground:
-            return "Open before bed to arm"
+            return "Open before bed to turn on"
         case let .listening(end):
             return "On \u{00B7} wakes by \(WatchStyle.time(end))"
         case .ringing:
@@ -179,7 +179,7 @@ private struct SmartAlarmRow: View {
         case let .woke(at):
             return "Woke at \(WatchStyle.time(at))"
         case .failed:
-            return "Not armed"
+            return "Couldn't turn on"
         }
     }
 
@@ -189,7 +189,7 @@ private struct SmartAlarmRow: View {
         case .failed(let message):
             return message
         case .later:
-            return "Open this app the evening before to arm it."
+            return "Open this app the evening before to turn it on."
         case .off, .noWindow, .ringing, .woke:
             return nil
         default:

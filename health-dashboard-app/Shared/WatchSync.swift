@@ -105,10 +105,10 @@ enum WatchMessage: Codable {
     /// Undo on the Watch, a few seconds after logging water.
     case undoWater(entryID: UUID)
     case woke(at: Date, fromLightSleep: Bool)
-    /// The Watch's smart alarm state: the end of the window it has armed (nil
-    /// when nothing is armed), and whether she switched it off on the Watch.
+    /// The Watch's smart alarm state: the end of the window it has turned on (nil
+    /// when it isn't on), and whether she switched it off on the Watch.
     /// Lets the phone remind her to open the Watch app when tomorrow's alarm
-    /// still needs arming.
+    /// still needs turning on.
     case alarmArmed(end: Date?, offOnWatch: Bool)
 
     /// "Latte", for an error message about this message.

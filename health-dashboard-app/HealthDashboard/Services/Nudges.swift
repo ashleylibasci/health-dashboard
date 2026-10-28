@@ -3,7 +3,7 @@ import UserNotifications
 import HealthCore
 
 /// Local notifications for the "Peak and dip nudges" and "Sick alerts"
-/// settings, and the smart-alarm arming reminder. Everything is scheduled
+/// settings, and the "turn on Watch alarm" reminder. Everything is scheduled
 /// on the phone; nothing leaves it.
 ///
 /// - Peak and dip: one notification 15 minutes before the first peak and
@@ -13,7 +13,7 @@ import HealthCore
 /// - Sick alerts: at most one a day, when the check finds "A couple of
 ///   signs" or "Several signs". Never at night: after 10pm or before 8am it waits until 8am.
 /// - Smart alarm: "Open the app on your Watch" the evening before a
-///   morning the Watch hasn't armed yet.
+///   morning the Watch alarm isn't on yet.
 enum Nudges {
     static let nudgePrefix = "nudge-"
     static let sickPrefix = "sick-"
@@ -112,13 +112,13 @@ enum Nudges {
     // MARK: Smart alarm
 
     /// "Open the app on your Watch", the evening before a morning the Watch
-    /// hasn't armed (it can only arm while its app is open). Replaces any
+    /// alarm isn't on yet (it can only turn on while its app is open). Replaces any
     /// earlier one.
     static func scheduleAlarmArm(at fire: Date, wakeTime: Date) async {
         await cancel(prefix: alarmPrefix)
         guard await isAllowed() else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Arm tomorrow's smart alarm"
+        content.title = "Turn on tomorrow's Watch alarm"
         content.body = "Open Health Dashboard on your Apple Watch before bed so it can wake you by \(Clock.format(Clock.minutesOfDay(wakeTime)))."
         content.sound = .default
         let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fire)

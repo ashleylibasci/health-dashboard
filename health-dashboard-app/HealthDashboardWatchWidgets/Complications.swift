@@ -336,7 +336,7 @@ struct BedtimeComplication: Widget {
                 .widgetURL(page(2))
         }
         .configurationDisplayName("Bedtime")
-        .description("Tonight's bedtime and whether your smart alarm is armed.")
+        .description("Tonight's bedtime and whether your Watch alarm is on.")
         .supportedFamilies(families)
     }
 }
@@ -345,11 +345,11 @@ private struct BedtimeComplicationView: View {
     let entry: ComplicationEntry
     @Environment(\.widgetFamily) private var family
 
-    /// "Alarm armed · by 7:45am", "Tap to arm the alarm", or nil.
+    /// "Watch alarm on · by 7:45am", "Tap to turn on Watch alarm", or nil.
     private var alarmLine: String? {
         guard let a = entry.alarm else { return nil }
-        if a.needsOpen { return "Tap to arm the alarm" }
-        if let end = a.armedEnd, end > entry.date { return "Alarm armed \u{00B7} by \(time(end))" }
+        if a.needsOpen { return "Tap to turn on Watch alarm" }
+        if let end = a.armedEnd, end > entry.date { return "Watch alarm on \u{00B7} by \(time(end))" }
         return nil
     }
 

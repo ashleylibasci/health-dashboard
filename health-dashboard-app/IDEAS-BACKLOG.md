@@ -80,7 +80,7 @@ Effort: S about a day, M a few days, L a week or more. Value 1–5 for Ashley.
 ### Notifications
 
 - **D-N1 One morning note** · effort M · value 4/5. At about 45 minutes after waking: "68 · take it steady · pill day 18 · bed by 11:50 tonight", with Log latte and +1 bottle buttons. Other nudges stay off unless she turns them on. *Why:* one notification she reads, not five she swipes away.
-- **D-N2 Notifications that do the thing** · effort S · value 4/5. The pill reminder has "Taken" and the wind-down nudge has "Arm alarm", both acting without opening the app. *Why:* one tap from the Lock Screen.
+- **D-N2 Notifications that do the thing** · effort S · value 4/5. The pill reminder has "Taken" and the wind-down nudge has "Turn on Watch alarm", both acting without opening the app. *Why:* one tap from the Lock Screen.
 - **D-N3 Bedtime reminder as a normal setting** · effort S · value 3/5. Settings → Sleep & alarm → "Wind-down reminder · 30 min before bed", no longer hidden in the clock-change plan. *Why:* it's the setting people look for first.
 - **D-N4 Settings by moment, not by feature** · effort S · value 2/5. Notifications grouped as Morning / Daytime / Bedtime, each with one switch. *Why:* easier to reason about than a list of features.
 

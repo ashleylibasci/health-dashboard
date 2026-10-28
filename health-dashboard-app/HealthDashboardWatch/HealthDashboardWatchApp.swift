@@ -54,7 +54,7 @@ struct HealthDashboardWatchApp: App {
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {
         Task { @MainActor in
-            // Once connected, tell the phone whether tomorrow's alarm is armed.
+            // Once connected, tell the phone whether tomorrow's alarm is on.
             WatchSync.shared.onActivated = { SmartAlarmManager.shared.reportStatus(force: true) }
             WatchSync.shared.activate()
         }

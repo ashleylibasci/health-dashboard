@@ -117,9 +117,9 @@ struct WidgetSnapshot: Codable, Equatable {
 /// Group by the Watch app whenever the alarm's state changes (the phone
 /// never writes it).
 struct WatchAlarmState: Codable, Equatable {
-    /// Armed: rings by this time at the latest.
+    /// On: rings by this time at the latest.
     var armedEnd: Date?
-    /// On, but watchOS needs the app opened to arm it (or to use a new window).
+    /// On, but watchOS needs the app opened to turn it on (or to use a new window).
     var needsOpen: Bool
 
     private static let key = "next.watchAlarm.v1"

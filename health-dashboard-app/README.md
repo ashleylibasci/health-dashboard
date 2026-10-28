@@ -102,7 +102,7 @@ until you press **Stop**, then tells the iPhone you're up.
 Limits:
 - watchOS only lets the app schedule the session while the app is open. Open
   the Watch app once before bed after changing the plan. The Tonight page
-  says "Open this app before bed to arm it" if scheduling failed.
+  says "Open this app the evening before to turn it on" if scheduling failed.
 - A smart-alarm session runs for at most 30 minutes, so with a longer window
   it may ring a few minutes early (still inside the window).
 - Apps can't read sleep stages live, so light sleep is a guess from movement
