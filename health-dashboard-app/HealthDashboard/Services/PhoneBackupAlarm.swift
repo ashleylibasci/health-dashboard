@@ -22,7 +22,9 @@ final class PhoneBackupAlarm: ObservableObject {
     /// She said no to alarms for this app in iOS Settings.
     @Published private(set) var denied = false
 
-    private static let dateKey = "phoneBackupAlarmDate"
+    /// Not the older app's "phoneBackupAlarmDate": this app replaced it, and
+    /// must not adopt (and then cancel) an alarm it didn't set.
+    private static let dateKey = "next.phoneBackupAlarmDate"
     private var queue: Task<Void, Never>?
 
     private init() {
@@ -68,7 +70,10 @@ final class PhoneBackupAlarm: ObservableObject {
         let manager = AlarmManager.shared
         let existing = (try? manager.alarms) ?? []
         if let wanted, wanted == scheduledFor, existing.count == 1 { return }
-        if wanted == nil, existing.isEmpty, scheduledFor == nil { return }
+        // Nothing wanted and nothing of ours set: leave any alarm alone. The
+        // older app this one replaced may have left tomorrow's backup, and
+        // it should still ring until she turns this app's backup on.
+        if wanted == nil, scheduledFor == nil { return }
         // Clear everything this app scheduled; only the alarm made below stays.
         for alarm in existing { try? manager.cancel(id: alarm.id) }
         scheduledFor = nil

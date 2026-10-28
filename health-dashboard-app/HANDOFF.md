@@ -12,7 +12,7 @@ A native iPhone (iOS 17) + Apple Watch (watchOS 10) app in SwiftUI. It reads App
 Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" canvas on claude.ai (dark `Night*` and light `Light*` boards).
 
 ## Layout
-- `project.yml`: XcodeGen spec. Run `./setup.sh` (or `xcodegen generate`) after adding or removing files. The app installs as **Health Next**, `com.ashleylibasci.healthdashboard.next` (+ `.watchkitapp`), alongside the old app from `ios/`, which keeps `com.ashleylibasci.healthdashboard` until Ashley switches over. Signing team `93C3VKR4FJ` is set for every target, so Xcode never asks.
+- `project.yml`: XcodeGen spec. Run `./setup.sh` (or `xcodegen generate`) after adding or removing files. The app installs as **Health Dashboard**, `com.ashleylibasci.healthdashboard` (+ `.watchkitapp`, `.widgets`, `.watchkitapp.widgets`), replacing the old app from `ios/` (same IDs) since Oct 27, 2026. It reads the old app's calendar sign-in from the Keychain and leaves an alarm the old app scheduled alone until its own backup is on. Signing team `93C3VKR4FJ` is set for every target, so Xcode never asks.
 - `HealthDashboardUITests/TestRound.swift`: the hands-on test round. It walks onboarding, every tab, the main screens, the pack setting, a coffee at a custom time, water and the chart drags in dark, light and the largest text size, saving a screenshot plus the element tree at each step (`TEST_RUNNER_SHOT_DIR=/folder xcodebuild test …`).
 - `Model/DemoMode.swift`: Debug-only launch arguments (`-demo`, `-demoSick`, `-demoCycle pill|hormonalIUD|natural|copper|irregular`, `-demoConditions`, `-resetData`) that show labelled example data without asking Apple Health. The Watch takes `-demo` and `-page 0…3`.
 - `Packages/HealthCore`: pure Swift logic with XCTest. Run `swift test` there. This is where the math lives: sleep need and debt, the energy model, wake planner, caffeine, cycle and birth control (`CycleDisplay`), stress, illness, fitness age, streaks, and wall-clock time helpers.
@@ -31,7 +31,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 - `HealthDashboardWatchWidgets/`: Watch-face complications (Recovery, Cycle, Caffeine, Bedtime).
 - `HealthDashboardWatch/`: Watch pages and `SmartAlarm.swift` (WKExtendedRuntimeSession smart alarm).
 - `Shared/`: HealthKit access (`HealthKitService`), phone↔Watch sync (`WatchSync`), `WidgetSnapshot`, the latte intent and the theme.
-- App Group: the old app's `group.com.ashleylibasci.healthdashboard` (a free team can't register a new one), with Health Next's own keys (`next.widgetSnapshot.v1`, `next.pendingDrinks.v1`) so the two apps' widgets never mix.
+- App Group: the old app's `group.com.ashleylibasci.healthdashboard` (a free team can't register a new one), with this app's own keys (`next.widgetSnapshot.v1`, `next.pendingDrinks.v1`) so it never reads the old app's leftover widget numbers.
 
 ## Conventions
 - Plain language for a college student; every number and term gets an ⓘ. Method details go behind "Learn how we got this number", never on the main page.
@@ -88,7 +88,7 @@ Xcode 27.1 can hang after the suite reports on this simulator; stop `xcodebuild`
 
 ## Not checked on a device yet
 - The widgets and complications on a real Home Screen and Watch face, Siri "Log a latte", the AlarmKit backup ringing, and calendar import with real events.
-- Google sign-in: the OAuth client is the old app's (made for `com.ashleylibasci.healthdashboard`). If Google refuses it for Health Next, add an iOS OAuth client for `com.ashleylibasci.healthdashboard.next` in Google Cloud and put its id in `GoogleConfig`; until then the calendar link works for Google Calendar.
+- Google sign-in with real events (the OAuth client is made for `com.ashleylibasci.healthdashboard`, which the app now uses).
 
 ## Not built yet
 - Friend streaks.

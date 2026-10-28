@@ -454,7 +454,7 @@ struct SettingsView: View {
     private var backupAlarmDetail: String {
         guard PhoneBackupAlarm.isAvailable else { return "Needs iOS 26.1 or later." }
         if backupAlarm.denied {
-            return "Alarms are off for Health Next in iOS Settings, so the backup can't ring. Turn them on in Settings \u{2192} Health Next."
+            return "Alarms are off for Health Dashboard in iOS Settings, so the backup can't ring. Turn them on in Settings \u{2192} Health Dashboard."
         }
         if store.data.phoneBackupAlarm, let at = backupAlarm.scheduledFor {
             return "Rings at \(Clock.format(Clock.minutesOfDay(at))) if your Watch hasn't woken you. Stopping the Watch alarm cancels it."

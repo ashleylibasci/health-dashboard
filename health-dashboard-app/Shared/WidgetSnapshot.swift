@@ -45,9 +45,9 @@ struct WidgetSnapshot: Codable, Equatable {
         var mg: Int
     }
 
-    /// Shared with the older Health Dashboard app from `ios/` (a free
-    /// developer team can't register a new group), so Health Next keeps
-    /// its own key: the two apps' widgets never read each other's numbers.
+    /// The older Health Dashboard app's group (a free developer team can't
+    /// register a new one). This app replaced it; its own key keeps it from
+    /// reading the old app's leftover snapshot.
     static let appGroup = "group.com.ashleylibasci.healthdashboard"
     private static let key = "next.widgetSnapshot.v1"
 

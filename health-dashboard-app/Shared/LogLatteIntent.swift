@@ -43,7 +43,7 @@ enum PendingDrinks {
     }
 }
 
-/// "Log a latte in Health Next": logs her saved latte (or her first saved
+/// "Log a latte in Health Dashboard": logs her saved latte (or her first saved
 /// drink) now, saves it to Apple Health, and updates the widgets. Works from
 /// Siri, Shortcuts, Spotlight and the Caffeine & water widget.
 struct LogLatteIntent: AppIntent {
@@ -54,7 +54,7 @@ struct LogLatteIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard var snapshot = WidgetSnapshot.load(), let drink = snapshot.quickDrink else {
-            return .result(dialog: "Open Health Next once first, so it knows your drinks.")
+            return .result(dialog: "Open Health Dashboard once first, so it knows your drinks.")
         }
         let now = Date()
         let entryID = UUID()

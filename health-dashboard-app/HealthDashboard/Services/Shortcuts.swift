@@ -1,7 +1,7 @@
 import AppIntents
 
 /// Siri and Shortcuts phrases. No setup needed: they appear in the Shortcuts
-/// app and Spotlight once Health Next is installed.
+/// app and Spotlight once the app is installed.
 struct HealthNextShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: LogLatteIntent(),

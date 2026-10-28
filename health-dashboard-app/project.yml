@@ -1,6 +1,6 @@
 name: HealthDashboard
 options:
-  bundleIdPrefix: com.ashleylibasci.healthdashboard.next
+  bundleIdPrefix: com.ashleylibasci.healthdashboard
   deploymentTarget:
     iOS: "17.0"
     watchOS: "10.0"
@@ -37,16 +37,16 @@ targets:
     info:
       path: HealthDashboard/Resources/Info.plist
       properties:
-        CFBundleDisplayName: Health Next
+        CFBundleDisplayName: Health Dashboard
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone."
         NSHealthUpdateUsageDescription: "Saves the caffeine and water you log to Apple Health."
-        NSCalendarsFullAccessUsageDescription: "Health Next looks for exams on your calendar (events with exam, midterm, final, quiz or test in the title) so it can plan your sleep around them. It never changes your calendar, and events stay on your phone."
-        NSAlarmKitUsageDescription: "Health Next sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you."
+        NSCalendarsFullAccessUsageDescription: "Health Dashboard looks for exams on your calendar (events with exam, midterm, final, quiz or test in the title) so it can plan your sleep around them. It never changes your calendar, and events stay on your phone."
+        NSAlarmKitUsageDescription: "Health Dashboard sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only (portrait-locked)
         OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "AlarmKit"]   # AlarmKit is iOS 26+; the app targets 17
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
@@ -68,16 +68,16 @@ targets:
     info:
       path: HealthDashboardWatch/Info.plist
       properties:
-        CFBundleDisplayName: Health Next
+        CFBundleDisplayName: Health Dashboard
         WKApplication: true
-        WKCompanionAppBundleIdentifier: com.ashleylibasci.healthdashboard.next
+        WKCompanionAppBundleIdentifier: com.ashleylibasci.healthdashboard
         WKBackgroundModes: [alarm]
         NSHealthShareUsageDescription: "Reads your heart rate and sleep to time your smart alarm and energy curve."
         NSHealthUpdateUsageDescription: "Saves the caffeine you log to Apple Health."
         NSMotionUsageDescription: "Watches for movement during your wake window so the smart alarm can wake you from light sleep."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.watchkitapp
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
   HealthDashboardWidgets:
@@ -97,13 +97,13 @@ targets:
     info:
       path: HealthDashboardWidgets/Info.plist
       properties:
-        CFBundleDisplayName: Health Next
+        CFBundleDisplayName: Health Dashboard
         NSHealthUpdateUsageDescription: "Saves the latte you log from the widget to Apple Health."
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.widgets
         TARGETED_DEVICE_FAMILY: "1"
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
@@ -122,12 +122,12 @@ targets:
     info:
       path: HealthDashboardWatchWidgets/Info.plist
       properties:
-        CFBundleDisplayName: Health Next
+        CFBundleDisplayName: Health Dashboard
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.watchkitapp.widgets
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
         SKIP_INSTALL: YES
@@ -140,7 +140,7 @@ targets:
       - target: HealthDashboard
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.uitests
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)

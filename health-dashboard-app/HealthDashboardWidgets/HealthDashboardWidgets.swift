@@ -84,7 +84,7 @@ private struct OpenAppPrompt: View {
         VStack(spacing: 4) {
             Image(systemName: "heart.text.square")
                 .font(.title2)
-            Text("Open Health Next to see your numbers")
+            Text("Open Health Dashboard to see your numbers")
                 .font(.caption)
                 .multilineTextAlignment(.center)
         }

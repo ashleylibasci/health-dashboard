@@ -18,14 +18,14 @@ Do all of these, in order, every time:
    xcrun devicectl device install app --device 00008160-000D146A00434036 \
      DerivedData/Build/Products/Debug-iphoneos/HealthDashboard.app
    xcrun devicectl device process launch --device 00008160-000D146A00434036 \
-     com.ashleylibasci.healthdashboard.next
+     com.ashleylibasci.healthdashboard
    ```
-   If the Watch shows up in `xcrun devicectl list devices`, launch `com.ashleylibasci.healthdashboard.next.watchkitapp` on it the same way. If not, say so and ask Ashley to open the app on the Watch.
+   If the Watch shows up in `xcrun devicectl list devices`, launch `com.ashleylibasci.healthdashboard.watchkitapp` on it the same way. If not, say so and ask Ashley to open the app on the Watch.
 3. **Commit and push to GitHub** (`origin` → https://github.com/ashleylibasci/health-dashboard, branch `main`). This repo is public: never commit health data, exports, the zip or anything personal.
 
 If any step fails (phone locked or not connected, signing, a failing build), stop and tell Ashley which step failed and why; don't skip ahead to commit and push.
 
 ## Notes
-- The new app installs as **Health Next** (`com.ashleylibasci.healthdashboard.next`, Watch `….next.watchkitapp`) alongside the old Health Dashboard (`com.ashleylibasci.healthdashboard`), which Ashley still uses for its iPhone backup alarm. Never install over the old app's bundle ID; Ashley decides when to switch back.
+- The app installs as **Health Dashboard** (`com.ashleylibasci.healthdashboard`, Watch `….watchkitapp`, widgets `….widgets` and `….watchkitapp.widgets`). Since Oct 27, 2026 (Ashley's decision) it replaces the old app from `ios/`, which used the same IDs: there is one app on her phone. The interim `com.ashleylibasci.healthdashboard.next` ("Health Next") is retired; never build it again.
 - Signing: team `93C3VKR4FJ` (Ashley Libasci, Personal Team) is set in `project.yml` for both targets. A free team's install expires after 7 days; reinstalling renews it.
 - Logic tests: `cd health-dashboard-app/Packages/HealthCore && swift test`.

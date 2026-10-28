@@ -37,7 +37,7 @@ enum CalendarImportError: LocalizedError {
     case denied, notConfigured, cancelled, signedOut, badLink, failed(String)
     var errorDescription: String? {
         switch self {
-        case .denied: "Calendar access is off for Health Next. Turn it on in Settings \u{2192} Health Next \u{2192} Calendars."
+        case .denied: "Calendar access is off for Health Dashboard. Turn it on in Settings \u{2192} Health Dashboard \u{2192} Calendars."
         case .notConfigured: "Google sign-in isn\u{2019}t set up in this build."
         case .cancelled: "Sign-in was cancelled."
         case .signedOut: "Google signed you out. Connect again to keep finding exams."
@@ -202,10 +202,7 @@ extension AppModel {
 // MARK: - Google
 
 /// The iOS OAuth client from Google Cloud (Credentials → OAuth client ID →
-/// iOS). Not a secret. It was made for the older app's bundle id
-/// (com.ashleylibasci.healthdashboard); if Google refuses sign-in for Health
-/// Next, add an iOS client for com.ashleylibasci.healthdashboard.next and
-/// put its id here.
+/// iOS) for com.ashleylibasci.healthdashboard. Not a secret.
 enum GoogleConfig {
     static let clientID = "272901953650-i04kc39l8ee061e6c00320qokomstb7i.apps.googleusercontent.com"
 }
@@ -442,7 +439,9 @@ enum ICSFeed {
 /// The Google refresh token and the calendar link, in the phone's Keychain
 /// rather than in settings.
 enum Keychain {
-    private static let service = "com.ashleylibasci.healthdashboard.next"
+    /// The older app's service: this app replaced it under the same bundle id,
+    /// so a Google sign-in or calendar link saved there carries over.
+    private static let service = "com.ashleylibasci.healthdashboard"
 
     static func get(_ account: String) -> String? {
         let query: [String: Any] = [

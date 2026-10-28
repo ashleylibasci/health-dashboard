@@ -19,8 +19,8 @@ You need a Mac with Xcode 15 or later.
    if needed, generates `HealthDashboard.xcodeproj`, and opens it.
 2. Signing is already set up: `project.yml` sets Ashley's team (`93C3VKR4FJ`)
    for every target, so Xcode doesn't ask for a Team. The app installs as
-   **Health Next** (`com.ashleylibasci.healthdashboard.next`) next to the older
-   Health Dashboard app.
+   **Health Dashboard** (`com.ashleylibasci.healthdashboard`), replacing the
+   older app from `ios/`.
 3. Press Run with a simulator selected first; it doesn't need your phone.
 4. To run on your iPhone and Watch, see "Your iPhone and Watch" below.
 
