@@ -67,21 +67,30 @@ struct SleepHistoryView: View {
         return gap < 0 ? "\(Clock.duration(-gap)) under your need" : "\(Clock.duration(gap)) over your need"
     }
 
+    private func nightDetail(_ night: NightRecord) -> String {
+        "Bed \(Clock.format(night.bedtime)) \u{00B7} up \(Clock.format(night.wake)) \u{00B7} \(vsNeed(night.asleepMinutes))"
+    }
+
+    private var summaryDetail: String {
+        "Your need is \(Clock.duration(need)), the dashed line. \(metCount) of \(nights.count) nights reached it."
+    }
+
     @ViewBuilder
     private var readout: some View {
+        let slots = [summaryDetail] + nights.map(nightDetail)
         if let night = selectedNight {
             let source = model.usingSampleData ? (isExample(night) ? "Example night \u{00B7} " : "Your night \u{00B7} ") : ""
             ChartReadout(title: source + dateText(night.wakeDay) + " \u{00B7} asleep",
                          value: Clock.duration(night.asleepMinutes),
-                         detail: "Bed \(Clock.format(night.bedtime)) \u{00B7} up \(Clock.format(night.wake)) \u{00B7} \(vsNeed(night.asleepMinutes))",
+                         detail: nightDetail(night),
                          accent: model.metNeed(night) ? .purple : .coral,
-                         onClear: { selectedDay = nil })
+                         onClear: { selectedDay = nil }, detailSlots: slots)
         } else {
             let avg = averageAsleep
             ChartReadout(title: "Last \(range.days) days \u{00B7} average",
                          value: Clock.duration(avg),
-                         detail: "Your need is \(Clock.duration(need)), the dashed line. \(metCount) of \(nights.count) nights reached it.",
-                         accent: .purple)
+                         detail: summaryDetail,
+                         accent: .purple, detailSlots: slots)
         }
     }
 
@@ -99,7 +108,10 @@ struct SleepHistoryView: View {
             }
             readout
             HistoryBars(nights: nights, need: need, metDays: metDays, exampleDays: exampleDays,
-                        selected: selectedNight?.wakeDay, selection: $selectedDay,
+                        selected: selectedNight?.wakeDay,
+                        selection: $selectedDay.snapping { raw in
+                            nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
+                        },
                         barWidth: range == .week ? 22 : 6)
                 .frame(height: 200)
                 .motion(.dataSwap, value: rangeRaw)
@@ -159,7 +171,9 @@ private enum HistoryRange: String, CaseIterable, Identifiable {
     var days: Int { self == .week ? 7 : 30 }
 }
 
-private struct HistoryBars: View {
+/// Time asleep per night as bars against the dashed need line (the
+/// Sleep tab's last 7 nights and this screen).
+struct HistoryBars: View {
     let nights: [NightRecord]
     let need: Int
     /// Start-of-day wake days that met her need (`AppModel.metNeed`, the one threshold).

@@ -32,7 +32,7 @@ extension AppModel {
             waterGoalML: store.data.waterGoalML,
             waterGoalHidden: hidesEffortTargets,
             bottleML: store.data.bottleSizeML,
-            bedtime: AppDay.date(store.data.bedtime, relativeTo: nextWakeDay),
+            bedtime: AppDay.date(tonightBedtime, relativeTo: nextWakeDay),
             bedtimeStreak: onTime,
             quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) },
             caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) }

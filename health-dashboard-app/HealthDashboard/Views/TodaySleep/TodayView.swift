@@ -2,11 +2,13 @@ import SwiftUI
 import UIKit
 import HealthCore
 
-/// The home screen: recovery (Today owns it), tonight's plan and today at a
-/// glance. One ⓘ per card; the details live on the screens each card opens.
+/// The home screen, summary first: at most one line that needs her, then
+/// recovery (Today owns it), tonight's plan and today at a glance. One ⓘ
+/// per card; the details live on the screens each card opens.
 struct TodayView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
+    @ObservedObject private var calendar = CalendarImport.shared
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openTab) private var openTab
@@ -21,30 +23,29 @@ struct TodayView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var alarmTurnedOn = 0
     @State private var alarmUndone = 0
+    /// The page the alert line opened.
+    @State private var opened: Alert?
 
     var body: some View {
         Screen(accent: .indigo) {
             TabHeader(greeting)
             SampleDataBanner(prominent: true)
-            PackCheckCard()
-            examChip
-            if showsCheckIn {
-                checkInPrompt
+            if showsExamChip {
+                examChip
             }
-            if showSickCard {
-                sickCard
-            }
-            if !model.lastNightIsFresh {
-                noSleepCard
-            }
+            alertSlot
             recoveryCard
-            if showWhyOffUpTop {
-                whyOffLink
-            }
             tonightCard
             glanceHeader
             tiles
-            moreCard
+        }
+        .navigationDestination(item: $opened) { alert in
+            switch alert {
+            case .sick: SickView()
+            case .calendar: ExamListView()
+            case .noSleep: AccuracyTipsView()
+            case .checkIn: CheckInView()
+            }
         }
         .overlay(alignment: .bottom) {
             if let alarmUndo {
@@ -71,8 +72,12 @@ struct TodayView: View {
     /// Her next exam (only exams she added; never examples).
     private var nextExam: UpcomingExam? { model.upcomingExams.first }
 
+    /// Only for an exam in the next two weeks. Adding one lives with the
+    /// exam list and the calendar in Settings, not on the home screen.
+    private var showsExamChip: Bool { (nextExam?.daysUntil ?? .max) <= 14 }
+
     private var examChipText: String {
-        guard let exam = nextExam else { return "Add an exam" }
+        guard let exam = nextExam else { return "" }
         let day: String
         switch exam.daysUntil {
         case 0: day = "today"
@@ -86,15 +91,27 @@ struct TodayView: View {
     /// Tonight card only (Whitfield F6), so there's one bedtime on Today.
     private var examChip: some View {
         NavigationLink {
-            if nextExam != nil { ExamWeekView() } else { ExamListView() }
+            ExamWeekView()
         } label: {
             InfoPill(systemImage: "calendar", iconColor: Accent.yellow.ink(scheme), text: examChipText, showsChevron: true)
         }
         .buttonStyle(.pressable)
-        .accessibilityHint(nextExam == nil ? "Add your exams" : "Opens your exam week plan")
+        .accessibilityHint("Opens your exam week plan")
     }
 
-    // MARK: Check-in prompt
+    // MARK: The one alert line
+
+    /// What the alert line can open.
+    private enum Alert: Hashable, Identifiable {
+        case sick, calendar, noSleep, checkIn
+        var id: Self { self }
+    }
+
+    /// The pill pack question is the one thing that needs her.
+    private var showsPackCheck: Bool {
+        (model.packNeedsCheck && model.packCheckNewPackDate != nil)
+            || (model.packBleedOutsideBreak && model.packBleedOutsideBreakDate != nil)
+    }
 
     /// From waking until noon (or two hours after a late wake), and only
     /// here on Today (Whitfield F11). The Log tab keeps its own check-in.
@@ -104,36 +121,38 @@ struct TodayView: View {
         return model.now < max(12 * 60, wake + 120)
     }
 
-    private var checkInPrompt: some View {
-        let p = Palette(scheme: scheme)
-        return NavigationLink {
-            CheckInView()
-        } label: {
-            HStack(spacing: Space.m) {
-                Image(systemName: "sun.horizon.fill")
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(Accent.orange.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(Accent.orange.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text("Morning check-in").font(.bodyEmphasis)
-                    Text("How awake do you feel? Takes 10 seconds.")
-                        .font(.secondary)
-                        .foregroundStyle(p.secondary)
-                }
-                Spacer(minLength: Space.xs)
-                Image(systemName: "chevron.right")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(p.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .padding(Space.m)
-            .frame(minHeight: Sizes.tallRow)
-            .tileSurface()
-            .contentShape(Rectangle())
+    /// The most pressing line, or nil: the sick check flagged something,
+    /// then Google Calendar signed out, then no sleep from Apple Health,
+    /// then the morning check-in. Only one shows at a time.
+    private var alert: (Alert, text: String, systemImage: String, accent: Accent)? {
+        if model.sickCheckFlagged { return (.sick, sickTitle, "thermometer.medium", .coral) }
+        if calendar.needsSignIn { return (.calendar, "Google Calendar signed out \u{00B7} sign in again", "calendar.badge.exclamationmark", .yellow) }
+        if !model.lastNightIsFresh { return (.noSleep, "No sleep recorded last night", "moon.zzz", .purple) }
+        if showsCheckIn { return (.checkIn, "Morning check-in \u{00B7} takes 10 seconds", "sun.horizon.fill", .orange) }
+        return nil
+    }
+
+    @ViewBuilder
+    private var alertSlot: some View {
+        if let alert, alert.0 == .sick {
+            alertBar(alert)
+        } else if showsPackCheck {
+            PackCheckCard()
+        } else if let alert {
+            alertBar(alert)
         }
-        .buttonStyle(.pressable)
+    }
+
+    private func alertBar(_ alert: (Alert, text: String, systemImage: String, accent: Accent)) -> some View {
+        CalloutBar(text: alert.text, systemImage: alert.systemImage, accent: alert.accent) { opened = alert.0 }
+    }
+
+    /// Counts signs; never "likely" (round 4, Liu 15).
+    private var sickTitle: String {
+        let title = model.illness.confidence == .high
+            ? "Several signs your body may be fighting something"
+            : "Your body may be fighting something"
+        return model.usingSampleData ? "Example: " + title.prefix(1).lowercased() + title.dropFirst() : title
     }
 
     // MARK: Recovery
@@ -147,7 +166,7 @@ struct TodayView: View {
         if model.recoveryIsExample {
             note += " Example: it uses example heart readings until your Watch has learned your usual."
         } else if !model.hasHeartData {
-            note += " No HRV or resting heart rate yet, so this is from sleep alone."
+            note += " No HRV or resting heart rate yet, so this is from sleep alone. Your Watch measures HRV while you're still, often overnight, and resting heart rate from still moments during the day."
         } else if !model.lastNightIsFresh {
             note += " From your heart readings only; no sleep was recorded."
         } else if model.hrvLevel == .wellBelow || model.hrvLevel == .below {
@@ -182,7 +201,6 @@ struct TodayView: View {
 
     private var recoveryCard: some View {
         let p = Palette(scheme: scheme)
-        let heart = model.hasHeartData
         return Card {
             HStack(spacing: 0) {
                 SectionLabel(text: "Recovery today")
@@ -195,7 +213,7 @@ struct TodayView: View {
                     RecoveryView()
                 } label: {
                     AdaptiveStack(spacing: Space.l) {
-                        Ring(value: Double(value) / 100, accent: .indigo, label: "\(value)", caption: "Recovery", size: 120)
+                        Ring(value: Double(value) / 100, accent: .indigo, label: "\(value)", caption: "Recovery", size: 104)
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text(model.recoveryLabel(for: value)).font(.heading)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -203,11 +221,6 @@ struct TodayView: View {
                                 .font(.secondary)
                                 .foregroundStyle(p.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            // Below the title, so it never breaks the label
-                            // ("Take it / steady") (Brennan F10).
-                            if model.recoveryIsExample {
-                                ExampleTag()
-                            }
                         }
                         Spacer(minLength: 0)
                         if !typeSize.isAccessibilitySize {
@@ -231,34 +244,55 @@ struct TodayView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             gauges
-            if !heart {
-                Text("HRV and resting heart rate: no reading yet. Your Watch measures HRV while you're still, often overnight, and resting heart rate from still moments during the day.")
-                    .font(.secondary)
-                    .foregroundStyle(p.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            Divider().overlay(p.cardBorder)
+            LinkRow(title: "Why do I feel off?", subtitle: whyOffSubtitle,
+                    systemImage: "questionmark.bubble.fill", accent: .coral) {
+                WhyOffView()
             }
         }
+    }
+
+    private var whyOffSubtitle: String {
+        if let top = model.whyOffReasons.first { return "Most likely: \(top.title.lowercased())" }
+        return "The likeliest reasons, from your data"
     }
 
     // MARK: Recovery drivers
 
     /// HRV, resting heart rate and sleep in their own colours (indigo, pink,
     /// purple), with the change in secondary text and a ▲/▼ that's coral
-    /// only when it needs attention (Tanaka F2, Valtonen F4).
+    /// only when it needs attention (Tanaka F2, Valtonen F4). Each opens
+    /// its own screen; Sleep switches to the Sleep tab.
     private var gauges: some View {
         let heart = model.hasHeartData
         let fresh = model.lastNightIsFresh
         return AdaptiveStack(spacing: Space.s, alignment: .top) {
-            MiniGauge(fraction: heart ? model.hrvGaugeFraction : 0, accent: .indigo,
-                      value: heart ? "\(Int(model.hrv.rounded()))" : "\u{2014}", title: "HRV",
-                      change: heart ? hrvChange : .none(text: "no reading"))
-            MiniGauge(fraction: heart ? model.restingHRGaugeFraction : 0, accent: .pink,
-                      value: heart ? "\(Int(model.restingHR.rounded()))" : "\u{2014}", title: "Resting HR",
-                      change: heart ? restingHRChange : .none(text: "no reading"))
-            MiniGauge(fraction: fresh ? Double(model.lastNight.asleep) / 540 : 0, accent: .purple,
-                      // "7h 21m", as the Sleep screen says it (round 3).
-                      value: fresh ? Clock.duration(model.lastNight.asleep) : "\u{2014}", title: "Sleep",
-                      change: sleepChange)
+            NavigationLink {
+                HeartMetricView(metric: .hrv)
+            } label: {
+                MiniGauge(fraction: heart ? model.hrvGaugeFraction : 0, accent: .indigo,
+                          value: heart ? "\(Int(model.hrv.rounded()))" : "\u{2014}", title: "HRV",
+                          change: heart ? hrvChange : .none(text: "no reading"))
+            }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Opens HRV")
+            NavigationLink {
+                HeartMetricView(metric: .restingHR)
+            } label: {
+                MiniGauge(fraction: heart ? model.restingHRGaugeFraction : 0, accent: .pink,
+                          value: heart ? "\(Int(model.restingHR.rounded()))" : "\u{2014}", title: "Resting HR",
+                          change: heart ? restingHRChange : .none(text: "no reading"))
+            }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Opens resting heart rate")
+            Button { openTab(.sleep) } label: {
+                MiniGauge(fraction: fresh ? Double(model.lastNight.asleep) / 540 : 0, accent: .purple,
+                          // "7h 21m", as the Sleep screen says it (round 3).
+                          value: fresh ? Clock.duration(model.lastNight.asleep) : "\u{2014}", title: "Sleep",
+                          change: sleepChange)
+            }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Opens the Sleep tab")
         }
     }
 
@@ -293,200 +327,62 @@ struct TodayView: View {
         return .none(text: "on target")
     }
 
-    // MARK: No sleep recorded
-
-    private var noSleepCard: some View {
-        let p = Palette(scheme: scheme)
-        return Card {
-            HStack(alignment: .top, spacing: Space.m) {
-                Image(systemName: "moon.zzz")
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(Accent.purple.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text("No sleep recorded last night").font(.cardTitle)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Wear your Watch to bed and turn on Sleep Focus so it records your night.")
-                        .font(.secondary)
-                        .foregroundStyle(p.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            LinkRow(title: "How to get your sleep recorded", systemImage: "applewatch", accent: .purple) {
-                AccuracyTipsView()
-            }
-        }
-    }
-
-    // MARK: Might be getting sick
-
-    /// Whenever the sick check finds a couple of signs or several, so Today
-    /// agrees with Body and "Why do I feel off?". On example data it says so.
-    private var showSickCard: Bool { model.sickCheckFlagged }
-
-    /// Counts signs; never "likely" (round 4, Liu 15).
-    private var sickTitle: String {
-        let title = model.illness.confidence == .high
-            ? "Several signs your body may be fighting something"
-            : "Your body may be fighting something"
-        return model.usingSampleData ? "Example: " + title.prefix(1).lowercased() + title.dropFirst() : title
-    }
-
-    private var sickDetail: String {
-        // Lowercase mid-sentence, but keep acronyms ("HRV", not "hrv").
-        let flagged = model.illness.factors.filter(\.flagged).map { $0.name == $0.name.uppercased() ? $0.name : $0.name.lowercased() }
-        var detail = flagged.isEmpty
-            ? "Several of your signals moved at once."
-            : "Your " + joined(flagged) + (flagged.count == 1 ? " is" : " are") + " off your usual."
-        if model.hardTrainingYesterday {
-            detail += model.hidesEffortTargets
-                ? " Yesterday's extra activity is already allowed for."
-                : " Yesterday's hard training is already allowed for."
-        }
-        if model.illness.cyclePhaseUnknown {
-            detail += " The app can't tell which phase of your cycle you're in, so it didn't allow for one. Part of this could be your cycle."
-        } else if model.inLutealPhase {
-            detail += " The late part of your cycle is already allowed for."
-        }
-        return detail + " Take it easy, drink water and get extra sleep tonight."
-    }
-
-    private var sickCard: some View {
-        let p = Palette(scheme: scheme)
-        return Card(accent: .coral) {
-            HStack(spacing: 0) {
-                SectionLabel(text: "Sick check \u{00B7} \(model.illness.confidence.rawValue)", accent: .coral)
-                Spacer(minLength: 0)
-                InfoButton(topic: .illness).padding(.vertical, -14).padding(.trailing, -12)
-            }
-            .padding(.bottom, -Space.s)
-            NavigationLink {
-                SickView()
-            } label: {
-                HStack(alignment: .top, spacing: Space.m) {
-                    Image(systemName: "thermometer.medium")
-                        .font(.scaled(size: 16, weight: .semibold))
-                        .foregroundStyle(Accent.coral.ink(scheme))
-                        .frame(width: Sizes.icon, height: Sizes.icon)
-                        .background(Accent.coral.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: Space.xxs) {
-                        Text(sickTitle).font(.cardTitle)
-                        Text(sickDetail)
-                            .font(.secondary)
-                            .foregroundStyle(p.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.scaled(size: 13, weight: .semibold))
-                        .foregroundStyle(p.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .frame(minHeight: Sizes.minTap)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    /// "a", "a and b", "a, b and c".
-    private func joined(_ xs: [String]) -> String {
-        guard let last = xs.last else { return "" }
-        if xs.count == 1 { return last }
-        return xs.dropLast().joined(separator: ", ") + " and " + last
-    }
-
-    // MARK: Why do I feel off?
-
-    private var showWhyOffUpTop: Bool {
-        (recoveryValue.map { $0 < model.recoveryUsual } ?? false) || model.sleepDebt >= 60
-    }
-
-    private var whyOffSubtitle: String {
-        if let top = model.whyOffReasons.first { return "Most likely: \(top.title.lowercased())" }
-        return "The likeliest reasons, from your data"
-    }
-
-    private var whyOffLink: some View {
-        Card(density: .compact) {
-            LinkRow(title: "Why do I feel off?", subtitle: whyOffSubtitle,
-                    systemImage: "questionmark.bubble.fill", accent: .coral) {
-                WhyOffView()
-            }
-        }
-    }
-
     // MARK: Tonight
 
-    /// One recommendation, one bedtime and one wake time, and one line about
-    /// the shortfall (Whitfield F1, Dubois 1, Valtonen F1). The full
-    /// reasoning is behind the ⓘ and on the wake plan.
+    /// The one bedtime and wake time (her best sleep times, the same the
+    /// Sleep tab, the Watch and the smart alarm use). The reasoning is
+    /// behind the ⓘ; the card opens the Sleep plan.
     private var tonightCard: some View {
         let tonight = model.tonightPlan
         let p = Palette(scheme: scheme)
-        let bed = model.tonightAimBedtime
         let wake = tonight.wake ?? tonight.upBy
         return Card {
-            HStack(alignment: .top, spacing: Space.m) {
-                Image(systemName: "moon.stars.fill")
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(Accent.purple.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    CapsLabel("Tonight", color: Accent.purple.ink(scheme))
-                    Text("Bed by \(Clock.format(bed))").font(.heading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Up at \(Clock.format(wake))").font(.bodyEmphasis)
-                        .foregroundStyle(p.secondary)
+            HStack(alignment: .top, spacing: 0) {
+                NavigationLink {
+                    WakePlanView()
+                } label: {
+                    HStack(alignment: .top, spacing: Space.m) {
+                        Image(systemName: "moon.stars.fill")
+                            .font(.scaled(size: 16, weight: .semibold))
+                            .foregroundStyle(Accent.purple.ink(scheme))
+                            .frame(width: Sizes.icon, height: Sizes.icon)
+                            .background(Accent.purple.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            CapsLabel("Tonight", color: Accent.purple.ink(scheme))
+                            Text("Bed by \(Clock.format(model.tonightBedtime))")
+                                .font(typeSize.isAccessibilitySize ? .cardTitle : .heading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Up at \(Clock.format(wake))").font(.bodyEmphasis)
+                                .foregroundStyle(p.secondary)
+                        }
+                        Spacer(minLength: Space.s)
+                        Image(systemName: "chevron.right")
+                            .font(.scaled(size: 13, weight: .semibold))
+                            .foregroundStyle(p.tertiary)
+                            .padding(.top, Space.l)
+                            .accessibilityHidden(true)
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
-                Spacer(minLength: 0)
+                .accessibilityHint("Opens your sleep plan")
                 InfoButton(explanation: tonightExplanation).padding(.vertical, -10).padding(.trailing, -12)
             }
-            Text(tonightLine)
-                .font(.bodyText)
-                .foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Space.s) {
-                    alarmChip(tonight)
-                    Spacer(minLength: 0)
-                    whyThisTimeLink
-                }
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    alarmChip(tonight)
-                    whyThisTimeLink
-                }
-            }
+            alarmChip(tonight)
         }
-    }
-
-    /// "You need 8h 25m tonight. Bed at your usual 12:30am gets you about
-    /// 7h 40m, 45 min short." The one asleep figure on the card.
-    private var tonightLine: String {
-        let t = model.tonightPlan
-        let usual = Clock.format(t.bedtime)
-        var line = "You need \(Clock.duration(t.need)) tonight. "
-        if t.coversNeed {
-            line += "Bed at \(usual) gets you about \(Clock.duration(t.expectedAsleep))."
-        } else {
-            line += "Bed at your usual \(usual) gets you about \(Clock.duration(t.expectedAsleep)), \(Clock.duration(t.shortfall)) short."
-        }
-        return line
     }
 
     private var tonightExplanation: Explanation {
         var forYou: [String] = []
+        if let earlier = BestTimesText.earlierReason(model) { forYou.append(earlier) }
+        if let usual = model.usualBedtimeNote { forYou.append(usual) }
         if let short = model.tonightShortNote { forYou.append(short) }
         if let wakes = model.wakeTimesExplained { forYou.append(wakes) }
         forYou.append("Tap the smart alarm button to turn the alarm on your Watch on or off. Your phone's alarms are never changed.")
         return Explanation(id: "tonight", title: "Tonight's plan",
-                           meaning: "The bedtime that covers tonight's sleep need and the best time to wake tomorrow: the end of a sleep cycle that still lands before your latest wake-up. Tonight you need \(model.tonightNeedText).",
+                           meaning: "The bedtime from your best sleep times, which covers tonight's sleep need, and the best time to wake tomorrow: the end of a sleep cycle that still lands before your latest wake-up. Tonight you need \(model.tonightNeedText).",
                            forYou: forYou.joined(separator: " "))
     }
 
@@ -501,7 +397,7 @@ struct TodayView: View {
     }
 
     /// Turns the smart alarm on or off right here, with Undo (Whitfield F2).
-    /// Without a plan it opens the wake plan instead.
+    /// Without a plan it opens the sleep plan instead.
     @ViewBuilder
     private func alarmChip(_ tonight: TonightPlan) -> some View {
         let p = Palette(scheme: scheme)
@@ -548,17 +444,6 @@ struct TodayView: View {
             }
             .buttonStyle(.pressable)
         }
-    }
-
-    private var whyThisTimeLink: some View {
-        NavigationLink { WakePlanView() } label: {
-            Text("Why this time")
-                .font(.scaled(size: 13, weight: .semibold))
-                .foregroundStyle(Accent.indigo.ink(scheme))
-                .textLinkHitArea()
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens your wake plan")
     }
 
     private func toggleAlarm() {
@@ -677,11 +562,6 @@ struct TodayView: View {
         model.sleepDebt >= 15 ? Clock.duration(model.sleepDebt) : "None"
     }
 
-    private var sleepDebtNote: String {
-        if let score = model.sleepRegularityScore, model.lastNightIsFresh { return "Regularity \(score)" }
-        return "Over the last 2 weeks"
-    }
-
     /// Two columns, or one at accessibility text sizes so titles and
     /// values aren't cut off.
     @ViewBuilder
@@ -711,7 +591,7 @@ struct TodayView: View {
     /// onto Today (Whitfield F5).
     private var sleepTile: some View {
         Button { openTab(.sleep) } label: {
-            MetricTile(title: "Sleep debt", value: sleepDebtValue, note: sleepDebtNote,
+            MetricTile(title: "Sleep debt", value: sleepDebtValue, note: "Over the last 2 weeks",
                        accent: .purple, systemImage: "moon.zzz.fill")
         }
         .buttonStyle(.pressable)
@@ -744,25 +624,6 @@ struct TodayView: View {
                        accent: .orange, systemImage: "waveform.path")
         }
         .buttonStyle(.pressable)
-    }
-
-    // MARK: More
-
-    private var moreCard: some View {
-        Card(density: .compact) {
-            if !showWhyOffUpTop {
-                LinkRow(title: "Why do I feel off?", subtitle: "Check what might be behind a rough day",
-                        systemImage: "questionmark.bubble.fill", accent: .coral) {
-                    WhyOffView()
-                }
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-            }
-            LinkRow(title: "Getting accurate numbers", subtitle: "Simple ways to help your Watch",
-                    systemImage: "checklist", accent: .indigo) {
-                AccuracyTipsView()
-            }
-        }
-        .padding(.top, Space.s)
     }
 }
 

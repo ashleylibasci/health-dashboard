@@ -1,63 +1,54 @@
 import SwiftUI
 import HealthCore
 
-/// Last night, the smart alarm, stages and the weekend shift.
+/// The Sleep tab, summary first: last night, her best sleep times, the last
+/// week at a glance, then one row per detail (stages, history, need and
+/// debt, weekend shift) and the Health guide.
 struct SleepView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var selectedDay: Date? = nil
 
     var body: some View {
-        let plan = model.wakePlan()
         Screen(title: "Sleep", accent: .purple) {
             TabHeader("Sleep")
             SampleDataBanner()
             if model.lastNightIsFresh {
                 lastNightCard
             } else {
-                noSleepCard
+                noSleepBar
             }
-            historyLink
-            smartAlarmCard(plan)
-            linksCard
-            if model.lastNightIsFresh {
-                stagesCard
-            }
-            weekendCard
-            troubleSleepingCard
-        }
-    }
-
-    // MARK: Trouble sleeping
-
-    /// When it's more than a bad week (Park 13).
-    private var troubleSleepingCard: some View {
-        Card {
-            Text("Trouble sleeping?").font(.cardTitle).accessibilityAddTraits(.isHeader)
-            Text("Trouble falling or staying asleep 3 or more nights a week, for months? That's insomnia, and it's very treatable. CBT-I, a short program that changes sleep habits and thoughts, is the first-line treatment, and many campuses offer it. Ask your campus health or counseling center.")
-                .font(.bodyText).lineSpacing(2).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            Text("An urge to move your legs at night can be restless legs, which is linked to low iron. Sleep that gets much worse every month before your period is worth mentioning to a clinician too.")
-                .font(.bodyText).lineSpacing(2).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
+            BestTimesCard()
+            weekCard
+            rows
         }
     }
 
     // MARK: Last night
 
-    /// Dial beside the numbers when they fit; at large text sizes the numbers go under the dial.
+    /// "34 min short of your 7h 55m need", "Right on your 7h 55m need".
+    private var needLine: String {
+        let need = model.sleepNeed.minutes
+        let gap = model.lastNight.asleep - need
+        if gap < -15 { return "\(Clock.duration(-gap)) short of your \(Clock.duration(need)) need" }
+        if gap > 15 { return "\(Clock.duration(gap)) more than your \(Clock.duration(need)) need" }
+        return "Right on your \(Clock.duration(need)) need"
+    }
+
+    /// Dial beside the times and last night against her need; at
+    /// accessibility text sizes they go under the dial.
     private var lastNightCard: some View {
         Card {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 18) {
+            if typeSize.isAccessibilitySize {
+                lastNightDial.frame(maxWidth: .infinity)
+                lastNightStats
+            } else {
+                HStack(spacing: Space.l) {
                     lastNightDial
                     lastNightStats
                     Spacer(minLength: 0)
-                }
-                VStack(alignment: .leading, spacing: 14) {
-                    lastNightDial.frame(maxWidth: .infinity)
-                    lastNightStats
                 }
             }
         }
@@ -65,219 +56,111 @@ struct SleepView: View {
 
     private var lastNightDial: some View {
         let night = model.lastNight
-        return SleepArcDial(start: night.onset, end: night.wake, size: 168, lineWidth: 14,
+        return SleepArcDial(start: night.onset, end: night.wake, size: typeSize.isAccessibilitySize ? 180 : 124, lineWidth: 12,
                             colors: [Accent.purple.ink(scheme), Accent.purple.fill(scheme)],
-                            label: Clock.duration(night.asleep), labelSize: 24,
+                            label: Clock.duration(night.asleep), labelSize: 22,
                             caption: "last night", showHours: true)
     }
 
     private var lastNightStats: some View {
         let night = model.lastNight
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: Space.s) {
             statBlock("Fell asleep", night.onset)
             statBlock("Woke up", night.wake)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 0) {
-                    SectionLabel(text: "Regularity")
-                    InfoButton(topic: .regularity).padding(.vertical, -14).padding(.horizontal, -8)
-                }
-                Text(model.sleepRegularityScore.map { "\($0)" } ?? "\u{2014}").font(.numberM)
-            }
-        }
-    }
-
-    private var noSleepCard: some View {
-        Card {
-            Text("No sleep recorded last night").font(.section)
-                .accessibilityAddTraits(.isHeader)
-            Text("Your Watch didn't record a night that ended this morning. Wear it to bed with at least 30% battery and turn on Sleep Focus.")
-                .font(.bodyText).lineSpacing(2)
-                .secondaryText()
+            Text(needLine)
+                .font(.secondary)
+                .foregroundStyle(Palette(scheme: scheme).secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            LinkRow(title: "How to get your sleep recorded", systemImage: "applewatch", accent: .purple) {
-                AccuracyTipsView()
-            }
         }
     }
 
     private func statBlock(_ title: String, _ time: Minutes) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            SectionLabel(text: title)
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            CapsLabel(title, isHeader: false)
             ClockText(minutes: time, role: .numberM)
         }
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: Week & month
+    /// No night ended this morning: one line that opens how to get it recorded.
+    @State private var showingNoSleep = false
 
-    private var historyLink: some View {
-        Card(density: .compact) {
-            LinkRow(title: "Week & month", subtitle: "Every night, your averages and how steady your sleep is",
-                    systemImage: "chart.bar.fill", accent: .purple) {
-                SleepHistoryView()
+    private var noSleepBar: some View {
+        CalloutBar(text: "No sleep recorded last night", systemImage: "moon.zzz", accent: .purple) {
+            showingNoSleep = true
+        }
+        .navigationDestination(isPresented: $showingNoSleep) { AccuracyTipsView() }
+    }
+
+    // MARK: Last 7 nights
+
+    private var weekNights: [NightRecord] { model.sleepHistoryNights(days: 7) }
+
+    private var selectedNight: NightRecord? {
+        guard let selectedDay else { return nil }
+        return weekNights.min { abs($0.wakeDay.timeIntervalSince(selectedDay)) < abs($1.wakeDay.timeIntervalSince(selectedDay)) }
+    }
+
+    private func vsNeed(_ asleep: Int) -> String {
+        let gap = asleep - model.sleepNeed.minutes
+        if abs(gap) <= 10 { return "about your need" }
+        return gap < 0 ? "\(Clock.duration(-gap)) under your need" : "\(Clock.duration(gap)) over your need"
+    }
+
+    private func nightTitle(_ day: Date) -> String {
+        let night = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
+        return "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+
+    private var weekAverage: Int { Int((weekNights.map { Double($0.asleepMinutes) }.mean ?? 0).rounded()) }
+    private var weekMet: Int { weekNights.filter { model.metNeed($0) }.count }
+
+    private var weekSummaryDetail: String {
+        "\(weekMet) of \(weekNights.count) nights reached your \(Clock.duration(model.sleepNeed.minutes)) need."
+    }
+
+    private func nightDetail(_ n: NightRecord) -> String {
+        "Bed \(Clock.format(n.bedtime)) \u{00B7} up \(Clock.format(n.wake)) \u{00B7} \(vsNeed(n.asleepMinutes))"
+    }
+
+    @ViewBuilder
+    private var weekReadout: some View {
+        let slots = [weekSummaryDetail] + weekNights.map(nightDetail)
+        if let n = selectedNight {
+            ChartReadout(title: nightTitle(n.wakeDay) + " \u{00B7} asleep", value: Clock.duration(n.asleepMinutes),
+                         detail: nightDetail(n), accent: model.metNeed(n) ? .purple : .coral,
+                         onClear: { selectedDay = nil }, detailSlots: slots)
+        } else {
+            ChartReadout(title: "Last 7 nights \u{00B7} average", value: Clock.duration(weekAverage),
+                         detail: weekSummaryDetail, accent: .purple, detailSlots: slots)
+        }
+    }
+
+    @ViewBuilder
+    private var weekCard: some View {
+        if !weekNights.isEmpty {
+            let met = Set(weekNights.filter { model.metNeed($0) }.map { Calendar.current.startOfDay(for: $0.wakeDay) })
+            Card {
+                weekReadout
+                HistoryBars(nights: weekNights, need: model.sleepNeed.minutes, metDays: met, exampleDays: [],
+                            selected: selectedNight?.wakeDay,
+                            selection: $selectedDay.snapping { d in
+                                weekNights.min { abs($0.wakeDay.timeIntervalSince(d)) < abs($1.wakeDay.timeIntervalSince(d)) }?.wakeDay
+                            },
+                            barWidth: 22)
+                    .frame(height: 100)
+                NeedLegend(need: model.sleepNeed.minutes)
             }
         }
     }
 
-    // MARK: Smart alarm
+    // MARK: Rows
 
-    private var alarmBinding: Binding<Bool> {
-        let binding = Binding<Bool>(
-            get: { store.data.smartAlarmEnabled },
-            set: { on in
-                if on, let plan = model.wakePlan() {
-                    model.setSmartAlarm(from: plan)
-                } else {
-                    store.data.smartAlarmEnabled = on
-                    model.pushToWatch()
-                }
-            })
-        return binding.animation(Motion.reveal.animation(reduceMotion: reduceMotion))
+    /// Deep and REM last night, the stages a row can name in one line.
+    private var stagesNote: String {
+        let m = model.lastNight.stageMinutes
+        return "Deep \(Clock.duration(m[.deep] ?? 0)) \u{00B7} REM \(Clock.duration(m[.rem] ?? 0))"
     }
-
-    private func smartAlarmCard(_ plan: WakePlan?) -> some View {
-        let p = Palette(scheme: scheme)
-        let night = model.lastNight
-        return Card {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    ExplainedTitle(text: "Smart alarm", topic: .smartAlarm, size: 17)
-                    Text(store.data.smartAlarmEnabled ? "On your Watch" : "Off")
-                        .font(.secondary).foregroundStyle(p.secondary)
-                        .contentTransition(.opacity)
-                }
-                Spacer()
-                Toggle("Smart alarm", isOn: alarmBinding)
-                    .labelsHidden()
-                    .tint(Accent.purple.fill(scheme))
-            }
-            if let plan {
-                // "8:00–8:25am", then the latest wake-up (Dubois 7). Dimmed
-                // while the alarm is off (Valtonen F14).
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    ClockText(minutes: plan.alarmWindow.end, role: .numberL, from: plan.alarmWindow.start)
-                        .keepsOnOneLine()
-                    Text("Never after \(Clock.format(store.data.upBy)), your latest wake-up.")
-                        .font(.secondary)
-                        .foregroundStyle(p.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .opacity(store.data.smartAlarmEnabled ? 1 : 0.5)
-                .accessibilityElement(children: .combine)
-            }
-            if model.lastNightIsFresh {
-                HStack(spacing: 8) {
-                    Image(systemName: night.wokeFromLight ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                        .foregroundStyle((night.wokeFromLight ? Accent.mint : Accent.coral).ink(scheme))
-                        .accessibilityHidden(true)
-                    Text("This morning you woke at \(Clock.format(night.wake)), " + (night.wokeFromLight ? "in light sleep." : "from deep or REM sleep."))
-                        .font(.bodyText)
-                        .foregroundStyle(p.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if store.data.smartAlarmEnabled {
-                Toggle(isOn: $store.data.alarmWeekdaysOnly) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Weekdays only").font(.bodyEmphasis)
-                        Text("No smart alarm on Saturday and Sunday mornings.")
-                            .font(.secondary).foregroundStyle(p.secondary)
-                    }
-                }
-                .tint(Accent.purple.fill(scheme))
-                .frame(minHeight: 44)
-                .motionTransition(.reveal, edge: .top)
-            }
-            if let plan {
-                NavigationLink {
-                    WakePlanView()
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Best time to wake \(model.nextWakeDayLabel.lowercased()): \(Clock.format(plan.wake))")
-                            .font(.bodyEmphasis)
-                        Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
-                    }
-                    .foregroundStyle(Accent.purple.ink(scheme))
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .sensoryFeedback(.success, trigger: store.data.smartAlarmEnabled) { old, new in !old && new }
-    }
-
-    // MARK: Links
-
-    private var linksCard: some View {
-        let need = model.sleepNeed
-        let showClockChange = model.daysUntilFallBack <= 28
-        return Card {
-            HStack(spacing: 0) {
-                Text("Sleep debt").font(.bodyEmphasis)
-                InfoButton(topic: .sleepDebt).padding(.vertical, -12)
-                Spacer()
-                Text(model.sleepDebt > 0 ? Clock.duration(model.sleepDebt) : "None")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle((model.sleepDebt >= 60 ? Accent.coral : Accent.mint).ink(scheme))
-            }
-            .padding(.horizontal, 4)
-            Divider()
-            LinkRow(title: "Your sleep need: \(Clock.duration(need.minutes))",
-                    subtitle: "Tonight \(model.tonightNeedText), " + SleepText.needSource(model),
-                    systemImage: "bed.double.fill", accent: .purple) {
-                SleepNeedView()
-            }
-            if showClockChange {
-                Divider()
-                LinkRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
-                        subtitle: "What it means for your sleep",
-                        systemImage: "clock.arrow.circlepath", accent: .orange) {
-                    TimeChangeView()
-                }
-            }
-        }
-    }
-
-    // MARK: Stages
-
-    private var stagesCard: some View {
-        let p = Palette(scheme: scheme)
-        let night = model.lastNight
-        return Card {
-            HStack(alignment: .firstTextBaseline) {
-                ExplainedTitle(text: "Last night", topic: .sleepStages, size: 17)
-                Spacer()
-                Text("\(Clock.format(night.onset)) \u{2013} \(Clock.format(night.wake))")
-                    .font(.scaled(size: 14, weight: .semibold))
-                    .foregroundStyle(p.secondary)
-            }
-            let timeline = model.lastNightTimeline
-            if timeline.isEmpty {
-                StageStackBar(minutes: night.stageMinutes)
-                Text("Stage-by-stage timing shows up once your Watch records a night in Apple Health.")
-                    .font(.scaled(size: 13))
-                    .secondaryText()
-            } else {
-                StageTimeline(segments: timeline)
-            }
-            StageLegendRow(minutes: night.stageMinutes)
-            NavigationLink {
-                SleepStagesView()
-            } label: {
-                HStack(spacing: 6) {
-                    Text("See stage details").font(.scaled(size: 15, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
-                }
-                .foregroundStyle(Accent.purple.ink(scheme))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: Weekend shift
 
     private static func average(_ nights: [Chronotype.Night]) -> TimeRange? {
         guard !nights.isEmpty else { return nil }
@@ -287,29 +170,85 @@ struct SleepView: View {
         return TimeRange(Int(onset.rounded()), Int(wake.rounded()))
     }
 
+    /// School nights against free nights, in place (the body clock itself
+    /// lives on the Body tab).
     @ViewBuilder
-    private var weekendCard: some View {
+    private var weekendRow: some View {
         if let work = Self.average(model.workNights), let free = Self.average(model.freeNights) {
             let shift = model.chronotype?.socialJetlag ?? abs((free.start + free.end) / 2 - (work.start + work.end) / 2)
-            Card {
-                HStack(alignment: .firstTextBaseline) {
-                    ExplainedTitle(text: "Weekend shift", topic: .weekendShift)
-                    Spacer()
-                    Text("\(Clock.duration(shift)) later")
-                        .font(.bodyEmphasis)
-                        .foregroundStyle(shift >= 60 ? Accent.coral.ink(scheme) : Palette(scheme: scheme).secondary)
-                }
+            RowDivider()
+            ExpandRow(title: "Weekend shift", summary: "Free nights \(Clock.duration(shift)) later than school nights",
+                      systemImage: "calendar", accent: shift >= 60 ? .coral : .indigo) {
                 ShiftBar(title: "School nights", range: work, color: Accent.purple.fill(scheme))
                 ShiftBar(title: "Free nights", range: free,
                          color: shift >= 60 ? Accent.coral.fill(scheme) : Accent.purple.ink(scheme).opacity(0.6))
                 Text(shift >= 60
                      ? "Like flying a time zone west every weekend. Keeping free days within an hour of school days makes Mondays easier."
                      : "Under an hour, which is the goal. Your body clock stays steady through the week.")
-                    .font(.bodyText).lineSpacing(2)
-                    .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var rows: some View {
+        let debt = model.sleepDebt
+        return RowCard {
+            if model.lastNightIsFresh {
+                MetricRow(title: "Sleep stages", note: stagesNote, systemImage: "chart.bar.doc.horizontal.fill", accent: .purple) {
+                    SleepStagesView()
+                }
+                RowDivider()
+            }
+            MetricRow(title: "Week & month", note: "Every night, averages",
+                      value: model.sleepRegularityScore.map { "\($0)" },
+                      verdict: model.sleepRegularityScore.map { _ in RowVerdict(text: "Regularity", accent: .purple) },
+                      systemImage: "chart.bar.fill", accent: .purple) {
+                SleepHistoryView()
+            }
+            RowDivider()
+            MetricRow(title: "Sleep need & debt",
+                      note: "You need \(Clock.duration(model.sleepNeed.minutes)) a night",
+                      value: debt >= 15 ? Clock.duration(debt) : nil,
+                      verdict: RowVerdict(text: debt >= 15 ? "Debt" : "No debt", accent: debt >= 60 ? .coral : .mint),
+                      systemImage: "bed.double.fill", accent: .purple) {
+                SleepNeedView()
+            }
+            weekendRow
+            if model.daysUntilFallBack <= 28 {
+                RowDivider()
+                MetricRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
+                          note: "What it means for your sleep",
+                          systemImage: "clock.arrow.circlepath", accent: .orange) {
+                    TimeChangeView()
+                }
+            }
+            RowDivider(hasIcon: false)
+            LearnMoreRow("Learn more about trouble sleeping", article: .troubleSleeping, accent: .purple)
+                .padding(.horizontal, Space.l)
+        }
+    }
+}
+
+/// The dashed need line's key, under a sleep chart instead of on the plot.
+struct NeedLegend: View {
+    var need: Int
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        HStack(spacing: Space.s) {
+            Capsule()
+                .stroke(p.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                .frame(width: 18, height: 2)
+            Text("Your need \(Clock.duration(need))")
+            Spacer(minLength: Space.s)
+            Circle().fill(Accent.coral.fill(scheme)).frame(width: 8, height: 8)
+            Text("Under it")
+        }
+        .font(.secondary)
+        .foregroundStyle(p.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Dashed line: your need, \(Clock.duration(need)). Coral bars are nights under it.")
     }
 }
 

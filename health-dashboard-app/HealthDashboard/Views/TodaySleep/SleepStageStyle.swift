@@ -217,6 +217,14 @@ struct StageTimeline: View {
         return start.addingTimeInterval(f * span)
     }
 
+    /// Snapped to 5 minutes and written only when it changes, so a drag
+    /// doesn't redraw the card on every touch event.
+    private func select(atX x: CGFloat, _ width: CGFloat) {
+        let raw = date(atX: x, width).timeIntervalSince(start)
+        let snapped = start.addingTimeInterval((raw / 300).rounded() * 300)
+        if snapped != selected { selected = snapped }
+    }
+
     private func segment(at date: Date) -> StageSegment? {
         segments.first { $0.start <= date && date < $0.end } ?? segments.last
     }
@@ -231,6 +239,9 @@ struct StageTimeline: View {
         return "Sleep stages from \(clock(start)) to \(clock(end)): " + parts.joined(separator: ", ")
     }
 
+    private let restDetail = "Deep sleep comes early in the night, REM toward morning. Brief wake-ups are normal."
+    private var detailSlots: [String] { [restDetail] + SleepStage.allCases.map(StageStyle.oneLiner) }
+
     @ViewBuilder
     private var readout: some View {
         if let selected, let seg = segment(at: selected) {
@@ -238,15 +249,14 @@ struct StageTimeline: View {
                          value: StageStyle.name(seg.stage),
                          detail: StageStyle.oneLiner(seg.stage),
                          accent: StageStyle.accent(seg.stage),
-                         onClear: { self.selected = nil })
+                         onClear: { self.selected = nil }, detailSlots: detailSlots)
         } else {
             // At rest: the night's span and time asleep, not a "touch" hint
             // (Valtonen F13).
             let asleep = segments.filter { $0.stage != .awake }.map(\.minutes).reduce(0, +)
             ChartReadout(title: "Asleep \u{00B7} \(clock(start)) to \(clock(end))",
                          value: Clock.duration(asleep),
-                         detail: "Deep sleep comes early in the night, REM toward morning. Brief wake-ups are normal.",
-                         accent: .purple)
+                         detail: restDetail, accent: .purple, detailSlots: detailSlots)
         }
     }
 
@@ -304,7 +314,7 @@ struct StageTimeline: View {
         }
         .frame(width: width, height: barHeight, alignment: .topLeading)
         .contentShape(Rectangle())
-        .overlay(ScrubSurface { location in selected = date(atX: location.x, width) })
+        .overlay(ScrubSurface { location in select(atX: location.x, width) })
     }
 
     private var stackedLanes: some View {
@@ -355,7 +365,7 @@ struct StageTimeline: View {
         }
         .frame(width: width, height: lanesHeight, alignment: .topLeading)
         .contentShape(Rectangle())
-        .overlay(ScrubSurface { location in selected = date(atX: location.x, width) })
+        .overlay(ScrubSurface { location in select(atX: location.x, width) })
         .scrubFeedback(selected.flatMap { segment(at: $0) })
     }
 
