@@ -48,10 +48,12 @@ struct WakePlanView: View {
     private func isGood(_ plan: WakePlan) -> Bool { plan.cycles >= 5 || plan.shortfall <= 10 }
 
     private func why(_ plan: WakePlan) -> String {
-        var text = "This time lands at the end of a sleep cycle, when you're in light sleep, so waking up feels easier."
+        var text = plan.endsCycle
+            ? "A sleep cycle ends a few minutes before your up-by time. Waking near the end of a cycle can feel a bit easier. Cycle timing varies, so this is a rough guide."
+            : "No sleep cycle ends close enough before your up-by time, so you sleep until then. More sleep beats waking early to finish a cycle."
         let cycle = model.sleepCycleLength
         if store.data.smartAlarmEnabled, let into = plan.currentAlarmMinutesIntoCycle, into >= 15, into <= cycle - 15 {
-            text += " Your current alarm lands \(into) minutes into a sleep cycle, when you're more likely to be in deep sleep."
+            text += " Your current alarm lands about \(into) minutes into a sleep cycle, in the middle of one."
         }
         return text
     }
@@ -64,8 +66,8 @@ struct WakePlanView: View {
             HStack(spacing: 0) {
                 SectionLabel(text: wakeDayTitle, accent: .orange)
                 InfoButton(title: "Best time to wake",
-                           meaning: "The wake-up time that fits your sleep cycles, your best wake window and tonight's sleep need, and is never later than when you need to be up.",
-                           forYou: "Set your smart alarm to it. Waking at the end of a cycle means less grogginess.")
+                           meaning: "Your up-by time, or the end of a sleep cycle when one falls in the 25 minutes before it. It's never later than when you need to be up, and never more than about 25 minutes earlier.",
+                           forYou: "Set your smart alarm to it. Sleep comes first: the app never cuts much sleep just to land on the end of a cycle.")
                     .padding(.vertical, -14)
                 Spacer()
             }
@@ -90,7 +92,7 @@ struct WakePlanView: View {
                     .font(.scaled(size: 14, weight: .semibold))
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .accessibilityHidden(true)
-                Text("Smart alarm window \(plan.alarmWindow.label) \u{00B7} wakes you at the first light sleep")
+                Text("Smart alarm window \(plan.alarmWindow.label) \u{00B7} wakes you when you start stirring")
                     .font(.scaled(size: 14, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .smartAlarm).padding(.vertical, -14)
@@ -102,7 +104,7 @@ struct WakePlanView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HowWeGotThisLink(title: "Best time to wake",
-                             method: "We count whole sleep cycles from about \(latency) minutes after your bedtime, using \(cycleSource). We pick the last cycle end before your up-by time, prefer one inside the wake window where your past mornings felt best, and check it against tonight's sleep need. The smart alarm window runs from \(AppModel.alarmWindowLead) minutes before that cycle ends to 3 minutes after.")
+                             method: "We count sleep cycles from about \(latency) minutes after your bedtime, using \(cycleSource). If the last cycle ends in the \(WakePlanner.maxCycleTrade) minutes before your up-by time (and still covers tonight's need when up-by would), that's your best wake; otherwise it's your up-by time, so you never lose more than about \(WakePlanner.maxCycleTrade) minutes of sleep to land on a cycle. The smart alarm window is the \(AppModel.alarmWindowLead + 3) minutes around it, never past up-by. Cycle timing varies from night to night, so this is a rough guide.")
         }
     }
 
@@ -217,7 +219,7 @@ struct WakePlanView: View {
                 model.setSmartAlarm(from: plan)
                 appliedUpBy = store.data.upBy
             }
-            Text("Your Watch wakes you at the first light sleep inside the window.")
+            Text("Your Watch wakes you when you start stirring inside the window, or at its end.")
                 .font(.scaled(size: 12))
                 .foregroundStyle(p.secondary)
         }
@@ -225,7 +227,7 @@ struct WakePlanView: View {
 
     private func tipText(_ plan: WakePlan) -> String? {
         guard !isGood(plan) else { return nil }
-        var text = "Only \(plan.cycles) full cycles fit."
+        var text = "About \(Clock.duration(plan.asleep)) asleep, \(Clock.duration(plan.shortfall)) short."
         if let bed = model.tonightPlan.bedtimeToCoverNeed {
             text += " To cover tonight's \(model.tonightNeedText), go to bed by \(Clock.format(bed))."
         }
@@ -265,6 +267,9 @@ struct WakePlanView: View {
         var parts: [String] = []
         if let best = history.bestWindow {
             parts.append("Your sweet spot is \(best.label).")
+        } else if model.mornings.count >= 10 {
+            // Liu 10: no window clearly beat the rest.
+            parts.append("No clear best window yet: no wake time has clearly beaten the others.")
         }
         if let worst = history.buckets.min(by: { $0.mean < $1.mean }), history.buckets.count > 1 {
             parts.append("Waking \(bucketLabel(worst.range).lowercased()) went worst, at \(String(format: "%.1f", worst.mean)).")
@@ -335,8 +340,11 @@ struct WakePlanView: View {
             ChartReadout(title: "Your best wake window", value: best.label,
                          detail: "Mornings you woke in this window, you felt best. Touch a dot to see one morning.", accent: .mint)
         } else {
-            ChartReadout(title: "\(model.mornings.count) mornings", value: "Still learning",
-                         detail: "Touch a dot to see one morning.", accent: .mint)
+            ChartReadout(title: "\(model.mornings.count) mornings",
+                         value: model.mornings.count >= 10 ? "No clear best window" : "Still learning",
+                         detail: model.mornings.count >= 10
+                            ? "No wake time has clearly beaten the others so far. Touch a dot to see one morning."
+                            : "Touch a dot to see one morning.", accent: .mint)
         }
     }
 
@@ -414,10 +422,10 @@ struct WakePlanView: View {
                             : "Caffeine still in your body at bedtime makes sleep lighter, even if you fall asleep fine.",
                         topic: .caffeineCutoff)
             WindDownRow(systemImage: "lightbulb.fill", accent: .orange, title: "Dim lights, screens down", value: Clock.format(dimFrom),
-                        note: "Bright light holds back your body's sleep signal.", topic: .windDown)
+                        note: "About 2 hours before you usually fall asleep. Bright light holds back your body's sleep signal.", topic: .windDown)
             if let melatonin {
-                WindDownRow(systemImage: "moon.stars.fill", accent: .purple, title: "Melatonin rising", value: melatonin.label,
-                            note: "Your body's own sleep signal, not a pill. Aim to be in bed in this window; you'll fall asleep fastest.",
+                WindDownRow(systemImage: "moon.stars.fill", accent: .purple, title: "Sleep window", value: melatonin.label,
+                            note: "The hour before you usually fall asleep. Your body's own sleep hormone (not a pill) is up by now, so it's usually the easiest time to drift off.",
                             topic: .melatonin)
             }
             WindDownRow(systemImage: "bed.double.fill", accent: .indigo, title: "In bed", value: Clock.format(bed))
@@ -493,22 +501,22 @@ private struct CycleTimeline: View {
         let fullEnd = onset + cycles * cycleLength
         if window.contains(m) {
             return (time, "Smart alarm window",
-                    "Your Watch wakes you at the first light sleep in here, by \(Clock.format(window.end)) at the latest.", .orange)
+                    "Your Watch wakes you when you start stirring in here, by \(Clock.format(window.end)) at the latest.", .orange)
         }
         if m >= fullEnd {
-            return (time, "Part of a cycle",
-                    "Not enough time for another full cycle before \(Clock.format(deadline)). Waking here could catch you in deep sleep.", .coral)
+            return (time, "After your last full cycle",
+                    "Not enough time for another full cycle before \(Clock.format(deadline)). Sleeping on is still worth more than waking early to finish one.", .indigo)
         }
         let index = (m - onset) / max(cycleLength, 1)
         let into = (m - onset) % max(cycleLength, 1)
         let fraction = Double(into) / Double(max(cycleLength, 1))
         let detail: String
-        if fraction < 0.35 {
-            detail = "Early in a cycle: light sleep sliding into deep sleep, which is hard to wake from."
-        } else if fraction < 0.8 {
-            detail = "Middle of a cycle: deep sleep or REM. Waking here feels groggy."
+        if fraction < 0.8 {
+            detail = index < 2
+                ? "Early in the night, when most deep sleep happens. Waking now would feel groggy."
+                : "Middle of a cycle. Later in the night most of it is lighter sleep and REM."
         } else {
-            detail = "End of a cycle: light sleep, the easiest time to wake up."
+            detail = "Near the end of a cycle. Waking around here can feel a bit easier. Cycle timing varies, so it's a rough guide."
         }
         return ("\(time) \u{00B7} \(into) min in", "Sleep cycle \(index + 1) of \(cycles)", detail, .indigo)
     }

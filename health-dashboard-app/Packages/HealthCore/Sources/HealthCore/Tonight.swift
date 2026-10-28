@@ -9,9 +9,11 @@ import Foundation
 /// numbers, so they can't disagree (Sam N3).
 ///
 /// Three wake times, each with its own name:
-/// - **best wake** (`wake`): the end of the last whole sleep cycle that fits,
-/// - **smart alarm window** (`alarmWindow`): the Watch listens for light sleep
-///   from 22 minutes before the best wake to 3 minutes after it,
+/// - **best wake** (`wake`): the end of the last sleep cycle when it falls in
+///   the 25 minutes before up-by, else up-by itself,
+/// - **smart alarm window** (`alarmWindow`): the Watch listens for stirring
+///   for 25 minutes: from 22 minutes before a cycle end to 3 after it, or
+///   the 25 minutes up to up-by,
 /// - **up by** (`upBy`): the latest she said she can get up. The window
 ///   never ends after it.
 public struct TonightPlan: Hashable, Sendable {
@@ -41,7 +43,7 @@ public struct TonightPlan: Hashable, Sendable {
         self.plan = plan
     }
 
-    /// The best wake time: the end of a sleep cycle (nil when none fits).
+    /// The best wake time (nil when no whole sleep cycle fits).
     public var wake: Minutes? { plan?.wake }
     public var alarmWindow: TimeRange? { plan?.alarmWindow }
 
@@ -56,8 +58,8 @@ public struct TonightPlan: Hashable, Sendable {
     /// plan even rounds to whole cycles. Say so plainly.
     public var bedtimeTooLateForNeed: Bool { mostSleepAllowed < need }
 
-    /// Sleep the plan expects: whole cycles from falling asleep to the best
-    /// wake time (the most the window allows when no cycle fits).
+    /// Sleep the plan expects: from falling asleep to the best wake time
+    /// (the most the window allows when no cycle fits).
     public var expectedAsleep: Int { plan?.asleep ?? mostSleepAllowed }
 
     /// Minutes short of tonight's need (0 when covered).
@@ -66,9 +68,9 @@ public struct TonightPlan: Hashable, Sendable {
     /// Within 10 minutes counts as covering it (the planner's rule).
     public var coversNeed: Bool { shortfall <= 10 }
 
-    /// The bedtime that would cover tonight's need with whole cycles before
-    /// up-by, rounded down to 5 minutes (earlier is the safe side). Nil when
-    /// tonight's plan already covers it.
+    /// The bedtime that would cover tonight's need before up-by, rounded
+    /// down to 5 minutes (earlier is the safe side). Nil when tonight's plan
+    /// already covers it.
     public var bedtimeToCoverNeed: Minutes? {
         guard !coversNeed else { return nil }
         if let b = plan?.bedtimeToCoverNeed { return Self.roundDown5(b) }

@@ -23,6 +23,22 @@ struct SleepView: View {
                 stagesCard
             }
             weekendCard
+            troubleSleepingCard
+        }
+    }
+
+    // MARK: Trouble sleeping
+
+    /// When it's more than a bad week (Park 13).
+    private var troubleSleepingCard: some View {
+        Card {
+            Text("Trouble sleeping?").font(.scaled(size: 17, weight: .bold))
+            Text("Trouble falling or staying asleep 3 or more nights a week, for months? That's insomnia, and it's very treatable. CBT-I, a short program that changes sleep habits and thoughts, is the first-line treatment, and many campuses offer it. Ask your campus health or counseling center.")
+                .font(.scaled(size: 14)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+            Text("An urge to move your legs at night can be restless legs, which is linked to low iron. Sleep that gets much worse every month before your period is worth mentioning to a clinician too.")
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

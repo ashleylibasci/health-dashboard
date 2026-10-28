@@ -38,10 +38,8 @@ extension AppModel {
         } else {
             text = "About \(Clock.duration(p.expectedAsleep)) asleep, \(Clock.duration(p.shortfall)) short of tonight\u{2019}s \(Clock.duration(p.need))."
         }
-        // Whole sleep cycles, so the wake still lands at the end of one; say
-        // so, or it looks like more than the shortfall (round 3, N3).
         if let bed = p.bedtimeToCoverNeed {
-            text += " Bed by \(Clock.format(bed)) covers it with whole sleep cycles, so you still wake at the end of one."
+            text += " Bed by \(Clock.format(bed)) covers it."
         }
         return text
     }
@@ -61,7 +59,11 @@ extension AppModel {
     var wakeTimesExplained: String? {
         let p = tonightPlan
         guard let wake = p.wake, let w = p.alarmWindow else { return nil }
-        return "Best wake \(Clock.format(wake)) is the end of a sleep cycle. The smart alarm listens from \(Clock.format(w.start)) and rings at the first light sleep, by \(Clock.format(w.end)) at the latest. Up by \(Clock.format(p.upBy)) is the latest you said you can get up."
+        let alarm = "The smart alarm listens from \(Clock.format(w.start)) and wakes you when you start stirring, by \(Clock.format(w.end)) at the latest."
+        if p.plan?.endsCycle == false {
+            return "No sleep cycle ends close enough before \(Clock.format(p.upBy)), the latest you said you can get up, so you sleep until then. " + alarm
+        }
+        return "Best wake \(Clock.format(wake)) is near the end of a sleep cycle, a few minutes before up by \(Clock.format(p.upBy)), the latest you said you can get up. " + alarm
     }
 
     /// How tonight's debt payback relates to the debt itself (Maya N15).
@@ -73,8 +75,8 @@ extension AppModel {
         let perNight = max(tonightPlan.payback, 15)
         let nights = Int((Double(debt) / Double(perNight)).rounded(.up))
         if nights <= 7 {
-            return "Adding \(Clock.duration(perNight)) a night clears your \(Clock.duration(debt)) in about \(nights) \(nights == 1 ? "night" : "nights")."
+            return "Adding \(Clock.duration(perNight)) a night brings your \(Clock.duration(debt)) down over about \(nights) \(nights == 1 ? "night" : "nights")."
         }
-        return "Adding \(Clock.duration(perNight)) a night pays back about \(Clock.duration(perNight * 7)) of your \(Clock.duration(debt)) in a week. Short nights older than two weeks also drop out of the count."
+        return "Adding \(Clock.duration(perNight)) a night brings your \(Clock.duration(debt)) down by about \(Clock.duration(perNight * 7)) over a week. Short nights older than two weeks also drop out of the count."
     }
 }

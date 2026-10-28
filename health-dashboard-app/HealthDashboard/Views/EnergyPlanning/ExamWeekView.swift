@@ -28,8 +28,10 @@ struct ExamWeekView: View {
             }
             if let exam = exams.first {
                 let plan = ExamPlanner.plan(examStart: exam.start, daysUntil: min(exam.daysUntil, 2),
-                                            usualBedtime: store.data.bedtime, need: model.tonightNeed.total,
-                                            energyTemplate: model.energyToday, caffeineCutoff: model.caffeineCutoff)
+                                            usualBedtime: store.data.bedtime, latency: AppModel.planLatency,
+                                            cycleLength: model.sleepCycleLength, need: model.tonightNeed.total,
+                                            energyTemplate: model.energyToday, caffeineCutoff: model.caffeineCutoff,
+                                            windowLength: AppModel.alarmWindowLead)
                 examCard(exam)
                 comparison
                 planCard(exam, plan: plan)
@@ -123,7 +125,7 @@ struct ExamWeekView: View {
             HStack(spacing: 0) {
                 Text("Right now vs. your normal").font(.scaled(size: 20, weight: .bold))
                 InfoButton(title: "Your normal",
-                           meaning: "Your own average over the last 30 days. Red numbers are worse than your normal.",
+                           meaning: "Your own average over the last 30 days. Red numbers are further from your normal.",
                            forYou: "Exam stress often shows up as shorter, later sleep and a higher resting heart rate. Seeing it early helps you protect your sleep before the exam.")
             }
             .padding(.top, 4)
@@ -168,16 +170,16 @@ struct ExamWeekView: View {
         }
         let sleepLine: String
         if let first = nights.first, nights.allSatisfy({ $0.bed == first.bed }) {
-            sleepLine = "Asleep by \(Clock.format(first.bed)) \(joined(nights.map { $0.name })). The night before matters most."
+            sleepLine = "In bed by \(Clock.format(first.bed)) \(joined(nights.map { $0.name })). " + Self.sleepMakesItStick
         } else if !nights.isEmpty {
-            sleepLine = "In bed by " + joined(nights.map { "\(Clock.format($0.bed)) \($0.name)" }) + ". The night before matters most."
+            sleepLine = "In bed by " + joined(nights.map { "\(Clock.format($0.bed)) \($0.name)" }) + ". " + Self.sleepMakesItStick
         } else {
-            sleepLine = "Keep your usual bedtime. The night before matters most."
+            sleepLine = "Keep your usual bedtime. " + Self.sleepMakesItStick
         }
         let caffeineLine: String
         if model.caffeineCutoffShown != nil {
             caffeineLine = model.caffeineCutoffSentence
-                + (model.isLateLuteal ? " Late luteal makes sleep lighter already." : " Anything later is still around at bedtime.")
+                + (model.isLateLuteal ? " Before your period, sleep may feel a bit lighter already." : " Anything later is still around at bedtime.")
         } else {
             // The cutoff for a typical drink falls before she's up: no clock time.
             caffeineLine = model.caffeineNoCutoffShort + ", soon after you wake. "
@@ -191,6 +193,10 @@ struct ExamWeekView: View {
             ExamNumberedRow(number: 3, accent: .pink, text: heartLine, topic: .restingHR)
         }
     }
+
+    /// Sleep through the whole week of studying, not one night, is what
+    /// stores it (Park 8; Okano 2019).
+    static let sleepMakesItStick = "Sleep all week, especially the nights after you study, is what makes it stick."
 
     private func linksCard(_ exam: UpcomingExam, plan: [ExamDayPlan]) -> some View {
         let tonight = plan.first { $0.dayOffset == -exam.daysUntil + 1 }?.bedtimeBefore ?? store.data.bedtime
@@ -274,7 +280,7 @@ private struct ExamCompareTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .contain)
-        .accessibilityValue(Text(worse ? "Worse than normal" : ""))
+        .accessibilityValue(Text(worse ? "Further from your normal" : ""))
     }
 }
 

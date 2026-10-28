@@ -271,26 +271,49 @@ public struct ExamDayPlan: Hashable, Sendable {
     public var alarmWindow: TimeRange
     public var studyBlocks: [TimeRange]
     public var caffeineBy: Minutes
+    /// Planned minutes asleep that night (never less than her need).
+    public var asleep: Int = 0
+    /// The wake time ends a whole sleep cycle.
+    public var endsCycle: Bool = true
 }
 
 public enum ExamPlanner {
+    /// Grogginess after waking, in minutes: about 30 after a light-sleep
+    /// wake, up to an hour after deep sleep. The energy curve uses the same.
+    public static let grogginessMinutes = 30
+    public static let grogginessMinutesDeep = 60
+
     /// Plans the nights before an exam. Exam morning wakes at least
     /// `clearHeadMinutes` before the start so grogginess has passed.
     /// `caffeineCutoff`: her own cutoff for the study days (it's earlier on
     /// the combined pill, ring or patch); 2pm when not given.
-    public static func plan(examStart: Minutes, daysUntil: Int, usualBedtime: Minutes, latency: Int = 12, cycleLength: Int = 92, need: Int, energyTemplate: EnergyDay, clearHeadMinutes: Int = 70, caffeineCutoff: Minutes? = nil) -> [ExamDayPlan] {
+    ///
+    /// Each night plans whole sleep cycles of her own `cycleLength`, rounded
+    /// up so it never plans less than her `need` (Park 2, Liu 11). When the
+    /// extra cycle would add more than 25 minutes past her need (and move
+    /// bedtime that much earlier), it plans exactly her need instead, the
+    /// same 25-minute rule as the wake planner. The smart alarm window is the
+    /// same shape as the everyday one: `windowLength` minutes before the
+    /// wake to 3 after.
+    public static func plan(examStart: Minutes, daysUntil: Int, usualBedtime: Minutes, latency: Int = 12, cycleLength: Int = 92, need: Int, energyTemplate: EnergyDay, clearHeadMinutes: Int = 70, caffeineCutoff: Minutes? = nil, windowLength: Int = 22) -> [ExamDayPlan] {
+        let cycle = max(cycleLength, 1)
+        let cycles = max(1, Int((Double(need) / Double(cycle)).rounded(.up)))
+        let endsCycle = cycles * cycle - need <= WakePlanner.maxCycleTrade
+        let sleep = endsCycle ? cycles * cycle : need
         var days: [ExamDayPlan] = []
         for offset in stride(from: -daysUntil, through: 0, by: 1) {
             let isExam = offset == 0
-            let deadline = isExam ? examStart - clearHeadMinutes : usualBedtime + latency + need + 30
-            // Latest bedtime with five whole cycles before the deadline.
-            let cycles = max(4, Int((Double(need) / Double(cycleLength)).rounded(.down)))
-            let bed = min(usualBedtime, deadline - cycles * cycleLength - latency)
-            let wake = bed + latency + cycles * cycleLength
+            // Exam morning: up by the clear-head time. Other nights: her
+            // usual bedtime, or earlier, never later.
+            let deadline = isExam ? examStart - clearHeadMinutes : usualBedtime + latency + sleep
+            // Rounded down to 5 minutes: "bed by 11:20pm", not 11:23pm.
+            let bed = min(usualBedtime, Int((Double(deadline - sleep - latency) / 5).rounded(.down)) * 5)
+            let wake = bed + latency + sleep
             let blocks = isExam ? [] : [energyTemplate.zone(.morningPeak)?.range, energyTemplate.zone(.secondWind)?.range].compactMap { $0 }
             days.append(ExamDayPlan(dayOffset: offset, bedtimeBefore: bed, wake: wake,
-                                    alarmWindow: TimeRange(wake - 30, wake + 3), studyBlocks: blocks,
-                                    caffeineBy: isExam ? examStart - 45 : (caffeineCutoff ?? 840)))
+                                    alarmWindow: TimeRange(wake - windowLength, wake + 3), studyBlocks: blocks,
+                                    caffeineBy: isExam ? examStart - 45 : (caffeineCutoff ?? 840),
+                                    asleep: sleep, endsCycle: endsCycle))
         }
         return days
     }

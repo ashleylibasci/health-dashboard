@@ -42,6 +42,22 @@ public struct WakeHistory: Hashable, Sendable {
             guard xs.count >= minCount, let m = xs.mean else { continue }
             if best == nil || m > best!.1 { best = (TimeRange(start, start + windowWidth), m, xs.count) }
         }
+        // Picking the best of ~35 overlapping windows finds one that looks
+        // better by chance (Liu 10). It only counts when its mornings beat
+        // the rest by at least half of her usual morning-to-morning spread,
+        // and by a margin well past chance for the number of mornings (2.5
+        // standard errors, stricter than usual because many windows were
+        // tried).
+        if let b = best {
+            let inside = mornings.filter { $0.wake >= b.0.start && $0.wake < b.0.end }.map(\.outcome)
+            let outside = mornings.filter { $0.wake < b.0.start || $0.wake >= b.0.end }.map(\.outcome)
+            let spread = mornings.map(\.outcome).standardDeviation ?? 0
+            let diff = (inside.mean ?? 0) - (outside.mean ?? 0)
+            let standardError = spread * (1 / Double(max(inside.count, 1)) + 1 / Double(max(outside.count, 1))).squareRoot()
+            if outside.count < minCount || spread <= 0 || diff < 0.5 * spread || diff < 2.5 * standardError {
+                best = nil
+            }
+        }
 
         let light = mornings.filter { $0.wokeFromLightSleep == true }.map(\.outcome)
         let deep = mornings.filter { $0.wokeFromLightSleep == false }.map(\.outcome)
@@ -54,9 +70,10 @@ public struct WakeHistory: Hashable, Sendable {
 
 /// Picks tomorrow's wake time and smart-alarm window.
 ///
-/// Candidates are the predicted ends of whole sleep cycles before the
-/// deadline. Each is scored on how much of tonight's need it covers and
-/// whether it lands in the window that has worked best for her before.
+/// She sleeps until her up-by time unless the end of a sleep cycle falls in
+/// the last `maxCycleTrade` minutes before it: then she wakes at that cycle
+/// end instead. Waking near the end of a cycle can feel a little easier, but
+/// it is never worth more than about 25 minutes of sleep (Park 1).
 public struct WakePlan: Hashable, Sendable {
     public struct Reason: Hashable, Sendable {
         public enum Kind: String, Sendable { case cycleEnd, bestWindow, sleepNeed }
@@ -68,18 +85,25 @@ public struct WakePlan: Hashable, Sendable {
 
     public var wake: Minutes
     public var alarmWindow: TimeRange
+    /// Whole sleep cycles before the wake time.
     public var cycles: Int
     public var asleep: Int
     /// Positive when short of tonight's need.
     public var shortfall: Int
     public var reasons: [Reason]
-    /// Latest bedtime that fits enough whole cycles to cover the need, if any.
+    /// Latest bedtime that covers the need before up-by, if tonight's doesn't.
     public var bedtimeToCoverNeed: Minutes?
     /// How far into a cycle the current alarm lands, when one is set.
     public var currentAlarmMinutesIntoCycle: Int?
+    /// True when the wake time is the end of a sleep cycle; false when it's
+    /// the up-by time itself (no cycle ends close enough before it).
+    public var endsCycle: Bool = true
 }
 
 public enum WakePlanner {
+    /// The most sleep given up to wake at the end of a cycle instead of at up-by.
+    public static let maxCycleTrade = 25
+
     public struct Input: Sendable {
         public var bedtime: Minutes
         public var latency: Int
@@ -108,24 +132,33 @@ public enum WakePlanner {
         let maxCycles = (input.deadline - onset) / input.cycleLength
         guard maxCycles >= 1 else { return nil }
 
-        func score(_ n: Int) -> Double {
-            let wake = onset + n * input.cycleLength
-            let asleep = n * input.cycleLength
-            var s = -Double(max(0, input.tonightNeed - asleep))          // shortfall hurts most
-            s -= Double(max(0, asleep - input.tonightNeed - 45)) * 0.3   // a lot of surplus costs a little
-            if let w = input.bestWindow {
-                s += w.contains(wake) ? 40 : -Double(min(abs(wake - w.start), abs(wake - w.end))) * 0.5
-            }
-            return s
-        }
-        let n = (1...maxCycles).max { score($0) < score($1) }!
-        let wake = onset + n * input.cycleLength
-        let asleep = n * input.cycleLength
-        let shortfall = max(0, input.tonightNeed - asleep)
-        let window = TimeRange(wake - input.windowLength, min(wake + 3, input.deadline))
+        // The last cycle end before up-by, used only when it costs at most
+        // 25 minutes of sleep, and never when it would make a night that
+        // covers the need at up-by fall short of it.
+        let cycleEnd = onset + maxCycles * input.cycleLength
+        let coversAtUpBy = input.deadline - onset >= input.tonightNeed - 10
+        let coversAtCycle = maxCycles * input.cycleLength >= input.tonightNeed - 10
+        let endsCycle = input.deadline - cycleEnd <= maxCycleTrade && (coversAtCycle || !coversAtUpBy)
 
-        var reasons = [WakePlan.Reason(kind: .cycleEnd, ok: true, title: "Ends a full sleep cycle",
-                                       detail: "Cycle \(n) ends at \(Clock.format(wake)), so you wake from light sleep.")]
+        let wake = endsCycle ? cycleEnd : input.deadline
+        let asleep = wake - onset
+        let n = asleep / input.cycleLength
+        let shortfall = max(0, input.tonightNeed - asleep)
+        // The Watch listens for `windowLength + 3` minutes: from
+        // `windowLength` before a cycle end to 3 after it, or up to up-by.
+        // It never runs past up-by, and keeps its full length when a cycle
+        // ends right at up-by.
+        let windowEnd = endsCycle ? min(wake + 3, input.deadline) : wake
+        let window = TimeRange(windowEnd - input.windowLength - 3, windowEnd)
+
+        var reasons: [WakePlan.Reason] = []
+        if endsCycle {
+            reasons.append(.init(kind: .cycleEnd, ok: true, title: "Near the end of a sleep cycle",
+                                 detail: "Cycle \(n) ends around \(Clock.format(wake)), \(input.deadline - wake) minutes before your up-by time. Waking near the end of a cycle can feel a bit easier. Cycle timing varies, so this is a rough guide."))
+        } else {
+            reasons.append(.init(kind: .cycleEnd, ok: true, title: "All the sleep your up-by time allows",
+                                 detail: "No sleep cycle ends close enough before \(Clock.format(wake)), so you sleep until your up-by time. Waking earlier just to finish a cycle would cost more sleep than it's worth."))
+        }
         if let w = input.bestWindow {
             let inside = w.contains(wake)
             reasons.append(.init(kind: .bestWindow, ok: inside,
@@ -137,15 +170,15 @@ public enum WakePlanner {
                              title: covers ? "Covers tonight's sleep need" : "\(Clock.duration(shortfall)) short of tonight's need",
                              detail: "\(Clock.duration(asleep)) of the \(Clock.duration(input.tonightNeed)) you need tonight." + (covers ? "" : " The rest goes onto your sleep debt.")))
 
-        // Fewest whole cycles that cover the need, ending by the deadline.
-        let cyclesForNeed = Int((Double(input.tonightNeed) / Double(input.cycleLength)).rounded(.up))
-        // Rounded down to 5 minutes: "bed by 11:05pm", not 11:06pm.
-        let bedForNeed = Int((Double(input.deadline - cyclesForNeed * input.cycleLength - input.latency) / 5).rounded(.down)) * 5
+        // The latest bedtime that leaves the whole need before up-by, rounded
+        // down to 5 minutes: "bed by 11:05pm", not 11:06pm. At that bedtime
+        // the plan covers the need whether it wakes at up-by or a cycle end.
+        let bedForNeed = Int((Double(input.deadline - input.tonightNeed - input.latency) / 5).rounded(.down)) * 5
         let into = input.currentAlarmLatest.map { (($0 - onset) % input.cycleLength + input.cycleLength) % input.cycleLength }
 
         return WakePlan(wake: wake, alarmWindow: window, cycles: n, asleep: asleep, shortfall: shortfall,
                         reasons: reasons, bedtimeToCoverNeed: shortfall > 10 ? bedForNeed : nil,
-                        currentAlarmMinutesIntoCycle: into)
+                        currentAlarmMinutesIntoCycle: into, endsCycle: endsCycle)
     }
 
     /// A night with a clock change: plan on elapsed time (the clock after
@@ -164,13 +197,15 @@ public enum WakePlanner {
         let reasons = p.reasons.map { r -> WakePlan.Reason in
             var r = r
             if r.kind == .cycleEnd {
-                r.detail = "Cycle \(p.cycles) ends at \(Clock.format(wake)) on the new clock, so you wake from light sleep."
+                r.detail = p.endsCycle
+                    ? "Cycle \(p.cycles) ends around \(Clock.format(wake)) on the new clock. Waking near the end of a cycle can feel a bit easier. Cycle timing varies, so this is a rough guide."
+                    : "No sleep cycle ends close enough before \(Clock.format(wake)) on the new clock, so you sleep until your up-by time."
             }
             return r
         }
         return WakePlan(wake: wake, alarmWindow: window, cycles: p.cycles, asleep: p.asleep, shortfall: p.shortfall,
                         reasons: reasons, bedtimeToCoverNeed: p.bedtimeToCoverNeed,
-                        currentAlarmMinutesIntoCycle: p.currentAlarmMinutesIntoCycle)
+                        currentAlarmMinutesIntoCycle: p.currentAlarmMinutesIntoCycle, endsCycle: p.endsCycle)
     }
 
     /// Her typical cycle length from tracked nights: total asleep time divided

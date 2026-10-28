@@ -25,7 +25,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Saves the caffeine you log to Apple Health.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Watches for movement during your wake window so the smart alarm can wake you from light sleep.</string>
+	<string>Watches for movement during your wake window so the smart alarm can wake you when you start stirring.</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKBackgroundModes</key>

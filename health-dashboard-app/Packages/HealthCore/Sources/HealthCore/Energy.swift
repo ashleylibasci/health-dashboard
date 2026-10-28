@@ -3,7 +3,9 @@ import Foundation
 /// Predicts the day's energy curve with the two-process model of sleep
 /// regulation (Borbély): a homeostatic pressure that builds while awake and
 /// drains during sleep, plus a circadian rhythm timed from her body clock.
-/// Fatigue tools like SAFTE, and apps like RISE, build on the same idea.
+/// Fatigue tools like SAFTE, and apps like RISE, build on the same idea. The
+/// body-clock part's shape is hand-tuned, so the curve is a rough guide,
+/// not a measurement (Liu 12).
 public struct EnergyDay: Hashable, Sendable {
     public struct Point: Hashable, Sendable { public var time: Minutes; public var level: Double }
     public struct Zone: Hashable, Sendable {
@@ -20,7 +22,7 @@ public struct EnergyDay: Hashable, Sendable {
             case .afternoonDip: return (720..<1080).contains(range.start) ? "Afternoon dip" : "Energy dip"
             case .secondWind: return "Second wind"
             case .windDown: return "Wind-down"
-            case .melatonin: return "Melatonin"
+            case .melatonin: return "Sleep window"
             }
         }
     }
@@ -76,20 +78,15 @@ public enum EnergyModel {
         let restorative = input.sleepNeed.map { min(input.asleepMinutes, $0) } ?? input.asleepMinutes
         let sWake0 = sBed * exp(-Double(restorative) / 60 / tauFall)
         let sWake = min(sWake0 + Double(input.sleepDebt) / 60 * 0.035, 0.9)
-        let debtDamping = max(0.55, 1 - Double(input.sleepDebt) / 60 * 0.06)
 
-        // Circadian phase from mid-sleep: the 24h component peaks ~14h after
-        // mid-sleep (the evening "second wind"), the 12h component gives the
-        // late-morning peak and the post-lunch dip. Tuned so a 4:22am
-        // mid-sleep peaks near 11:30am and dips near 4pm.
-        let mid = Double(input.habitualMidSleep) / 60
-        let phi24 = mid + 14.0, phi12 = mid + 6.0
+        // Grogginess (sleep inertia) mostly clears within about 30 minutes
+        // of a light-sleep wake and about an hour after deep sleep; the
+        // grogginess zone ends at those times (Park 12).
         let inertiaK = input.wokeFromLightSleep ? 0.22 : 0.4
-        let inertiaTau = input.wokeFromLightSleep ? 25.0 : 45.0
+        let inertiaTau = input.wokeFromLightSleep ? 17.0 : 26.0
 
         func circadian(_ t: Minutes) -> Double {
-            let h = Double(t) / 60
-            return 0.30 * cos(2 * .pi * (h - phi24) / 24) + 0.12 * cos(2 * .pi * (h - phi12) / 12)
+            EnergyModel.circadian(t, midSleep: input.habitualMidSleep, sleepDebt: input.sleepDebt)
         }
         func rescale(_ raw: Double) -> Double { min(max((raw - 0.05) / 0.85 * 100, 0), 100) }
 
@@ -108,10 +105,10 @@ public enum EnergyModel {
             let awakeH = Double(t - input.wake) / 60
             let s = 1 - (1 - sWake) * exp(-awakeH / tauRise)
             let inertia = inertiaK * exp(-Double(t - input.wake) / inertiaTau)
-            let raw = (1 - s) + circadian(t) * debtDamping - inertia
+            let raw = (1 - s) + circadian(t) - inertia
             curve.append(.init(time: t, level: rescale(raw)))
             if t <= scoredEnd {
-                scored.append(rescale((1 - s) + circadian(min(t, clockHold)) * debtDamping - inertia))
+                scored.append(rescale((1 - s) + circadian(min(t, clockHold)) - inertia))
             }
         }
         let score = Int(((scored.mean ?? 50)).rounded())
@@ -148,14 +145,35 @@ public enum EnergyModel {
         if let d = dip { zones.append(.init(kind: .afternoonDip, range: band(around: d, within: 3, isMax: false, after: m1 ?? .min, before: m2 ?? .max))) }
         if let p = peak2 { zones.append(.init(kind: .secondWind, range: band(around: p, within: 3, isMax: true, after: m2 ?? .min))) }
 
-        // Melatonin rises in the hour before her habitual sleep onset.
-        let melStart = input.habitualSleepOnset - 57
-        zones.append(.init(kind: .windDown, range: TimeRange(melStart - 15, melStart)))
-        zones.append(.init(kind: .melatonin, range: TimeRange(melStart, melStart + 60)))
+        // Melatonin starts rising about 2 hours before her usual sleep onset
+        // (Park 6): wind-down covers that first hour, the sleep window the
+        // hour before onset. Onset is rounded to 15 minutes; it's an
+        // estimate, not a measurement.
+        let onset = Int((Double(input.habitualSleepOnset) / 15).rounded()) * 15
+        zones.append(.init(kind: .windDown, range: TimeRange(onset - 120, onset - 60)))
+        zones.append(.init(kind: .melatonin, range: TimeRange(onset - 60, onset)))
 
         let highest = (peak1 ?? curve.max { $0.level < $1.level })!
         let lowest = (dip ?? curve.min { $0.level < $1.level })!
         return EnergyDay(curve: curve, zones: zones, score: score, highest: highest, lowest: lowest, input: input)
+    }
+
+    /// The body-clock part of the curve at `t`. Circadian phase from
+    /// mid-sleep: the 24h component peaks ~14h after mid-sleep (the evening
+    /// "second wind"), the 12h component gives the late-morning peak and the
+    /// post-lunch dip. Tuned so a 4:22am mid-sleep peaks near 11:30am and
+    /// dips near 4pm.
+    ///
+    /// Sleep debt deepens the dips but leaves the peaks alone (Park 5): the
+    /// low half of the 12h component (the post-lunch dip) is scaled by
+    /// 1 + 0.06 per hour of debt, at most ×1.5; its high half is unchanged.
+    static func circadian(_ t: Minutes, midSleep: Minutes, sleepDebt: Int) -> Double {
+        let h = Double(t) / 60
+        let mid = Double(midSleep) / 60
+        let phi24 = mid + 14.0, phi12 = mid + 6.0
+        let deepening = min(1 + Double(max(sleepDebt, 0)) / 60 * 0.06, 1.5)
+        let c12 = 0.12 * cos(2 * .pi * (h - phi12) / 12)
+        return 0.30 * cos(2 * .pi * (h - phi24) / 24) + (c12 < 0 ? c12 * deepening : c12)
     }
 
     /// Hours after waking that the score averages over.

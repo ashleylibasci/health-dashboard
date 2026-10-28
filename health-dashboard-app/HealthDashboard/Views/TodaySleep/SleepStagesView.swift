@@ -51,20 +51,38 @@ struct SleepStagesView: View {
 
     private func minutes(_ stage: SleepStage) -> Int { model.lastNight.stageMinutes[stage] ?? 0 }
 
-    /// Her usual minutes per stage: the average of tracked nights when there
-    /// are at least a week of them, otherwise typical values for her.
+    /// Her usual minutes per stage: the average of her tracked nights once
+    /// there are at least a week of them. Nil before that: fixed "typical"
+    /// minutes don't fit everyone (women tend to get more deep sleep, the
+    /// pill a little less), so until then a stage is shown as a share of the
+    /// night against a typical range (Park 11, Liu 3).
     private func usual(_ stage: SleepStage) -> Int? {
         let tracked = model.sessions.suffix(30)
-        if tracked.count >= 7 {
-            let total = tracked.map { $0.minutes(in: stage) }.reduce(0, +)
-            return Int((Double(total) / Double(tracked.count)).rounded())
-        }
+        guard tracked.count >= 7, stage != .awake else { return nil }
+        let total = tracked.map { $0.minutes(in: stage) }.reduce(0, +)
+        return Int((Double(total) / Double(tracked.count)).rounded())
+    }
+
+    /// A gap smaller than this is within the Watch's error for a single
+    /// night, so it reads "about usual" (Park 11: 25 minutes).
+    private let meaningfulGap = 25
+
+    /// A typical share of the night for adults in their late teens and
+    /// twenties, as a percentage range.
+    private func typicalShare(_ stage: SleepStage) -> ClosedRange<Int>? {
         switch stage {
-        case .deep: return 70
-        case .rem: return 105
-        case .core: return 290
+        case .deep: return 13...25
+        case .rem: return 20...25
+        case .core: return 50...60
         case .awake: return nil
         }
+    }
+
+    /// Last night's share of sleep in a stage, as a whole percentage.
+    private func share(_ stage: SleepStage) -> Int? {
+        let asleep = model.lastNight.asleep
+        guard asleep > 0 else { return nil }
+        return Int((Double(minutes(stage)) / Double(asleep) * 100).rounded())
     }
 
     private var wakeUps: Int? {
@@ -210,10 +228,14 @@ struct SleepStagesView: View {
             } else {
                 note = "Short stirs are normal"
             }
+        } else if let typical {
+            note = "your usual \(SleepText.compact(typical))"
+        } else if let range = typicalShare(stage), let pct = share(stage) {
+            note = "\(pct)% of your sleep \u{00B7} typical \(range.lowerBound)\u{2013}\(range.upperBound)%"
         } else {
-            note = typical.map { "usual \(SleepText.compact($0))" } ?? ""
+            note = ""
         }
-        let deltaGood = (delta ?? 0) >= -10
+        let deltaGood = (delta ?? 0) > -meaningfulGap
         return HStack(alignment: .center, spacing: 12) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(StageStyle.color(stage, scheme))
@@ -227,8 +249,8 @@ struct SleepStagesView: View {
                         InfoButton(topic: StageStyle.topic(stage)).padding(.vertical, -14).padding(.horizontal, -8)
                     }
                     if let delta, stage != .awake {
-                        // Under 10 minutes is within the Watch's error (N16).
-                        Text(abs(delta) < 10 ? "about usual" : SleepText.signedCompact(delta))
+                        // Under 25 minutes is within the Watch's error for one night.
+                        Text(abs(delta) < meaningfulGap ? "about usual" : SleepText.signedCompact(delta))
                             .font(.scaled(size: 12, weight: .bold))
                             .foregroundStyle((deltaGood ? Accent.mint : Accent.coral).ink(scheme))
                             .padding(.horizontal, 7)
@@ -255,8 +277,11 @@ struct SleepStagesView: View {
 
     private var meaning: String {
         var text = "Deep sleep repairs your body; REM sorts what you learned."
-        let deepOK = usual(.deep).map { minutes(.deep) >= $0 - 10 } ?? true
-        let remOK = usual(.rem).map { minutes(.rem) >= $0 - 10 } ?? true
+        guard usual(.deep) != nil || usual(.rem) != nil else {
+            return text + " After a week of tracked nights, each stage is compared with your own usual. Until then it's shown as a share of your sleep next to a typical range, which varies a lot from person to person."
+        }
+        let deepOK = usual(.deep).map { minutes(.deep) > $0 - meaningfulGap } ?? true
+        let remOK = usual(.rem).map { minutes(.rem) > $0 - meaningfulGap } ?? true
         switch (deepOK, remOK) {
         case (true, true): text += " Both held up last night."
         case (false, false): text += " Both ran short last night."
@@ -265,7 +290,7 @@ struct SleepStagesView: View {
         }
         if let usualCore = usual(.core) {
             let gap = usualCore - minutes(.core)
-            if gap >= 15 {
+            if gap >= meaningfulGap {
                 let later = model.lastNight.bedtime > store.data.bedtime + 15
                 text += " Core sleep ran \(gap) minutes short" + (later ? ", mostly from the later bedtime." : ".")
             }
@@ -280,7 +305,7 @@ struct SleepStagesView: View {
                 .font(.scaled(size: 15))
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Your usual stages",
-                             method: "Your usual for each stage is the average of your last 30 tracked nights once you have at least a week of them. Before that we use typical values for someone your age. The Watch estimates stages from movement and heart rate, so treat single nights as rough and look at the trend.")
+                             method: "Your usual for each stage is the average of your last 30 tracked nights once you have at least a week of them. Before that, each stage is shown as a share of your sleep next to a typical range for adults your age; women tend to get a little more deep sleep, and the pill can mean a little less. A difference under 25 minutes is called about usual: the Watch estimates stages from movement and heart rate, so single nights are rough. Look at the trend.")
         }
     }
 }

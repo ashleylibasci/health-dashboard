@@ -20,7 +20,7 @@ struct CutoffTestView: View {
             resultCard
             howCard
             HowWeGotThisLink(title: "Caffeine cutoff test",
-                             method: "From the day you first logged caffeine, we take each night's last caffeinated drink (from 4am the day before until you fell asleep) and how long you slept (from your Apple Watch). Nights go into groups: no caffeine, last caffeine before 12pm, 12 to 3pm, and after 3pm (drinks after midnight count as late). Each bar is the average sleep in that group. We compare the earliest and latest caffeine groups once each has at least \(HabitEffect.minimumNights) nights, and a difference under about 15 minutes is too small to mean much.")
+                             method: "From the day you first logged caffeine, we take each night's last caffeinated drink (from 4am the day before until you fell asleep) and how long you slept (from your Apple Watch). Nights go into groups: no caffeine, last caffeine before 12pm, 12 to 3pm, and after 3pm (drinks after midnight count as late). Each bar is the average sleep in that group. We compare the earliest and latest caffeine groups once each has at least \(HabitEffect.minimumNights) nights, and a difference has to be big enough to stand out from ordinary night-to-night swings: about 45 minutes with 5 nights in each group, shrinking to about 20 minutes with 30 or more.")
         }
     }
 
@@ -87,16 +87,26 @@ struct CutoffTestView: View {
         let lateLabel = late.label.lowercased()
         let caveat = test.nightsLogged < test.target ? " This is an early result; it firms up as you log more." : ""
         let n = " (\(early.nights) and \(late.nights) nights)"
-        if diff >= 15 {
+        let gap = Self.meaningfulGap(nights: min(early.nights, late.nights))
+        if diff >= gap {
             return ("Late caffeine costs you sleep",
                     "When your last caffeine is \(lateLabel), you sleep about \(Clock.duration(diff)) less than when it's \(earlyLabel)\(n). \(model.caffeineCutoffShown.map { "Your \(Clock.format($0)) cutoff is worth keeping." } ?? "Keeping caffeine small and early is worth it.")\(caveat)")
         }
-        if diff <= -15 {
+        if diff <= -gap {
             return ("No cost from later caffeine so far",
                     "You've actually slept a bit more on later-caffeine days\(n). Other things probably matter more for you, like bedtime. Caffeine can still make sleep lighter without making it shorter.\(caveat)")
         }
         return ("About the same so far",
-                "Your sleep is within 15 minutes whether your last caffeine is \(earlyLabel) or \(lateLabel)\(n). Caffeine can still make sleep lighter without making it shorter.\(caveat)")
+                "With this many nights, a difference under about \(gap) minutes could just be chance, and yours is \(abs(diff)) minutes, whether your last caffeine is \(earlyLabel) or \(lateLabel)\(n). Caffeine can still make sleep lighter without making it shorter.\(caveat)")
+    }
+
+    /// The smallest difference in average sleep that stands out from
+    /// ordinary swings (Liu 10): sleep varies about an hour night to night,
+    /// so with few nights per group only a big gap means much. About 45
+    /// minutes at 5 nights, 30 at 10, 25 at 20, 20 from about 30, in 5s.
+    static func meaningfulGap(nights: Int) -> Int {
+        let raw = 60 * (2 / Double(max(nights, 1))).squareRoot() * 1.2
+        return max(20, Int((raw / 5).rounded()) * 5)
     }
 
     private var selectedGroup: CaffeineCutoffTest.Group? {

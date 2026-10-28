@@ -84,10 +84,41 @@ final class WakeTests: XCTestCase {
     }
 
     func testEarlyDeadlineIsShort() {
+        // The last cycle ends at 6:50am, 40 minutes before up-by: too much
+        // sleep to give up, so she sleeps until 7:30am (Park 1).
         let plan = try! XCTUnwrap(WakePlanner.plan(.init(bedtime: 30, deadline: 450, tonightNeed: 495, bestWindow: TimeRange(470, 510))))
-        XCTAssertEqual(Clock.format(plan.wake), "6:50am")
+        XCTAssertEqual(Clock.format(plan.wake), "7:30am")
+        XCTAssertFalse(plan.endsCycle)
         XCTAssertFalse(plan.reasons[1].ok)
         XCTAssertNotNil(plan.bedtimeToCoverNeed)
+    }
+
+    // Park 1: bed 12:30am, up by 8:00am. The last cycle ends at 6:50am,
+    // 70 minutes early; the plan sleeps until 8:00am and the smart alarm
+    // window ends at 8:00am.
+    func testNeverWakesMoreThan25MinutesEarly() {
+        let plan = try! XCTUnwrap(WakePlanner.plan(.init(bedtime: 30, deadline: 480, tonightNeed: 480, windowLength: 22)))
+        XCTAssertEqual(Clock.format(plan.wake), "8:00am")
+        XCTAssertFalse(plan.endsCycle)
+        XCTAssertEqual(plan.asleep, 480 - 42)
+        XCTAssertEqual(plan.alarmWindow, TimeRange(455, 480))
+        // Whatever the bedtime, the plan never gives up more than 25 minutes.
+        for bed in stride(from: -120, through: 60, by: 1) {
+            guard let p = WakePlanner.plan(.init(bedtime: bed, deadline: 480, tonightNeed: 480, windowLength: 22)) else { continue }
+            XCTAssertLessThanOrEqual(480 - p.wake, WakePlanner.maxCycleTrade)
+            XCTAssertLessThanOrEqual(p.alarmWindow.end, 480)
+            XCTAssertEqual(p.alarmWindow.length, 25)
+        }
+    }
+
+    // A cycle end that would leave her short when up-by covers the need
+    // isn't used.
+    func testCycleEndNeverMakesACoveredNightShort() {
+        // Onset 11:42pm; cycle 5 ends 7:22am, up-by 7:40am (478 asleep).
+        let plan = try! XCTUnwrap(WakePlanner.plan(.init(bedtime: -30, deadline: 460, tonightNeed: 475)))
+        XCTAssertFalse(plan.endsCycle)
+        XCTAssertEqual(plan.wake, 460)
+        XCTAssertEqual(plan.shortfall, 0)
     }
 
     func testHistoryFindsBestWindow() {
@@ -179,6 +210,23 @@ final class PlanningTests: XCTestCase {
         XCTAssertLessThanOrEqual(examDay.wake, 540 - 70)
         XCTAssertLessThan(examDay.bedtimeBefore, 30)
         XCTAssertFalse(plan.first!.studyBlocks.isEmpty)
+        // Park 2 / Liu 11: never plans less than her need.
+        for d in plan {
+            XCTAssertGreaterThanOrEqual(d.wake - d.bedtimeBefore - 12, 495)
+            XCTAssertEqual(d.alarmWindow, TimeRange(d.wake - 22, d.wake + 3))
+        }
+    }
+
+    // Whole cycles of her own length, rounded up, when that's within 25
+    // minutes of her need; her own latency is used.
+    func testExamPlanRoundsCyclesUp() {
+        let energy = EnergyModel.day(.init(wake: 480, asleepMinutes: 460, sleepDebt: 0, habitualMidSleep: 262, habitualSleepOnset: 1482, bedtime: 1470))
+        let plan = ExamPlanner.plan(examStart: 600, daysUntil: 1, usualBedtime: 30, latency: 20, cycleLength: 85, need: 500, energyTemplate: energy)
+        let examDay = plan.last!
+        XCTAssertTrue(examDay.endsCycle)
+        XCTAssertEqual(examDay.asleep, 6 * 85)                  // 510 ≥ 500
+        XCTAssertEqual(examDay.wake - examDay.bedtimeBefore - 20, 510)
+        XCTAssertLessThanOrEqual(examDay.wake, 600 - 70)
     }
     func testWeekRecap() {
         let d0 = Date(timeIntervalSince1970: 1_780_000_000)

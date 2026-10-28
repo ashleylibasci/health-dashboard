@@ -177,7 +177,7 @@ private struct SmartAlarmCard: View {
         case .noWindow:
             return "Waiting for a wake window from your iPhone"
         case let .scheduled(start, end):
-            let base = "Listens for light sleep from \(when(start)) and wakes you by \(WatchStyle.time(end)) at the latest."
+            let base = "Listens for stirring from \(when(start)) and wakes you by \(WatchStyle.time(end)) at the latest."
             return alarm.pendingChange ? base + " Open this app to use your new window." : base
         case let .later(_, end):
             let weekend = snapshot.alarmWeekdaysOnly == true && Calendar.current.isDateInWeekend(Date().addingTimeInterval(24 * 3600))
@@ -185,7 +185,7 @@ private struct SmartAlarmCard: View {
         case .needsForeground:
             return "Open this app before bed to arm it"
         case .listening:
-            return "Listening for light sleep"
+            return "Listening for stirring"
         case .ringing:
             return "Ringing"
         case let .woke(at):
@@ -208,7 +208,7 @@ private struct SmartAlarmCard: View {
             }
             .tint(Color(hex: 0x34C759))
             .disabled(!snapshot.alarmEnabled || !hasWindow)
-            .accessibilityHint("Wakes you at the first sign of light sleep in your window")
+            .accessibilityHint("Wakes you when you start stirring in your window")
 
             Text(statusText)
                 .font(.system(size: 12, weight: .medium))
