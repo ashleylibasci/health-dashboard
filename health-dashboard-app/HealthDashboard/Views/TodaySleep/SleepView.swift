@@ -190,6 +190,23 @@ struct SleepView: View {
         }
     }
 
+    /// "A 20-min nap before 3:10pm won't hurt tonight" (H-C2), from her
+    /// wake time and tonight's bedtime; after the cutoff, that it's passed.
+    @ViewBuilder
+    private var napRow: some View {
+        if model.showsNapWindow, let cutoff = model.napCutoff {
+            let open = model.now < cutoff
+            RowDivider()
+            ExpandRow(title: "Nap window",
+                      summary: open ? "A \(AppModel.napMinutes)-min nap before \(Clock.format(cutoff)) won\u{2019}t hurt tonight"
+                                    : "Past \(Clock.format(cutoff)), a nap would push bedtime later",
+                      systemImage: "powersleep", accent: open ? .indigo : .coral) {
+                Text("Short naps early in the afternoon help you stay alert. Long naps, or naps late in the day, make it harder to fall asleep at \(Clock.format(model.tonightBedtime)). Keep it to \(AppModel.napMinutes) minutes, start it before \(Clock.format(cutoff)), and set an alarm.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var rows: some View {
         let debt = model.sleepDebt
         return RowCard {
@@ -215,6 +232,7 @@ struct SleepView: View {
                 SleepNeedView()
             }
             weekendRow
+            napRow
             if model.daysUntilFallBack <= 28 {
                 RowDivider()
                 MetricRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
