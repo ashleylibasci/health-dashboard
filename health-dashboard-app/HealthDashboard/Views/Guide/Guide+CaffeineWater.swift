@@ -80,7 +80,7 @@ extension GuideArticle {
             .paragraph("For women, US guidance is about 9 cups (74 oz) a day from drinks. Drinks like tea, milk and juice count too, and food adds more on top."),
             .paragraph(CaffeineWaterCopy.waterGoal.forYou),
             .heading("Catching up"),
-            .paragraph("No need to catch up at once: spread it out, no more than about 1 liter (34 oz) an hour."),
+            .paragraph("No need to catch up at once: spread it out, no more than about 34 oz an hour."),
             .callout(CaffeineWaterCopy.highGoal),
         ],
         keywords: ["hydration", "cups", "ounces", "liters", "goal", "bottle"])

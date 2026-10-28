@@ -68,7 +68,7 @@ struct WaterView: View {
         }
         let behind = gap / bottleML
         return (SummaryStatus(text: "Behind pace", accent: .yellow),
-                "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind. Spread it out: no more than about 1 liter (34 oz) an hour.")
+                "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind. Spread it out: no more than about 34 oz an hour.")
     }
 
     private var lastPair: StatPair {
@@ -199,10 +199,10 @@ struct WaterDayView: View {
         let pace = model.waterPace(at: model.now)
         let gap = pace - have
         if gap <= bottleML * 0.25 { return "On track for this time of day." }
-        // Never a catch-up faster than about 1 liter an hour (Ruiz F10).
+        // Never a catch-up faster than about 34 oz (1 liter) an hour (Ruiz F10).
         if gap < min(bottleML, 1000) { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up over the next hour or two." }
         let behind = gap / bottleML
-        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 1 liter (34 oz) an hour."
+        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 34 oz an hour."
     }
 
     private var chartStart: Minutes {
