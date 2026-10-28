@@ -104,9 +104,11 @@ enum SampleData {
     static let respiratoryRateDelta: Double? = 0.2
     static let wristTempDelta: Double? = 0.3
     static let vo2Max: Double? = 38.2
+    /// Yearly estimates, the latest 6 weeks old (so the freshness tip shows).
     static func vo2MaxHistory() -> [(date: Date, value: Double)] {
         let now = Date()
-        return [(48, 41.0), (36, 40.2), (24, 39.4), (12, 38.8), (0, 38.2)].map { (calendar.date(byAdding: .month, value: -$0.0, to: now)!, $0.1) }
+        let yearly = [(48, 41.0), (36, 40.2), (24, 39.4), (12, 38.8)].map { (calendar.date(byAdding: .month, value: -$0.0, to: now)!, $0.1) }
+        return yearly + [(calendar.date(byAdding: .day, value: -42, to: now)!, 38.2)]
     }
     static let activeCalories = 420.0
     static let restingCalories = 1470.0
