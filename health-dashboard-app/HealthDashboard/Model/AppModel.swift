@@ -1243,6 +1243,7 @@ final class AppModel: ObservableObject {
             await Nudges.sickAlertIfNeeded(signal.confidence, cyclePhaseUnknown: signal.cyclePhaseUnknown)
         }
         await updateAlarmNudge()
+        await updateBedtimeNudge()
     }
 
     // MARK: Smart alarm on the Watch
