@@ -17,7 +17,7 @@ struct SettingsView: View {
         Screen(title: "Settings", accent: .indigo) {
             profile
             RowCard {
-                MetricRow(title: "Health guide", note: "Help now, sleep, sick days, the pill and more",
+                MetricRow(title: "Health guide", note: "Sleep, sick days, the pill, periods and more",
                           systemImage: "book.closed.fill", accent: .indigo) { HealthGuideView() }
             }
             group("Connections") {
@@ -35,7 +35,7 @@ struct SettingsView: View {
                           systemImage: "drop.fill", accent: .pink) { CycleSettingsView() }
                 RowDivider()
                 MetricRow(title: "Sleep & alarm",
-                          note: "Bed \(Clock.format(store.data.bedtime)) \u{00B7} up by \(Clock.format(store.data.upBy))",
+                          note: "Usual bed \(Clock.format(store.data.bedtime)) \u{00B7} up by \(Clock.format(store.data.upBy))",
                           systemImage: "alarm.fill", accent: .orange) { SleepSettingsView() }
                 RowDivider()
                 MetricRow(title: "Tracking", note: trackingNote,

@@ -69,7 +69,9 @@ struct CaffeineView: View {
         if let latest = model.latestTimeForCaffeine(mg: drink.caffeineMg), latest > t {
             return (SummaryStatus(text: "Have it by \(Clock.format(latest))", accent: .yellow), line)
         }
-        return (SummaryStatus(text: "Skip more today", accent: .orange), line)
+        // "More" only once she's had some today.
+        let skip = model.caffeineDoses.isEmpty ? "Past today\u{2019}s cutoff" : "Skip more today"
+        return (SummaryStatus(text: skip, accent: .orange), line)
     }
 
     /// The biggest drink that still fits now (mg, in 5s).

@@ -124,7 +124,9 @@ enum BestTimesText {
         case "Fighting something off": "in case you're fighting something off"
         default: "for tonight's extra sleep"
         }
-        return "Tonight \(Clock.duration(earlier)) earlier than your best window, \(why)."
+        // "Bed by" is the end of her best window on an ordinary night, so
+        // tonight can still sit inside the window: say earlier than usual.
+        return "Tonight \(Clock.duration(earlier)) earlier than usual, \(why)."
     }
 
     /// Under "Up at": the smart alarm window, or that it's off.

@@ -62,6 +62,12 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 
 6. Round 3 on the Mac (Oct 27, 2026): real builds, the simulator test round, and the six student testers (the "student-testers" BMad party) on real screens. Findings and their status are in TEST-FINDINGS.md. The old app's features were ported in the same session (see Layout).
 7. Expert review (Oct 28, 2026): a women's health expert party and a design party (both in `_bmad/custom/bmad-party-mode.toml`) reviewed every calculation, message and screen. What changed and what's still recommended: EXPERT-REVIEW.md. The app is for women only (no male norms or options), and it replaced the old app on her phone under the old bundle IDs.
+8. Restructure (Oct 28, 2026), after Ashley found the app disorganized and glitchy on her phone:
+   - Stutter: her phone gets Release builds; a Health refresh publishes once (all reads first); refreshes from new Health data are at most every 30 s while the app is open.
+   - Her old app's caffeine and water (kept only in Apple Health) are read into the logs (`mergeHealthLogs`, 60 days). Caffeine bedtime limit 35 mg (Gardiner 2023), pill half-life 7.3 h. Google sign-out shows "Sign in to Google again". Age is read from her Health birthday when unset.
+   - A new design party ("app-structure") reviewed every screen; every screen is now summary-first (SummaryHeader, RowCard/MetricRow, ExpandRow, LearnMoreRow, CalloutBar) with detail one tap down, plus a searchable Health guide (Settings, first row). Charts keep a steady readout height while scrubbing.
+   - Best sleep times (`HealthCore/SleepTiming.swift`, Dr. Park's method, 26 tests): `tonightBedtime` is the one bedtime for tonight everywhere (Today, Sleep, alarm, Watch, caffeine cutoff, energy). `store.data.bedtime` is her usual bedtime (exam plans, streaks, rollover).
+   - At Ashley's request the 988 crisis line and the sick check's "when to get care / see a doctor" content are removed; don't add them back unless she asks.
 
 ## Simulator test round
 `HealthDashboardUITests/TestRound.swift`, one tester setup at a time, e.g.

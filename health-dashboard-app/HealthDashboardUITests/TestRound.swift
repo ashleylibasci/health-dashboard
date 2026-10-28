@@ -370,10 +370,18 @@ final class TestRound: XCTestCase {
             shotPage(tile.lowercased().replacingOccurrences(of: " ", with: "-"), maxPages: 4)
         }
         goTab("Body")
+        if tap("Energy left") { sleep(1); shotPage("energy", maxPages: 4) }
+        for link in ["Caffeine", "Water"] {
+            goTab("Today")
+            guard tap(link) else { continue }
+            sleep(1)
+            shotPage(link.lowercased(), maxPages: 4)
+        }
+        goTab("Body")
         tap("Settings")
         shotPage("settings", maxPages: 8)
         goTab("Today")
-        for link in ["Stress", "Why do I feel off?", "Getting accurate numbers"] {
+        for link in ["Stress", "Why do I feel off?"] {
             goTab("Today")
             guard tap(link) else { continue }
             sleep(1)

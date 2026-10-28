@@ -83,3 +83,8 @@ Features (biggest value first):
 - A one-time Today card on day 3 that introduces widgets, the Watch and health conditions.
 - Alcohol has no colour of its own (it shares purple with sleep); a ninth hue would need care to stay distinct.
 - A snooze on the Watch alarm was left out on purpose: the smart-alarm session can't outlast its window, and the iPhone backup alarm covers that case.
+
+## Changed after the review (Oct 28, 2026)
+- Ashley asked to remove the 988 Suicide & Crisis Lifeline (stress, PMDD, onboarding, guide) and the sick check's "when to get care" tiers and "see a doctor" lines. Both were the health party's recommendations; they're out by her decision and may come back later.
+- Caffeine: the bedtime limit is 35 mg, not 25 (a meta-analysis found a coffee needs about 8.8 hours before bed, Gardiner et al. 2023, which this model reads as about 35 mg left), and the pill half-life is 7.3 h (5 h × 7.9/5.4 from Abernethy & Todd 1985) instead of 8. On the pill a coffee now has a real morning cutoff.
+- Best sleep times (Dr. Park's method) were built: a personal bedtime window that her own nights can only move earlier, with honest "learning" and "no clear pattern" states.
