@@ -153,6 +153,9 @@ struct AppData: Codable {
     var flowLog: [FlowEntry] = []
     var symptomLog: [SymptomEntry] = []
     var moodLog: [MoodEntry] = []
+    /// The time zone she was in each day (midnight → identifier), the last
+    /// 60 days, so travel days stay out of her baselines (E1).
+    var timeZoneByDay: [Date: String] = [:]
 
     init() {}
 
@@ -206,6 +209,7 @@ struct AppData: Codable {
         flowLog = get(.flowLog, d.flowLog)
         symptomLog = get(.symptomLog, d.symptomLog)
         moodLog = get(.moodLog, d.moodLog)
+        timeZoneByDay = get(.timeZoneByDay, d.timeZoneByDay)
     }
 
     /// Entries from today's app day only (since the rollover, 4:00am or
