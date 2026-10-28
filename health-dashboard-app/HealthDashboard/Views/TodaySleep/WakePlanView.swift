@@ -108,21 +108,21 @@ struct WakePlanView: View {
         return slot.nights < 3 ? "\(nights) \u{00B7} too few to read much into" : nights
     }
 
-    private func overviewDetail(_ best: SleepTiming.Result) -> String {
-        "\(best.nightsUsed) school nights so far. Nights after drinks, exams or being sick are left out."
-    }
+    private let overviewDetail = "School nights only. Nights after drinks, during exams or while sick are left out."
+
 
     @ViewBuilder
     private func hrvReadout(_ best: SleepTiming.Result) -> some View {
-        let all = [overviewDetail(best)] + slots.map { slotDetail($0, best: best) }
+        let all = [overviewDetail] + slots.map { slotDetail($0, best: best) }
         if let start = selectedSlot, let slot = slots.first(where: { $0.start == start }), let hrv = slot.hrvPct {
             ChartReadout(title: "Asleep \(slotLabel(slot.start)) \u{00B7} next-morning HRV",
                          value: SleepText.signed(hrv) + "% \u{00B7} vs your usual",
                          detail: slotDetail(slot, best: best), accent: hrv >= 0 ? .purple : .coral,
                          onClear: { selectedSlot = nil }, detailSlots: all)
         } else {
-            ChartReadout(title: "Your HRV by bedtime", value: "\(best.nightsUsed) of \(best.nightsNeeded) \u{00B7} nights",
-                         detail: overviewDetail(best), accent: .purple, detailSlots: all)
+            let count = best.nightsUsed < best.nightsNeeded ? "\(best.nightsUsed) of \(best.nightsNeeded)" : "\(best.nightsUsed)"
+            ChartReadout(title: "Your HRV by bedtime", value: count + " \u{00B7} nights",
+                         detail: overviewDetail, accent: .purple, detailSlots: all)
         }
     }
 
@@ -474,6 +474,24 @@ private struct BedtimeHRVChart: View {
         return c
     }
 
+    /// One slot: a bar from her usual (0) to its average, inset 3 minutes
+    /// each side so neighbouring slots don't touch.
+    private func bar(_ slot: SleepTiming.Slot) -> some ChartContent {
+        let start: Minutes = slot.start + 3, end: Minutes = slot.start + 27
+        let hrv: Double = slot.hrvPct ?? 0
+        return RectangleMark(xStart: .value("Asleep", start), xEnd: .value("Asleep", end),
+                             yStart: .value("HRV", 0.0), yEnd: .value("HRV", hrv))
+            .foregroundStyle(color(slot))
+            .cornerRadius(3)
+    }
+
+    /// Every slot edge, or every hour when there are more than six slots.
+    private var axisTicks: [Minutes] {
+        guard let first = slots.first?.start, let last = slots.last?.start else { return [] }
+        let edges = Array(stride(from: first, through: last + 30, by: 30))
+        return edges.count > 7 ? edges.filter { $0 % 60 == 0 } : edges
+    }
+
     private var summary: String {
         "Next-morning HRV against your usual by when you fell asleep, \(slots.count) half-hour slots."
     }
@@ -484,16 +502,14 @@ private struct BedtimeHRVChart: View {
                 .foregroundStyle(Palette(scheme: scheme).secondary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
             ForEach(slots, id: \.start) { slot in
-                BarMark(x: .value("Asleep", slot.start + 15), y: .value("HRV", slot.hrvPct ?? 0), width: .ratio(0.7))
-                    .foregroundStyle(color(slot))
-                    .cornerRadius(3)
+                bar(slot)
             }
         }
         .chartScrub($selection, snapped: selected, steps: slots.map(\.start))
         .transaction(value: selected) { $0.animation = nil }
         .chartXScale(domain: (slots.first.map { $0.start } ?? 0)...((slots.last.map { $0.start + 30 }) ?? 30))
         .chartXAxis {
-            AxisMarks(values: slots.map(\.start).filter { $0 % 60 == 0 }) { value in
+            AxisMarks(values: axisTicks) { value in
                 AxisGridLine()
                 AxisValueLabel {
                     if let m = value.as(Int.self) { Text(Clock.format(m).replacingOccurrences(of: ":00", with: "")) }
