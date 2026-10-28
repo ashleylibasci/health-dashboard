@@ -733,13 +733,16 @@ final class AppModel: ObservableObject {
             finishRefresh()
             return
         }
+        // Everything is read from Apple Health first and published after the
+        // last read, with no awaits in between: each published change redraws
+        // every screen, so changes spread across the reads redrew them dozens
+        // of times a refresh and made scrolling and taps stutter.
         let cal = Calendar.current
         let days = 120
         let all = try await health.sleepSessions(days: days)
         let main = Self.mainSleeps(all)
         let fresh = Self.latestMainSleep(in: main, now: .now, appDayStart: appDayStart)
         let periods = (try? await health.periodStarts(days: 400)) ?? []
-        realNightCount = main.count
         let heart = await loadHeart(main: main, days: days)
         let built = main.map { night($0, heart: heart) }
 
@@ -747,6 +750,7 @@ final class AppModel: ObservableObject {
             // Example data until 14 nights, but her own last night as soon as
             // there is one, her own nights in the history, her own heart
             // readings once there's a baseline, and her own cycle.
+            realNightCount = main.count
             applySampleData()
             healthPeriodStarts = periods
             nights = Self.merge(sample: nights, real: built)
@@ -771,9 +775,26 @@ final class AppModel: ObservableObject {
             return
         }
 
+        let today = cal.startOfDay(for: .now)
+        let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
         let daylight = (try? await health.dailySum(.timeInDaylight, unit: .minute(), days: 9)) ?? [:]
         let steps = (try? await health.dailySum(.stepCount, unit: .count(), days: 2)) ?? [:]
+        // Stress, sickness signals, fitness and calories. Each is optional:
+        // a missing permission or type just leaves "no data".
+        let hrHourly = (try? await health.hourlyToday(.heartRate, unit: .bpm, sum: false)) ?? [:]
+        let hrvHourly = (try? await health.hourlyToday(.heartRateVariabilitySDNN, unit: .msUnit, sum: false)) ?? [:]
+        let stepsHourly = (try? await health.hourlyToday(.stepCount, unit: .count(), sum: true)) ?? [:]
+        let kcalHourly = (try? await health.hourlyToday(.activeEnergyBurned, unit: .kilocalorie(), sum: true)) ?? [:]
+        let mass = try? await health.latest(.bodyMass, unit: .gramUnit(with: .kilo), days: 365)
+        let stillBaseline = await stillHourBaseline(sessions: all, bodyMassKg: mass)
+        let respiratory = (try? await health.dailyAverage(.respiratoryRate, unit: .count().unitDivided(by: .minute()), days: 40)) ?? [:]
+        let wristTemp = (try? await health.dailyAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), days: 40)) ?? [:]
+        let vo2 = (try? await health.samples(.vo2Max, unit: .vo2, days: 5 * 365)) ?? []
+        let activeByDay = (try? await health.dailySum(.activeEnergyBurned, unit: .kilocalorie(), days: 16)) ?? [:]
+        let resting = ((try? await health.dailySum(.basalEnergyBurned, unit: .kilocalorie(), days: 1)) ?? [:])[today] ?? 0
 
+        // From here to the end, no awaits: one redraw.
+        realNightCount = main.count
         usingSampleData = false
         self.sessions = main
         nights = built
@@ -792,8 +813,6 @@ final class AppModel: ObservableObject {
         applyHeart(heart)
         heartIsReal = hasHeartData
 
-        let today = cal.startOfDay(for: .now)
-        let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
         daylightByDay = daylight
         daylightToday = Int(daylight[today] ?? 0)
         stepsToday = Int(steps[today] ?? 0)
@@ -803,14 +822,8 @@ final class AppModel: ObservableObject {
         freeNights = built.filter { !$0.alarmUsed }.map { Chronotype.Night(onset: $0.sleepOnset, wake: $0.wake) }
         chronotypeIsLearning = workNights.isEmpty || freeNights.isEmpty
 
-        // Stress, sickness signals, fitness and calories. Each is optional:
-        // a missing permission or type just leaves "no data".
-        let hrHourly = (try? await health.hourlyToday(.heartRate, unit: .bpm, sum: false)) ?? [:]
-        let hrvHourly = (try? await health.hourlyToday(.heartRateVariabilitySDNN, unit: .msUnit, sum: false)) ?? [:]
-        let stepsHourly = (try? await health.hourlyToday(.stepCount, unit: .count(), sum: true)) ?? [:]
-        let kcalHourly = (try? await health.hourlyToday(.activeEnergyBurned, unit: .kilocalorie(), sum: true)) ?? [:]
-        bodyMassKg = try? await health.latest(.bodyMass, unit: .gramUnit(with: .kilo), days: 365)
-        stressStillBaseline = await stillHourBaseline(sessions: all)
+        bodyMassKg = mass
+        stressStillBaseline = stillBaseline
         let asleepSegments = all.filter { $0.wake > today }.flatMap(\.segments).filter { $0.stage != .awake }
         func asleep(inHour h: Int) -> Bool {
             guard let a = cal.date(bySettingHour: h, minute: 0, second: 0, of: today) else { return false }
@@ -827,16 +840,14 @@ final class AppModel: ObservableObject {
             guard let v = byDay[today] ?? byDay[yesterday], let b = Self.baseline(byDay, before: today) else { return nil }
             return v - b
         }
-        respiratoryRateDelta = delta((try? await health.dailyAverage(.respiratoryRate, unit: .count().unitDivided(by: .minute()), days: 40)) ?? [:])
-        wristTempDelta = delta((try? await health.dailyAverage(.appleSleepingWristTemperature, unit: .degreeCelsius(), days: 40)) ?? [:])
-        let vo2 = (try? await health.samples(.vo2Max, unit: .vo2, days: 5 * 365)) ?? []
+        respiratoryRateDelta = delta(respiratory)
+        wristTempDelta = delta(wristTemp)
         vo2Max = vo2.last?.value
         vo2MaxHistory = vo2
-        let activeByDay = (try? await health.dailySum(.activeEnergyBurned, unit: .kilocalorie(), days: 16)) ?? [:]
         activeCalories = activeByDay[today] ?? 0
         activeCaloriesYesterday = activeByDay[yesterday]
         activeCaloriesEarlier = activeByDay.filter { $0.key < yesterday }.map(\.value)
-        restingCalories = ((try? await health.dailySum(.basalEnergyBurned, unit: .kilocalorie(), days: 1)) ?? [:])[today] ?? 0
+        restingCalories = resting
 
         lastWeek = buildLastWeek(daylight: daylight)
         updatePersonalUsuals()
@@ -847,7 +858,7 @@ final class AppModel: ObservableObject {
     /// hours with few steps and little active energy (her own active-hour
     /// threshold), not the hour after an active one, and not mostly asleep.
     /// Nil until there are enough such hours (`StressModel.stillHoursNeeded`).
-    private func stillHourBaseline(sessions: [SleepSession], days: Int = 14) async -> StressModel.StillBaseline? {
+    private func stillHourBaseline(sessions: [SleepSession], bodyMassKg: Double?, days: Int = 14) async -> StressModel.StillBaseline? {
         let hr = (try? await health.hourly(.heartRate, unit: .bpm, sum: false, days: days)) ?? [:]
         guard hr.count >= StressModel.stillHoursNeeded else { return nil }
         let steps = (try? await health.hourly(.stepCount, unit: .count(), sum: true, days: days)) ?? [:]
