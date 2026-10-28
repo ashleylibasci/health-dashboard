@@ -39,17 +39,17 @@ struct ConditionsView: View {
                 Text("Anything we")
                 Text("should know?").foregroundStyle(Accent.indigo.ink(scheme))
             }
-            .font(.scaled(size: 32, weight: .bold))
+            .font(.detailTitle)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
 
             Text("Optional. Each one says exactly what it changes in the app. Some are only saved for your own reference.")
-                .font(.scaled(size: 16))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
 
             Label("Private and stays on your phone", systemImage: "lock.fill")
-                .font(.scaled(size: 13, weight: .semibold))
+                .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(Accent.mint.ink(scheme))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -74,7 +74,7 @@ struct ConditionsView: View {
             }
 
             Text("General information, not medical advice. The app can\u{2019}t diagnose any condition.")
-                .font(.scaled(size: 12))
+                .font(.secondary)
                 .secondaryText()
                 .padding(.top, 4)
         }
@@ -102,24 +102,24 @@ struct ConditionsView: View {
         Card(accent: .indigo) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "checkmark")
-                    .font(.scaled(size: 14, weight: .heavy))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.indigo.ink(scheme))
-                    .frame(width: 36, height: 36)
+                    .frame(width: Sizes.icon, height: Sizes.icon)
                     .background(Accent.indigo.fill(scheme).opacity(0.24), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     // Wraps the tag under the name instead of breaking
                     // "Endometriosis" into letters at large sizes.
                     FlowLayout(spacing: 8, lineSpacing: 4) {
-                        Text(item.name).font(.scaled(size: 16, weight: .bold))
+                        Text(item.name).font(.bodyEmphasis)
                         Text("Added")
-                            .font(.scaled(size: 11, weight: .bold))
+                            .font(.small).fontWeight(.bold)
                             .foregroundStyle(Accent.indigo.ink(scheme))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(Accent.indigo.fill(scheme).opacity(0.2), in: Capsule())
                     }
-                    Text(item.change).font(.scaled(size: 14)).secondaryText()
+                    Text(item.change).font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -142,7 +142,7 @@ struct ConditionsView: View {
                 if Self.confirmFirst.contains(item.name) { confirmRemove = item.name } else { remove(item.name) }
             } label: {
                 Text("Remove")
-                    .font(.scaled(size: 14, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.pink.ink(scheme))
                     .frame(minHeight: 44)
             }
@@ -158,13 +158,13 @@ struct ConditionsView: View {
     private func availableRow(_ item: ConditionCatalog.Item) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name).font(.scaled(size: 15, weight: .bold))
-                Text(item.change).font(.scaled(size: 13)).secondaryText()
+                Text(item.name).font(.bodyEmphasis)
+                Text(item.change).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 if item.name == "PCOS" {
                     NavigationLink { PCOSView() } label: {
                         Text("Learn about PCOS")
-                            .font(.scaled(size: 13, weight: .semibold))
+                            .font(.secondary).fontWeight(.semibold)
                             .foregroundStyle(Accent.indigo.ink(scheme))
                             .frame(minHeight: 44, alignment: .leading)
                     }
@@ -178,7 +178,7 @@ struct ConditionsView: View {
                 store.data.conditions.append(item.name)
             } label: {
                 Text("Add")
-                    .font(.scaled(size: 14, weight: .bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.indigo.ink(scheme))
                     .padding(.horizontal, 16)
                     .frame(minWidth: 60, minHeight: 44)
@@ -201,11 +201,11 @@ struct EatingDisorderSupportRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Support if you want it: the ANAD eating-disorder helpline is free, 1-888-375-7767 (US). Your campus counseling center can help too.")
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Link(destination: Self.anad) {
                 Label("Call ANAD", systemImage: "phone.fill")
-                    .font(.scaled(size: 14, weight: .bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.indigo.ink(scheme))
                     .frame(minHeight: 44)
             }
@@ -213,6 +213,6 @@ struct EatingDisorderSupportRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Accent.indigo.fill(scheme).opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Accent.indigo.fill(scheme).opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
     }
 }

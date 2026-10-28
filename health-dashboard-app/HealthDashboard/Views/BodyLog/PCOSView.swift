@@ -14,7 +14,7 @@ struct PCOSView: View {
         Screen(title: "PCOS", accent: .mint) {
             if added {
                 Label("Added to your profile", systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.mint.ink(scheme))
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(Accent.mint.tint(scheme), in: Capsule())
@@ -23,11 +23,11 @@ struct PCOSView: View {
                 Text("Living with")
                 Text("PCOS").foregroundStyle(Accent.mint.ink(scheme))
             }
-            .font(.scaled(size: 32, weight: .bold))
+            .font(.detailTitle)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
 
-            Text(whatItIs).font(.scaled(size: 16)).fixedSize(horizontal: false, vertical: true)
+            Text(whatItIs).font(.bodyText).fixedSize(horizontal: false, vertical: true)
 
             listCard("How it can show up in your data", accent: .indigo, items: dataItems)
             listCard("What the app does differently", accent: .mint, items: appItems)
@@ -37,7 +37,7 @@ struct PCOSView: View {
                 // Only things the log really has: symptoms and spotting.
                 FlowChips(items: ["Acne", "Hair changes", "Spotting", "Fatigue", "Mood swings", "Cramps"])
                 Text("How awake you feel goes in the morning check-in. The app doesn\u{2019}t log medications; note changes to them for your doctor.")
-                    .font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.secondary).secondaryText().fixedSize(horizontal: false, vertical: true)
                 LinkRow(title: "Log bleeding and symptoms", systemImage: "square.and.pencil", accent: .coral) {
                     CycleLogView()
                 }
@@ -46,15 +46,15 @@ struct PCOSView: View {
             Card {
                 SectionLabel(text: "How it\u{2019}s diagnosed")
                 Text("From irregular or missing periods plus signs of higher androgens (like acne, extra hair growth, or a blood test), once other causes are ruled out. In the first 8 years after your first period, an ultrasound or AMH test isn\u{2019}t used to diagnose it.")
-                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
 
             Card(accent: .coral) {
-                Text("Talk to a doctor if").font(.scaled(size: 15, weight: .bold))
+                Text("See a doctor if").font(.bodyEmphasis)
                 Text("Your period stops for 3 months or more: regular bleeds, or medicine, protect the lining of your womb, so it\u{2019}s worth treating. Also if bleeding is very heavy or anything feels off. Many PCOS treatments change cycles, so update the app if yours changes.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
                 Text("PCOS makes low mood, anxiety and eating problems more common. It\u{2019}s fine to ask to be checked for them too.")
-                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
 
             Card {
@@ -70,21 +70,21 @@ struct PCOSView: View {
                     }
                 }
             }
-            .font(.scaled(size: 14, weight: .semibold))
+            .font(.bodyEmphasis)
             .foregroundStyle(Accent.indigo.ink(scheme))
 
             Button {
                 if added { store.data.conditions.removeAll { $0 == "PCOS" } } else { store.data.conditions.append("PCOS") }
             } label: {
                 Text(added ? "Remove PCOS from my profile" : "Add PCOS to my profile")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle((added ? Accent.pink : Accent.mint).ink(scheme))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
 
             Text("General information, not medical advice. The app can\u{2019}t diagnose PCOS or any condition.")
-                .font(.scaled(size: 12)).secondaryText()
+                .font(.secondary).secondaryText()
         }
     }
 
@@ -118,7 +118,7 @@ struct PCOSView: View {
             ForEach(items, id: \.self) { line in
                 HStack(alignment: .top, spacing: 8) {
                     Circle().fill(accent.fill(scheme)).frame(width: 6, height: 6).padding(.top, 7).accessibilityHidden(true)
-                    Text(line).font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                    Text(line).font(.bodyText).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -134,7 +134,7 @@ private struct FlowChips: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], alignment: .leading, spacing: 6) {
             ForEach(items, id: \.self) { item in
                 Text(item)
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .lineLimit(2).minimumScaleFactor(0.8)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, minHeight: 32)

@@ -55,10 +55,12 @@ enum BodyLogStyle {
     }
 
     /// Text and icon color for a phase. Each phase has its own hue:
-    /// period coral, follicular mint, ovulation yellow, luteal purple.
+    /// period pink (the cycle's colour everywhere; coral now only means
+    /// "worse", Tanaka F1/F4), follicular mint, ovulation yellow, luteal
+    /// purple.
     static func phaseAccent(_ phase: CyclePhase) -> Accent {
         switch phase {
-        case .period: .coral
+        case .period: .pink
         case .follicular: .mint
         case .ovulation: .yellow
         case .luteal: .purple
@@ -76,11 +78,11 @@ enum BodyLogStyle {
     /// is never the only cue.
     static func phaseFill(_ phase: CyclePhase, _ scheme: ColorScheme) -> Color {
         switch (phase, scheme) {
-        case (.period, .dark): Color(hex: 0xE5484D)
+        case (.period, .dark): Color(hex: 0xFF6B8A)
         case (.follicular, .dark): Color(hex: 0x7BE3B8)
         case (.ovulation, .dark): Color(hex: 0xFFD24D)
         case (.luteal, .dark): Color(hex: 0x7050EE)
-        case (.period, _): Color(hex: 0xAA2A20)
+        case (.period, _): Color(hex: 0xC2335A)
         case (.follicular, _): Color(hex: 0x27A267)
         case (.ovulation, _): Color(hex: 0xB08600)
         case (.luteal, _): Color(hex: 0x5B3FD0)
@@ -442,7 +444,7 @@ enum CycleCopy {
         }
         return CycleReadout(title: isToday ? "Today \u{00B7} pack day \(day)" : "Pack day \(day) of \(packLength)",
                             value: value, detail: "Energy: \(e.energy)\nSleep: \(e.sleep)\nMood: \(e.mood)",
-                            accent: isBreak ? .coral : .indigo)
+                            accent: isBreak ? .pink : .indigo)
     }
 }
 

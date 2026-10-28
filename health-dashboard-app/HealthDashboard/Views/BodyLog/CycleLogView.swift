@@ -31,20 +31,19 @@ struct CycleLogView: View {
     private var cal: Calendar { Calendar.current }
 
     var body: some View {
-        Screen(title: "Log", accent: .coral) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Bleeding & symptoms").font(.scaled(size: 28, weight: .bold)).accessibilityAddTraits(.isHeader)
-                Text(introText).font(.scaled(size: 15)).secondaryText().fixedSize(horizontal: false, vertical: true)
-            }
+        // One title, the nav title, named like the link that opens it; the
+        // period is pink like the rest of the cycle (Valtonen F8, Tanaka F4).
+        Screen(title: "Bleeding and symptoms", accent: .pink) {
+            Text(introText).font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             if model.usingSampleData {
                 Text("The other numbers in the app are examples for now. What you log here is saved and counts toward your cycle right away.")
-                    .font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    .font(.secondary).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             PackCheckCard()
             dateCard
             flowCard
             symptomsCard
-            PrimaryButton(title: saveTitle, accent: .coral, done: justSaved) { save() }
+            PrimaryButton(title: saveTitle, accent: .pink, done: justSaved) { save() }
             recentSection
         }
         .onAppear { load() }
@@ -96,13 +95,13 @@ struct CycleLogView: View {
     private var dateCard: some View {
         Card {
             DatePicker("Day", selection: dateBinding, in: ...Date.now, displayedComponents: .date)
-                .font(.scaled(size: 15, weight: .bold))
-                .tint(Accent.coral.ink(scheme))
+                .font(.bodyEmphasis)
+                .tint(Accent.pink.ink(scheme))
                 .frame(minHeight: 44)
             if hasEntry(on: date) {
                 Label("Already logged. Saving replaces it.", systemImage: "pencil")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.coral.ink(scheme))
+                    .font(.secondary).fontWeight(.semibold)
+                    .foregroundStyle(Accent.pink.ink(scheme))
             }
         }
     }
@@ -121,7 +120,7 @@ struct CycleLogView: View {
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ForEach(AppData.Flow.allCases, id: \.self) { f in
-                    Chip(title: f.rawValue, selected: flow == f, accent: .coral) {
+                    Chip(title: f.rawValue, selected: flow == f, accent: .pink) {
                         flow = flow == f ? nil : f
                     }
                 }
@@ -129,11 +128,11 @@ struct CycleLogView: View {
             if flow == .heavy {
                 // One ACOG wording everywhere, with the urgent tier (Okafor H).
                 Text(CycleCare.heavyBleeding)
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 Text(CycleCare.heavyBleedingUrgent)
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.coral.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -193,7 +192,7 @@ struct CycleLogView: View {
         if items.isEmpty {
             Card {
                 Text("Nothing logged yet. Your days will show up here so you can edit or delete them.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
             }
         } else {
             Card(density: .compact) {
@@ -211,19 +210,19 @@ struct CycleLogView: View {
             Button { pick(item.day) } label: {
                 HStack(spacing: 10) {
                     Image(systemName: item.flow.map { $0 == .none ? "circle" : "drop.fill" } ?? "list.bullet")
-                        .foregroundStyle(Accent.coral.ink(scheme))
+                        .foregroundStyle(Accent.pink.ink(scheme))
                         .frame(width: 32, height: 32)
-                        .background(Accent.coral.tint(scheme), in: Circle())
+                        .background(Accent.pink.tint(scheme), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                            .font(.scaled(size: 15, weight: .bold))
-                        Text(summary(item)).font(.scaled(size: 13)).secondaryText()
+                            .font(.bodyEmphasis)
+                        Text(summary(item)).font(.secondary).secondaryText()
                             .lineLimit(2)
                     }
                     Spacer(minLength: 0)
                     Text(selected ? "Editing" : "Edit")
-                        .font(.scaled(size: 13, weight: .semibold))
+                        .font(.secondary).fontWeight(.semibold)
                         .foregroundStyle(Accent.indigo.ink(scheme))
                 }
                 .frame(minHeight: 44)
@@ -233,7 +232,7 @@ struct CycleLogView: View {
             .accessibilityLabel("Edit \(item.day.formatted(.dateTime.month(.wide).day())): \(summary(item))")
             Button { confirmDelete = item.day } label: {
                 Image(systemName: "trash")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.pink.ink(scheme))
                     .frame(width: 44, height: 44)
             }

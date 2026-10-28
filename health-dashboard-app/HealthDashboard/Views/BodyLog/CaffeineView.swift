@@ -98,7 +98,7 @@ struct CaffeineView: View {
                     }
                     HStack(spacing: 0) {
                         Text("Up to \(dailyLimit) mg a day is generally fine")
-                            .font(.scaled(size: 13, weight: .semibold))
+                            .font(.secondary).fontWeight(.semibold)
                             .secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                         InfoButton(title: "How much caffeine a day",
@@ -111,7 +111,7 @@ struct CaffeineView: View {
             }
             ForEach(dailyNotes, id: \.self) { note in
                 Label(note, systemImage: "info.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -135,10 +135,10 @@ struct CaffeineView: View {
     private func heroStat(label: String, value: String, accent: Accent) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label.uppercased())
-                .font(.scaled(size: 12, weight: .bold))
+                .font(.secondary).fontWeight(.bold)
                 .foregroundStyle(accent.ink(scheme))
                 .lineLimit(1)
-            Text(value).font(.scaledNumber(19))
+            Text(value).font(.numberM)
         }
         .accessibilityElement(children: .combine)
     }
@@ -148,9 +148,9 @@ struct CaffeineView: View {
     private var logCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Log caffeine").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("Logs \(logTime.phrase)").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                Text("Logs \(logTime.phrase)").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             .padding(.top, 4)
             Card {
@@ -175,20 +175,20 @@ struct CaffeineView: View {
             commonDrinks
             NavigationLink { CustomDrinkView() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "plus").font(.scaled(size: 15, weight: .bold)).accessibilityHidden(true)
-                    Text("New caffeine drink").font(.scaled(size: 15, weight: .bold))
+                    Image(systemName: "plus").font(.bodyEmphasis).accessibilityHidden(true)
+                    Text("New caffeine drink").font(.bodyEmphasis)
                 }
                 .foregroundStyle(Accent.yellow.ink(scheme))
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(Accent.yellow.fill(scheme).opacity(0.06), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .background(Accent.yellow.fill(scheme).opacity(0.06), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
                     .strokeBorder(Accent.yellow.fill(scheme).opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             if let lastLogged {
                 Label(lastLogged, systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.mint.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -219,7 +219,7 @@ struct CaffeineView: View {
                 + (model.caffeineLastsLonger ? " On your birth control caffeine stays \(model.caffeineLongerPhrase)." : "")
         }
         return Label(text, systemImage: tooMuch ? "exclamationmark.triangle.fill" : "checkmark.circle")
-            .font(.scaled(size: 13, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .foregroundStyle((tooMuch ? Accent.orange : Accent.mint).ink(scheme))
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -250,7 +250,7 @@ struct CaffeineView: View {
                         ForEach(unsavedCommon) { drink in
                             Button { log(drink) } label: {
                                 Text("\(drink.name) \u{00B7} \(drink.caffeineMg) mg")
-                                    .font(.scaled(size: 13, weight: .bold))
+                                    .font(.secondary).fontWeight(.bold)
                                     .padding(.horizontal, 14)
                                     .frame(minHeight: 44)
                                     .background(Accent.yellow.fill(scheme).opacity(0.14), in: Capsule())
@@ -261,7 +261,7 @@ struct CaffeineView: View {
                         }
                 }
                 Text("Typical amounts. Coffee-shop coffee is stronger than home brewed, and energy drinks and pre-workouts vary a lot (150 to 300 mg), so check your label. For a different amount, use New caffeine drink.")
-                    .font(.scaled(size: 12)).secondaryText()
+                    .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -280,13 +280,13 @@ struct CaffeineView: View {
     private var todayCard: some View {
         Card {
             HStack {
-                Text("Today's caffeine").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Today's caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("\(model.caffeineMgToday) mg").font(.scaled(size: 14, weight: .bold)).foregroundStyle(Accent.yellow.ink(scheme))
+                Text("\(model.caffeineMgToday) mg").font(.bodyEmphasis).foregroundStyle(Accent.yellow.ink(scheme))
             }
             if model.todaysDrinks.isEmpty {
                 Text("Nothing logged yet today.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 LogEntryList(items: model.todaysDrinks.reversed(), onTap: { editing = $0 },
@@ -295,7 +295,7 @@ struct CaffeineView: View {
                                 detail: "\(entry.mg) mg", time: Clock.format(Clock.minutesOfDay(entry.date)))
                 }
                 Text("Tap an entry to change its time or caffeine. Swipe left to delete.")
-                    .font(.scaled(size: 12)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
         }
     }
@@ -337,7 +337,7 @@ struct CaffeineView: View {
     private var falloffReadout: (title: String, value: String, detail: String) {
         guard let p = selectedPoint else {
             let mg = model.caffeineInBody(at: model.now)
-            return ("Now \u{00B7} \(Clock.format(model.now))", "\(Int(mg.rounded())) mg in your body", AppModel.caffeineMeaning(mg: mg))
+            return ("Now \u{00B7} \(Clock.format(model.now))", "\(Int(mg.rounded())) mg \u{00B7} in your body", AppModel.caffeineMeaning(mg: mg))
         }
         var title = Clock.format(p.time)
         var detail = AppModel.caffeineMeaning(mg: p.mg)
@@ -350,15 +350,15 @@ struct CaffeineView: View {
         } else if p.time > model.now {
             detail += " Predicted, if you have no more caffeine."
         }
-        return (title, "\(Int(p.mg.rounded())) mg in your body", detail)
+        return (title, "\(Int(p.mg.rounded())) mg \u{00B7} in your body", detail)
     }
 
     private var falloffCard: some View {
         Card(accent: .yellow) {
-            Text("Caffeine in your body").font(.scaled(size: 15, weight: .bold))
+            Text("Caffeine in your body").font(.bodyEmphasis)
             let r = falloffReadout
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .yellow)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .yellow,
+                         onClear: selectedTime == nil ? nil : { selectedTime = nil })
             CaffeineFalloffChart(points: curve, start: chartStart, end: chartEnd, cutoff: model.caffeineCutoffShown,
                                  bedtime: bedtime, now: model.now, goal: bedtimeGoal,
                                  selected: selectedPoint, selection: $selectedTime)
@@ -368,16 +368,17 @@ struct CaffeineView: View {
                     title: "Caffeine in your body", seriesName: "Caffeine", yTitle: "Milligrams",
                     points: curve.map { ($0.time, $0.mg) },
                     yLabel: { "\(Int($0.rounded())) mg" }))
-            ScrubHint()
+            ScrubHint(each: "hour")
             HStack(spacing: 0) {
                 Image(systemName: "moon.zzz.fill")
                     .foregroundStyle(Accent.yellow.ink(scheme))
-                    .frame(width: 36, height: 36)
-                    .background(Accent.yellow.fill(scheme).opacity(0.16), in: Circle())
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(Accent.yellow.tint(scheme), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("At bedtime \u{00B7} ~\(model.caffeineAtBedtime) mg").font(.scaled(size: 15, weight: .bold))
-                    Text(bedtimeNote).font(.scaled(size: 13)).secondaryText()
+                    // "about", not "~", which VoiceOver reads as "tilde" (Ortiz F8).
+                    Text("At bedtime \u{00B7} about \(model.caffeineAtBedtime) mg").font(.bodyEmphasis)
+                    Text(bedtimeNote).font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.leading, 12)
@@ -387,19 +388,19 @@ struct CaffeineView: View {
             HStack(spacing: 0) {
                 Image(systemName: "clock.badge.exclamationmark")
                     .foregroundStyle(Accent.orange.ink(scheme))
-                    .frame(width: 36, height: 36)
-                    .background(Accent.orange.fill(scheme).opacity(0.16), in: Circle())
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(Accent.orange.tint(scheme), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     if let cutoff = model.caffeineCutoffShown {
-                        Text("Cutoff \u{00B7} \(Clock.format(cutoff))").font(.scaled(size: 15, weight: .bold))
+                        Text("Cutoff \u{00B7} \(Clock.format(cutoff))").font(.bodyEmphasis)
                         Text("Your last caffeine of the day, so very little is left by your \(Clock.format(bedtime)) bedtime.")
-                            .font(.scaled(size: 13)).secondaryText()
+                            .font(.secondary).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("Cutoff \u{00B7} one small drink early").font(.scaled(size: 15, weight: .bold))
+                        Text("Cutoff \u{00B7} one small drink early").font(.bodyEmphasis)
                         Text(model.caffeineEarlyOnlyText)
-                            .font(.scaled(size: 13)).secondaryText()
+                            .font(.secondary).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -511,20 +512,32 @@ struct CaffeineView: View {
         return (title, "Before you're up", "Your caffeine window starts at \(Clock.format(timing.bestWindow.start)).")
     }
 
+    /// The audio graph's points for the timing strip: when you're groggy,
+    /// the best window, the dip and the cutoff, in order.
+    private var timingLabels: [String] { ["Groggy until", "Best window starts", "Afternoon dip starts", "Cutoff"] }
+    private var timingPoints: [(x: Int, y: Double)] {
+        var out: [(x: Int, y: Double)] = []
+        if let g = timingEnergy.zone(.grogginess)?.range { out.append((g.end, 0)) }
+        if !noWindow { out.append((timing.bestWindow.start, 1)) }
+        if let d = timingEnergy.zone(.afternoonDip)?.range { out.append((d.start, 2)) }
+        if !noWindow { out.append((timing.cutoff, 3)) }
+        return out
+    }
+
     private var timingCard: some View {
         Card(accent: .mint) {
             HStack(spacing: 0) {
-                Text("Timed to your energy").font(.scaled(size: 15, weight: .bold))
+                Text("Timed to your energy").font(.bodyEmphasis)
                 Spacer()
                 if timing.coffeeNapAt != nil {
-                    Text("Coffee nap").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    Text("Coffee nap").font(.secondary).fontWeight(.semibold).secondaryText()
                 }
                 InfoButton(topic: .coffeeNap).padding(.vertical, -12)
             }
             AdaptiveSegmentedPicker("Day", selection: $timingDay, options: Array(TimingDay.allCases), accent: .mint) { day in label(day) }
             let r = timingReadout
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .mint)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .mint,
+                         onClear: selectedTiming == nil ? nil : { selectedTiming = nil })
             EnergyTimingChart(span: span, groggy: timingEnergy.zone(.grogginess)?.range, window: noWindow ? nil : timing.bestWindow,
                               dip: timingEnergy.zone(.afternoonDip)?.range, cutoff: noWindow ? nil : timing.cutoff, marker: timingMarker,
                               selected: selectedTiming.map { min(max($0, span.lowerBound), span.upperBound) },
@@ -532,29 +545,33 @@ struct CaffeineView: View {
                 .frame(height: 74)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timingSummary)
-            ScrubHint()
+                .accessibilityChartDescriptor(ClockChartDescriptor(
+                    title: "Caffeine timing and your energy", seriesName: "Times", yTitle: "Moment",
+                    points: timingPoints, yLabel: { timingLabels[min(max(Int($0.rounded()), 0), timingLabels.count - 1)] }))
+                .motion(.dataSwap, value: timingDay)
+            ScrubHint(each: "hour")
             HStack(spacing: 12) {
                 // The blocks carry their own labels; this spells them out.
                 legend("Groggy: still waking up", color: Accent.indigo.fill(scheme).opacity(0.55))
                 if !noWindow { legend("Best: best for caffeine", color: Accent.mint.fill(scheme).opacity(0.55)) }
-                legend("Dip: afternoon dip", color: Accent.coral.fill(scheme).opacity(0.6))
+                legend("Dip: afternoon dip", color: Accent.blue.fill(scheme).opacity(0.6))
             }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(timingTitle).font(.scaled(size: 14, weight: .bold))
-                Text(timingNote).font(.scaled(size: 14)).secondaryText()
+                Text(timingTitle).font(.bodyEmphasis)
+                Text(timingNote).font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             NavigationLink { EnergyView() } label: {
                 HStack(spacing: 6) {
                     Text("See your energy curve")
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
+                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
                 }
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.indigo.ink(scheme))
                 .frame(minHeight: 44)
             }
@@ -567,7 +584,7 @@ struct CaffeineView: View {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
             Text(text)
         }
-        .font(.scaled(size: 12))
+        .font(.secondary)
         .secondaryText()
     }
 }
@@ -641,7 +658,7 @@ private struct CaffeineFalloffChart: View {
                 .fill(color.fill(scheme))
                 .frame(width: dashed ? 10 : 18, height: 3)
                 .accessibilityHidden(true)
-            Text(text).font(.scaled(size: 13, weight: .semibold)).foregroundStyle(color.ink(scheme))
+            Text(text).font(.secondary).fontWeight(.semibold).foregroundStyle(color.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -759,7 +776,8 @@ private struct EnergyTimingChart: View {
         var out: [TimingZone] = []
         if let groggy { out.append(TimingZone(name: "Grogginess", range: groggy, color: Accent.indigo.fill(scheme).opacity(0.5), short: "Groggy")) }
         if let window { out.append(TimingZone(name: "Best for caffeine", range: window, color: Accent.mint.fill(scheme).opacity(0.45), short: "Best")) }
-        if let dip { out.append(TimingZone(name: "Afternoon dip", range: dip, color: Accent.coral.fill(scheme).opacity(0.6), short: "Dip")) }
+        // The dip is normal, not a warning: blue, as on the energy curve.
+        if let dip { out.append(TimingZone(name: "Afternoon dip", range: dip, color: Accent.blue.fill(scheme).opacity(0.6), short: "Dip")) }
         return out
     }
 
@@ -791,7 +809,7 @@ private struct EnergyTimingChart: View {
                     .annotation(position: .overlay, alignment: .bottom) {
                         if labelFits(zone) {
                             Text(zone.short)
-                                .font(.scaled(size: 11, weight: .bold))
+                                .font(.small).fontWeight(.bold)
                                 .foregroundStyle(Palette(scheme: scheme).primary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)

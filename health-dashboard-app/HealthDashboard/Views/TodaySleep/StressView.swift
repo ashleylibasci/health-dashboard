@@ -13,7 +13,9 @@ struct StressView: View {
 
     var body: some View {
         let day = model.stressToday
-        Screen(title: "Stress", accent: .coral) {
+        // Stress is orange on every screen (Tanaka F1); the hero takes the
+        // colour of today's band (F6).
+        Screen(title: "Stress", accent: .orange) {
             SampleDataBanner()
             heroCard(day)
             chartCard(day)
@@ -66,7 +68,7 @@ struct StressView: View {
         case .some(.usual): return .blue
         case .some(.raised): return .orange
         case .some(.high): return .coral
-        case .none: return .coral
+        case .none: return .orange
         }
     }
 
@@ -97,9 +99,9 @@ struct StressView: View {
     private func heroCard(_ day: StressDay) -> some View {
         let p = Palette(scheme: scheme)
         let accent = labelAccent(day.label)
-        return Card(accent: .coral) {
+        return Card(accent: accent) {
             HStack(spacing: 0) {
-                SectionLabel(text: "Body signals, not how you feel", accent: .coral)
+                SectionLabel(text: "Body signals, not how you feel", accent: accent)
                 InfoButton(topic: .stress).padding(.vertical, -14)
                 Spacer()
             }
@@ -107,22 +109,22 @@ struct StressView: View {
             // Laurent F2). A band only, no 0–100 number (Liu 9).
             if let felt = model.stressLoggedToday {
                 Text("You said you felt \(feelName(felt).lowercased()) (\(felt) of 5).")
-                    .font(.scaled(size: 17, weight: .bold))
+                    .font(.cardTitle)
                     .fixedSize(horizontal: false, vertical: true)
             }
             AdaptiveStack(spacing: 10, alignment: .firstTextBaseline) {
                 Text(day.label?.rawValue ?? "No data yet")
-                    .font(.scaledNumber(day.label == nil ? 28 : 44))
-                    .foregroundStyle(accent.ink(scheme))
+                    .font(day.label == nil ? TypeRole.detailTitle : TypeRole.display)
+                    .foregroundStyle(day.label == nil ? p.primary : accent.ink(scheme))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                 if day.label != nil {
-                    Text("from heart rate at rest").font(.scaled(size: 15, weight: .semibold)).foregroundStyle(p.secondary)
+                    Text("from heart rate at rest").font(.bodyEmphasis).foregroundStyle(p.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
             Text(vsUsual(day))
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Your stress level", method: method(day))
@@ -152,41 +154,44 @@ struct StressView: View {
             if hour.asleep {
                 ChartReadout(title: Self.hourText(hour.hour), value: "Asleep",
                              detail: "Sleep hours aren't counted, so they don't make your day look calmer than it was.",
-                             accent: .indigo)
+                             accent: .purple, onClear: { selectedHour = nil })
             } else if hour.active {
                 ChartReadout(title: Self.hourText(hour.hour), value: "Active",
                              detail: "You were moving. Moving raises heart rate too, so this hour isn't counted as stress.",
-                             accent: .indigo)
+                             accent: .indigo, onClear: { selectedHour = nil })
             } else if hour.coolingDown {
                 ChartReadout(title: Self.hourText(hour.hour), value: "Settling",
                              detail: "The hour after you were moving. Your heart rate is still coming down, so it isn't counted as stress.",
-                             accent: .indigo)
+                             accent: .indigo, onClear: { selectedHour = nil })
             } else if let level = hour.level {
                 let b = Self.band(level)
                 ChartReadout(title: Self.hourText(hour.hour), value: b.name,
-                             detail: Self.meaning(level), accent: b.accent)
+                             detail: Self.meaning(level), accent: b.accent, onClear: { selectedHour = nil })
             } else {
                 ChartReadout(title: Self.hourText(hour.hour), value: "No reading",
                              detail: "Your Watch had no heart rate for this hour, often because it was off or charging.",
-                             accent: .indigo)
+                             accent: .indigo, onClear: { selectedHour = nil })
             }
         } else if let peak = day.peak, let level = peak.level {
+            // At rest the readout sums up the day; the hint under the chart
+            // says how to explore it (Valtonen F13).
             ChartReadout(title: "Highest today \u{00B7} \(Self.hourText(peak.hour))", value: Self.band(level).name,
-                         detail: "Touch the chart to see any hour.", accent: Self.band(level).accent)
+                         detail: "Today overall: \(day.label?.rawValue.lowercased() ?? "no band yet"), from \(day.countedHours) still \(day.countedHours == 1 ? "hour" : "hours").",
+                         accent: Self.band(level).accent)
         } else {
             ChartReadout(title: "Today", value: "No readings yet",
-                         detail: "Hours fill in as your Watch measures your heart rate.", accent: .coral)
+                         detail: "Hours fill in as your Watch measures your heart rate.", accent: .orange)
         }
     }
 
     private func chartCard(_ day: StressDay) -> some View {
         let p = Palette(scheme: scheme)
         return Card {
-            Text("Hour by hour").font(.scaled(size: 17, weight: .bold))
+            Text("Hour by hour").font(.cardTitle)
             readout(day)
             StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
                 .frame(height: 170)
-            ScrubHint()
+            ScrubHint(each: "hour")
             // Wraps (one per line at the largest sizes) instead of breaking
             // the words into letters.
             FlowLayout(spacing: 12, lineSpacing: 6) {
@@ -194,10 +199,10 @@ struct StressView: View {
                 swatch(StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue)
                 swatch(StressLevelColor.fill(2, scheme), "Raised \u{25CF}")
                 swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
-                swatch(p.primary.opacity(0.18), "Active")
+                swatch(p.tertiary, "Active")
             }
-            Text("Each hour is colored by band, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
-                .font(.scaled(size: 13))
+            Text("Each hour is colored by band, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}. The short grey marks along the bottom are active hours (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
+                .font(.secondary)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -207,7 +212,7 @@ struct StressView: View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
                 .accessibilityHidden(true)
-            Text(text).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(text).font(.secondary).fontWeight(.semibold).secondaryText()
                 .keepsOnOneLine(minimumScale: 0.8)
         }
     }
@@ -219,7 +224,7 @@ struct StressView: View {
             StressStat(title: "Peak",
                        value: day.peak.map { Self.hourText($0.hour) } ?? "\u{2014}",
                        note: day.peak?.level.map { Self.band($0).name } ?? "no readings yet",
-                       accent: .coral,
+                       accent: .orange,
                        explanation: Explanation(id: "stressPeak", title: "Peak hour",
                                                 meaning: "The still hour today when your heart rate was furthest above your resting rate.",
                                                 forYou: "Think about what was happening then: a deadline, a class, a hard conversation. Knowing your triggers is the first step to planning around them."))
@@ -246,7 +251,7 @@ struct StressView: View {
         let p = Palette(scheme: scheme)
         let current = model.stressLoggedToday ?? 0
         return Card {
-            Text("How stressed do you feel?").font(.scaled(size: 17, weight: .bold))
+            Text("How stressed do you feel?").font(.cardTitle)
             HStack(spacing: 8) {
                 ForEach(1...5, id: \.self) { n in
                     feelButton(n, selected: n == current)
@@ -257,13 +262,13 @@ struct StressView: View {
                 Spacer()
                 Text(feelNames[4])
             }
-            .font(.scaled(size: 12, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .foregroundStyle(p.secondary)
             .accessibilityHidden(true)
             StressCrisisRow(level: model.stressLoggedToday)
             if justLogged {
                 Text("Saved. Logging how you feel lets you compare it with what your body shows.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(Accent.mint.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -276,9 +281,9 @@ struct StressView: View {
                             .fill(moodColor(entry.stress))
                             .overlay(Circle().strokeBorder(p.cardBorder))
                             .frame(width: 26, height: 26)
-                            .overlay(Text(entry.stress.map { "\($0)" } ?? "").font(.scaled(size: 11, weight: .bold)))
+                            .overlay(Text(entry.stress.map { "\($0)" } ?? "").font(.small).fontWeight(.bold))
                         Text(entry.day.formatted(.dateTime.weekday(.narrow)))
-                            .font(.scaled(size: 11, weight: .semibold))
+                            .font(.small).fontWeight(.semibold)
                             .foregroundStyle(p.secondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -298,6 +303,10 @@ struct StressView: View {
         }
     }
 
+    /// Orange, the stress colour; the deep ink in light mode so the white
+    /// number on it passes 4.5:1.
+    private var selectedFill: Color { scheme == .dark ? Accent.orange.fill(.dark) : Accent.orange.ink(.light) }
+
     private func feelButton(_ n: Int, selected: Bool) -> some View {
         let p = Palette(scheme: scheme)
         return Button {
@@ -305,12 +314,12 @@ struct StressView: View {
             justLogged = true
         } label: {
             Text("\(n)")
-                .font(.scaledNumber(22))
+                .font(.numberM)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .foregroundStyle(selected ? Color(hex: 0x1A0E00) : p.primary)
-                .background(selected ? Accent.coral.fill(scheme) : p.chip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(selected ? Accent.coral.fill(scheme) : p.cardBorder))
+                .foregroundStyle(selected ? (scheme == .dark ? Color(hex: 0x1A0E00) : .white) : p.primary)
+                .background(selected ? selectedFill : p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
+                    .strokeBorder(selected ? selectedFill : p.cardBorder))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -322,7 +331,7 @@ struct StressView: View {
 
     private var tipsCard: some View {
         Card {
-            Text("What helps").font(.scaled(size: 17, weight: .bold))
+            Text("What helps").font(.cardTitle)
             HelpTipRow(systemImage: "wind", accent: .mint, title: "1 minute of slow breathing",
                    detail: "Breathe in for 4, out for 6. Long out-breaths slow your heart. The Mindfulness app on your Watch can guide you.")
             if model.hidesEffortTargets {
@@ -359,11 +368,14 @@ private struct StressHoursChart: View {
 
     private var bars: [StressBar] {
         hours.compactMap { h in
-            if h.active { return StressBar(hour: h.hour, level: 100, active: true) }
+            if h.active { return StressBar(hour: h.hour, level: 0, active: true) }
             guard let level = h.level else { return nil }
             return StressBar(hour: h.hour, level: max(level, 3), active: false)
         }
     }
+
+    /// The height of an active hour's cap (the chart runs to 115).
+    static let activeCap = 6
 
     private var domain: ClosedRange<Int> {
         let hs = hours.map(\.hour)
@@ -372,7 +384,7 @@ private struct StressHoursChart: View {
 
     private func color(_ bar: StressBar) -> Color {
         let base: Color = bar.active
-            ? Palette(scheme: scheme).primary.opacity(0.18)
+            ? Palette(scheme: scheme).tertiary
             : StressLevelColor.fill(StressView.bandIndex(bar.level), scheme)
         guard let selected else { return base }
         return selected == bar.hour ? base : base.opacity(0.4)
@@ -394,7 +406,7 @@ private struct StressHoursChart: View {
         if let selected, let bar = bars.first(where: { $0.hour == selected }) {
             RuleMark(x: .value("Hour", selected))
                 .foregroundStyle(Palette(scheme: scheme).primary.opacity(0.3))
-            PointMark(x: .value("Hour", selected), y: .value("Level", bar.level))
+            PointMark(x: .value("Hour", selected), y: .value("Level", bar.active ? Self.activeCap : bar.level))
                 .foregroundStyle(Palette(scheme: scheme).primary)
                 .symbolSize(40)
         }
@@ -403,19 +415,22 @@ private struct StressHoursChart: View {
     var body: some View {
         Chart {
             ForEach(bars) { bar in
-                BarMark(x: .value("Hour", bar.hour), y: .value("Level", bar.level), width: .fixed(12))
+                // An active hour is a short cap on the baseline, not a full
+                // grey bar that out-shouts the stress (Tanaka F11).
+                BarMark(x: .value("Hour", bar.hour), yStart: .value("Level", 0),
+                        yEnd: .value("Level", bar.active ? Self.activeCap : bar.level), width: .fixed(12))
                     .foregroundStyle(color(bar))
                     .cornerRadius(3)
                     .annotation(position: .top, spacing: 2) {
                         // Not color alone: High hours get a ▲ and Raised a ●.
                         // No numbers: a band, not a precise score (round 4, Liu 9).
                         if !bar.active, StressView.bandIndex(bar.level) == 3 {
-                            Text("\u{25B2}").font(.scaled(size: 8, weight: .heavy))
+                            Text("\u{25B2}").font(.system(size: 8, weight: .bold))
                                 .foregroundStyle(StressLevelColor.fill(3, scheme))
                         } else if !bar.active, StressView.bandIndex(bar.level) == 2 {
                             // Raised gets its own mark too: green Low and amber
                             // Raised are a colour-blind pair (round 3).
-                            Text("\u{25CF}").font(.scaled(size: 6, weight: .heavy))
+                            Text("\u{25CF}").font(.system(size: 6, weight: .bold))
                                 .foregroundStyle(StressLevelColor.fill(2, scheme))
                         }
                     }
@@ -458,18 +473,18 @@ private struct StressStat: View {
         let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 13, weight: .bold)).foregroundStyle(p.secondary)
+                Text(title).font(.secondary).fontWeight(.bold).foregroundStyle(p.secondary)
                 Spacer(minLength: 0)
                 InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -8)
             }
-            Text(value).font(.scaledNumber(20)).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
+            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
+            Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(accent.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .padding(Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(p.cardBorder))
+        .background(p.card, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(p.cardBorder))
     }
 }
 
@@ -484,15 +499,15 @@ private struct HelpTipRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 34, height: 34)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.scaled(size: 15, weight: .bold))
+                Text(title).font(.bodyEmphasis)
                 Text(detail)
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -72,34 +72,36 @@ struct WakePlanView: View {
                 Spacer()
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(Clock.format(plan.wake, suffix: false)).font(.scaledNumber(64)).minimumScaleFactor(0.6).lineLimit(1)
-                Text(SleepText.meridiem(plan.wake)).font(.scaled(size: 22, weight: .bold)).foregroundStyle(p.secondary)
+                Text(Clock.format(plan.wake, suffix: false)).font(.displayXL).minimumScaleFactor(0.6).lineLimit(1)
+                Text(SleepText.meridiem(plan.wake)).font(.numberL).fontWeight(.semibold).foregroundStyle(p.secondary)
                 Spacer()
                 Text(good ? "Best" : "Short night")
-                    .font(.scaled(size: 13, weight: .bold))
-                    .foregroundStyle(gradeAccent.ink(scheme))
+                    .font(.secondary).fontWeight(.bold)
+                    .foregroundStyle(gradeAccent.onTint(scheme))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(gradeAccent.fill(scheme).opacity(0.2), in: Capsule())
+                    .background(gradeAccent.tint(scheme), in: Capsule())
             }
-            .accessibilityElement(children: .combine)
+            // "8:25am, best", not "8:25, am" (Ortiz F8).
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Best time to wake, \(Clock.format(plan.wake)), \(good ? "best" : "short night")")
             Text(why(plan))
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "alarm")
-                    .font(.scaled(size: 14, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.orange.ink(scheme))
                     .accessibilityHidden(true)
-                Text("Smart alarm window \(plan.alarmWindow.label) \u{00B7} wakes you when you start stirring")
-                    .font(.scaled(size: 14, weight: .semibold))
+                Text("Smart alarm \u{00B7} \(plan.alarmWindow.label) \u{00B7} wakes you when you start stirring")
+                    .font(.bodyEmphasis)
                     .fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .smartAlarm).padding(.vertical, -14)
             }
             if let times = model.wakeTimesExplained {
                 Text(times)
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -110,9 +112,9 @@ struct WakePlanView: View {
 
     private var noPlanCard: some View {
         Card(accent: .orange) {
-            Text("No full sleep cycle fits").font(.scaled(size: 17, weight: .bold))
+            Text("No full sleep cycle fits").font(.cardTitle)
             Text("With bed at \(Clock.format(store.data.bedtime)), there isn't time for a whole sleep cycle before \(Clock.format(store.data.upBy)). Pick an earlier bedtime or a later up-by time below.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -120,7 +122,7 @@ struct WakePlanView: View {
 
     private func reasonsCard(_ plan: WakePlan) -> some View {
         Card {
-            Text("Why this time").font(.scaled(size: 17, weight: .bold))
+            Text("Why this time").font(.cardTitle)
             ForEach(plan.reasons, id: \.self) { reason in
                 ReasonRow(ok: reason.ok, title: reason.title, detail: reason.detail)
             }
@@ -153,13 +155,14 @@ struct WakePlanView: View {
         if inBed <= 0 {
             Label("Your bedtime is after your up-by time. Pick an earlier bedtime or a later up-by time.",
                   systemImage: "exclamationmark.triangle.fill")
-                .font(.scaled(size: 14, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.coral.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         } else {
+            // Coral only when it's short; otherwise plain (Valtonen F4).
             Text("That's \(Clock.duration(inBed)) in bed.")
-                .font(.scaled(size: 14, weight: .semibold))
-                .foregroundStyle((inBed < 6 * 60 ? Accent.coral : Accent.mint).ink(scheme))
+                .font(.bodyEmphasis)
+                .foregroundStyle(inBed < 6 * 60 ? Accent.coral.ink(scheme) : Palette(scheme: scheme).primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -168,7 +171,7 @@ struct WakePlanView: View {
         let p = Palette(scheme: scheme)
         return Card {
             HStack(spacing: 0) {
-                Text("Your times").font(.scaled(size: 17, weight: .bold))
+                Text("Your times").font(.cardTitle)
                 InfoButton(title: "Bedtime and up-by",
                            meaning: "Up-by is the latest you need to be up. Bedtime is when you plan to be in bed. The wake plan, your caffeine cutoff, your smart alarm and bedtime streaks all use them.",
                            forYou: "Set up-by to your earliest commitment, like a 9am class. Pick a bedtime you can keep most nights.")
@@ -176,17 +179,17 @@ struct WakePlanView: View {
             }
             DatePicker(selection: upByBinding, displayedComponents: .hourAndMinute) {
                 Label("I need to be up by", systemImage: "sunrise.fill")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
             }
             .frame(minHeight: 44)
             DatePicker(selection: bedtimeBinding, displayedComponents: .hourAndMinute) {
                 Label("Bedtime", systemImage: "moon.fill")
-                    .font(.scaled(size: 15, weight: .semibold))
+                    .font(.bodyEmphasis)
             }
             .frame(minHeight: 44)
             timeInBedLine
             Text("Asleep about \(latency) minutes after \(Clock.format(store.data.bedtime)). Changes reach your Watch right away.")
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -205,12 +208,12 @@ struct WakePlanView: View {
             CycleTimeline(onset: onset, deadline: deadline, cycleLength: model.sleepCycleLength,
                           cycles: plan.cycles, window: plan.alarmWindow, wake: plan.wake)
             HStack(spacing: 14) {
-                legendSwatch(color: Accent.indigo.fill(scheme).opacity(0.6), text: "Full sleep cycle")
+                legendSwatch(color: Accent.purple.fill(scheme).opacity(0.7), text: "Full sleep cycle")
                 legendSwatch(color: Accent.orange.fill(scheme).opacity(0.5), text: "Smart alarm window")
             }
             if let tip {
                 Text(tip)
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .foregroundStyle(Accent.coral.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -220,7 +223,7 @@ struct WakePlanView: View {
                 appliedUpBy = store.data.upBy
             }
             Text("Your Watch wakes you when you start stirring inside the window, or at its end.")
-                .font(.scaled(size: 12))
+                .font(.secondary)
                 .foregroundStyle(p.secondary)
         }
     }
@@ -237,7 +240,7 @@ struct WakePlanView: View {
     private func legendSwatch(color: Color, text: String) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 14, height: 10)
-            Text(text).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(text).font(.secondary).fontWeight(.semibold).secondaryText()
         }
     }
 
@@ -288,18 +291,18 @@ struct WakePlanView: View {
             HStack(alignment: .firstTextBaseline) {
                 ExplainedTitle(text: "Your past wake-ups", topic: .bestWakeWindow, size: 17)
                 Spacer()
-                Text("last \(model.mornings.count) mornings").font(.scaled(size: 13)).secondaryText()
+                Text("last \(model.mornings.count) mornings").font(.secondary).secondaryText()
             }
             if model.mornings.isEmpty {
                 Text("Check in for a few mornings and your best wake window will show up here.")
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
             } else {
                 wakeReadout(history)
                 WakeHistoryChart(dots: morningDots, bestWindow: history.bestWindow, yDomain: domain,
                                  selected: nearestDot, selection: $selectedWakeHours)
                     .frame(height: 180)
-                ScrubHint()
+                ScrubHint(each: "morning")
                 HStack(spacing: 14) {
                     legendDot(color: Accent.mint.fill(scheme), text: "Woke in light sleep")
                     legendDot(color: Accent.coral.fill(scheme), text: "Woke in deep or REM")
@@ -314,7 +317,7 @@ struct WakePlanView: View {
                     }
                 }
                 Text(historyNote(history))
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -332,26 +335,27 @@ struct WakePlanView: View {
             let minutes = Int((dot.hours * 60).rounded())
             let stage: String = dot.light == true ? "Woke in light sleep." : dot.light == false ? "Woke from deep or REM sleep, which feels groggier." : "Sleep stage not recorded."
             let inBest = history.bestWindow?.contains(minutes) ?? false
-            ChartReadout(title: "Woke at \(Clock.format(minutes))",
-                         value: "Felt " + String(format: "%.1f", dot.outcome) + " of 5",
+            ChartReadout(title: "Woke at \(Clock.format(minutes)) \u{00B7} how awake you felt",
+                         value: String(format: "%.1f", dot.outcome) + " of 5",
                          detail: stage + (inBest ? " Inside your best wake window." : ""),
-                         accent: dot.light == false ? .coral : .mint)
+                         accent: dot.light == false ? .coral : .mint,
+                         onClear: { selectedWakeHours = nil })
         } else if let best = history.bestWindow {
             ChartReadout(title: "Your best wake window", value: best.label,
-                         detail: "Mornings you woke in this window, you felt best. Touch a dot to see one morning.", accent: .mint)
+                         detail: "Mornings you woke in this window, you felt best.", accent: .mint)
         } else {
             ChartReadout(title: "\(model.mornings.count) mornings",
                          value: model.mornings.count >= 10 ? "No clear best window" : "Still learning",
                          detail: model.mornings.count >= 10
-                            ? "No wake time has clearly beaten the others so far. Touch a dot to see one morning."
-                            : "Touch a dot to see one morning.", accent: .mint)
+                            ? "No wake time has clearly beaten the others so far."
+                            : "Check in for a few more mornings to see which wake times suit you.", accent: .mint)
         }
     }
 
     private func legendDot(color: Color, text: String) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 9, height: 9)
-            Text(text).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(text).font(.secondary).fontWeight(.semibold).secondaryText()
         }
     }
 
@@ -368,7 +372,7 @@ struct WakePlanView: View {
             HStack(alignment: .firstTextBaseline) {
                 ExplainedTitle(text: "What your smart alarm learned", topic: .smartAlarm, size: 17)
                 Spacer()
-                Text("last \(known.count) mornings").font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                Text("last \(known.count) mornings").font(.secondary).foregroundStyle(p.secondary)
             }
             HStack(spacing: 8) {
                 LearnedStat(value: "\(model.sleepCycleLength) min", caption: "your cycle length")
@@ -380,15 +384,15 @@ struct WakePlanView: View {
                     LearnedStat(value: String(format: "%.1f", deepMean), caption: "Deep-sleep mornings", accent: .coral)
                 }
                 Text("How awake you said you felt at your morning check-in, out of 5.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(p.secondary)
             }
             NavigationLink {
                 CheckInView()
             } label: {
                 HStack(spacing: 6) {
-                    Text("See the morning check-in").font(.scaled(size: 15, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
+                    Text("See the morning check-in").font(.bodyEmphasis)
+                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
                 }
                 .foregroundStyle(Accent.orange.ink(scheme))
                 .frame(minHeight: 44)
@@ -415,7 +419,7 @@ struct WakePlanView: View {
         let melatonin = model.energyToday.zone(.melatonin)?.range
         let dimFrom = model.energyToday.zone(.windDown)?.range.start ?? (1440 + bed - 60)
         return Card {
-            Text("Tonight's wind-down").font(.scaled(size: 17, weight: .bold))
+            Text("Tonight's wind-down").font(.cardTitle)
             WindDownRow(systemImage: "cup.and.saucer.fill", accent: .yellow, title: "Last caffeine", value: lastCaffeineText,
                         note: model.caffeineCutoffShown == nil
                             ? model.caffeineEarlyOnlyText
@@ -525,10 +529,11 @@ private struct CycleTimeline: View {
     private var readout: some View {
         if let selected {
             let d = describe(selected)
-            ChartReadout(title: d.title, value: d.value, detail: d.detail, accent: d.accent)
+            ChartReadout(title: d.title, value: d.value, detail: d.detail, accent: d.accent,
+                         onClear: { self.selected = nil })
         } else {
-            ChartReadout(title: "Asleep about \(Clock.format(onset))", value: "Wake \(Clock.format(wake))",
-                         detail: "\(cycles) full sleep cycles of about \(cycleLength) minutes. Touch the bar to see any time.",
+            ChartReadout(title: "Asleep about \(Clock.format(onset)) \u{00B7} wake", value: Clock.format(wake),
+                         detail: "\(cycles) full sleep cycles of about \(cycleLength) minutes.",
                          accent: .orange)
         }
     }
@@ -537,7 +542,7 @@ private struct CycleTimeline: View {
         VStack(alignment: .leading, spacing: 10) {
             readout
             timeline
-            ScrubHint(text: "Touch and drag along the cycles to see each part of the night")
+            ScrubHint(each: "part of the night")
         }
     }
 
@@ -550,15 +555,15 @@ private struct CycleTimeline: View {
                     ForEach(0..<max(cycles, 0), id: \.self) { i in
                         let start = onset + i * cycleLength
                         let cellWidth = max(x(start + cycleLength, w) - x(start, w) - 2, 2)
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Accent.indigo.fill(scheme).opacity(min(0.35 + Double(i) * 0.1, 0.9)))
+                        RoundedRectangle(cornerRadius: Radius.mark * 2, style: .continuous)
+                            .fill(Accent.purple.fill(scheme).opacity(min(0.45 + Double(i) * 0.1, 0.9)))
                             .frame(width: cellWidth, height: 32)
-                            .overlay(Text("\(i + 1)").font(.scaled(size: 12, weight: .bold)))
+                            .overlay(Text("\(i + 1)").font(.secondary).fontWeight(.bold))
                             .offset(x: x(start, w) + 1, y: 6)
                     }
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
                         .fill(Accent.orange.fill(scheme).opacity(0.32))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
                             .strokeBorder(Accent.orange.fill(scheme), lineWidth: 1.5))
                         .frame(width: max(x(window.end, w) - x(window.start, w), 4), height: 44)
                         .offset(x: x(window.start, w))
@@ -596,7 +601,7 @@ private struct CycleTimeline: View {
                     Text(Clock.format(deadline))
                         .position(x: max(w - 30, w / 2), y: max(16, Font.scaledSize(16)) / 2)
                 }
-                .font(.scaled(size: 12, weight: .semibold))
+                .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(p.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -693,6 +698,10 @@ private struct WakeHistoryChart: View {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ValueChartDescriptor(
+            title: "How awake you felt by wake time", seriesName: "Mornings", xTitle: "Wake time", yTitle: "How awake, out of 5",
+            points: dots.map { ($0.hours, $0.outcome) },
+            xLabel: { Clock.format(Int(($0 * 60).rounded())) }, yLabel: { String(format: "%.1f", $0) }))
     }
 }
 
@@ -704,24 +713,41 @@ private struct BucketRow: View {
     var count: String
     var isBest: Bool
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let p = Palette(scheme: scheme)
-        HStack(spacing: 10) {
-            Text(label)
-                .font(.scaled(size: 13, weight: isBest ? .bold : .semibold))
-                .frame(width: Font.scaledSize(92), alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(p.track)
-                    Capsule()
-                        .fill(isBest ? Accent.mint.fill(scheme) : p.primary.opacity(0.35))
-                        .frame(width: geo.size.width * CGFloat(max(0.02, min(fraction, 1))))
+        let bar = GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(p.track)
+                Capsule()
+                    .fill(isBest ? Accent.mint.fill(scheme) : p.secondary)
+                    .frame(width: geo.size.width * CGFloat(max(0.02, min(fraction, 1))))
+            }
+        }
+        .frame(height: 10)
+        Group {
+            if typeSize.isAccessibilitySize {
+                // Label and numbers on one line, the bar full width below,
+                // instead of fixed columns wider than the screen.
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(label).font(.secondary).fontWeight(isBest ? .bold : .semibold)
+                        Spacer(minLength: Space.s)
+                        Text("\(value) \u{00B7} \(count)").font(.secondary).fontWeight(.bold)
+                    }
+                    bar
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Text(label)
+                        .font(.secondary).fontWeight(isBest ? .bold : .semibold)
+                        .frame(width: Font.scaledSize(92), alignment: .leading)
+                    bar
+                    Text(value).font(.secondary).fontWeight(.bold).frame(width: Font.scaledSize(30), alignment: .trailing)
+                    Text(count).font(.secondary).foregroundStyle(p.secondary).frame(width: Font.scaledSize(30), alignment: .trailing)
                 }
             }
-            .frame(height: 10)
-            Text(value).font(.scaled(size: 13, weight: .bold)).frame(width: Font.scaledSize(30), alignment: .trailing)
-            Text(count).font(.scaled(size: 12)).foregroundStyle(p.secondary).frame(width: Font.scaledSize(30), alignment: .trailing)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Waking \(label): average \(value) over \(count.dropLast()) mornings\(isBest ? ", your best" : "")")
@@ -737,12 +763,12 @@ private struct LearnedStat: View {
     var body: some View {
         let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.scaledNumber(22)).foregroundStyle(accent?.ink(scheme) ?? p.primary)
-            Text(caption).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
+            Text(value).font(.numberM).foregroundStyle(accent?.ink(scheme) ?? p.primary)
+            Text(caption).font(.secondary).fontWeight(.semibold).foregroundStyle(p.secondary)
         }
-        .padding(12)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.chip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -755,31 +781,40 @@ private struct WindDownRow: View {
     var note: String? = nil
     var topic: Topic? = nil
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 14, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 32, height: 32)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 0) {
-                    Text(title).font(.scaled(size: 14, weight: .semibold))
-                    if let topic { InfoButton(topic: topic).padding(.vertical, -14).padding(.horizontal, -6) }
+                    Text(title).font(.bodyEmphasis)
+                    if let topic {
+                        InfoButton(topic: topic).padding(.vertical, -14).padding(.horizontal, -6)
+                            .accessibilityHidden(true)
+                    }
                     Spacer(minLength: 8)
-                    Text(value).font(.scaled(size: 14, weight: .bold)).multilineTextAlignment(.trailing)
+                    Text(value).font(.bodyEmphasis).multilineTextAlignment(.trailing)
                 }
                 if let note {
                     Text(note)
-                        .font(.scaled(size: 12))
+                        .font(.secondary)
                         .secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.top, 6)
         }
-        .accessibilityElement(children: .contain)
+        // One stop per row: title and time together, the ⓘ as an action
+        // (Ortiz F8, F9).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([title, value.replacingOccurrences(of: "\u{2013}", with: " to "), note].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAction(named: "Explain") { explaining = topic?.explanation }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }

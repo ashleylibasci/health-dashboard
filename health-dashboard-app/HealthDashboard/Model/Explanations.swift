@@ -1,8 +1,9 @@
 import Foundation
 
 /// Plain-language explanations for every term the app shows.
-/// `meaning` says what it is, `forYou` says what to do with it, and
-/// `howWeGotIt` (shown only behind "How we got this number") holds the method.
+/// `meaning` says what it is ("What it is", about 35 words at most),
+/// `forYou` says what to do with it ("What to do"), and `howWeGotIt` holds
+/// the method and the caveats ("How it's worked out") (Dubois 20, 21).
 struct Explanation: Identifiable, Hashable {
     let id: String
     let title: String
@@ -27,7 +28,7 @@ enum Topic: String, CaseIterable, Identifiable {
     var explanation: Explanation {
         switch self {
         case .melatonin: Explanation(id: id, title: "Sleep window",
-            meaning: "The hour before you usually fall asleep. Melatonin, a hormone your own body makes at night to get you ready for sleep, usually starts rising about 2 hours before then, so by this hour it has been up for a while. It has nothing to do with taking melatonin pills.",
+            meaning: "The hour before you usually fall asleep. Melatonin, the sleep hormone your own body makes, starts rising about 2 hours before then, so by this hour it's well up. It has nothing to do with melatonin pills.",
             forYou: "It's usually the easiest time to drift off instead of lying awake. Bright screens and overhead lights can hold melatonin back, so dim them from your wind-down on.",
             howWeGotIt: "In studies, melatonin starts rising (in dim light) about 2 hours before people's usual time of falling asleep, though this varies from person to person. Your Watch can't measure melatonin, so this is a rough estimate: the hour ending at the time you usually fall asleep on school nights, from your Apple Watch sleep data (or your planned bedtime until there are nights to learn from), to the nearest 15 minutes. The hour before it is your wind-down.")
         case .grogginess: Explanation(id: id, title: "Grogginess",
@@ -48,9 +49,9 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "About 2 hours before you usually fall asleep, your body starts making its own sleep hormone (melatonin). Wind-down is the first of those two hours; the second is your sleep window.",
             forYou: "Dim the lights, put screens down or on night mode, and do something calm. Bright light now holds the sleep hormone back and makes falling asleep harder.")
         case .energyScore: Explanation(id: id, title: "Energy score",
-            meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It's a different number from energy left, which is a battery for right now. Your usual is shown next to it. Until there are 7 days of your own, that's a starting point of 74: a fixed middle-of-the-range value the app begins from, not anyone's measured average.",
+            meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It rates the whole day; energy left is a different number, a battery for right now.",
             forYou: "Below usual means today may feel harder than normal. It's mostly driven by sleep debt and how rested your body is. It's a rough guide, not a measurement: how you feel counts more.",
-            howWeGotIt: "It's based on the two-process model of sleep from sleep research: sleep pressure that builds while you're awake and clears while you sleep, plus your body clock's daily rhythm. The body-clock part's shape is our own estimate, timed from when you usually sleep, so treat the curve as a rough guide. Sleep debt deepens your dips.")
+            howWeGotIt: "Your usual is shown next to it. Until there are 7 days of your own, that's a starting point of 74: a fixed middle-of-the-range value the app begins from, not anyone's measured average. The score is based on the two-process model of sleep from sleep research: sleep pressure that builds while you're awake and clears while you sleep, plus your body clock's daily rhythm. The body-clock part's shape is our own estimate, timed from when you usually sleep, so treat the curve as a rough guide. Sleep debt deepens your dips.")
         case .energyBank: Explanation(id: id, title: "Energy left",
             meaning: "Think of it like a battery. It charges while you sleep and drains steadily while you're awake. It's a different number from your energy score, which rates the whole day.",
             forYou: "The percentage tells you how much you have left now and roughly how much you'll have at bedtime.",
@@ -66,8 +67,9 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Aim to get at least this much most nights. Getting less builds up sleep debt, even if you feel fine.",
             howWeGotIt: "We look at three things from your own nights. 1) On nights with no alarm, how long you naturally sleep: a clue that tends to run high, because catch-up sleep can last a while. 2) The point where more sleep stops improving your next-day resting heart rate and HRV. 3) How you felt in your morning check-ins, used only as a cross-check, because research shows people who sleep too little often say they feel fine while their bodies and performance are still affected (Van Dongen et al., 2003). With little data we start near the adult average of 8 hours and narrow it down as nights add up. The range shown is the range of the clues: how far apart they are.")
         case .tonightNeed: Explanation(id: id, title: "Tonight's need",
-            meaning: "Your usual sleep need, plus a little extra if you have sleep debt to pay back, the sick check thinks you may be fighting something off (30 minutes), or it's the last few days before a natural-cycle period or the first two days of it (about 10 minutes).",
-            forYou: "This is the amount to aim for tonight. Around your period, sleep may feel lighter; the 10 minutes is a small allowance, and extra rest is fine.")
+            meaning: "Your usual sleep need, plus a little extra when you have sleep debt to pay back, the sick check thinks you may be fighting something off, or your period is close.",
+            forYou: "This is the amount to aim for tonight. Around your period, sleep may feel lighter; the 10 minutes is a small allowance, and extra rest is fine.",
+            howWeGotIt: "The extras: part of your sleep debt (see Sleep debt), 30 minutes when the sick check thinks you may be fighting something off, and about 10 minutes in the last few days before a natural-cycle period or the first two days of it.")
         case .sleepDebt: Explanation(id: id, title: "Sleep debt",
             meaning: "How much sleep you've missed compared with your need, over the last two weeks. Recent nights count most.",
             forYou: "Sleep debt deepens your energy dips. You don't have to pay it all back at once: tonight's need adds about a tenth of your debt (up to 45 minutes a night), which brings a big debt down over about a week or two.")
@@ -93,14 +95,15 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "How much later you sleep and wake on free days than on school nights.",
             forYou: "A big shift is like flying a time zone west every weekend and back every Monday, which is why Mondays feel rough.")
         case .smartAlarm: Explanation(id: id, title: "Smart alarm",
-            meaning: "Instead of one fixed time, your Apple Watch gets a 25-minute window (for example 8:00–8:25). It wakes you the first time you start stirring in that window, or at the end of it at the latest.",
+            meaning: "Instead of one fixed time, your Apple Watch gets a 25-minute window (for example 8:00–8:25am). It wakes you when you first start stirring in it, or at its end at the latest.",
             forYou: "Stirring often means lighter sleep, which can make waking a bit easier. The latest time is never later than when you need to be up.")
         case .sleepCycle: Explanation(id: id, title: "Sleep cycle",
-            meaning: "One trip through light, deep and REM sleep. For most people a cycle takes about 80 to 110 minutes. The wake plan uses yours, measured from your nights once there are enough of them.",
+            meaning: "One trip through light, deep and REM sleep, usually 80 to 110 minutes. The wake plan uses your own, measured from your nights once there are enough of them.",
             forYou: "Waking near the end of a cycle can feel a bit easier. Cycle timing varies from night to night, so the app never cuts more than about 25 minutes of sleep to land on one.")
         case .bestWakeWindow: Explanation(id: id, title: "Your best wake window",
-            meaning: "The time range where your past mornings went best, based on how you felt and your energy those days. It only shows when those mornings clearly beat the rest; otherwise it says there's no clear best window yet.",
-            forYou: "Use it as a hint when you can choose your wake time. Sleeping enough matters more than when you wake.")
+            meaning: "The time range where your past mornings went best, based on how you felt and your energy those days.",
+            forYou: "Use it as a hint when you can choose your wake time. Sleeping enough matters more than when you wake.",
+            howWeGotIt: "It only shows when those mornings clearly beat the rest; otherwise the app says there's no clear best window yet.")
         case .recovery: Explanation(id: id, title: "Recovery",
             meaning: "How ready your body is today, from 0 to 100, compared with your own usual.",
             forYou: "Lower than usual means your body is still catching up (from short sleep, stress, illness, alcohol or a hard workout). Take it easier; higher means it's a good day to push.",
@@ -112,29 +115,32 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "Your heart rate when you're fully at rest. Your Apple Watch works it out from readings taken while you're still during the day.",
             forYou: "3 or more beats above your usual can mean short sleep, stress, alcohol or getting sick. With a natural cycle it also runs a little higher in the second half (after ovulation, before your period); on the pill, ring, patch, implant or shot it doesn't swing with your cycle.")
         case .stress: Explanation(id: id, title: "Stress",
-            meaning: "Body signals, not how you feel: how hard your heart seems to be working when you're not moving, from a raised heart rate and lower HRV while sitting still. It's shown as a band (Low, Moderate, Raised, High), not an exact score.",
-            forYou: "Stress can raise it, and so can caffeine, some medicines, heat, a big meal or getting sick. It often doesn't match how stressed you feel, so log that too. Long stretches of it can hurt sleep, and a few minutes of slow breathing lowers it quickly. Hours you were asleep or working out aren't counted.")
+            meaning: "Body signals, not how you feel: how hard your heart seems to be working while you're still, from a raised heart rate and lower HRV. It's shown as a band: Low, Moderate, Raised or High.",
+            forYou: "Stress can raise it, and so can caffeine, some medicines, heat, a big meal or getting sick. It often doesn't match how stressed you feel, so log that too. Long stretches of it can hurt sleep, and a few minutes of slow breathing lowers it quickly. Hours you were asleep or working out aren't counted.",
+            howWeGotIt: "It's a band, not an exact score, because a Watch reading isn't that precise. Only hours when you were awake and still count.")
         case .breathingRate: Explanation(id: id, title: "Breathing rate",
             meaning: "Breaths per minute while you sleep. It's very steady for most people.",
             forYou: "A rise of one breath a minute or more is one of the earliest signs of getting sick.")
         case .wristTemp: Explanation(id: id, title: "Wrist temperature",
             meaning: "How your skin temperature during sleep compares with your usual.",
             forYou: "Small ups and downs night to night are normal. If you have a natural cycle, it also rises about \(TempFormat.delta(0.3, signed: false)) after ovulation and falls before your period; on birth control that stops ovulation, it stays flatter. A rise well above your usual can mean you're fighting something off.")
-        case .illness: Explanation(id: id, title: "Might be getting sick",
-            meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it. A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of them too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.",
-            forYou: "It's a guess, not a diagnosis, and it counts signs rather than saying how likely you are to be sick. Extra sleep, fluids and an easy day help. See a doctor if you have a fever, trouble breathing, or you're getting worse.")
+        case .illness: Explanation(id: id, title: "Sick check",
+            meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it.",
+            forYou: "It's a guess, not a diagnosis, and it counts signs rather than saying how likely you are to be sick. Extra sleep, fluids and an easy day help. See a doctor if you have a fever, trouble breathing, or you're getting worse.",
+            howWeGotIt: "A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of these signals too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.")
         case .fitnessAge: Explanation(id: id, title: "Fitness age",
-            meaning: "The age of a typical woman with your cardio fitness (VO2 max, estimated by your Apple Watch during walks and runs). It's shown as a range because a Watch estimate is often off by 5 points or more.",
-            forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks, so watch the trend rather than one reading.")
+            meaning: "The age of a typical woman with your cardio fitness (VO2 max, estimated by your Apple Watch during walks and runs). It's shown as a range, because Watch estimates aren't exact.",
+            forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks, so watch the trend rather than one reading.",
+            howWeGotIt: "A Watch VO2 max estimate is often off by 5 points or more, so the age is a range rather than one number.")
         case .calories: Explanation(id: id, title: "Calories",
             meaning: "An estimate of the energy your body used today: resting energy just to keep you alive, plus active energy from moving.",
             forYou: "Watch estimates are often off by 20–30% or more, and more at rest. It's useful for trends, not exact numbers. This is off by default; you can turn it on in Settings.")
         case .bodyClock: Explanation(id: id, title: "Your body clock",
-            meaning: "Whether your body naturally prefers earlier or later sleep and wake times. It's partly genetic and tends to run latest around age 20. The type names compare you with adults of all ages, so a later type is often typical for your age.",
+            meaning: "Whether your body naturally prefers earlier or later sleep and wake times. It's partly genetic and tends to run latest around age 20.",
             forYou: "Being an evening type isn't laziness. Your peak focus comes later in the day, so morning classes need more help: morning light, a steady wake time and a smaller weekend shift.",
-            howWeGotIt: "We use the method of the Munich ChronoType Questionnaire (Roenneberg), applied to your tracked sleep: the midpoint of your sleep on free days (weekend mornings), corrected for catch-up sleep.")
-        case .socialJetlag: Explanation(id: id, title: "Social jet lag",
-            meaning: "The gap between when your body wants to sleep (on free days) and when your schedule makes you sleep (on school days).",
+            howWeGotIt: "We use the method of the Munich ChronoType Questionnaire (Roenneberg), applied to your tracked sleep: the midpoint of your sleep on free days (weekend mornings), corrected for catch-up sleep. The type names compare you with adults of all ages, so a later type is often typical for your age.")
+        case .socialJetlag: Explanation(id: id, title: "Weekend shift",
+            meaning: "The gap between when your body wants to sleep (on free nights) and when your schedule makes you sleep (on school nights). Also called social jet lag.",
             forYou: "Under an hour is the goal. Cutting your weekend shift is the easiest way to shrink it.")
         case .caffeineCutoff: Explanation(id: id, title: "Caffeine cutoff",
             meaning: "The latest time to have caffeine so that very little is left in your body at bedtime.",
@@ -148,22 +154,25 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "Drinking a regular coffee and then napping for 20 minutes. The caffeine kicks in just as you wake up.",
             forYou: "Only worth it when your afternoon dip starts before your caffeine cutoff.")
         case .cutoffTest: Explanation(id: id, title: "Caffeine cutoff test",
-            meaning: "A personal experiment: for 21 days the app compares your sleep on days your last caffeine was early with days it was late. A day with no caffeine counts only if you logged something else that day, so a day you forgot to log isn't counted as caffeine-free.",
-            forYou: "It tells you your own cutoff instead of a general rule.")
+            meaning: "A personal experiment: for 21 days the app compares your sleep on days your last caffeine was early with days it was late.",
+            forYou: "It tells you your own cutoff instead of a general rule.",
+            howWeGotIt: "A day with no caffeine counts only if you logged something else that day, so a day you forgot to log isn't counted as caffeine-free.")
         case .period: Explanation(id: id, title: "Period",
             meaning: "The days you bleed, the start of a new cycle.",
             forYou: "You may sleep a little more; cramps can break up sleep on the first days.")
         case .follicular: Explanation(id: id, title: "Follicular phase",
-            meaning: "Starts on the first day of your period and runs until ovulation. Estrogen rises through it. The app shows your bleeding days separately as \u{201C}Period\u{201D}, so \u{201C}Follicular\u{201D} here means the days after it.",
-            forYou: "Some women feel their best this week; many notice no difference. Train as planned and go by how you feel.")
+            meaning: "Starts on the first day of your period and runs until ovulation. Estrogen rises through it.",
+            forYou: "Some women feel their best this week; many notice no difference. Train as planned and go by how you feel.",
+            howWeGotIt: "The app shows your bleeding days separately as \u{201C}Period\u{201D}, so \u{201C}Follicular\u{201D} here means the days after it.")
         case .ovulation: Explanation(id: id, title: "Mid-cycle (estimate)",
-            meaning: "Ovulation is when an egg is released, usually about 12 to 14 days before your next period, though it varies more than that. The app's mid-cycle days are a rough estimate from your cycle length; it can't tell when you ovulate.",
-            forYou: "This is not your fertile window. Don't use it to avoid pregnancy. If you're on a method that stops ovulation, this doesn't apply to you.")
+            meaning: "Ovulation is when an egg is released, usually about 12 to 14 days before your next period. The app's mid-cycle days are only a rough estimate; it can't tell when you ovulate.",
+            forYou: "This is not your fertile window. Don't use it to avoid pregnancy. If you're on a method that stops ovulation, this doesn't apply to you.",
+            howWeGotIt: "The mid-cycle days are counted back from your cycle length. Real ovulation varies more than the usual 12 to 14 days, from cycle to cycle and person to person.")
         case .luteal: Explanation(id: id, title: "Luteal phase",
             meaning: "From ovulation to your next period. Progesterone rises, which raises your temperature and resting heart rate a little.",
             forYou: "A slightly higher heart rate and lower HRV are normal here, and some people sleep more lightly. Many women notice no difference in how they feel. In the last few days before your period the app adds about 10 minutes to tonight's sleep need, because sleep may feel lighter. Your recovery score, stress level and sick check all allow for this phase, so it doesn't count against you.")
         case .pillPack: Explanation(id: id, title: "Pill pack",
-            meaning: "On the combined pill, ring or patch you take hormones for a set number of days, then usually have a short break: 21 days and 7 off, or 24 and 4 off for some pills. Some people skip the break and use it continuously.",
+            meaning: "On the combined pill, ring or patch you take hormones for a set number of days, then usually have a short break: 21 days and 7 off, or 24 and 4 off. Some people skip the break.",
             forYou: "These methods stop ovulation, so cycle phases like ovulation and luteal don't apply to you. The app doesn't predict them. Set your pack type and today's pill in Settings or on the Cycle screen so the break lands on the right days. You can also skip a break there.")
         case .withdrawalBleed: Explanation(id: id, title: "Withdrawal bleed",
             meaning: "The bleed in your break week. It's caused by the drop in hormones from the pill, ring or patch, not a true period.",
@@ -171,9 +180,10 @@ enum Topic: String, CaseIterable, Identifiable {
         case .timeChange: Explanation(id: id, title: "Clock change",
             meaning: "When the clocks change by an hour, your body clock doesn't change overnight. It takes a few days to adjust.",
             forYou: "You can keep your usual bedtime and wake time by the clock (nothing moves; when the clocks go back you just get an extra hour that night), or use the extra hour to become a slightly earlier riser. Neither option changes your alarm.")
-        case .alcohol: Explanation(id: id, title: "Drinks and your body",
-            meaning: "Alcohol can help you fall asleep but makes the second half of the night lighter, with less REM and more wake-ups, and raises your heart rate overnight. One standard drink is 5 oz of wine, 12 oz of 5% beer or seltzer, or a 1.5 oz shot. Women reach a higher blood alcohol level than men from the same drinks, because of less body water.",
-            forYou: "A standard drink takes most women about 2 hours to clear. Nothing speeds it up: not coffee, water or sleep. Cocktails and big pours are often 2 or more. The app compares your own nights with and without drinks so you can see the effect on you; it doesn't separate one drink from several.")
+        case .alcohol: Explanation(id: id, title: "Alcohol and your sleep",
+            meaning: "Alcohol can help you fall asleep but makes the second half of the night lighter, with less REM and more wake-ups, and raises your heart rate overnight.",
+            forYou: "One standard drink is 5 oz of wine, 12 oz of 5% beer or seltzer, or a 1.5 oz shot; cocktails and big pours are often 2 or more. A standard drink takes most women about 2 hours to clear. Nothing speeds it up: not coffee, water or sleep.",
+            howWeGotIt: "Women reach a higher blood alcohol level than men from the same drinks, because of less body water. The app compares your own nights with and without alcohol so you can see the effect on you; it doesn't separate one drink from several.")
         case .lateNight: Explanation(id: id, title: "Late-night cost",
             meaning: "What a bedtime well past your usual does to the next day and the day after, from your own nights.",
             forYou: "One very late night can take a couple of days to fully recover from.")

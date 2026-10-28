@@ -7,14 +7,14 @@ struct SleepStagesView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedAngle: Int? = nil
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         Screen(title: "Sleep stages", accent: .purple) {
             SampleDataBanner()
-            Text("Last night, stage by stage")
-                .font(.scaled(size: 28, weight: .bold))
-                .accessibilityAddTraits(.isHeader)
+            // One title: the inline nav title, then the hero (Valtonen F8).
             if model.lastNightIsFresh {
                 donutCard
                 lanesCard
@@ -22,10 +22,10 @@ struct SleepStagesView: View {
                 meaningCard
             } else {
                 Card {
-                    Text("No sleep recorded last night").font(.scaled(size: 17, weight: .bold))
+                    Text("No sleep recorded last night").font(.cardTitle)
                         .accessibilityAddTraits(.isHeader)
                     Text("Wear your Watch to bed and turn on Sleep Focus, and tomorrow's stages show up here.")
-                        .font(.scaled(size: 14)).secondaryText()
+                        .font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                     LinkRow(title: "How to get your sleep recorded", systemImage: "applewatch", accent: .purple) {
                         AccuracyTipsView()
@@ -36,15 +36,16 @@ struct SleepStagesView: View {
                 SleepHistoryView()
             } label: {
                 HStack(spacing: 6) {
-                    Text("See your week and month").font(.scaled(size: 15, weight: .semibold))
-                    Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
+                    Text("See your week and month").font(.bodyEmphasis)
+                    Image(systemName: "chevron.right").font(.secondary).fontWeight(.bold).accessibilityHidden(true)
                 }
                 .foregroundStyle(Accent.purple.ink(scheme))
-                .frame(minHeight: 44)
+                .frame(minHeight: Sizes.minTap)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 
     // MARK: Data
@@ -126,10 +127,22 @@ struct SleepStagesView: View {
                              accent: StageStyle.accent(slice.stage),
                              onClear: { selectedAngle = nil })
             } else {
-                ChartReadout(title: "Last night", value: "\(Clock.duration(night.asleep)) asleep",
-                             detail: "Touch a slice to see each stage.", accent: .purple)
+                // At rest: the night's total and its shape (Valtonen F13).
+                ChartReadout(title: "Last night \u{00B7} asleep", value: Clock.duration(night.asleep),
+                             detail: inBedSummary,
+                             accent: .purple)
             }
         }
+    }
+
+    /// "Asleep for 94% of your 7h 49m in bed." (the timeline below says
+    /// where the stages fall, so the two readouts don't repeat each other).
+    private var inBedSummary: String {
+        let night = model.lastNight
+        let inBed = night.wake - night.bedtime
+        guard inBed > 0, night.asleep > 0 else { return "Each slice is one stage of last night\u{2019}s sleep." }
+        let pct = min(Int((Double(night.asleep) / Double(inBed) * 100).rounded()), 100)
+        return "Asleep for \(pct)% of your \(Clock.duration(inBed)) in bed. Each slice is one stage."
     }
 
     private var donutChart: some View {
@@ -141,6 +154,10 @@ struct SleepStagesView: View {
         }
         .chartLegend(.hidden)
         .chartAngleScrub($selectedAngle, total: slices.reduce(0) { $0 + $1.minutes })
+        .accessibilityChartDescriptor(CategoryChartDescriptor(
+            title: "Sleep stages last night", seriesName: "Stage", yTitle: "Minutes",
+            points: slices.map { (StageStyle.name($0.stage), Double($0.minutes)) },
+            yLabel: { Clock.duration(Int($0.rounded())) }))
         .scrubFeedback(selectedSlice?.stage)
         .accessibilityLabel("Sleep stages last night: " + slices.map { "\(StageStyle.name($0.stage)) \(Clock.duration($0.minutes))" }.joined(separator: ", "))
     }
@@ -149,27 +166,39 @@ struct SleepStagesView: View {
         let p = Palette(scheme: scheme)
         let night = model.lastNight
         let summary = slices.map { "\(StageStyle.name($0.stage)) \(Clock.duration($0.minutes))" }.joined(separator: ", ")
-        let donut = ZStack {
-            donutChart
-            VStack(spacing: 0) {
-                Text(Clock.duration(night.asleep)).font(.scaledNumber(20)).minimumScaleFactor(0.7).lineLimit(1)
-                Text("asleep").font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
+        // The total sits in the hole only while it fits there; at the
+        // accessibility sizes it moves under the ring, never cut off to
+        // "7h 2…" (Ortiz F1).
+        let totalInside = !typeSize.isAccessibilitySize
+        let donut = VStack(spacing: Space.xs) {
+            ZStack {
+                donutChart
+                if totalInside {
+                    VStack(spacing: 0) {
+                        Text(Clock.duration(night.asleep)).font(.numberM).minimumScaleFactor(0.7).lineLimit(1)
+                        Text("asleep").font(.secondary).fontWeight(.semibold).foregroundStyle(p.secondary)
+                    }
+                    .padding(.horizontal, 30)
+                    .allowsHitTesting(false)
+                }
             }
-            .padding(.horizontal, 30)
-            .allowsHitTesting(false)
+            .frame(width: 150, height: 150)
+            if !totalInside {
+                Text("\(Clock.duration(night.asleep)) asleep").font(.numberM)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .frame(width: 150, height: 150)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(Clock.duration(night.asleep)) asleep: \(summary)")
         let times = VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                SectionLabel(text: "Fell asleep")
-                Text(Clock.format(night.onset)).font(.scaledNumber(22))
+                CapsLabel("Fell asleep", isHeader: false)
+                Text(Clock.format(night.onset)).font(.numberM)
             }
             .accessibilityElement(children: .combine)
             VStack(alignment: .leading, spacing: 2) {
-                SectionLabel(text: "Woke up")
-                Text(Clock.format(night.wake)).font(.scaledNumber(22))
+                CapsLabel("Woke up", isHeader: false)
+                Text(Clock.format(night.wake)).font(.numberM)
             }
             .accessibilityElement(children: .combine)
         }
@@ -186,7 +215,10 @@ struct SleepStagesView: View {
                     times
                 }
             }
-            ScrubHint(text: "Touch a slice to see that stage")
+            // The slices' names and minutes (Tanaka F10): the ring alone
+            // left you matching colours to the rows further down.
+            StageLegendRow(minutes: night.stageMinutes)
+            ScrubHint(each: "stage")
         }
     }
 
@@ -200,7 +232,7 @@ struct SleepStagesView: View {
             if timeline.isEmpty {
                 StageStackBar(minutes: night.stageMinutes, height: 24)
                 Text("Stage-by-stage timing shows up once your Watch records a night in Apple Health.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
             } else {
                 StageTimeline(segments: timeline)
@@ -237,42 +269,51 @@ struct SleepStagesView: View {
         } else {
             note = ""
         }
-        let deltaGood = (delta ?? 0) > -meaningfulGap
-        return HStack(alignment: .center, spacing: 12) {
+        // Coral only for a shortfall worth acting on (45 min or more);
+        // smaller gaps are neutral, gains mint (Tanaka F10, Valtonen F4).
+        let pillAccent: Accent? = delta.map { $0 <= -45 ? .coral : ($0 >= meaningfulGap ? .mint : nil) } ?? nil
+        let pillText = delta.map { abs($0) < meaningfulGap ? "about usual" : SleepText.signedCompact($0) }
+        let spokenDelta = delta.map { d -> String in
+            abs(d) < meaningfulGap ? "about usual" : "\(Clock.duration(abs(d))) \(d < 0 ? "less" : "more") than usual"
+        }
+        return HStack(alignment: .center, spacing: Space.m) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(StageStyle.color(stage, scheme))
                 .frame(width: 6, height: 40)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    HStack(spacing: 0) {
-                        Text(StageStyle.name(stage).uppercased())
-                            .font(.scaled(size: 12, weight: .bold))
-                            .foregroundStyle(StageStyle.ink(stage, scheme))
-                        InfoButton(topic: StageStyle.topic(stage)).padding(.vertical, -14).padding(.horizontal, -8)
-                    }
-                    if let delta, stage != .awake {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                FlowLayout(spacing: Space.s, lineSpacing: Space.xs) {
+                    Text(StageStyle.name(stage).uppercased())
+                        .font(.caps)
+                        .foregroundStyle(StageStyle.ink(stage, scheme))
+                    if let pillText, stage != .awake {
                         // Under 25 minutes is within the Watch's error for one night.
-                        Text(abs(delta) < meaningfulGap ? "about usual" : SleepText.signedCompact(delta))
-                            .font(.scaled(size: 12, weight: .bold))
-                            .foregroundStyle((deltaGood ? Accent.mint : Accent.coral).ink(scheme))
+                        Text(pillText)
+                            .font(.secondary).fontWeight(.bold)
+                            .foregroundStyle(pillAccent?.onTint(scheme) ?? p.secondary)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
-                            .background((deltaGood ? Accent.mint : Accent.coral).tint(scheme), in: Capsule())
+                            .background(pillAccent?.tint(scheme) ?? p.chip, in: Capsule())
                     }
                 }
-                Text(note).font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                Text(note).font(.secondary).foregroundStyle(p.secondary)
                 Text(StageStyle.oneLiner(stage))
-                    .font(.scaled(size: 12))
+                    .font(.secondary)
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
-            Text(SleepText.compact(value)).font(.scaledNumber(22))
+            Spacer(minLength: Space.s)
+            Text(SleepText.compact(value)).font(.numberM).keepsOnOneLine(minimumScale: 0.7)
         }
-        .padding(14)
-        .background(p.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(p.cardBorder))
-        .accessibilityElement(children: .contain)
+        .padding(Space.l)
+        .background(p.card, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(p.cardBorder))
+        // One element per stage; its explanation is an action, not a
+        // separate ⓘ stop (Valtonen F5, Ortiz F9).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([StageStyle.name(stage), Clock.duration(value), stage == .awake ? nil : spokenDelta,
+                             note.replacingOccurrences(of: "\u{2013}", with: " to "), StageStyle.oneLiner(stage)]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityAction(named: "Explain") { explaining = StageStyle.topic(stage).explanation }
     }
 
     // MARK: Meaning
@@ -304,7 +345,7 @@ struct SleepStagesView: View {
         Card(accent: .purple) {
             SectionLabel(text: "What it means", accent: .purple)
             Text(meaning)
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Your usual stages",
                              method: "Your usual for each stage is the average of your last 30 tracked nights once you have at least a week of them. Before that, each stage is shown as a share of your sleep next to a typical range for adults your age; women tend to get a little more deep sleep, and the pill can mean a little less. A difference under 25 minutes is called about usual: the Watch estimates stages from movement and heart rate, so single nights are rough. Look at the trend.")

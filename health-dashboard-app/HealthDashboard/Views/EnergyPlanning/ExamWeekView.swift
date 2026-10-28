@@ -14,14 +14,12 @@ struct ExamWeekView: View {
         let exams = model.examsToShow
         Screen(title: "Exam week", accent: .indigo) {
             SampleDataBanner()
-            (Text("Exam week ") + Text("plan").foregroundStyle(Accent.yellow.ink(scheme)))
-                .font(.scaled(size: 34, weight: .bold))
-                .accessibilityAddTraits(.isHeader)
+            // One title, the nav title (Valtonen F8).
             if exams.isEmpty {
                 Card(accent: .yellow) {
-                    Text("No exams on your list").font(.scaled(size: 17, weight: .bold))
+                    Text("No exams on your list").font(.cardTitle)
                     Text("Add your exams and this screen plans the nights before each one, your caffeine and your study blocks.")
-                        .font(.scaled(size: 14)).secondaryText()
+                        .font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                     LinkRow(title: "Add an exam", systemImage: "plus.circle.fill", accent: .yellow) { ExamListView() }
                 }
@@ -57,13 +55,13 @@ struct ExamWeekView: View {
         return Card {
             HStack(spacing: 8) {
                 Label("Next exam".uppercased(), systemImage: "calendar")
-                    .font(.scaled(size: 12, weight: .bold))
+                    .font(.secondary).fontWeight(.bold)
                     .secondaryText()
                 if exam.isExample { ExamExampleTag() }
                 Spacer(minLength: 0)
                 NavigationLink { ExamListView() } label: {
                     Text(exam.isExample ? "Add yours" : "Edit")
-                        .font(.scaled(size: 14, weight: .semibold))
+                        .font(.bodyEmphasis)
                         .foregroundStyle(Accent.yellow.ink(scheme))
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
@@ -85,15 +83,15 @@ struct ExamWeekView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(summary)
             HStack(spacing: 8) {
-                Text(exam.title).font(.scaled(size: 16, weight: .bold))
+                Text(exam.title).font(.bodyEmphasis)
                 Text("· \(exam.date.formatted(.dateTime.weekday(.abbreviated))) \(Clock.format(exam.start))")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
                 Spacer(minLength: 4)
                 if model.isLateLuteal {
                     NavigationLink { CycleView() } label: {
                         HStack(spacing: 5) {
                             Circle().fill(Accent.purple.fill(scheme)).frame(width: 8, height: 8)
-                            Text("late luteal").font(.scaled(size: 12, weight: .bold))
+                            Text("late luteal").font(.secondary).fontWeight(.bold)
                         }
                         .foregroundStyle(Accent.purple.ink(scheme))
                         .padding(.horizontal, 10)
@@ -123,7 +121,7 @@ struct ExamWeekView: View {
         let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 0) {
-                Text("Right now vs. your normal").font(.scaled(size: 20, weight: .bold))
+                Text("Right now vs. your normal").font(.section)
                 InfoButton(title: "Your normal",
                            meaning: "Your own average over the last 30 days. Red numbers are further from your normal.",
                            forYou: "Exam stress often shows up as shorter, later sleep and a higher resting heart rate. Seeing it early helps you protect your sleep before the exam.")
@@ -232,13 +230,13 @@ private struct ExamWeekDayCell: View {
         let dayColor: Color = style == .exam ? Color(hex: 0x1A1400) : (style == .today ? Accent.indigo.ink(scheme) : p.primary)
         VStack(spacing: 6) {
             Text(weekday)
-                .font(.scaled(size: 12, weight: .semibold))
+                .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(weekdayColor)
             Text(day)
-                .font(.scaled(size: 15, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(dayColor)
                 .frame(maxWidth: .infinity, minHeight: 36)
-                .background(background(p), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(background(p), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
         }
         .frame(maxWidth: .infinity)
     }
@@ -265,20 +263,20 @@ private struct ExamCompareTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 14, weight: .bold))
+                Text(title).font(.bodyEmphasis)
                 InfoButton(topic: topic).padding(.vertical, -12)
                 Spacer(minLength: 0)
                 Image(systemName: systemImage).foregroundStyle(accent.ink(scheme)).accessibilityHidden(true)
             }
             Text(value)
-                .font(.scaledNumber(24))
+                .font(.numberM)
                 .foregroundStyle(worse ? Accent.coral.ink(scheme) : Palette(scheme: scheme).primary)
                 .minimumScaleFactor(0.6).lineLimit(1)
-            Text(normal).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(normal).font(.secondary).fontWeight(.semibold).secondaryText()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityValue(Text(worse ? "Further from your normal" : ""))
     }
@@ -294,12 +292,12 @@ private struct ExamNumberedRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
-                .font(.scaled(size: 14, weight: .heavy))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
                 .frame(width: 28, height: 28)
                 .background(accent.fill(scheme).opacity(0.28), in: Circle())
                 .accessibilityHidden(true)
-            Text(text).font(.scaled(size: 15, weight: .semibold))
+            Text(text).font(.bodyEmphasis)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 4)
             Spacer(minLength: 0)

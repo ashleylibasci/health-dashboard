@@ -87,14 +87,14 @@ struct WaterView: View {
     private var totalHero: some View {
         Card {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(LogFormat.oz(model.waterTodayML)).font(.scaledNumber(34))
+                Text(LogFormat.oz(model.waterTodayML)).font(.display)
                 InfoButton(title: "Water today",
                            meaning: "The water you logged today, added up. Bottles are counted with your own bottle size, which you can change below.",
                            forYou: "Drink to thirst, and a bit more on hot days. Drinks like tea, milk and juice count too, and food adds more.")
                     .padding(.vertical, -12)
             }
             Text("\(LogFormat.bottlesPhrase(model.waterBottlesToday)) logged today")
-                .font(.scaled(size: 14, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.blue.ink(scheme))
         }
     }
@@ -106,15 +106,15 @@ struct WaterView: View {
                      label: LogFormat.bottles(model.waterBottlesToday),
                      caption: "of \(LogFormat.bottlesPhrase(model.waterGoalBottles))", size: 146)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(LogFormat.oz(model.waterTodayML)).font(.scaledNumber(26))
+                    Text(LogFormat.oz(model.waterTodayML)).font(.numberL)
                     HStack(spacing: 0) {
-                        Text("of \(LogFormat.oz(goalML)) goal").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                        Text("of \(LogFormat.oz(goalML)) goal").font(.secondary).fontWeight(.semibold).secondaryText()
                         InfoButton(title: "Daily water goal",
                                    meaning: "How much you want to drink across the day. Bottles are counted with your own bottle size, which you can change below.",
                                    forYou: "For women, US guidance is about 9 cups (74 oz) a day from drinks; food adds more. You need more if you\u{2019}re pregnant or breastfeeding, and on hot days and workout days. These are averages, not requirements: drink to thirst, and pale yellow pee usually means you\u{2019}re drinking enough. During long workouts, don\u{2019}t drink much more than you sweat out; far too much water can be dangerous.")
                             .padding(.vertical, -12)
                     }
-                    Text(status).font(.scaled(size: 13, weight: .semibold))
+                    Text(status).font(.secondary).fontWeight(.semibold)
                         .foregroundStyle(Accent.blue.ink(scheme))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -135,28 +135,28 @@ struct WaterView: View {
 
     private var addCard: some View {
         Card {
-            Text("Add water").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text("Add water").font(.cardTitle).accessibilityAddTraits(.isHeader)
             LogTimeSelector(time: $time, accent: .blue)
             HStack(spacing: 10) {
                 addButton(title: "1 bottle", detail: LogFormat.oz(bottleML)) { add(ml: bottleML, label: "1 bottle") }
                 addButton(title: "\u{00BD} bottle", detail: LogFormat.oz(bottleML / 2)) { add(ml: bottleML / 2, label: "half a bottle") }
             }
             LabeledControlRow(spacing: 10) {
-                Text("Other amount").font(.scaled(size: 14, weight: .semibold))
+                Text("Other amount").font(.bodyEmphasis)
                     .fixedSize(horizontal: false, vertical: true)
             } control: {
               HStack(spacing: 10) {
                 TextField("8", text: $customOz)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
-                    .font(.scaled(size: 16, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .focused($focused, equals: .amount)
                     .padding(.horizontal, 10)
                     .frame(width: Font.scaledSize(80))
                     .frame(minHeight: 44)
-                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                     .accessibilityLabel("Other amount in ounces")
-                Text("oz").font(.scaled(size: 14)).secondaryText()
+                Text("oz").font(.bodyText).secondaryText()
                 Button {
                     focused = nil
                     guard let oz = Self.parse(customOz), oz > 0 else { return }
@@ -170,7 +170,7 @@ struct WaterView: View {
                     customOz = ""
                 } label: {
                     Text("Add")
-                        .font(.scaled(size: 15, weight: .bold))
+                        .font(.bodyEmphasis)
                         .fixedSize()   // never squeezed into letters (round 3)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 44)
@@ -185,7 +185,7 @@ struct WaterView: View {
             if let amountNote { rangeNote(amountNote) }
             if let lastLogged {
                 Label(lastLogged, systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
+                    .font(.secondary).fontWeight(.semibold)
                     .foregroundStyle(Accent.mint.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -194,7 +194,7 @@ struct WaterView: View {
 
     private func rangeNote(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.circle")
-            .font(.scaled(size: 13, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .foregroundStyle(Accent.orange.ink(scheme))
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -202,13 +202,13 @@ struct WaterView: View {
     private func addButton(title: String, detail: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 2) {
-                Label(title, systemImage: "plus").font(.scaled(size: 15, weight: .bold))
-                Text(detail).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                Label(title, systemImage: "plus").font(.bodyEmphasis)
+                Text(detail).font(.secondary).fontWeight(.semibold).secondaryText()
             }
             .frame(maxWidth: .infinity, minHeight: 60)
             .foregroundStyle(Accent.blue.ink(scheme))
-            .background(Accent.blue.fill(scheme).opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Accent.blue.fill(scheme).opacity(0.35)))
+            .background(Accent.blue.fill(scheme).opacity(0.18), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous).strokeBorder(Accent.blue.fill(scheme).opacity(0.35)))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add \(title), \(detail), \(time.phrase)")
@@ -265,10 +265,10 @@ struct WaterView: View {
 
     private var chartCard: some View {
         Card(accent: .blue) {
-            Text("Water through the day").font(.scaled(size: 15, weight: .bold))
+            Text("Water through the day").font(.bodyEmphasis)
             let r = readout
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .blue)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .blue,
+                         onClear: selected == nil ? nil : { selected = nil })
             WaterDayChart(run: run, pace: paceLine, goal: hidesGoal ? nil : goalML, start: chartStart, end: chartEnd,
                           now: model.now, selected: selected.map(snap), selectedML: selected.map { model.waterML(by: snap($0)) },
                           selection: $selected)
@@ -280,7 +280,7 @@ struct WaterView: View {
                     title: "Water today", seriesName: "Water so far", yTitle: "Ounces",
                     points: run.map { ($0.time, $0.ml / LogFormat.mlPerOunce) },
                     yLabel: { "\(Int($0.rounded())) oz" }))
-            ScrubHint()
+            ScrubHint(each: "hour")
             if !hidesGoal {
                 HStack(spacing: 14) {
                     legend("You", color: Accent.blue.fill(scheme), dashed: false)
@@ -300,7 +300,7 @@ struct WaterView: View {
             Capsule().fill(color).frame(width: 16, height: dashed ? 2 : 4)
             Text(text)
         }
-        .font(.scaled(size: 12))
+        .font(.secondary)
         .secondaryText()
     }
 
@@ -309,13 +309,13 @@ struct WaterView: View {
     private var entriesCard: some View {
         Card {
             HStack {
-                Text("Today").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Today").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("\(model.todaysWater.count) logged").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                Text("\(model.todaysWater.count) logged").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             if model.todaysWater.isEmpty {
                 Text("Nothing logged yet today. Add water above, at the time you had it.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
             } else {
                 LogEntryList(items: model.todaysWater.reversed(), onTap: { editing = $0 },
                              onDelete: { model.deleteWater($0.id) }) { entry in
@@ -324,7 +324,7 @@ struct WaterView: View {
                                 time: LogFormat.time(entry.date))
                 }
                 Text("Tap an entry to change its time or amount. Swipe left to delete.")
-                    .font(.scaled(size: 12)).secondaryText()
+                    .font(.secondary).secondaryText()
             }
         }
     }
@@ -358,14 +358,14 @@ struct WaterView: View {
     private var bottleCard: some View {
         Card {
             HStack(spacing: 0) {
-                Text("Your bottle").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Your bottle").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 InfoButton(title: "Bottle size",
                            meaning: "How much your usual water bottle holds. Every \u{201C}1 bottle\u{201D} button and bottle count in the app uses it.",
                            forYou: "Check the label or the bottom of your bottle. If you switch bottles, change it here; entries you already logged keep their amounts.")
                     .padding(.vertical, -12)
                 Spacer()
                 Text(LogFormat.oz(bottleML))
-                    .font(.scaled(size: 14, weight: .bold)).foregroundStyle(Accent.blue.ink(scheme))
+                    .font(.bodyEmphasis).foregroundStyle(Accent.blue.ink(scheme))
                     .fixedSize()
             }
             HStack(spacing: 8) {
@@ -374,25 +374,29 @@ struct WaterView: View {
                 }
             }
             Stepper(value: bottleBinding, in: 4...68, step: 1) {
-                Text("Adjust by 1 oz").font(.scaled(size: 14, weight: .semibold))
+                Text("Adjust by 1 oz").font(.bodyEmphasis)
             }
             .frame(minHeight: 44)
+            // "Bottle size, 24 oz", not "Adjust by 1 oz" (Ortiz F8).
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Bottle size")
+            .accessibilityValue("\(LogFormat.ozNumber(bottleML)) ounces")
             LabeledControlRow(spacing: 10) {
-                Text("Exact size").font(.scaled(size: 14, weight: .semibold))
+                Text("Exact size").font(.bodyEmphasis)
                     .fixedSize(horizontal: false, vertical: true)
             } control: {
               HStack(spacing: 10) {
                 TextField("\(LogFormat.ozNumber(bottleML))", text: $customBottle)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
-                    .font(.scaled(size: 16, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .focused($focused, equals: .bottle)
                     .padding(.horizontal, 10)
                     .frame(width: Font.scaledSize(80))
                     .frame(minHeight: 44)
-                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                     .accessibilityLabel("Exact bottle size in ounces")
-                Text("oz").font(.scaled(size: 14)).secondaryText()
+                Text("oz").font(.bodyText).secondaryText()
                 Button {
                     focused = nil
                     guard let oz = Self.parse(customBottle), oz >= 4 else { return }
@@ -405,19 +409,19 @@ struct WaterView: View {
                     customBottle = ""
                 } label: {
                     Text("Set")
-                        .font(.scaled(size: 15, weight: .bold))
+                        .font(.bodyEmphasis)
                         .fixedSize()   // never squeezed into letters (round 3)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 44)
-                        .foregroundStyle(Accent.blue.ink(scheme))
-                        .background(Accent.blue.fill(scheme).opacity(0.2), in: Capsule())
+                        .foregroundStyle(Accent.blue.onTint(scheme))
+                        .background(Accent.blue.tint(scheme), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .disabled((Self.parse(customBottle) ?? 0) < 4)
               }
             }
             if let bottleNote { rangeNote(bottleNote) }
-            Text("Between 4 and 68 oz.").font(.scaled(size: 12)).secondaryText()
+            Text("Between 4 and 68 oz.").font(.secondary).secondaryText()
         }
     }
 
@@ -426,14 +430,14 @@ struct WaterView: View {
         let on = abs(bottleML - ml) < 1
         return Button { store.data.bottleSizeML = ml } label: {
             VStack(spacing: 2) {
-                Text(LogFormat.ozNumber(ml)).font(.scaled(size: 15, weight: .bold)).keepsOnOneLine()
-                Text("oz").font(.scaled(size: 11, weight: .semibold))
+                Text(LogFormat.ozNumber(ml)).font(.bodyEmphasis).keepsOnOneLine()
+                Text("oz").font(.small).fontWeight(.semibold)
                     .foregroundStyle(on ? Color(hex: 0x00111F).opacity(0.75) : p.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 56)
             .foregroundStyle(on ? Color(hex: 0x00111F) : p.primary)
-            .background(on ? Accent.blue.fill(scheme) : p.chip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(on ? Accent.blue.fill(scheme) : p.cardBorder))
+            .background(on ? Accent.blue.fill(scheme) : p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous).strokeBorder(on ? Accent.blue.fill(scheme) : p.cardBorder))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(LogFormat.ozNumber(ml)) ounce bottle")
@@ -442,20 +446,23 @@ struct WaterView: View {
 
     private var goalCard: some View {
         Card {
-            Text("Daily goal").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text("Daily goal").font(.cardTitle).accessibilityAddTraits(.isHeader)
             Stepper(value: goalBinding, in: 16...170, step: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(LogFormat.oz(goalML)).font(.scaledNumber(22))
+                    Text(LogFormat.oz(goalML)).font(.numberM)
                     Text(LogFormat.bottlesPhrase(model.waterGoalBottles))
-                        .font(.scaled(size: 13)).secondaryText()
+                        .font(.secondary).secondaryText()
                 }
             }
             .frame(minHeight: 52)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Daily goal")
+            .accessibilityValue("\(LogFormat.ozNumber(goalML)) ounces, \(LogFormat.bottlesPhrase(model.waterGoalBottles))")
             if goalML / LogFormat.mlPerOunce > Self.highGoalOz {
                 rangeNote("Over about 135 oz (4 liters) a day is a lot for most women, and drinking far more than your body needs can be dangerous. Unless a doctor told you to, a lower goal is safer.")
             }
             Text("For women, US guidance is about 9 cups (74 oz) a day from drinks. Drinks like tea, milk and juice count too, and food adds more on top.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -537,11 +544,12 @@ private struct WaterDayChart: View {
     @ChartContentBuilder
     private var goalRule: some ChartContent {
         if let goal {
+            // Water is blue on this screen, goal included (Tanaka F4).
             RuleMark(y: .value("Goal", goal))
-                .foregroundStyle(Accent.mint.fill(scheme))
+                .foregroundStyle(Accent.blue.ink(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .annotation(position: .top, alignment: .leading) {
-                    Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
+                    Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.blue.ink(scheme))
                 }
         }
     }

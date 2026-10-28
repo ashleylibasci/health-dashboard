@@ -36,9 +36,9 @@ struct SleepHistoryView: View {
             .onChange(of: rangeRaw) { selectedDay = nil }
             if nights.isEmpty {
                 Card {
-                    Text("No nights yet").font(.scaled(size: 17, weight: .bold))
+                    Text("No nights yet").font(.cardTitle)
                     Text("Wear your Watch to bed and your nights will show up here.")
-                        .font(.scaled(size: 14))
+                        .font(.bodyText)
                         .secondaryText()
                 }
             } else {
@@ -71,10 +71,11 @@ struct SleepHistoryView: View {
     private var readout: some View {
         if let night = selectedNight {
             let source = model.usingSampleData ? (isExample(night) ? "Example night \u{00B7} " : "Your night \u{00B7} ") : ""
-            ChartReadout(title: source + dateText(night.wakeDay),
-                         value: "\(Clock.duration(night.asleepMinutes)) asleep",
+            ChartReadout(title: source + dateText(night.wakeDay) + " \u{00B7} asleep",
+                         value: Clock.duration(night.asleepMinutes),
                          detail: "Bed \(Clock.format(night.bedtime)) \u{00B7} up \(Clock.format(night.wake)) \u{00B7} \(vsNeed(night.asleepMinutes))",
-                         accent: model.metNeed(night) ? .mint : .coral)
+                         accent: model.metNeed(night) ? .purple : .coral,
+                         onClear: { selectedDay = nil })
         } else {
             let avg = averageAsleep
             ChartReadout(title: "Last \(range.days) days \u{00B7} average",
@@ -89,10 +90,10 @@ struct SleepHistoryView: View {
     private var chartCard: some View {
         Card {
             HStack(alignment: .firstTextBaseline) {
-                Text("Time asleep").font(.scaled(size: 17, weight: .bold))
+                Text("Time asleep").font(.cardTitle)
                 Spacer()
                 HStack(spacing: 0) {
-                    Text("Need \(Clock.duration(need))").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    Text("Need \(Clock.duration(need))").font(.secondary).fontWeight(.semibold).secondaryText()
                     InfoButton(topic: .sleepNeed).padding(.vertical, -12)
                 }
             }
@@ -101,10 +102,11 @@ struct SleepHistoryView: View {
                         selected: selectedNight?.wakeDay, selection: $selectedDay,
                         barWidth: range == .week ? 22 : 6)
                 .frame(height: 200)
-            ScrubHint()
+                .motion(.dataSwap, value: rangeRaw)
+            ScrubHint(each: "night")
             if mixesExamples {
                 Text("Faded bars are example nights. Solid bars are your own nights from Apple Health.")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -122,7 +124,7 @@ struct SleepHistoryView: View {
         let wake = Clock.circularMean(nights.map(\.wake))
         let regularity = model.regularity(of: nights)
         return Card {
-            Text("Your averages").font(.scaled(size: 17, weight: .bold))
+            Text("Your averages").font(.cardTitle)
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     AverageTile(title: "Asleep", value: Clock.duration(averageAsleep),
@@ -217,6 +219,7 @@ private struct HistoryBars: View {
         }
         .chartScrub($selection, snapped: selected, steps: nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
+        .chartXScale(range: .plotDimension(startPadding: 4, endPadding: 8))
         .chartYAxis {
             AxisMarks(position: .leading, values: [0.0, 4.0, 6.0, 8.0, 10.0]) { value in
                 AxisGridLine()
@@ -231,6 +234,10 @@ private struct HistoryBars: View {
             }
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(DateChartDescriptor(
+            title: "Time asleep, last \(nights.count) nights", seriesName: "Time asleep", yTitle: "Time asleep",
+            points: nights.map { ($0.wakeDay, Double($0.asleepMinutes)) },
+            yLabel: { Clock.duration(Int($0.rounded())) }, isContinuous: false))
     }
 }
 
@@ -240,22 +247,29 @@ private struct AverageTile: View {
     var note: String
     var explanation: Explanation
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 13, weight: .bold)).foregroundStyle(p.secondary)
+                Text(title).font(.secondary).fontWeight(.bold).foregroundStyle(p.secondary)
                 Spacer(minLength: 0)
                 InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -8)
+                    .accessibilityHidden(true)
             }
-            Text(value).font(.scaledNumber(22)).minimumScaleFactor(0.7).lineLimit(1)
-            Text(note).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(Accent.purple.ink(scheme))
+            Text(value).font(.numberM).minimumScaleFactor(0.7).lineLimit(1)
+            Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(Accent.purple.ink(scheme))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
+        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.chip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(p.chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+        // One stop per tile; the ⓘ is an "Explain" action (Ortiz F9).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(value == "\u{2014}" ? "no value yet" : value), \(note)")
+        .accessibilityAction(named: "Explain") { explaining = explanation }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }

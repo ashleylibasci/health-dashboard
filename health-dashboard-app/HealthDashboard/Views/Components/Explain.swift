@@ -64,10 +64,10 @@ struct ExplainedTitle: View {
     private var font: Font { role?.font ?? .scaled(size: size, weight: .bold) }
 }
 
-/// "How we got this number" link that opens the method behind a number.
+/// "How it's worked out" link that opens the method behind a number.
 struct HowWeGotThisLink: View {
     var explanation: Explanation
-    var label = "Learn how we got this number"
+    var label = HowWeGotThisLink.defaultLabel
     @State private var showing = false
     @Environment(\.colorScheme) private var scheme
 
@@ -90,9 +90,12 @@ struct HowWeGotThisLink: View {
 }
 
 extension HowWeGotThisLink {
-    init(topic: Topic, label: String = "Learn how we got this number") { self.init(explanation: topic.explanation, label: label) }
+    /// One name for the method link and the sheet section it opens (Dubois 20).
+    static let defaultLabel = "How it\u{2019}s worked out"
+
+    init(topic: Topic, label: String = HowWeGotThisLink.defaultLabel) { self.init(explanation: topic.explanation, label: label) }
     /// The method behind one screen's number, kept off the main page.
-    init(title: String, method: String, meaning: String = "", label: String = "Learn how we got this number") {
+    init(title: String, method: String, meaning: String = "", label: String = HowWeGotThisLink.defaultLabel) {
         self.init(explanation: Explanation(id: title, title: title, meaning: meaning, forYou: "", howWeGotIt: method), label: label)
     }
 }
@@ -142,14 +145,15 @@ struct ExplanationSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    // One set of headings on every sheet (Dubois 20).
                     if method, let how = e.howWeGotIt {
-                        section("How we got this number", how)
-                        if !e.meaning.isEmpty { section("What it means", e.meaning) }
+                        section(HowWeGotThisLink.defaultLabel, how)
+                        if !e.meaning.isEmpty { section("What it is", e.meaning) }
                     } else {
-                        if !e.meaning.isEmpty { section("What it means", e.meaning) }
-                        if !e.forYou.isEmpty { section("What it means for you", e.forYou) }
+                        if !e.meaning.isEmpty { section("What it is", e.meaning) }
+                        if !e.forYou.isEmpty { section("What to do", e.forYou) }
                         if let how = e.howWeGotIt {
-                            DisclosureGroup("How we got this number") {
+                            DisclosureGroup(HowWeGotThisLink.defaultLabel) {
                                 Text(how).font(.bodyText).foregroundStyle(p.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
                             }
@@ -220,7 +224,9 @@ struct ChartReadout: View {
                 .foregroundStyle(p.secondary)
                 .lineLimit(ax ? nil : 1)
                 .minimumScaleFactor(ax ? 1 : 0.8)
-            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+            // The qualifier sits under the number at the accessibility
+            // sizes instead of wrapping in a narrow column beside it.
+            AdaptiveStack(spacing: ax ? 0 : Space.s, alignment: .firstTextBaseline) {
                 Text(parts.number)
                     .font(.numberM)
                     .foregroundStyle(accent.ink(scheme))
@@ -288,12 +294,18 @@ private struct ClearOnTap: ViewModifier {
 }
 
 /// Default hint under interactive charts. Hidden from VoiceOver, where
-/// the chart itself is adjustable (swipe up or down).
+/// the chart itself is adjustable (swipe up or down). One wording
+/// everywhere: "Drag across the chart to see each night." (Dubois 30).
 struct ScrubHint: View {
-    var text = "Tap or slide along the chart to see details"
+    var text = "Drag across the chart to see each point."
+
+    init(text: String = "Drag across the chart to see each point.") { self.text = text }
+    /// "Drag across the chart to see each \(unit)."
+    init(each unit: String) { self.text = "Drag across the chart to see each \(unit)." }
+
     var body: some View {
         Label(text, systemImage: "hand.point.up.left")
-            .font(.scaled(size: 12))
+            .font(.secondary)
             .secondaryText()
             .accessibilityHidden(true)
     }

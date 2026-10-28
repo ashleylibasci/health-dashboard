@@ -82,13 +82,13 @@ struct ExamListView: View {
     var body: some View {
         Screen(title: "Your exams", accent: .yellow) {
             Text("Add your exams and the app plans your sleep, study blocks and exam-morning alarm around them. They stay on your phone.")
-                .font(.scaled(size: 14)).secondaryText()
+                .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if upcoming.isEmpty {
                 Card {
-                    Text("No exams yet").font(.scaled(size: 17, weight: .bold))
+                    Text("No exams yet").font(.cardTitle)
                     Text("Add one below and the exam week screen and exam mode plan around it.")
-                        .font(.scaled(size: 14)).secondaryText()
+                        .font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
@@ -107,7 +107,7 @@ struct ExamListView: View {
                     store.data.exams.removeAll { Calendar.current.startOfDay(for: $0.date) < today }
                 } label: {
                     Text(past.count == 1 ? "Remove 1 past exam" : "Remove \(past.count) past exams")
-                        .font(.scaled(size: 15, weight: .semibold))
+                        .font(.bodyEmphasis)
                         .foregroundStyle(Accent.coral.ink(scheme))
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -168,7 +168,7 @@ private struct ExamEditorSheet: View {
                     Card {
                         SectionLabel(text: "Class or name")
                         TextField("e.g. STAT 400", text: $draft.title)
-                            .font(.scaled(size: 17, weight: .semibold))
+                            .font(.cardTitle)
                             .frame(minHeight: 44)
                         SectionLabel(text: "Kind")
                         ViewThatFits(in: .horizontal) {
@@ -188,7 +188,7 @@ private struct ExamEditorSheet: View {
                             dismiss()
                         } label: {
                             Text("Delete this exam")
-                                .font(.scaled(size: 16, weight: .semibold))
+                                .font(.bodyEmphasis)
                                 .foregroundStyle(Accent.coral.ink(scheme))
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
@@ -255,17 +255,17 @@ private struct ExamListRow: View {
         Button(action: edit) {
             HStack(spacing: 12) {
                 Image(systemName: "graduationcap.fill")
-                    .font(.scaled(size: 16, weight: .semibold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.yellow.ink(scheme))
-                    .frame(width: 36, height: 36)
-                    .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(exam.title).font(.scaled(size: 15, weight: .bold))
-                    Text(when).font(.scaled(size: 13)).foregroundStyle(p.secondary)
+                    Text(exam.title).font(.bodyEmphasis)
+                    Text(when).font(.secondary).foregroundStyle(p.secondary)
                 }
                 Spacer()
-                Text("Edit").font(.scaled(size: 14, weight: .semibold)).foregroundStyle(Accent.yellow.ink(scheme))
+                Text("Edit").font(.bodyEmphasis).foregroundStyle(Accent.yellow.ink(scheme))
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -281,7 +281,7 @@ struct ExamExampleTag: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         Text("Example")
-            .font(.scaled(size: 12, weight: .bold))
+            .font(.secondary).fontWeight(.bold)
             .foregroundStyle(Accent.yellow.ink(scheme))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -302,14 +302,14 @@ struct CalendarImportCard: View {
     var body: some View {
         Card {
             HStack(spacing: 0) {
-                Text("From your calendar").font(.scaled(size: 17, weight: .bold))
+                Text("From your calendar").font(.cardTitle)
                 InfoButton(title: "Exams from your calendar",
                            meaning: "The app looks for events with exam, midterm, final, quiz or test in the title, from today to four months ahead. Repeating events like classes are skipped, and so are events like \u{201C}midterm review\u{201D}.",
                            forYou: "It only reads your calendar, never changes it, and your events stay on your phone. Exams you add or edit here are never overwritten.")
                     .padding(.vertical, -12)
             }
             if let source = importer.source {
-                Text(status(source)).font(.scaled(size: 14)).secondaryText()
+                Text(status(source)).font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
                     Button(importer.working ? "Checking\u{2026}" : "Check now") {
@@ -318,12 +318,12 @@ struct CalendarImportCard: View {
                     .disabled(importer.working)
                     Button("Stop", role: .destructive) { importer.disconnect() }
                 }
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .tint(Accent.indigo.ink(scheme))
                 .frame(minHeight: 44)
             } else {
                 Text("Connect a calendar and your exams join your exam list on their own.")
-                    .font(.scaled(size: 14)).secondaryText()
+                    .font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 10) { buttons }
@@ -333,7 +333,7 @@ struct CalendarImportCard: View {
             }
             if let error = importer.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(Accent.coral.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -356,7 +356,7 @@ struct CalendarImportCard: View {
             withAnimation { showLink.toggle() }
         }
         .buttonStyle(.plain)
-        .font(.scaled(size: 15, weight: .semibold))
+        .font(.bodyEmphasis)
         .foregroundStyle(Accent.indigo.ink(scheme))
         .multilineTextAlignment(.leading)
         .frame(minHeight: 44)
@@ -366,9 +366,9 @@ struct CalendarImportCard: View {
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .padding(12)
-                .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
             Button(importer.working ? "Checking\u{2026}" : "Use this link") {
                 Task {
                     await importer.connectLink(link, model: model)
@@ -376,12 +376,12 @@ struct CalendarImportCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .font(.scaled(size: 15, weight: .bold))
+            .font(.bodyEmphasis)
             .foregroundStyle(Accent.indigo.ink(scheme))
             .frame(minHeight: 44)
             .disabled(importer.working || link.trimmingCharacters(in: .whitespaces).isEmpty)
             Text("In Google Calendar on a computer: Settings \u{2192} your calendar \u{2192} \u{201C}Secret address in iCal format.\u{201D} Treat it like a password: it\u{2019}s kept in your phone\u{2019}s Keychain.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -391,7 +391,7 @@ struct CalendarImportCard: View {
             Task { await importer.connect(source, model: model) }
         } label: {
             Label(source.name, systemImage: systemImage)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .frame(minHeight: 44)
                 .padding(.horizontal, 12)
                 .background(Accent.indigo.tint(scheme), in: Capsule())

@@ -48,10 +48,10 @@ struct EnergyView: View {
             }
             if !model.lastNightIsFresh && day == .today {
                 Card(accent: .purple) {
-                    Text("No sleep recorded last night").font(.scaled(size: 16, weight: .bold))
+                    Text("No sleep recorded last night").font(.bodyEmphasis)
                         .accessibilityAddTraits(.isHeader)
                     Text("Today's curve uses your most recent recorded night, so treat it as a rough guide.")
-                        .font(.scaled(size: 13)).secondaryText()
+                        .font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                     LinkRow(title: "How to get your sleep recorded", systemImage: "applewatch", accent: .purple) {
                         AccuracyTipsView()
@@ -83,7 +83,7 @@ struct EnergyView: View {
     }
 
     private var dayPicker: some View {
-        AdaptiveSegmentedPicker("Day", selection: $day, options: Array(Day.allCases), accent: .yellow) { d in label(d) }
+        AdaptiveSegmentedPicker("Day", selection: $day, options: Array(Day.allCases), accent: .mint) { d in label(d) }
     }
 
     /// Today's score is below her usual: the score card links to "Why is my
@@ -106,14 +106,14 @@ struct EnergyView: View {
                 Ring(value: Double(e.score) / 100, accent: .mint, label: "\(e.score)",
                      caption: day == .today ? "Today" : "Forecast", size: 134, accessibilityText: ringLabel)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(headline(e)).font(.scaled(size: 20, weight: .bold))
+                    Text(headline(e)).font(.section)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(subhead(e)).font(.scaled(size: 14)).secondaryText()
+                    Text(subhead(e)).font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Text("0 to 100: how alert your body is predicted to feel across your waking hours. " + (model.energyUsualIsPersonal ? "Your usual is \(usualScore)." : "The app starts from \(usualScore), a fixed starting point; your own usual shows after 7 days."))
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(topic: .energyScore)
             if day == .today && !model.energyDrivers.isEmpty {
@@ -193,17 +193,19 @@ struct EnergyView: View {
         let selected: Minutes? = curveSelection.flatMap { AppModel.nearestPoint($0, in: e)?.time }
         return Card {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Peaks and dips").font(.scaled(size: 17, weight: .bold))
+                Text("Peaks and dips").font(.cardTitle)
                 InfoButton(title: "Your energy curve",
                            meaning: "A prediction of how alert you'll feel at each time of day, from 0 (running on empty) to 100 (fully switched on). It comes from when and how long you slept and your body clock.",
                            forYou: "Plan hard work for the high parts and easy things for the low parts. Drag along the curve to see what each moment means.")
                     .padding(.vertical, -12)
                 Spacer()
-                Text(chartNote(e)).font(.scaled(size: 13)).secondaryText()
+                Text(chartNote(e)).font(.secondary).secondaryText()
             }
-            ChartReadout(title: "\(lead) · \(moment.title)", value: "Energy level \(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
-                         detail: "\(moment.meaning) \(action)", accent: accent)
-                .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+            // "58 · 3 below today's peak": the level big, the comparison
+            // beside it (Dubois 5, Hale F8).
+            ChartReadout(title: "\(lead) · \(moment.title)", value: "\(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
+                         detail: "\(moment.meaning) \(action)", accent: accent,
+                         onClear: curveSelection == nil ? nil : { curveSelection = nil })
             EnergyCurveChart(energy: e,
                              band: zone,
                              bandColor: zone.map { Self.accent(for: $0.kind).fill(scheme) } ?? .clear,
@@ -212,7 +214,8 @@ struct EnergyView: View {
                              selection: $curveSelection,
                              summary: chartSummary(e))
                 .frame(height: 190)
-            ScrubHint(text: "Drag the dot along the curve to see each moment")
+                .motion(.dataSwap, value: day)
+            ScrubHint(each: "moment")
         }
     }
 
@@ -259,16 +262,16 @@ struct EnergyView: View {
             SectionLabel(text: "What moved today's score")
             ForEach(model.energyDrivers) { d in
                 HStack {
-                    Text(d.name).font(.scaled(size: 14)).secondaryText()
+                    Text(d.name).font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Text(d.deltaText)
-                        .font(.scaled(size: 13, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle((d.points >= 0 ? Accent.mint : Accent.coral).ink(scheme))
                         .frame(minWidth: 40)
                         .padding(.vertical, 3)
                         .padding(.horizontal, 8)
-                        .background((d.points >= 0 ? Accent.mint : Accent.coral).tint(scheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background((d.points >= 0 ? Accent.mint : Accent.coral).tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -280,7 +283,8 @@ struct EnergyView: View {
         switch kind {
         case .grogginess: return .indigo
         case .morningPeak, .secondWind: return .mint
-        case .afternoonDip: return .coral
+        // A dip is normal, not a warning: blue, not coral (Tanaka F1).
+        case .afternoonDip: return .blue
         case .windDown, .melatonin: return .purple
         }
     }
@@ -290,9 +294,9 @@ struct EnergyView: View {
     private func zonesCard(_ e: EnergyDay, zone: EnergyDay.Zone?) -> some View {
         let ordered = e.zones.sorted { $0.range.start < $1.range.start }
         return Card {
-            Text("Your day, zone by zone").font(.scaled(size: 17, weight: .bold))
+            Text("Your day, zone by zone").font(.cardTitle)
             Text("Tap a zone to highlight it on the curve. Tap ⓘ for more.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
             VStack(spacing: 6) {
                 ForEach(ordered, id: \.kind) { z in
                     EnergyZoneRow(title: AppModel.zoneTitle(z), time: timeLabel(z),
@@ -306,16 +310,14 @@ struct EnergyView: View {
             if let zone {
                 let accent = Self.accent(for: zone.kind)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("For you: \(AppModel.zoneTitle(zone)) · \(timeLabel(zone))").font(.scaled(size: 15, weight: .bold))
-                    Text(tip(for: zone)).font(.scaled(size: 14))
+                    Text("For you: \(AppModel.zoneTitle(zone)) · \(timeLabel(zone))").font(.bodyEmphasis)
+                    Text(tip(for: zone)).font(.bodyText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(accent.fill(scheme).opacity(0.3)))
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityElement(children: .combine)
             }
         }
@@ -403,7 +405,7 @@ struct EnergyView: View {
         }
         return HStack(spacing: 12) {
             EnergyExtremeTile(eyebrow: "Highest", value: Clock.format(e.highest.time), note: highNote, accent: .mint)
-            EnergyExtremeTile(eyebrow: "Lowest", value: Clock.format(e.lowest.time), note: lowNote, accent: .coral)
+            EnergyExtremeTile(eyebrow: "Lowest", value: Clock.format(e.lowest.time), note: lowNote, accent: .blue)
         }
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -419,16 +421,15 @@ struct EnergyView: View {
         let selected: Minutes? = bankSelection.map { min(max($0, wake), bedtime) }
         return Card {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Energy left").font(.scaled(size: 17, weight: .bold))
+                Text("Energy left").font(.cardTitle)
                 InfoButton(topic: .energyBank).padding(.vertical, -12)
                 Spacer()
-                Text("charges asleep, drains awake").font(.scaled(size: 13)).secondaryText()
+                Text("charges asleep, drains awake").font(.secondary).secondaryText()
             }
             Text("Like a phone battery for your body: sleep charges it, being awake drains it. A different number from your energy score.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             bankReadout(selected: selected, now: now, atWake: atWake, bed: bed, bedtime: bedtime)
-                .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
             EnergyBankChart(wake: wake, atWake: model.energyBankAtWake,
                             now: model.now, atNow: model.energyBankNow,
                             bedtime: bedtime, atBedtime: model.energyBankAtBedtime,
@@ -436,13 +437,13 @@ struct EnergyView: View {
                             selection: $bankSelection,
                             summary: "Energy left: charged to \(atWake)% overnight, \(now)% at \(Clock.format(model.now)), projected \(bed)% at \(Clock.format(bedtime))")
                 .frame(height: 110)
-            ScrubHint()
+            ScrubHint(each: "moment")
         }
     }
 
     private func bankReadout(selected: Minutes?, now: Int, atWake: Int, bed: Int, bedtime: Minutes) -> some View {
         guard let t = selected else {
-            return ChartReadout(title: "Now, \(Clock.format(model.now))", value: "\(now)% left",
+            return ChartReadout(title: "Now, \(Clock.format(model.now)) \u{00B7} left", value: "\(now)%",
                                 detail: "You woke with \(atWake)%. About \(bed)% by bedtime at \(Clock.format(bedtime)).", accent: .mint)
         }
         let level = Int(model.energyBank(at: t).rounded())
@@ -457,7 +458,8 @@ struct EnergyView: View {
         } else {
             detail = "Earlier today."
         }
-        return ChartReadout(title: Clock.format(t), value: "\(level)%", detail: detail, accent: .mint)
+        return ChartReadout(title: Clock.format(t), value: "\(level)%", detail: detail, accent: .mint,
+                            onClear: { bankSelection = nil })
     }
 
     // MARK: Sleep debt + effort
@@ -542,7 +544,7 @@ struct EnergyView: View {
             ? "\(lateCount) \(lateCount == 1 ? "night" : "nights") in bed after \(threshold). See what they cost you."
             : "What a night in bed after \(threshold) does to the next two days."
         return Card {
-            Text("Make the most of it").font(.scaled(size: 17, weight: .bold))
+            Text("Make the most of it").font(.cardTitle)
             EnergyTipRow(systemImage: "sun.max.fill", accent: .yellow,
                          title: daylightTitle, detail: daylightNote, topic: .daylight)
             if let dipStart {
@@ -579,9 +581,9 @@ struct EnergyView: View {
         Card {
             Toggle(isOn: $store.data.peakDipNudges) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Heads-up before peaks and dips").font(.scaled(size: 15, weight: .bold))
+                    Text("Heads-up before peaks and dips").font(.bodyEmphasis)
                     Text("A notification 15 minutes before your first peak and your dip. Uses last night's sleep from your Watch, so it starts once a night is recorded.")
-                        .font(.scaled(size: 13)).secondaryText()
+                        .font(.secondary).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -595,7 +597,7 @@ struct EnergyView: View {
             if model.canCheckInNow && !model.checkInDoneToday {
                 NavigationLink { CheckInView() } label: {
                     Text("Check in for today: it makes your curve more accurate")
-                        .font(.scaled(size: 13, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle(Accent.mint.ink(scheme))
                         .frame(minHeight: 44)
                 }
@@ -655,7 +657,18 @@ private struct EnergyCurveChart: View {
         }
         .chartXScale(domain: start...end)
         .chartYScale(domain: -8.0...112.0)
-        .chartYAxis(.hidden)
+        // A 0 / 50 / 100 scale, so a curve that peaks at 61 doesn't read as
+        // a full tank (Tanaka F12).
+        .chartYAxis {
+            AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+                AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
+                AxisValueLabel {
+                    if let v = value.as(Int.self) {
+                        Text("\(v)").font(.chartLabel(size: 10)).foregroundStyle(Palette(scheme: scheme).tertiary)
+                    }
+                }
+            }
+        }
         .chartXAxis {
             AxisMarks(values: ticks) { value in
                 AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
@@ -701,17 +714,17 @@ private struct EnergyCurveChart: View {
             .symbolSize(40)
             .foregroundStyle(Accent.mint.ink(scheme))
             .annotation(position: .top, spacing: 2) {
-                Text("Peak \(Clock.format(energy.highest.time))")
+                Text("Peak \(Int(energy.highest.level.rounded())) \u{00B7} \(Clock.format(energy.highest.time))")
                     .font(.chartLabel(size: 10, weight: .bold))
                     .foregroundStyle(Accent.mint.ink(scheme))
             }
         PointMark(x: .value("Time", energy.lowest.time), y: .value("Energy", energy.lowest.level))
             .symbolSize(40)
-            .foregroundStyle(Accent.coral.ink(scheme))
+            .foregroundStyle(Accent.blue.ink(scheme))
             .annotation(position: .bottom, spacing: 2) {
                 Text("Dip \(Clock.format(energy.lowest.time))")
                     .font(.chartLabel(size: 10, weight: .bold))
-                    .foregroundStyle(Accent.coral.ink(scheme))
+                    .foregroundStyle(Accent.blue.ink(scheme))
             }
     }
 
@@ -798,6 +811,10 @@ private struct EnergyBankChart: View {
         }
         .chartScrub($selection)
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ClockChartDescriptor(
+            title: "Energy left through the day", seriesName: "Energy left", yTitle: "Energy left, percent",
+            points: [(wake, atWake), (clampedNow, atNow), (bedtime, atBedtime)],
+            yLabel: { "\(Int($0.rounded()))%" }))
     }
 
     @ChartContentBuilder private var lineMarks: some ChartContent {
@@ -845,8 +862,8 @@ private struct EnergyZoneRow: View {
             Button(action: action) {
                 HStack(alignment: .top, spacing: 10) {
                     Circle().fill(accent.fill(scheme)).frame(width: 10, height: 10).padding(.top, 5)
-                    (Text("\(title) \(time)").font(.scaled(size: 14, weight: .bold))
-                     + Text(" — \(oneLiner)").font(.scaled(size: 14)).foregroundStyle(p.secondary))
+                    (Text("\(title) \(time)").font(.role(.bodyEmphasis))
+                     + Text(" — \(oneLiner)").font(.role(.bodyText)).foregroundStyle(p.secondary))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -860,9 +877,7 @@ private struct EnergyZoneRow: View {
         }
         .padding(.leading, 10)
         .padding(.vertical, 2)
-        .background(selected ? accent.tint(scheme) : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .strokeBorder(selected ? accent.fill(scheme).opacity(0.5) : Color.clear))
+        .background(selected ? accent.tint(scheme) : Color.clear, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
     }
 }
 
@@ -876,13 +891,13 @@ private struct EnergyExtremeTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             SectionLabel(text: eyebrow, accent: accent)
-            Text(value).font(.scaledNumber(26)).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.scaled(size: 13)).secondaryText()
+            Text(value).font(.numberL).minimumScaleFactor(0.6).lineLimit(1)
+            Text(note).font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .padding(Space.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -896,22 +911,29 @@ private struct EnergyInfoTile: View {
     var accent: Accent
     var systemImage: String
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 0) {
-                Text(title).font(.scaled(size: 14, weight: .bold))
+                Text(title).font(.bodyEmphasis)
                 InfoButton(topic: topic).padding(.vertical, -12)
+                    .accessibilityHidden(true)
                 Spacer(minLength: 0)
                 Image(systemName: systemImage).foregroundStyle(accent.ink(scheme)).accessibilityHidden(true)
             }
-            Text(value).font(.scaledNumber(24)).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
+            Text(note).font(.secondary).fontWeight(.semibold).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .padding(Space.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        // One stop: title, value and note, the ⓘ as an action (Ortiz F9).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(value), \(note)")
+        .accessibilityAction(named: "Explain") { explaining = topic.explanation }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }
 
@@ -927,17 +949,17 @@ private struct EnergyTipRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.scaled(size: 16, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
-                .frame(width: 36, height: 36)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 0) {
-                    Text(title).font(.scaled(size: 15, weight: .bold))
+                    Text(title).font(.bodyEmphasis)
                     if let topic { InfoButton(topic: topic).padding(.vertical, -12) }
                 }
-                Text(detail).font(.scaled(size: 13)).secondaryText()
+                Text(detail).font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -9,11 +9,9 @@ struct AccuracyTipsView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Screen(title: "Accurate numbers", accent: .indigo) {
-            Text("Getting accurate numbers")
-                .font(.scaled(size: 28, weight: .bold))
-                .accessibilityAddTraits(.isHeader)
-                .padding(.top, 4)
+        // One title, the nav title, with the same name as every link to it
+        // (Valtonen F8, Dubois 12).
+        Screen(title: "Getting accurate numbers", accent: .indigo) {
             summaryCard
             section("Wearing your Watch", watchTips)
             section("Settings on your phone and Watch", settingsTips)
@@ -138,9 +136,9 @@ struct AccuracyTipsView: View {
                 Ring(value: fraction, accent: .indigo, lineWidth: 10, label: "\(done)/\(known.count)", size: 94,
                      accessibilityText: "\(done) of \(known.count) checks done")
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Things the app can check").font(.scaled(size: 17, weight: .bold))
+                    Text("Things the app can check").font(.cardTitle)
                     Text("Your recovery, sleep need and stress are compared with your own usual, so the more good data the app has, the sharper they get.")
-                        .font(.scaled(size: 14))
+                        .font(.bodyText)
                         .secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -167,7 +165,7 @@ struct AccuracyTipsView: View {
         [
             Tip(icon: "bed.double.fill", accent: .purple, title: "Turn on a sleep schedule or Sleep Focus",
                 why: "In the Health app, under Sleep. Apple Watch only tracks sleep when one is set up.", status: sleepTrackingStatus),
-            Tip(icon: "thermometer.medium", accent: .coral, title: "Turn on Track Sleep with Apple Watch and Wrist Temperature",
+            Tip(icon: "thermometer.medium", accent: .orange, title: "Turn on Track Sleep with Apple Watch and Wrist Temperature",
                 why: "In the Watch app, under Sleep and under Health. Temperature and breathing rate help spot getting sick and your cycle.",
                 status: sensorsStatus),
             Tip(icon: "heart.text.square.fill", accent: .pink, title: "Allow all Health permissions",
@@ -209,15 +207,15 @@ struct AccuracyTipsView: View {
         let p = Palette(scheme: scheme)
         return HStack(alignment: .top, spacing: 12) {
             Image(systemName: tip.icon)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(tip.accent.ink(scheme))
-                .frame(width: 34, height: 34)
-                .background(tip.accent.tint(scheme), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(tip.accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(tip.title).font(.scaled(size: 15, weight: .bold)).fixedSize(horizontal: false, vertical: true)
+                Text(tip.title).font(.bodyEmphasis).fixedSize(horizontal: false, vertical: true)
                 Text(tip.why)
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let status = tip.status { statusLine(status) }
@@ -239,7 +237,7 @@ struct AccuracyTipsView: View {
             Image(systemName: icon).foregroundStyle(accent.ink(scheme)).accessibilityHidden(true)
             Text(text).foregroundStyle(accent.ink(scheme)).fixedSize(horizontal: false, vertical: true)
         }
-        .font(.scaled(size: 13, weight: .semibold))
+        .font(.secondary).fontWeight(.semibold)
         .padding(.top, 2)
         .accessibilityElement(children: .combine)
     }
@@ -289,11 +287,11 @@ struct AccuracyTipsView: View {
 
     private func actionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.scaled(size: 13, weight: .bold))
+            .font(.secondary).fontWeight(.bold)
             .foregroundStyle(Accent.indigo.ink(scheme))
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
-            .background(Accent.indigo.fill(scheme).opacity(0.16), in: Capsule())
+            .background(Accent.indigo.tint(scheme), in: Capsule())
             .contentShape(Capsule())
     }
 }

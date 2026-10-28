@@ -50,7 +50,7 @@ struct CycleView: View {
     /// natural cycle.
     private func reasonNote(_ text: String) -> some View {
         Label(text, systemImage: "info.circle")
-            .font(.scaled(size: 13, weight: .semibold))
+            .font(.secondary).fontWeight(.semibold)
             .secondaryText()
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -60,7 +60,7 @@ struct CycleView: View {
     private var logCard: some View {
         Card {
             LinkRow(title: "Log bleeding and symptoms", subtitle: "Flow, cramps, headaches, mood. Today or a past day",
-                    systemImage: "drop.fill", accent: .coral) {
+                    systemImage: "drop.fill", accent: .pink) {
                 CycleLogView()
             }
         }
@@ -76,7 +76,7 @@ struct CycleView: View {
                     CyclePhasesView()
                 }
                 Divider().overlay(p.cardBorder)
-                LinkRow(title: "Birth control and your Watch data", subtitle: birthControlSubtitle,
+                LinkRow(title: "Birth control and your Watch", subtitle: birthControlSubtitle,
                         systemImage: "pills.fill", accent: .indigo) {
                     BirthControlLearnView()
                 }
@@ -126,9 +126,9 @@ struct CycleView: View {
 
     private var notTrackingCard: some View {
         Card(accent: .pink) {
-            Text("Cycle tracking is off").font(.scaled(size: 18, weight: .bold))
+            Text("Cycle tracking is off").font(.cardTitle)
             Text("Cycle cards stay hidden. You can turn tracking on anytime.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             PrimaryButton(title: "Track my cycle", accent: .pink) {
@@ -226,11 +226,11 @@ private struct PhasesSection: View {
                      accessibilityText: "Cycle day \(day) of about \(length)")
                 VStack(alignment: .leading, spacing: 6) {
                     Text(BodyLogStyle.todayLine)
-                        .font(.scaled(size: 12, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle(accent.ink(scheme))
                     ExplainedTitle(text: heroTitle, topic: topic, size: 22)
                     Text([countdownText, phaseNote].compactMap { $0 }.joined(separator: " "))
-                        .font(.scaled(size: 14))
+                        .font(.bodyText)
                         .secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -256,9 +256,9 @@ private struct PhasesSection: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "pills.fill").foregroundStyle(Accent.indigo.ink(scheme)).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(bc.rawValue).font(.scaled(size: 15, weight: .bold))
+                    Text(bc.rawValue).font(.bodyEmphasis)
                     Text(methodText(bc))
-                        .font(.scaled(size: 14))
+                        .font(.bodyText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -301,12 +301,12 @@ private struct PhasesSection: View {
         return HStack(spacing: 6) {
             Circle().fill(BodyLogStyle.phaseFill(p, scheme)).frame(width: 18, height: 18)
                 .overlay(Text(BodyLogStyle.phaseLetter(p, birthControl: bc))
-                    .font(.scaled(size: 10, weight: .heavy))
+                    .font(.small).fontWeight(.bold)
                     .foregroundStyle(BodyLogStyle.phaseOnFill(p, scheme)))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text(BodyLogStyle.phaseName(p, birthControl: bc)).font(.scaled(size: 13, weight: .bold))
-                Text("Days \(r.lowerBound)\u{2013}\(r.upperBound)").font(.scaled(size: 11)).secondaryText()
+                Text(BodyLogStyle.phaseName(p, birthControl: bc)).font(.secondary).fontWeight(.bold)
+                Text("Days \(r.lowerBound)\u{2013}\(r.upperBound)").font(.small).secondaryText()
             }
             InfoButton(topic: t).padding(.vertical, -8)
         }
@@ -337,25 +337,25 @@ private struct PhasesSection: View {
     @ViewBuilder
     private var nextPeriodCard: some View {
         if let range = nextPeriodRange {
-            Card(accent: .coral) {
+            Card(accent: .pink) {
                 HStack {
-                    SectionLabel(text: "Next period", accent: .coral)
+                    SectionLabel(text: "Next period", accent: .pink)
                     Spacer()
                     InfoButton(topic: .period).padding(.vertical, -12)
                 }
-                Text(range).font(.scaledNumber(26))
+                Text(range).font(.numberL)
                 Text(model.cycleLengthIsPersonal
                      ? "Estimated from your usual \(length)-day cycle. Real cycles vary by a few days either way."
                      : "Estimated from a typical \(length)-day cycle until you\u{2019}ve logged two periods\(store.data.methodChangedDate == nil ? "" : " since your last birth-control change"). Real cycles vary by a few days either way.")
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else if model.hidesPeriodCountdownOnScreens {
-            Card(accent: .coral) {
-                SectionLabel(text: bc == .hormonalIUD || bc == .miniPill ? "Bleeding & spotting" : "Next period", accent: .coral)
+            Card(accent: .pink) {
+                SectionLabel(text: bc == .hormonalIUD || bc == .miniPill ? "Bleeding & spotting" : "Next period", accent: .pink)
                 Text(noCountdownText)
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -432,17 +432,17 @@ private struct CycleCalendarCard: View {
         Card {
             HStack(alignment: .firstTextBaseline) {
                 Text(Date.now.formatted(.dateTime.month(.wide)))
-                    .font(.scaled(size: 17, weight: .bold))
+                    .font(.cardTitle)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text("Tap a day").font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                Text("Tap a day").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             if let r = readout {
                 ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent)
             }
             LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
-                    Text(symbol).font(.scaled(size: 12, weight: .bold)).secondaryText()
+                    Text(symbol).font(.secondary).fontWeight(.bold).secondaryText()
                 }
             }
             .accessibilityHidden(true)
@@ -464,13 +464,13 @@ private struct CycleCalendarCard: View {
                 }
             }
             Text("Letters: P period, F follicular, M mid-cycle (estimate), L luteal.")
-                .font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                .font(.secondary).fontWeight(.semibold).secondaryText()
                 .accessibilityHidden(true)
             if !model.hidesPeriodCountdownOnScreens {
                 HStack(spacing: 6) {
                     Circle().strokeBorder(BodyLogStyle.phaseFill(.period, scheme), style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
                         .frame(width: 10, height: 10)
-                    Text("Dashed ring: predicted period").font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                    Text("Dashed ring: predicted period").font(.secondary).fontWeight(.semibold).secondaryText()
                 }
                 .accessibilityHidden(true)
             }
@@ -517,11 +517,11 @@ private struct CycleDayCell: View {
             background
             VStack(spacing: -1) {
                 Text("\(date)")
-                    .font(.scaled(size: 15, weight: .bold, design: .rounded))
+                    .font(.bodyEmphasis).fontWeight(.bold).fontDesign(.rounded)
                 if !isPredicted, phase != .unknown {
                     // The phase letter, so color is never the only cue.
                     Text(BodyLogStyle.phaseLetter(phase, birthControl: birthControl))
-                        .font(.scaled(size: 11, weight: .heavy))
+                        .font(.small).fontWeight(.bold)
                 }
             }
             .foregroundStyle(textColor)
@@ -617,22 +617,22 @@ private struct PackSection: View {
     private var estimateNote: some View {
         Card(accent: .yellow) {
             Label("This pack day is a guess from your last bleed", systemImage: "questionmark.circle.fill")
-                .font(.scaled(size: 15, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.yellow.ink(scheme))
             Text("Set today\u{2019}s \(unit) below so your break week lands on the right days.")
-                .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var skipNote: some View {
         Card(accent: .indigo) {
             Label("Skipping this break", systemImage: "forward.end.fill")
-                .font(.scaled(size: 15, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.indigo.ink(scheme))
             Text("Your next \(method == .combinedPill ? "pack" : unitName) starts \(model.nextPackStart.map { PackPosition.shortDate($0) } ?? "soon"), right after your last active day, so no withdrawal bleed is due this time. Some spotting is common.")
-                .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             Button("Undo") { model.undoSkipBreak() }
-                .font(.scaled(size: 15, weight: .bold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.indigo.ink(scheme))
                 .frame(minHeight: 44)
         }
@@ -651,14 +651,14 @@ private struct PackSection: View {
                         .background(Accent.indigo.tint(scheme), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Not right? Set your pack day").font(.scaled(size: 15, weight: .bold))
+                        Text("Not right? Set your pack day").font(.bodyEmphasis)
                         Text(model.packSummaryLineShown ?? "Pack type and today\u{2019}s \(unit)")
-                            .font(.scaled(size: 13)).secondaryText()
+                            .font(.secondary).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: editing ? "chevron.up" : "chevron.down")
-                        .font(.scaled(size: 13, weight: .bold))
+                        .font(.secondary).fontWeight(.bold)
                         .foregroundStyle(Palette(scheme: scheme).tertiary)
                         .accessibilityHidden(true)
                 }
@@ -674,23 +674,34 @@ private struct PackSection: View {
     }
 
     private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(BodyLogStyle.todayLine).font(.scaled(size: 13, weight: .semibold)).secondaryText()
-                Text(method == .combinedPill ? "Pill \(day) of \(packLength)" : "Day \(day) of \(packLength)")
-                    .font(.scaled(size: 30, weight: .bold)).accessibilityAddTraits(.isHeader)
-                if !hasBreak {
-                    Text("Continuous \u{00B7} no break").font(.scaled(size: 13, weight: .semibold)).secondaryText()
-                }
+        let titles = VStack(alignment: .leading, spacing: 2) {
+            Text(BodyLogStyle.todayLine).font(.secondary).fontWeight(.semibold).secondaryText()
+            Text(method == .combinedPill ? "Pill \(day) of \(packLength)" : "Day \(day) of \(packLength)")
+                .font(.detailTitle).accessibilityAddTraits(.isHeader)
+            if !hasBreak {
+                Text("Continuous \u{00B7} no break").font(.secondary).fontWeight(.semibold).secondaryText()
             }
-            Spacer()
-            HStack(spacing: 6) {
-                Image(systemName: "pills.fill").foregroundStyle(Accent.indigo.ink(scheme)).accessibilityHidden(true)
-                Text(method.rawValue).font(.scaled(size: 13, weight: .semibold))
+        }
+        let pill = HStack(spacing: 6) {
+            Image(systemName: "pills.fill").foregroundStyle(Accent.indigo.ink(scheme)).accessibilityHidden(true)
+            Text(method.rawValue).font(.secondary).fontWeight(.semibold)
+                .fixedSize()
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: Font.scaledSize(32))
+        .background(Accent.indigo.tint(scheme), in: Capsule())
+        // Beside the title when it fits, under it otherwise: the method name
+        // never breaks into "Com/bined/pill" (Ortiz F4, Brennan F10).
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .bottom) {
+                titles
+                Spacer(minLength: Space.s)
+                pill
             }
-            .padding(.horizontal, 12)
-            .frame(minHeight: Font.scaledSize(32))
-            .background(Accent.indigo.tint(scheme), in: Capsule())
+            VStack(alignment: .leading, spacing: Space.s) {
+                titles
+                pill
+            }
         }
     }
 
@@ -700,11 +711,11 @@ private struct PackSection: View {
         return Card {
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent)
             PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping, selected: $selected)
-            ScrubHint(text: "Touch and drag across the pack to see each day")
+            ScrubHint(each: "day of the pack")
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Circle().fill(BodyLogStyle.packFill(isBreak: false, scheme)).frame(width: 10, height: 10)
-                    Text("\(model.packActiveName) \u{00B7} days 1\u{2013}\(activeDays)").font(.scaled(size: 13, weight: .semibold))
+                    Text("\(model.packActiveName) \u{00B7} days 1\u{2013}\(activeDays)").font(.secondary).fontWeight(.semibold)
                     InfoButton(topic: .pillPack).padding(.vertical, -10)
                 }
                 if hasBreak {
@@ -712,11 +723,11 @@ private struct PackSection: View {
                         Circle().strokeBorder(BodyLogStyle.packFill(isBreak: true, scheme), style: StrokeStyle(lineWidth: 2, dash: [3, 2])).frame(width: 12, height: 12)
                         Text(isBreak ? "\(model.packBreakName) \u{00B7} now"
                              : skipping ? "\(model.packBreakName) \u{00B7} skipped this time"
-                             : "\(model.packBreakName) \u{00B7} from \(breakDateText)").font(.scaled(size: 13, weight: .semibold))
+                             : "\(model.packBreakName) \u{00B7} from \(breakDateText)").font(.secondary).fontWeight(.semibold)
                         InfoButton(topic: .withdrawalBleed).padding(.vertical, -10)
                     }
                 } else {
-                    Text("Continuous use \u{00B7} no break week").font(.scaled(size: 13, weight: .semibold))
+                    Text("Continuous use \u{00B7} no break week").font(.secondary).fontWeight(.semibold)
                 }
             }
             .secondaryText()
@@ -747,13 +758,13 @@ private struct PackSection: View {
     private var statusCard: some View {
         Card(accent: isBreak ? .coral : .indigo) {
             Text(statusTitle)
-                .font(.scaled(size: 17, weight: .bold))
+                .font(.cardTitle)
             Text(statusText)
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             if hasBreak && !skipping {
                 Text(CycleCare.noBleedAdvice(method))
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -762,17 +773,20 @@ private struct PackSection: View {
 
     private var offCard: some View {
         Card {
-            SectionLabel(text: "Switched off for you")
-            ForEach(["Egg-release estimate", "Fertile days", "Luteal heart-rate bump", "Period countdown"], id: \.self) { item in
+            // Plain words and plain rows: "ovulation", no strikethrough
+            // (Dubois 15).
+            SectionLabel(text: "Not shown on the \(method.inSentence)")
+            ForEach(["Ovulation estimate", "Fertile days", "Luteal heart-rate bump", "Period countdown"], id: \.self) { item in
                 HStack(spacing: 10) {
                     Image(systemName: "nosign").foregroundStyle(Palette(scheme: scheme).tertiary).accessibilityHidden(true)
-                    Text(item).strikethrough().secondaryText()
+                    Text(item).secondaryText()
                 }
-                .font(.scaled(size: 15))
-                .accessibilityLabel("\(item): switched off")
+                .font(.bodyText)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(item): not shown")
             }
             Text("Your \(method.inSentence) stops your body from releasing an egg each month, so these natural-cycle changes don't happen to you and the app never predicts them.")
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -780,12 +794,12 @@ private struct PackSection: View {
 
     private var trackCard: some View {
         Card(accent: .indigo) {
-            SectionLabel(text: "What we still track for you", accent: .indigo)
-            trackRow("thermometer.medium", .coral, "Temperature running a bit higher and flat. Normal on your method.")
+            SectionLabel(text: "Still tracked", accent: .indigo)
+            trackRow("thermometer.medium", .orange, "Temperature running a bit higher and flat. Normal on your method.")
             trackRow("drop.fill", .pink, "Withdrawal bleeds and spotting, from what you log.")
             trackRow("face.smiling", .purple, "Headaches, mood and other symptoms you log, by date. Some people notice headaches in the break week.")
             Text(hasBreak ? CycleCare.packBleedCantShowFuel : CycleCare.methodBleedCantShowFuel)
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Learn how the \(unitName) affects your body", systemImage: "book.fill", accent: .indigo) {
@@ -797,12 +811,12 @@ private struct PackSection: View {
     private func trackRow(_ symbol: String, _ accent: Accent, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
-                .font(.scaled(size: 15, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(accent.ink(scheme))
                 .frame(width: 32, height: 32)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
-            Text(text).font(.scaled(size: 15)).fixedSize(horizontal: false, vertical: true).padding(.top, 5)
+            Text(text).font(.bodyText).fixedSize(horizontal: false, vertical: true).padding(.top, 5)
         }
     }
 }
@@ -921,39 +935,39 @@ private struct SuppressedSection: View {
 
     var body: some View {
         Card {
-            Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
-            Text("On the \(name)").font(.scaled(size: 26, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text(BodyLogStyle.todayLine).font(.secondary).fontWeight(.bold).foregroundStyle(Accent.indigo.ink(scheme))
+            Text("On the \(name)").font(.detailTitle).accessibilityAddTraits(.isHeader)
             Text(heroText)
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             if let days = model.daysSinceLastPeriodStart {
                 Label(days == 0 ? "Bleeding started today" : "Last bleeding started \(days) day\(days == 1 ? "" : "s") ago", systemImage: "drop.fill")
-                    .font(.scaled(size: 14, weight: .semibold))
-                    .foregroundStyle(Accent.coral.ink(scheme))
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(Accent.pink.ink(scheme))
             }
         }
         if !recentStarts.isEmpty { historyCard }
         Card(accent: .mint) {
             SectionLabel(text: "Bleeding on your method", accent: .mint)
             Text("Bleeding may be light, come at random times, or stop completely. All of that is expected on the \(name) and isn't a sign that something is wrong.")
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Log any bleeding or spotting and we'll keep a history you can show your doctor.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text(CycleCare.methodBleedCantShowFuel)
-                .font(.scaled(size: 13))
+                .font(.secondary)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
         if method == .miniPill { MissedDoseCard(method: .miniPill) }
         Card {
-            SectionLabel(text: "What we still track for you")
+            SectionLabel(text: "Still tracked")
             Text(mayOvulate
                  ? "Your temperature, HRV and resting heart rate, compared with your own usual. You may still ovulate, and the app can\u{2019}t tell which part of your cycle you\u{2019}re in, so the sick check doesn\u{2019}t assume a phase. If it flags something, it says your cycle could be part of it."
                  : "Your temperature, HRV and resting heart rate, compared with your own usual. With no monthly hormone swings, changes in them are more likely to be about sleep, stress or getting sick.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         BleedingCheckCard(extra: "Bleeding that lasts more than 2 weeks or comes with a lot of pain, or you think you could be pregnant: check in with a doctor too.")
@@ -965,18 +979,18 @@ private struct SuppressedSection: View {
             ForEach(Array(recentStarts.enumerated()), id: \.offset) { i, start in
                 HStack {
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year()))
-                        .font(.scaled(size: 15, weight: .semibold))
+                        .font(.bodyEmphasis)
                     Spacer()
                     if i + 1 < recentStarts.count,
                        let gap = Calendar.current.dateComponents([.day], from: recentStarts[i + 1], to: start).day {
-                        Text("\(gap) days after the one before").font(.scaled(size: 13)).secondaryText()
+                        Text("\(gap) days after the one before").font(.secondary).secondaryText()
                     }
                 }
                 .frame(minHeight: 32)
                 .accessibilityElement(children: .combine)
             }
             Text("Started on these days. A history like this is what a doctor will ask about.")
-                .font(.scaled(size: 13)).secondaryText()
+                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -991,17 +1005,17 @@ private struct BleedingCheckCard: View {
 
     var body: some View {
         Card(accent: .coral) {
-            Text("When to get bleeding checked").font(.scaled(size: 15, weight: .bold))
+            Text("When to get bleeding checked").font(.bodyEmphasis)
                 .accessibilityAddTraits(.isHeader)
             Text(CycleCare.bleedingRedFlags)
-                .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             Text(CycleCare.heavyBleeding)
-                .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             if let extra {
-                Text(extra).font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                Text(extra).font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             Text(CycleCare.heavyBleedingUrgent)
-                .font(.scaled(size: 14, weight: .semibold))
+                .font(.bodyEmphasis)
                 .foregroundStyle(Accent.coral.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1020,10 +1034,10 @@ private struct PackUnknownSection: View {
 
     var body: some View {
         Card {
-            Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
-            Text("Set where you are in your pack").font(.scaled(size: 24, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text(BodyLogStyle.todayLine).font(.secondary).fontWeight(.bold).foregroundStyle(Accent.indigo.ink(scheme))
+            Text("Set where you are in your pack").font(.detailTitle).accessibilityAddTraits(.isHeader)
             Text("The app doesn\u{2019}t know which \(unit) you\u{2019}re on yet, so it can\u{2019}t show your active days and break week. Pick today\u{2019}s \(unit) from your pack.")
-                .font(.scaled(size: 15))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         Card {
@@ -1033,7 +1047,7 @@ private struct PackUnknownSection: View {
         Card(accent: .indigo) {
             SectionLabel(text: "On your \(method.inSentence)", accent: .indigo)
             Text("It stops your body from releasing an egg, so there are no ovulation or luteal phases and no period countdown. The bleed in your break week is a withdrawal bleed.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Learn how it affects your body", systemImage: "book.fill", accent: .indigo) {
                 BirthControlLearnView()
@@ -1062,23 +1076,23 @@ private struct OverdueSection: View {
 
     var body: some View {
         Card {
-            Text(BodyLogStyle.todayLine).font(.scaled(size: 12, weight: .bold)).foregroundStyle(Accent.indigo.ink(scheme))
+            Text(BodyLogStyle.todayLine).font(.secondary).fontWeight(.bold).foregroundStyle(Accent.indigo.ink(scheme))
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Day \(day)").font(.scaledNumber(44))
+                Text("Day \(day)").font(.display)
                 InfoButton(explanation: Explanation(id: "overdue", title: "A longer cycle",
                                                    meaning: "Cycles vary. One that runs past your usual length now and then is common: stress, illness, travel, changes in sleep or exercise can all delay ovulation, and the period with it.",
                                                    forYou: "Log your period when it starts and the app picks up from there. If you could be pregnant: \(CycleCare.pregnancyTestTiming)"))
             }
             Text("Longer than \(model.usualLengthPhrase(typicalLength))")
-                .font(.scaled(size: 18, weight: .bold))
+                .font(.cardTitle)
                 .accessibilityAddTraits(.isHeader)
             Text("No period logged yet this cycle. The app doesn\u{2019}t guess a phase or a date while a cycle runs longer than usual, so nothing here counts down.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             NavigationLink { CycleLogView() } label: {
                 Label("Log a period", systemImage: "drop.fill")
-                    .font(.scaled(size: 17, weight: .bold))
+                    .font(.cardTitle)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .foregroundStyle(scheme == .dark ? Color(hex: 0x0E1136) : .white)
                     .background(scheme == .dark ? Accent.indigo.fill(.dark) : Accent.indigo.ink(.light), in: Capsule())
@@ -1089,13 +1103,13 @@ private struct OverdueSection: View {
         Card(accent: .indigo) {
             SectionLabel(text: "If your cycles often vary this much", accent: .indigo)
             Text("Switch to irregular tracking. The app then counts days since your last period and leaves out predictions and countdowns.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             Button {
                 store.data.cycleSetup = .irregular
             } label: {
                 Text("Switch to irregular")
-                    .font(.scaled(size: 15, weight: .bold))
+                    .font(.bodyEmphasis)
                     .foregroundStyle(Accent.indigo.ink(scheme))
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Accent.indigo.fill(scheme).opacity(0.18), in: Capsule())
@@ -1104,9 +1118,9 @@ private struct OverdueSection: View {
         }
         CycleCareNotes()
         Card {
-            Text("Check in with a doctor if").font(.scaled(size: 15, weight: .bold))
+            Text("Check in with a doctor if").font(.bodyEmphasis)
             Text(doctorText)
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1157,24 +1171,24 @@ private struct IrregularSection: View {
 
     var body: some View {
         Card {
-            Text("Your cycle, your way").font(.scaled(size: 26, weight: .bold)).accessibilityAddTraits(.isHeader)
+            Text("Your cycle, your way").font(.detailTitle).accessibilityAddTraits(.isHeader)
             if let days = model.daysSinceLastPeriodStart {
                 if days == 0 {
-                    Text("Your period started today").font(.scaled(size: 20, weight: .bold)).foregroundStyle(Accent.coral.ink(scheme))
+                    Text("Your period started today").font(.section).foregroundStyle(Accent.pink.ink(scheme))
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("\(days)").font(.scaledNumber(48)).foregroundStyle(Accent.coral.ink(scheme))
-                        Text("day\(days == 1 ? "" : "s") since your last period started").font(.scaled(size: 15, weight: .semibold)).secondaryText()
+                        Text("\(days)").font(.display).foregroundStyle(Accent.pink.ink(scheme))
+                        Text("day\(days == 1 ? "" : "s") since your last period started").font(.bodyEmphasis).secondaryText()
                     }
                     .accessibilityElement(children: .combine)
                 }
             } else {
                 Text("Log the first day of your next period and we'll start counting from there.")
-                    .font(.scaled(size: 15))
+                    .font(.bodyText)
                     .secondaryText()
             }
             Text("No countdown here. Your cycles vary a lot, so a predicted date would be wrong more often than right.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         historyCard
@@ -1183,11 +1197,11 @@ private struct IrregularSection: View {
             Text(model.ovulationStopped
                  ? "Your birth control stops your body from releasing an egg, so the app keeps a history of the bleeding you log. No predictions."
                  : "The app doesn't predict ovulation or periods for irregular cycles. It keeps a history of the periods you log, which is the most useful thing to bring to a doctor.")
-                .font(.scaled(size: 14))
+                .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
             if model.cycleIsNatural {
                 Text(CycleCare.redS)
-                    .font(.scaled(size: 13))
+                    .font(.secondary)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1201,13 +1215,14 @@ private struct IrregularSection: View {
             SectionLabel(text: bars.isEmpty ? "Your cycle lengths" : "Your last \(bars.count) cycles")
             if bars.isEmpty {
                 Text("Log the first day of each period and we'll keep a history of your cycle lengths. That's useful to share with a doctor.")
-                    .font(.scaled(size: 14))
+                    .font(.bodyText)
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                ChartReadout(title: readoutTitle, value: readoutValue, detail: readoutDetail, accent: .coral)
+                ChartReadout(title: readoutTitle, value: readoutValue, detail: readoutDetail, accent: .pink,
+                             onClear: selectedLabel == nil ? nil : { selectedLabel = nil })
                 cycleChart
-                ScrubHint()
+                ScrubHint(each: "cycle")
             }
         }
     }
@@ -1255,7 +1270,7 @@ private struct IrregularSection: View {
         // A category per cycle (its start date), so every bar gets a real
         // band to fill; a numeric x gave each bar a sliver and drew nothing.
         let fill = BodyLogStyle.phaseFill(.period, scheme)
-        let ink = Accent.coral.ink(scheme)
+        let ink = Accent.pink.ink(scheme)
         let top = max(chartBars.map(\.days).max() ?? 35, 35)
         return Chart(chartBars) { bar in
             if bar.isCurrent {
@@ -1271,7 +1286,7 @@ private struct IrregularSection: View {
                             .opacity(shownBar == nil || shownBar?.isCurrent == true ? 1 : 0.35)
                     }
                     .annotation(position: .top, spacing: 2) {
-                        Text("\(bar.days) d so far").font(.scaled(size: 11, weight: .bold)).foregroundStyle(ink)
+                        Text("\(bar.days) d so far").font(.small).fontWeight(.bold).foregroundStyle(ink)
                     }
             } else {
                 BarMark(x: .value("Cycle", bar.label), y: .value("Days", bar.days), width: .ratio(0.6))
@@ -1279,7 +1294,7 @@ private struct IrregularSection: View {
                     .opacity(shownBar == nil || shownBar?.id == bar.id ? 1 : 0.35)
                     .cornerRadius(6)
                     .annotation(position: .top, spacing: 2) {
-                        Text("\(bar.days) d").font(.scaled(size: 12, weight: .bold)).foregroundStyle(ink)
+                        Text("\(bar.days) d").font(.secondary).fontWeight(.bold).foregroundStyle(ink)
                     }
             }
         }
@@ -1288,18 +1303,21 @@ private struct IrregularSection: View {
         .chartScrub($selectedLabel, snapped: selectedLabel == nil ? nil : shownBar?.label, steps: chartBars.map(\.label))
         .chartXAxis {
             AxisMarks { _ in
-                AxisValueLabel().font(.scaled(size: 11, weight: .semibold))
+                AxisValueLabel().font(.chartLabel(size: 11, weight: .semibold))
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
                 AxisGridLine()
-                AxisValueLabel().font(.scaled(size: 11))
+                AxisValueLabel().font(.chartLabel(size: 11))
             }
         }
         .frame(height: 170)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(cycleChartSummary)
+        .accessibilityChartDescriptor(CategoryChartDescriptor(
+            title: "Cycle lengths", seriesName: "Cycle starting", yTitle: "Days",
+            points: chartBars.map { ($0.label, Double($0.days)) }, yLabel: { "\(Int($0.rounded())) days" }))
     }
 
     private var cycleChartSummary: String {
