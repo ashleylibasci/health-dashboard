@@ -48,10 +48,11 @@ struct ChronotypeView: View {
                 .fixedSize(horizontal: false, vertical: true)
             AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("Middle of your sleep on free days").font(.scaled(size: 14, weight: .semibold)).secondaryText()
+                Text(c.midSleepFreeCorrected == c.midSleepFree ? "Middle of your sleep on free days" : "Body clock time (free-day middle, minus catch-up sleep)")
+                    .font(.scaled(size: 14, weight: .semibold)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
-                InfoButton(title: "Middle of your sleep",
-                           meaning: "The halfway point between falling asleep and waking up on days with no alarm. It's the simplest way to tell how early or late your body naturally runs.",
+                InfoButton(title: "Body clock time",
+                           meaning: "The halfway point between falling asleep and waking up on days with no alarm. It's the simplest way to tell how early or late your body naturally runs. When you sleep longer on free days to catch up, that extra sleep pushes the raw middle later, so we take it out." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your raw free-day middle is \(Clock.format(c.midSleepFree)); without the catch-up sleep it's \(Clock.format(c.midSleepFreeCorrected))."),
                            forYou: "The later it is, the more of an evening type you are, and the harder early classes feel. Morning daylight and a steady wake time pull it earlier.")
                     .padding(.vertical, -12)
                 }
@@ -140,7 +141,7 @@ struct ChronotypeView: View {
                 ScrubHint()
                 VStack(spacing: 6) {
                     legendRow(accent: .indigo, name: "School nights", detail: "\(work.label) · middle \(Clock.format(c.midSleepWork))")
-                    legendRow(accent: .orange, name: "Free days", detail: "\(free.label) · middle \(Clock.format(c.midSleepFree))")
+                    legendRow(accent: .orange, name: "Free days", detail: "\(free.label) · middle \(Clock.format(c.midSleepFree))" + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " (raw)"))
                 }
             }
             HStack(alignment: .top, spacing: 10) {
@@ -161,7 +162,7 @@ struct ChronotypeView: View {
         guard let raw = windowSelection else {
             return ChartReadout(title: "Middle of your sleep",
                                 value: "\(Clock.duration(c.socialJetlag)) later on free days",
-                                detail: "School nights \(Clock.format(c.midSleepWork)), free days \(Clock.format(c.midSleepFree)).",
+                                detail: "School nights \(Clock.format(c.midSleepWork)), free days \(Clock.format(c.midSleepFree))." + (c.midSleepFreeCorrected == c.midSleepFree ? "" : " Your body clock time, \(Clock.format(c.midSleepFreeCorrected)), takes out the catch-up sleep."),
                                 accent: .orange)
         }
         let t = Int((Double(raw) / 5).rounded()) * 5
@@ -399,7 +400,7 @@ private struct ChronotypeSpectrum: View {
             ScrubHint(text: "Touch and drag along the bar")
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Body clock spectrum from very early to very late. The middle of your sleep on free days is \(Clock.format(msfsc)), a \(category.rawValue.lowercased()).")
+        .accessibilityLabel("Body clock spectrum from very early to very late. Your body clock time (free-day sleep middle, minus catch-up sleep) is \(Clock.format(msfsc)), a \(category.rawValue.lowercased()).")
     }
 }
 

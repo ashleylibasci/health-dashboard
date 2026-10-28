@@ -127,16 +127,10 @@ struct SleepNeedView: View {
         return part.label
     }
 
+    /// The same sentence Today shows (`tonightShortNote`), from the one plan.
     private func planSentence(_ plan: WakePlan) -> String {
-        let up = Clock.format(store.data.upBy)
-        if plan.shortfall > 10 {
-            var text = "Up by \(up), you'll get \(Clock.duration(plan.asleep)), so \(Clock.duration(plan.shortfall)) goes onto your sleep debt."
-            if let bed = plan.bedtimeToCoverNeed {
-                text += " Bed by \(Clock.format(bed)) would cover it."
-            }
-            return text
-        }
-        return "Up by \(up), you'll get \(Clock.duration(plan.asleep)), which covers it."
+        if let short = model.tonightShortNote { return short + " The rest goes onto your sleep debt." }
+        return "\(model.tonightBedUpLine): about \(Clock.duration(plan.asleep)) asleep, which covers it."
     }
 
     private var tonightCard: some View {
@@ -147,7 +141,7 @@ struct SleepNeedView: View {
             HStack(alignment: .firstTextBaseline) {
                 ExplainedTitle(text: "Tonight you need", topic: .tonightNeed)
                 Spacer()
-                Text(Clock.duration(tonight.total)).font(.scaledNumber(22))
+                Text(model.tonightNeedText).font(.scaledNumber(22))
             }
             ForEach(Array(tonight.parts.enumerated()), id: \.offset) { index, part in
                 HStack(spacing: 0) {

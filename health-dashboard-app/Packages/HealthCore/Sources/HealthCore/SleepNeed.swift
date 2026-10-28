@@ -163,7 +163,10 @@ public enum SleepNeedEstimator {
         let spread = objective.count >= 2
             ? (objective.map { Double($0.minutes) }.standardDeviation ?? 0)
             : 45
-        let clamped = min(max(Int(mean.rounded()) + userAdjustment, researchLimits.lowerBound), researchLimits.upperBound)
+        // Rounded to 5 minutes: the estimate is only good to ±15 minutes or so,
+        // so "7h 54m" would claim precision it doesn't have (Sam N16).
+        let rounded = Int((mean / 5).rounded()) * 5
+        let clamped = min(max(rounded + userAdjustment, researchLimits.lowerBound), researchLimits.upperBound)
         let half = Int(max(15, min(spread, 60)).rounded())
 
         // Confidence needs at least one strong knee fit; the rebound alone

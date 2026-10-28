@@ -66,7 +66,8 @@ struct WaterView: View {
         let gap = pace - have
         if gap <= bottleML * 0.25 { return "On track for this time of day." }
         if gap < bottleML { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up." }
-        return "About \(LogFormat.bottlesPhrase(gap / bottleML)) behind a steady pace for this time of day."
+        let behind = gap / bottleML
+        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day."
     }
 
     private var hero: some View {

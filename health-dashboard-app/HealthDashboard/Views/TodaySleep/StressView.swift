@@ -44,7 +44,7 @@ struct StressView: View {
     nonisolated static func meaning(_ level: Int) -> String {
         switch StressModel.label(for: level) {
         case .low: return "Low: your heart was close to its resting pace while you were still."
-        case .usual: return "Usual: normal day-to-day ups and downs. Nothing to do."
+        case .usual: return "Moderate: normal day-to-day ups and downs. Nothing to do."
         case .raised: return "Raised: your heart rate was up while you were sitting still. A minute of slow breathing helps."
         case .high: return "High: your body was working hard while you weren't moving. A break, slow breathing or some fresh air brings it down."
         }
@@ -162,7 +162,7 @@ struct StressView: View {
             // the words into letters.
             FlowLayout(spacing: 12, lineSpacing: 6) {
                 swatch(Accent.mint.fill(scheme), "Low")
-                swatch(Accent.blue.fill(scheme), "Usual")
+                swatch(Accent.blue.fill(scheme), StressDay.Label.usual.rawValue)
                 swatch(Accent.orange.fill(scheme), "Raised")
                 swatch(Accent.coral.fill(scheme), "High")
                 swatch(p.primary.opacity(0.18), "Active")

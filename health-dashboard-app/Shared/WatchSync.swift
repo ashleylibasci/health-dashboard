@@ -52,6 +52,15 @@ struct WatchSnapshot: Codable, Equatable {
     /// Her caffeine cutoff for a typical drink falls before she's up (the
     /// pill, ring or patch slow caffeine down): `caffeineCutoff` is nil then.
     var caffeineCutoffBeforeWake: Bool? = nil
+    /// Tonight's plan, the same numbers the phone shows (round 3, N3):
+    /// the best wake time (end of a sleep cycle; `alarmWindowEnd` is the
+    /// latest the alarm rings, a few minutes after it), her up-by time,
+    /// tonight's need and the sleep the plan expects. Older phone builds
+    /// omit them.
+    var plannedWake: Date? = nil
+    var upBy: Date? = nil
+    var tonightNeedMinutes: Int? = nil
+    var plannedAsleepMinutes: Int? = nil
 
     struct Zone: Codable, Equatable {
         var title: String

@@ -169,7 +169,7 @@ struct TodayView: View {
     private var recoveryValue: Int? { model.recoveryShown }
 
     private var recoveryNote: String {
-        var note = model.recoveryUsualIsPersonal ? "Your usual is \(model.recoveryUsual)." : "Typical is \(model.recoveryUsual)."
+        var note = model.recoveryUsualNote
         if model.recoveryIsExample {
             note += " Example: it uses example heart readings until your Watch has learned your usual."
         } else if !model.hasHeartData {
@@ -397,9 +397,10 @@ struct TodayView: View {
     // MARK: Tonight
 
     private var tonightCard: some View {
-        let plan = model.wakePlan()
-        let bed = store.data.bedtime
-        let wake = plan?.wake ?? store.data.upBy
+        let tonight = model.tonightPlan
+        let plan = tonight.plan
+        let bed = tonight.bedtime
+        let wake = tonight.wake ?? tonight.upBy
         let alarmText: String
         let weekendMorning = Calendar.current.isDateInWeekend(model.nextWakeDay)
         if let plan {
@@ -411,7 +412,7 @@ struct TodayView: View {
             } else {
                 state = "On"
             }
-            alarmText = "Smart alarm \(Clock.format(plan.alarmWindow.end, suffix: false)) \u{00B7} " + state
+            alarmText = "Smart alarm by \(Clock.format(plan.alarmWindow.end)) \u{00B7} " + state
         } else {
             alarmText = "Plan your wake time"
         }
@@ -419,18 +420,24 @@ struct TodayView: View {
             AdaptiveStack(spacing: 14) {
                 SleepArcDial(start: bed, end: wake, size: 88, lineWidth: 10,
                              colors: [Accent.purple.fill(scheme), Accent.orange.fill(scheme)],
-                             label: SleepText.hours(wake - bed), labelSize: 20)
+                             label: Clock.duration(tonight.expectedAsleep), labelSize: 20, caption: "asleep")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 0) {
                         SectionLabel(text: "Tonight", accent: .purple)
                         InfoButton(title: "Tonight's plan",
-                                   meaning: "Your planned bedtime and the best time to wake tomorrow: the end of a sleep cycle that still lands before you need to be up.",
-                                   forYou: "Tap the alarm chip to see why that time and to set the smart alarm on your Watch. Your phone's alarms are never changed.")
+                                   meaning: "Your planned bedtime and the best time to wake tomorrow: the end of a sleep cycle that still lands before you need to be up. Tonight you need \(model.tonightNeedText).",
+                                   forYou: (model.wakeTimesExplained.map { $0 + " " } ?? "") + "Tap the alarm chip to set the smart alarm on your Watch. Your phone's alarms are never changed.")
                             .padding(.vertical, -14)
                     }
-                    Text("Bed by \(Clock.format(bed, suffix: false)), up \(Clock.format(wake, suffix: false))")
+                    Text(model.tonightBedUpLine)
                         .font(.scaled(size: 19, weight: .bold))
                         .fixedSize(horizontal: false, vertical: true)
+                    if let short = model.tonightShortNote {
+                        Text(short)
+                            .font(.scaled(size: 13))
+                            .secondaryText()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     NavigationLink {
                         WakePlanView()
                     } label: {
@@ -624,8 +631,7 @@ private struct WaterTile: View {
         guard bottleML > 0 else { return "" }
         let had = todayML / bottleML
         let goal = goalML / bottleML
-        let noun = goal > 1 ? "bottles" : "bottle"
-        return "\(LogFormat.bottles(had)) of \(LogFormat.bottles(goal)) \(noun)"
+        return "\(LogFormat.bottles(had)) of \(LogFormat.bottlesPhrase(goal))"
     }
 
     var body: some View {

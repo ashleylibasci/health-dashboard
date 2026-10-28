@@ -95,6 +95,12 @@ struct WakePlanView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .smartAlarm).padding(.vertical, -14)
             }
+            if let times = model.wakeTimesExplained {
+                Text(times)
+                    .font(.scaled(size: 13))
+                    .foregroundStyle(p.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HowWeGotThisLink(title: "Best time to wake",
                              method: "We count whole sleep cycles from about \(latency) minutes after your bedtime, using \(cycleSource). We pick the last cycle end before your up-by time, prefer one inside the wake window where your past mornings felt best, and check it against tonight's sleep need. The smart alarm window runs from \(AppModel.alarmWindowLead) minutes before that cycle ends to 3 minutes after.")
         }
@@ -220,8 +226,8 @@ struct WakePlanView: View {
     private func tipText(_ plan: WakePlan) -> String? {
         guard !isGood(plan) else { return nil }
         var text = "Only \(plan.cycles) full cycles fit."
-        if let bed = plan.bedtimeToCoverNeed {
-            text += " To cover tonight's need, go to bed by \(Clock.format(bed))."
+        if let bed = model.tonightPlan.bedtimeToCoverNeed {
+            text += " To cover tonight's \(model.tonightNeedText), go to bed by \(Clock.format(bed))."
         }
         return text
     }

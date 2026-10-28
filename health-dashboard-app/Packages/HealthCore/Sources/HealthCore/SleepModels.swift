@@ -32,6 +32,13 @@ public struct SleepSession: Hashable, Codable, Sendable {
     public var asleepMinutes: Int { segments.filter { $0.stage != .awake }.map(\.minutes).reduce(0, +) }
     public var latencyMinutes: Int { max(0, Int(sleepOnset.timeIntervalSince(inBed) / 60)) }
     public func minutes(in stage: SleepStage) -> Int { segments.filter { $0.stage == stage }.map(\.minutes).reduce(0, +) }
+    /// Awake minutes between falling asleep and waking. Lying awake before
+    /// sleep isn't counted, so fell-asleep → woke-up always covers asleep +
+    /// awake (Sam N1).
+    public var awakeAfterOnsetMinutes: Int {
+        let onset = sleepOnset
+        return segments.filter { $0.stage == .awake && $0.start >= onset }.map(\.minutes).reduce(0, +)
+    }
 
     /// The stage she was in just before waking.
     public var wakeStage: SleepStage? { segments.last { $0.stage != .awake }?.stage }

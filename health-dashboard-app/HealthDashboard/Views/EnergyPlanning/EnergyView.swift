@@ -28,7 +28,7 @@ struct EnergyView: View {
 
     /// Her usual score (her own average once there are 7 days), else a typical one.
     private var usualScore: Int { model.energyUsual }
-    /// "your usual 74" or "a typical 74".
+    /// "your usual 74" or "the starting point of 74".
     private var usualPhrase: String { model.energyUsualPhrase }
 
     @State private var day: Day = .today
@@ -112,7 +112,7 @@ struct EnergyView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("0 to 100: how alert your body is predicted to feel across your waking hours. " + (model.energyUsualIsPersonal ? "Your usual is \(usualScore)." : "Typical is about \(usualScore); your own usual shows after 7 days."))
+            Text("0 to 100: how alert your body is predicted to feel across your waking hours. " + (model.energyUsualIsPersonal ? "Your usual is \(usualScore)." : "The app starts from \(usualScore), a fixed starting point; your own usual shows after 7 days."))
                 .font(.scaled(size: 13)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(topic: .energyScore)
@@ -201,7 +201,7 @@ struct EnergyView: View {
                 Spacer()
                 Text(chartNote(e)).font(.scaled(size: 13)).secondaryText()
             }
-            ChartReadout(title: "\(lead) · \(moment.title)", value: "Energy level \(moment.level)",
+            ChartReadout(title: "\(lead) · \(moment.title)", value: "Energy level \(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
                          detail: "\(moment.meaning) \(action)", accent: accent)
                 .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
             EnergyCurveChart(energy: e,
@@ -489,16 +489,19 @@ struct EnergyView: View {
         }
         let example = model.recoveryIsExample ? " (an example number for now)" : ""
         let morning = store.data.upBy <= 7 * 60 ? " Training early? Warm up a little longer." : ""
-        // The same band as the recovery label, scaled to her own spread.
-        let band = Int(Recovery.band(spread: model.personalRecoverySpread).rounded())
-        let gap = recovery - model.recoveryUsual
-        if gap >= band {
-            return ("Push", "Recovery \(recovery)\(example) is above \(usual). A good day for a hard workout.\(morning) \(steps)")
+        // The same band, and so the same name, as the recovery label.
+        let level = model.recoveryLevel(for: recovery)
+        let label = level.label
+        switch level {
+        case .push:
+            return (level.effort, "Recovery \(recovery)\(example), \(label.lowercased()): above \(usual). A good day for a hard workout.\(morning) \(steps)")
+        case .onTrack:
+            return (level.effort, "Recovery \(recovery)\(example), \(label.lowercased()): about \(usual). Train as planned.\(morning) \(steps)")
+        case .steady:
+            return (level.effort, "Recovery \(recovery)\(example), \(label.lowercased()): a bit below \(usual). Keep hard sessions moderate today.\(morning) \(steps)")
+        case .easy:
+            return (level.effort, "Recovery \(recovery)\(example), \(label.lowercased()): well below \(usual). Keep training light today. \(steps)")
         }
-        if gap <= -band {
-            return ("Go easy", "Recovery \(recovery)\(example) is below \(usual). Keep training light today. \(steps)")
-        }
-        return ("As planned", "Recovery \(recovery)\(example) is about \(usual). Train as planned.\(morning) \(steps)")
     }
 
     // MARK: Make the most of it

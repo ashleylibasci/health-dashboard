@@ -43,7 +43,7 @@ struct FitnessView: View {
                 }
             }
             HowWeGotThisLink(title: "Fitness age",
-                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average \(store.data.sex == .female ? "woman" : "man") has your VO\u{2082} max, from population averages that drop about \(store.data.sex == .female ? "0.32" : "0.35") points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age when you've added it, otherwise with an average 20-year-old, on the same line, so the two always agree.")
+                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average \(store.data.sex == .female ? "woman" : "man") has your VO\u{2082} max, from population averages that drop about \(store.data.sex == .female ? "0.32" : "0.35") points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
         }
     }
 
@@ -64,7 +64,7 @@ struct FitnessView: View {
                                    forYou: "Higher is better. It rises with regular cardio (brisk walks, runs, cycling) and drops with time off. It changes over weeks, not days.")
                             .padding(.vertical, -12)
                     }
-                    Text(model.fitnessLevel ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    Text(model.fitnessLevelShown ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !typeSize.isAccessibilitySize { Spacer() }

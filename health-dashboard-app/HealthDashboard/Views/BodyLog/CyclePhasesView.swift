@@ -77,9 +77,9 @@ struct CyclePhasesView: View {
         }
         Card {
             CycleStrip(length: length, today: min(day, length),
-                       color: { d in BodyLogStyle.phaseFill(CycleEstimator.phase(day: d, length: length), scheme) },
-                       readout: { d in CycleCopy.dayReadout(day: d, length: length, birthControl: store.birthControl, isToday: d == day) },
-                       letter: { d in BodyLogStyle.phaseLetter(CycleEstimator.phase(day: d, length: length), birthControl: store.birthControl) })
+                       color: { d in BodyLogStyle.phaseFill(model.cyclePhase(day: d, length: length), scheme) },
+                       readout: { d in CycleCopy.dayReadout(day: d, length: length, birthControl: store.birthControl, isToday: d == day, periodLength: model.periodLength) },
+                       letter: { d in BodyLogStyle.phaseLetter(model.cyclePhase(day: d, length: length), birthControl: store.birthControl) })
         }
         phaseCards(length: length, today: day)
         if CycleEstimator.isLateLuteal(day: day, length: length) {
@@ -109,7 +109,7 @@ struct CyclePhasesView: View {
         return ForEach(items) { item in
             PhaseCard(phase: item.phase, length: length, today: today,
                       average: model.phaseAverages?[item.phase], birthControl: store.birthControl,
-                      showsExercise: !model.hidesActivityNumbers)
+                      showsExercise: !model.hidesActivityNumbers, periodLength: model.periodLength)
         }
     }
 
@@ -189,6 +189,7 @@ private struct PhaseCard: View {
     let average: AppModel.PhaseAverage?
     let birthControl: BirthControl?
     let showsExercise: Bool
+    var periodLength = CycleEstimator.typicalPeriodLength
     @Environment(\.colorScheme) private var scheme
 
     private var topic: Topic {
@@ -202,7 +203,7 @@ private struct PhaseCard: View {
 
     private var isNow: Bool {
         guard let today, let length else { return false }
-        return CycleCopy.range(phase, length: length).contains(today)
+        return CycleCopy.range(phase, length: length, periodLength: periodLength).contains(today)
     }
 
     var body: some View {
@@ -239,7 +240,7 @@ private struct PhaseCard: View {
 
     private var daysText: String {
         guard let length else { return "Timing varies" }
-        let r = CycleCopy.range(phase, length: length)
+        let r = CycleCopy.range(phase, length: length, periodLength: periodLength)
         return "Days \(r.lowerBound)\u{2013}\(r.upperBound)"
     }
 

@@ -183,7 +183,7 @@ final class BodySignalFixTests: XCTestCase {
         XCTAssertTrue(day.hours.first { $0.hour == 13 }!.active)
         XCTAssertNotEqual(day.peak?.hour, 13)
         XCTAssertEqual(day.label, StressModel.label(for: day.average!))
-        XCTAssertEqual(StressDay.Label.allCases.map(\.rawValue), ["Low", "Usual", "Raised", "High"])
+        XCTAssertEqual(StressDay.Label.allCases.map(\.rawValue), ["Low", "Moderate", "Raised", "High"])
     }
 
     // W11: training and luteal context; likelihood labels.

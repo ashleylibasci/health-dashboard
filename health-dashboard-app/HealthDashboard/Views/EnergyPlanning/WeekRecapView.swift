@@ -59,7 +59,9 @@ struct WeekRecapView: View {
         return Card {
             VStack(spacing: 2) {
                 Text(range).font(.scaled(size: 17, weight: .bold))
-                Text("The last 7 days \u{00B7} \(days.count) of 7 with a recorded night")
+                Text(model.usingSampleData
+                     ? "Example week \u{00B7} \(model.weekRecapDays) of 7 nights are yours"
+                     : "The last 7 days \u{00B7} \(model.weekRecapDays) of 7 with a recorded night")
                     .font(.scaled(size: 13)).secondaryText()
             }
             .frame(maxWidth: .infinity)
@@ -277,6 +279,9 @@ struct WeekRecapView: View {
                     .font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Text("\(recap.betterDays) better days vs \(recap.lowerDays) lower days" + (recap.enoughForPattern ? "." : ": too few to call it a pattern (that takes \(HabitEffect.minimumNights)+ of each), so treat these as hints."))
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
             if recap.bestDayHabits.isEmpty {
                 Text("No single habit set your better days apart this week.")
                     .font(.scaled(size: 14)).secondaryText()

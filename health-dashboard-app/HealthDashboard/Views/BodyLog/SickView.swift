@@ -235,8 +235,9 @@ struct SickView: View {
     private var helpCard: some View {
         Card(accent: .mint) {
             SectionLabel(text: "Things that may help", accent: .mint)
-            // Tonight's need already adds 30 minutes when the check says Possible or Likely.
-            tip("moon.fill", "Sleep early tonight. Aim for \(Clock.duration(model.tonightNeed.total + (model.unwellTonight ? 0 : 30))).")
+            // The same plan Today and Sleep show. Tonight's need already adds
+            // 30 minutes when the check says Possible or Likely.
+            tip("moon.fill", "Sleep early tonight. \(model.tonightAimSentence)" + (model.unwellTonight ? "" : " Add about 30 minutes if you feel unwell."))
             tip("drop.fill", "Extra water, and skip drinks for a few days.")
             tip("leaf.fill", model.hidesEffortTargets ? "Take it easy today and rest when you can." : "Keep today easy: skip hard training until you feel better.")
             tip("pills", "Some people take vitamin C or zinc at the first sign of a cold. Evidence that it helps is mixed, so ask a pharmacist first.")

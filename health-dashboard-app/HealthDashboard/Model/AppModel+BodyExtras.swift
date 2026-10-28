@@ -134,7 +134,7 @@ extension AppModel {
             let day = (cal.dateComponents([.day], from: starts[i], to: wake).day ?? 0) + 1
             let length = i + 1 < starts.count ? (cal.dateComponents([.day], from: starts[i], to: starts[i + 1]).day ?? typical) : typical
             guard day <= length + CycleDisplay.overdueGraceDays else { continue }
-            groups[CycleEstimator.phase(day: day, length: length), default: []].append(n)
+            groups[CycleEstimator.phase(day: day, length: length, periodLength: periodLength), default: []].append(n)
         }
         let allSleep = nights.map { Double($0.asleepMinutes) }.mean ?? 0
         var out: [CyclePhase: PhaseAverage] = [:]
@@ -161,7 +161,7 @@ extension AppModel {
     /// differences against her baseline.
     var bodyTrend: [TrendPoint] {
         let recent = nights.sorted { $0.wakeDay < $1.wakeDay }.suffix(14)
-        let hrvBase = usingSampleData ? SampleData.baselineHRV : baselineHRV
+        let hrvBase = baselineHRV
         return recent.map { n in
             TrendPoint(date: n.wakeDay,
                        hrv: n.outcome.hrvDeltaPct.map { hrvBase * (1 + $0 / 100) },

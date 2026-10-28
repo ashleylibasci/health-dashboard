@@ -132,8 +132,10 @@ final class AppModel: ObservableObject {
         var segments: [StageSegment]
         /// When she woke (nil for the example night).
         var wakeDate: Date? = nil
-        static let sample = LastNight(bedtime: 30, onset: 42, wake: 441, asleep: 455, wokeFromLight: true,
-                                      stageMinutes: [.deep: 72, .rem: 108, .core: 261, .awake: 14], segments: [])
+        static let sample = LastNight(bedtime: SampleData.lastNight.bedtime, onset: SampleData.lastNight.onset,
+                                      wake: SampleData.lastNight.wake, asleep: SampleData.lastNight.asleep,
+                                      wokeFromLight: SampleData.lastNight.wokeFromLight,
+                                      stageMinutes: SampleData.lastNightStages, segments: [])
     }
 
     /// The anchor today's recovery is scored around (HealthCore's typical
@@ -253,7 +255,21 @@ final class AppModel: ObservableObject {
         CycleDisplay.make(tracking: store.data.cycleSetup != .notTracking,
                           irregular: showsIrregularCycle,
                           birthControl: store.birthControl, cycleDay: cycleDay, cycleLength: cycleLength,
-                          packDay: packDay, activeDays: store.data.packActiveDays, packLength: store.data.packLength)
+                          packDay: packDay, activeDays: store.data.packActiveDays, packLength: store.data.packLength,
+                          periodLength: periodLength)
+    }
+
+    /// Her usual period length, learned from the bleeding days she logged
+    /// (the median of her recent periods), else a typical 5. The legend, the
+    /// calendar and the predicted period all use it (round 3, N10).
+    var periodLength: Int {
+        let bleeding = store.data.flowLog.filter { $0.flow != .none && $0.flow != .spotting }.map(\.date)
+        return CycleEstimator.periodLength(bleedDays: bleeding) ?? CycleEstimator.typicalPeriodLength
+    }
+
+    /// The phase on cycle `day`, with her own period length.
+    func cyclePhase(day: Int, length: Int) -> CyclePhase {
+        CycleEstimator.phase(day: day, length: length, periodLength: periodLength)
     }
 
     /// Irregular view: she said so, PCOS, or her cycles run longer than 45
@@ -336,7 +352,12 @@ final class AppModel: ObservableObject {
     /// The label for any recovery score, with bands scaled to how much her
     /// own score usually moves. Use this instead of `Recovery.label`.
     func recoveryLabel(for score: Int) -> String {
-        Recovery.label(score, usual: recoveryUsual, spread: personalRecoverySpread)
+        recoveryLevel(for: score).label
+    }
+    /// The band for any recovery score: the label and the effort target on
+    /// Energy both come from it, so they always agree.
+    func recoveryLevel(for score: Int) -> Recovery.Level {
+        Recovery.level(score, usual: recoveryUsual, spread: personalRecoverySpread)
     }
     /// Recovery today leans on example HRV and resting heart rate (the first
     /// 14 nights, before her own baseline exists).
@@ -1155,6 +1176,7 @@ final class AppModel: ObservableObject {
         let curve = stride(from: 0, to: energy.curve.count, by: 3).map { energy.curve[$0].level }
         let shownRecovery = recoveryShown
         let cutoffBeforeWake = caffeineCutoffBeforeWake
+        let tonight = tonightPlan
         WatchSync.shared.send(WatchSnapshot(
             recovery: shownRecovery ?? 0, recoveryLabel: recoveryLabel,
             energyNow: Int(energyBankNow.rounded()),
@@ -1183,7 +1205,11 @@ final class AppModel: ObservableObject {
             recoveryMissing: shownRecovery == nil,
             lastNightMissing: !lastNightIsFresh,
             todayDrinkIDs: todaysDrinks.map(\.id),
-            caffeineCutoffBeforeWake: cutoffBeforeWake))
+            caffeineCutoffBeforeWake: cutoffBeforeWake,
+            plannedWake: tonight.wake.map { AppDay.date($0, relativeTo: nextWakeDay) },
+            upBy: AppDay.date(tonight.upBy, relativeTo: nextWakeDay),
+            tonightNeedMinutes: tonight.need,
+            plannedAsleepMinutes: tonight.plan == nil ? nil : tonight.expectedAsleep))
     }
 
     func handle(_ message: WatchMessage) {
@@ -1225,6 +1251,9 @@ extension AppModel.LastNight {
         let day = AppDay.day(containing: session.wake, calendar: calendar)
         var stages: [SleepStage: Int] = [:]
         for stage in SleepStage.allCases { stages[stage] = session.minutes(in: stage) }
+        // Awake while asleep only: lying awake before falling asleep isn't
+        // part of the night between "fell asleep" and "woke up".
+        stages[.awake] = session.awakeAfterOnsetMinutes
         self.init(bedtime: AppDay.minutes(session.inBed, relativeTo: day, calendar: calendar),
                   onset: AppDay.minutes(session.sleepOnset, relativeTo: day, calendar: calendar),
                   wake: AppDay.minutes(session.wake, relativeTo: day, calendar: calendar),

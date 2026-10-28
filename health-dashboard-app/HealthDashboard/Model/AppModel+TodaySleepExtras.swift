@@ -18,36 +18,11 @@ extension AppModel {
                                  stageMinutes: lastNight.stageMinutes, wakeDay: appDayDate)
     }
 
+    /// A typical night laid out in whole minutes from falling asleep, so
+    /// the timeline's stage totals and end match the stage tiles and the
+    /// "woke up" time (HealthCore `StageLayout`).
     static func typicalNight(onset: Minutes, wake: Minutes, stageMinutes: [SleepStage: Int], wakeDay: Date) -> [StageSegment] {
-        // Five cycles: deep sleep front-loaded, REM growing toward morning.
-        let template: [(SleepStage, Double)] = [
-            (.core, 12), (.deep, 30), (.core, 14), (.rem, 8),
-            (.core, 22), (.deep, 22), (.core, 12), (.rem, 14),
-            (.core, 26), (.deep, 12), (.awake, 4), (.core, 14), (.rem, 20),
-            (.core, 30), (.deep, 6), (.rem, 26), (.awake, 6),
-            (.core, 32), (.rem, 34), (.awake, 4), (.core, 12),
-        ]
-        var templateTotals: [SleepStage: Double] = [:]
-        for (stage, m) in template { templateTotals[stage, default: 0] += m }
-        let scaled: [(SleepStage, Double)] = template.map { stage, m in
-            let target = Double(stageMinutes[stage] ?? 0)
-            let total = templateTotals[stage] ?? 1
-            return (stage, total > 0 ? m * target / total : 0)
-        }
-        let sum = scaled.map(\.1).reduce(0, +)
-        let span = Double(max(wake - onset, 1))
-        guard sum > 0 else { return [] }
-        let start = Clock.date(onset, relativeTo: wakeDay)
-        var t = 0.0
-        var out: [StageSegment] = []
-        for (stage, m) in scaled where m > 0 {
-            let length = m / sum * span
-            let a = start.addingTimeInterval(t * 60)
-            let b = start.addingTimeInterval((t + length) * 60)
-            out.append(StageSegment(stage: stage, start: a, end: b))
-            t += length
-        }
-        return out
+        StageLayout.typical(onset: Clock.date(onset, relativeTo: wakeDay), stageMinutes: stageMinutes)
     }
 
     // MARK: Sleep history
@@ -81,7 +56,7 @@ extension AppModel {
     /// Morning HRV (ms) and resting heart rate (bpm) for recent nights,
     /// rebuilt from each night's change against the usual. Oldest first.
     func heartTrend(days: Int = 14) -> [HeartNight] {
-        let hrvBase = usingSampleData ? SampleData.baselineHRV : baselineHRV
+        let hrvBase = baselineHRV
         let rhrBase = baselineRestingHR
         return sleepHistoryNights(days: days).compactMap { n in
             let h = n.outcome.hrvDeltaPct.map { hrvBase * (1 + $0 / 100) }

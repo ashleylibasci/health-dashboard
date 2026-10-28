@@ -6,8 +6,26 @@ import HealthCore
 enum SampleData {
     static let calendar = Calendar.current
 
-    /// 71 nights whose next-day numbers stop improving at about 7h 50m.
+    /// 71 nights whose next-day numbers stop improving at about 7h 50m. The
+    /// newest one is `lastNight`, with today's HRV and resting heart rate, so
+    /// the 14-night charts end on the same night and numbers as the rest of
+    /// the app (round 3, N1/N2).
     static func nights(endingOn today: Date = .now) -> [NightRecord] {
+        var all = generatedNights(endingOn: today)
+        if var newest = all.popLast() {
+            newest.bedtime = lastNight.bedtime
+            newest.sleepOnset = lastNight.onset
+            newest.wake = lastNight.wake
+            newest.asleepMinutes = lastNight.asleep
+            newest.wokeFromLightSleep = lastNight.wokeFromLight
+            newest.outcome.hrvDeltaPct = hrvDeltaPct
+            newest.outcome.restingHRDelta = restingHRDelta
+            all.append(newest)
+        }
+        return all
+    }
+
+    private static func generatedNights(endingOn today: Date) -> [NightRecord] {
         var rng = Seeded(seed: 7)
         let day0 = calendar.startOfDay(for: today)
         return (1...71).reversed().map { back in
@@ -55,8 +73,19 @@ enum SampleData {
         }
     }
 
-    static let lastNight = (bedtime: 30, onset: 42, wake: 441, asleep: 455, wokeFromLight: true)
-    static let hrvDeltaPct = -6.0, restingHRDelta = 2.0, hrv = 43.0, restingHR = 70.0
+    /// Last night's stages. "Asleep" is the sleep stages only (no awake),
+    /// and fell asleep → woke up spans asleep + awake: 12:42am to 8:17am is
+    /// 7h 35m, of which 7h 21m asleep and 14 min awake (Sam N1).
+    static let lastNightStages: [SleepStage: Int] = [.deep: 72, .rem: 108, .core: 261, .awake: 14]
+    static let lastNight: (bedtime: Minutes, onset: Minutes, wake: Minutes, asleep: Int, wokeFromLight: Bool) = {
+        let asleep = lastNightStages.filter { $0.key != .awake }.map(\.value).reduce(0, +)
+        let onset = 42
+        return (bedtime: 30, onset: onset, wake: onset + asleep + (lastNightStages[.awake] ?? 0), asleep: asleep, wokeFromLight: true)
+    }()
+    /// Today's HRV is 6% under the usual 46 ms (about 43); resting heart rate
+    /// is 2 over the usual 68. One "today" and one "usual" everywhere (N2).
+    static let hrvDeltaPct = -6.0, restingHRDelta = 2.0
+    static let hrv = baselineHRV * (1 + hrvDeltaPct / 100), restingHR = 70.0
     static let daylightToday = 18, stepsToday = 7820
     static let caffeineToday = [CaffeineDose(time: 580, mg: 130)]
     static let cycleDay = 22, cycleLength = 29
@@ -82,12 +111,6 @@ enum SampleData {
 
     /// Wake days (as offsets back from today) that followed a night with drinks.
     static let drinkNightOffsets: Set<Int> = [3, 10, 17, 24, 31, 38, 45]
-
-    /// Last caffeine time and the next night's sleep, for the cutoff test.
-    static let cutoffTest: [(lastCaffeine: Minutes?, asleep: Int)] = [
-        (580, 500), (600, 495), (640, 505), (700, 490), (590, 500), (620, 510), (610, 498),
-        (760, 478), (800, 470), (850, 475), (780, 482),
-        (930, 420), (960, 430), (1000, 415)]
 
     struct Seeded {
         var state: UInt64

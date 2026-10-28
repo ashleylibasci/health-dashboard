@@ -324,12 +324,13 @@ enum CycleCopy {
     }
 
     /// The days each phase covers for a cycle of `length` days.
-    static func range(_ phase: CyclePhase, length: Int) -> ClosedRange<Int> {
+    static func range(_ phase: CyclePhase, length: Int, periodLength: Int = CycleEstimator.typicalPeriodLength) -> ClosedRange<Int> {
         let len = max(length, 21)
         let ovulation = len - 14
+        let bleed = max(periodLength, 1)
         switch phase {
-        case .period: return 1...5
-        case .follicular: return 6...max(6, ovulation - 2)
+        case .period: return 1...bleed
+        case .follicular: return (bleed + 1)...max(bleed + 1, ovulation - 2)
         case .ovulation: return (ovulation - 1)...(ovulation + 1)
         case .luteal: return (ovulation + 2)...len
         case .unknown: return 1...len
@@ -390,8 +391,9 @@ enum CycleCopy {
     }
 
     /// The readout for one day of a natural cycle.
-    static func dayReadout(day: Int, length: Int, birthControl: BirthControl?, isToday: Bool) -> CycleReadout {
-        let phase = CycleEstimator.phase(day: day, length: length)
+    static func dayReadout(day: Int, length: Int, birthControl: BirthControl?, isToday: Bool,
+                           periodLength: Int = CycleEstimator.typicalPeriodLength) -> CycleReadout {
+        let phase = CycleEstimator.phase(day: day, length: length, periodLength: periodLength)
         let e = effects(phase)
         let late = CycleEstimator.isLateLuteal(day: day, length: length)
         var name = BodyLogStyle.phaseName(phase, birthControl: birthControl)
