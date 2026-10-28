@@ -35,7 +35,7 @@ struct WakePlanView: View {
     private func summary(_ best: SleepTiming.Result, tonight: TonightPlan) -> some View {
         SummaryHeader(eyebrow: "Your best sleep times",
                       value: Clock.format(model.tonightBedtime), unit: "bed by",
-                      status: BestTimesText.status(best),
+                      status: BestTimesText.status(best, isExample: model.usingSampleData),
                       line: BestTimesText.line(model),
                       pairs: [StatPair(label: "Up at", value: Clock.format(tonight.wake ?? tonight.upBy)),
                               StatPair(label: "Best window", value: best.bed.label)],
