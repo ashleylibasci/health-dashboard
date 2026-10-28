@@ -88,9 +88,6 @@ struct AppData: Codable {
     var sickAlerts = true
     var drinksTracking = true
     var peakDipNudges = true
-    /// For fitness age. Nil until she picks one: nothing is preselected on an
-    /// optional step, and there's no fitness age until then (round 3, A6).
-    var sex: FitnessAge.Sex?
     var ageYears: Int?
 
     /// Pill, ring or patch: the day she took pill 1 (or put in the ring /
@@ -154,7 +151,6 @@ struct AppData: Codable {
         drinksTracking = get(.drinksTracking, d.drinksTracking)
         // `friendStreaks` from older saves is ignored.
         peakDipNudges = get(.peakDipNudges, d.peakDipNudges)
-        sex = get(.sex, d.sex)
         ageYears = get(.ageYears, d.ageYears)
         packStartDate = get(.packStartDate, d.packStartDate)
         packActiveDays = min(max(get(.packActiveDays, d.packActiveDays), 1), 28)

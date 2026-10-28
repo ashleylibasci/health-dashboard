@@ -136,8 +136,6 @@ struct SettingsView: View {
                 .fixedSize()
             }
             .frame(minHeight: 44)
-            Divider().overlay(Palette(scheme: scheme).cardBorder)
-            SexPickerRow()
         }
     }
 
@@ -609,55 +607,6 @@ struct SettingsView: View {
                     confirmDelete = true
                 }
             }
-        }
-    }
-}
-
-/// "Compared with" (women or men), used only for fitness age, in the same
-/// words as the Fitness screen. The segmented control sits next to
-/// the label when it fits and under it at large text sizes.
-struct SexPickerRow: View {
-    @EnvironmentObject var store: DataStore
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        Group {
-            if typeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    label
-                    picker
-                }
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        label
-                        Spacer(minLength: 8)
-                        picker.fixedSize()
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        label
-                        picker
-                    }
-                }
-            }
-        }
-        .frame(minHeight: 44)
-    }
-
-    private var label: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Compared with").font(.scaled(size: 15, weight: .bold))
-                Text("Optional. Used only to work out your fitness age.").font(.scaled(size: 13)).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            InfoButton(topic: .fitnessAge)
-        }
-    }
-
-    private var picker: some View {
-        AdaptiveSegmentedPicker("Compared with", selection: $store.data.sex, options: [.female, .male]) { sex in
-            sex == .female ? "Women" : "Men"
         }
     }
 }

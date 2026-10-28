@@ -296,8 +296,6 @@ struct OnboardingFlow: View {
                     .fixedSize()
                 }
                 .frame(minHeight: 44)
-                Divider().overlay(p.cardBorder)
-                SexPickerRow()
             }
             PrimaryButton(title: "Continue") {
                 nameFocused = false

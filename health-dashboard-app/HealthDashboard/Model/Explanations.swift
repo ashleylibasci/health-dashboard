@@ -124,7 +124,7 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it. A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of them too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.",
             forYou: "It's a guess, not a diagnosis. Extra sleep, fluids and an easy day help. See a doctor if you feel unwell.")
         case .fitnessAge: Explanation(id: id, title: "Fitness age",
-            meaning: "The age of an average person with your cardio fitness (VO2 max, measured by your Apple Watch during walks and runs).",
+            meaning: "The age of an average woman with your cardio fitness (VO2 max, measured by your Apple Watch during walks and runs).",
             forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks.")
         case .calories: Explanation(id: id, title: "Calories",
             meaning: "An estimate of the energy your body used today: resting energy just to keep you alive, plus active energy from moving.",

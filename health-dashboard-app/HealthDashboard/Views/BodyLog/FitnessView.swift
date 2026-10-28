@@ -47,23 +47,7 @@ struct FitnessView: View {
                 }
             }
             HowWeGotThisLink(title: "Fitness age",
-                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average \(averagePerson) has your VO\u{2082} max, from population averages that drop about \(dropPerYear) points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
-        }
-    }
-
-    private var averagePerson: String {
-        switch store.data.sex {
-        case .female?: "woman"
-        case .male?: "man"
-        case nil: "woman or man (you choose which, under Compared with)"
-        }
-    }
-
-    private var dropPerYear: String {
-        switch store.data.sex {
-        case .female?: "0.32"
-        case .male?: "0.35"
-        case nil: "0.32 (women) or 0.35 (men)"
+                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average woman has your VO\u{2082} max, from population averages that drop about 0.32 points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
         }
     }
 
@@ -109,8 +93,8 @@ struct FitnessView: View {
                     }
                 }
             }
-            if let fa = model.fitnessAge, let sex = store.data.sex, age > 0, !hidesTargets {
-                Text(ageComparison(fitnessAge: fa, vo2: vo2, sex: sex))
+            if let fa = model.fitnessAge, age > 0, !hidesTargets {
+                Text(ageComparison(fitnessAge: fa, vo2: vo2))
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
             }
             if hidesTargets {
@@ -130,8 +114,8 @@ struct FitnessView: View {
         meaning: "You added eating-disorder history to your health conditions, so the app leaves out rankings like \u{201C}below average\u{201D} and fitness age, your past peak, and ups and downs over time. It also keeps calories, step counts and exercise targets out of sight.",
         forYou: "VO\u{2082} max is shown as a plain number from your Watch. You can change this in Health conditions.")
 
-    private func ageComparison(fitnessAge fa: Int, vo2: Double, sex: FitnessAge.Sex) -> String {
-        if FitnessAge.isTopOfChart(vo2Max: vo2, sex: sex) {
+    private func ageComparison(fitnessAge fa: Int, vo2: Double) -> String {
+        if FitnessAge.isTopOfChart(vo2Max: vo2, sex: .female) {
             return age <= 20 ? "Your heart and lungs are at least as fit as an average 20-year-old's." : "Your heart and lungs are fitter than an average 20-year-old's, younger than your \(age) years."
         }
         let d = fa - age
@@ -150,10 +134,8 @@ struct FitnessView: View {
     private var readoutDetail: String {
         guard let p = shown else { return "" }
         var parts: [String] = []
-        if let sex = store.data.sex {
-            let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: sex) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: sex))"
-            parts.append("Fitness age then: \(fa).")
-        }
+        let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: .female) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: .female))"
+        parts.append("Fitness age then: \(fa).")
         // No "up/down since" or "your peak" with an eating-disorder history.
         if !hidesTargets {
             if let first = points.first, p.date != first.date {
@@ -240,7 +222,7 @@ struct FitnessView: View {
             LabeledControlRow {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(age == 0 ? "Add your age (optional)" : "Your age").font(.scaled(size: 15, weight: .bold))
-                    Text("Compares your fitness with your own age group. Stays on your phone.")
+                    Text("Compares your fitness with women your age. Stays on your phone.")
                         .font(.scaled(size: 12)).secondaryText().fixedSize(horizontal: false, vertical: true)
                 }
             } control: {
@@ -253,9 +235,6 @@ struct FitnessView: View {
                 .fixedSize()
             }
             .frame(minHeight: 44)
-            AdaptiveSegmentedPicker("Compared with", selection: $store.data.sex, options: [.female, .male], accent: .mint) { sex in
-                sex == .female ? "Women" : "Men"
-            }
         }
     }
 }

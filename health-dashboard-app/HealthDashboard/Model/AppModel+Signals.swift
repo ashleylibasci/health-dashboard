@@ -77,28 +77,27 @@ extension AppModel {
     }
 
     /// Fitness age, 20 at the youngest. Show `fitnessAgeText` on screen.
-    /// Nil until she says whether to compare with women or men.
+    /// Compared with women: the app is for women.
     var fitnessAge: Int? {
-        guard let v = vo2Max, let sex = store.data.sex else { return nil }
-        return FitnessAge.estimate(vo2Max: v, sex: sex)
+        guard let v = vo2Max else { return nil }
+        return FitnessAge.estimate(vo2Max: v, sex: .female)
     }
     /// "Under 20" when fitter than an average 20-year-old, else the age.
     var fitnessAgeText: String? {
-        guard let v = vo2Max, let sex = store.data.sex else { return nil }
-        return FitnessAge.isTopOfChart(vo2Max: v, sex: sex) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: sex))"
+        guard let v = vo2Max else { return nil }
+        return FitnessAge.isTopOfChart(vo2Max: v, sex: .female) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: .female))"
     }
     /// "Above average for your age", on the same scale as the fitness age so
     /// the two never disagree. Nil until she adds her age: without it there
     /// is no age group to compare with (round 3, N8). Show
     /// `fitnessLevelShown` on screen.
     var fitnessLevel: String? {
-        guard let age = store.data.ageYears, let sex = store.data.sex else { return nil }
-        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: sex, age: age) }
+        guard let age = store.data.ageYears else { return nil }
+        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: .female, age: age) }
     }
     /// The level, or a prompt for what's missing to work it out.
     var fitnessLevelShown: String? {
         guard vo2Max != nil else { return nil }
-        if store.data.sex == nil { return "Choose women or men to compare" }
         return fitnessLevel ?? "Add your age to compare"
     }
 
