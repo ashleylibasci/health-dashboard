@@ -58,6 +58,9 @@ final class CalendarImport: ObservableObject {
     @Published private(set) var lastChecked: Date? = UserDefaults.standard.object(forKey: CalendarImport.checkedKey) as? Date
     @Published private(set) var working = false
     @Published var error: String?
+    /// Google signed her out (its sign-in expires): the card offers to sign
+    /// in again instead of only showing the error.
+    @Published private(set) var needsSignIn = false
 
     private static let sourceKey = "calendarSource"
     private static let checkedKey = "calendarLastChecked"
@@ -67,6 +70,7 @@ final class CalendarImport: ObservableObject {
 
     func connect(_ new: CalendarSource, model: AppModel) async {
         error = nil
+        needsSignIn = false
         do {
             switch new {
             case .apple:
@@ -114,6 +118,7 @@ final class CalendarImport: ObservableObject {
         Keychain.set(nil, for: ICSFeed.account)
         setSource(nil)
         error = nil
+        needsSignIn = false
     }
 
     private func setSource(_ s: CalendarSource?) {
@@ -143,7 +148,9 @@ final class CalendarImport: ObservableObject {
             lastChecked = .now
             UserDefaults.standard.set(lastChecked, forKey: Self.checkedKey)
             error = nil
+            needsSignIn = false
         } catch {
+            if case CalendarImportError.signedOut = error { needsSignIn = true }
             self.error = error.localizedDescription
         }
     }

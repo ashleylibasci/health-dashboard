@@ -130,24 +130,26 @@ final class Round2SignalTests: XCTestCase {
 final class Round2CaffeineTests: XCTestCase {
     // Maya N2 / Sam N11: no "latest time" that has already gone by.
     func testLatestTimeIsNilWhenItHasPassed() {
-        // 8h half-life (the pill), 12:30am bedtime: a latte must be had before ~5am.
-        let latest = try! XCTUnwrap(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 8))
-        XCTAssertLessThan(latest, 480)
-        XCTAssertNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: 8, notBefore: 480))
-        XCTAssertNotNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, notBefore: 480))
-        // The pill's cutoff for the reference coffee (140 mg) lands before she's up.
-        XCTAssertLessThan(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 8, mg: 140), 480)
-        // Pill users aren't told "none today" for every drink: a smaller one
-        // early in the day still fits.
-        XCTAssertNotNil(CaffeineModel.latestTime(forMg: 64, bedtime: 1470, halfLifeHours: 8, notBefore: 480))
+        // The pill's half-life, 12:30am bedtime: a latte by about 10am.
+        let pill = CaffeineModel.estrogenHalfLifeHours
+        let latest = try! XCTUnwrap(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: pill))
+        XCTAssertLessThan(latest, 660)
+        XCTAssertNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, halfLifeHours: pill, notBefore: 660))
+        XCTAssertNotNil(CaffeineModel.latestTime(forMg: 130, bedtime: 1470, notBefore: 660))
+        // With the evidence-based 35 mg limit (Gardiner 2023), a pill user up
+        // at 8am still has a time for the reference coffee (140 mg): 9:00am.
+        XCTAssertEqual(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: pill, mg: 140), 540)
+        // A smaller drink fits later in the day.
+        XCTAssertNotNil(CaffeineModel.latestTime(forMg: 64, bedtime: 1470, halfLifeHours: pill, notBefore: 720))
     }
 
     func testLargestDoseFits() {
-        let mg = CaffeineModel.largestDose(at: 480, bedtime: 1470, halfLifeHours: 8)
+        let pill = CaffeineModel.estrogenHalfLifeHours, limit = CaffeineModel.bedtimeLimitMg
+        let mg = CaffeineModel.largestDose(at: 480, bedtime: 1470, halfLifeHours: pill)
         XCTAssertGreaterThan(mg, 0)
         XCTAssertEqual(mg % 5, 0)
-        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg)], halfLifeHours: 8), 25)
-        XCTAssertGreaterThanOrEqual(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg + 10)], halfLifeHours: 8), 25)
+        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg)], halfLifeHours: pill), limit)
+        XCTAssertGreaterThanOrEqual(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: 480, mg: mg + 10)], halfLifeHours: pill), limit)
         XCTAssertEqual(CaffeineModel.largestDose(at: 480, bedtime: 1470, existing: [CaffeineDose(time: 1200, mg: 200)]), 0)
     }
 
@@ -271,12 +273,12 @@ final class Round2WakePlanTests: XCTestCase {
     }
 
     /// Round 3 H10: the cutoff for the 140 mg reference coffee comes earlier
-    /// than for 100 mg, and still leaves under 25 mg at bedtime.
+    /// than for 100 mg, and still leaves under the bedtime limit.
     func testCutoffForReferenceCoffee() {
         let c140 = CaffeineModel.cutoff(bedtime: 1470, mg: 140)
         XCTAssertLessThan(c140, CaffeineModel.cutoff(bedtime: 1470))
-        XCTAssertEqual(Clock.format(c140), "11:30am")
-        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: c140, mg: 140)]), 25)
+        XCTAssertEqual(Clock.format(c140), "2:00pm")
+        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: c140, mg: 140)]), CaffeineModel.bedtimeLimitMg)
     }
 
     /// Round 3 J1: a hormonal IUD or mini pill with no period logged gets its

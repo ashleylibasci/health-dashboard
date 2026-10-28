@@ -177,7 +177,8 @@ final class CaffeineTests: XCTestCase {
         XCTAssertEqual(left, 17, accuracy: 3)
     }
     func testCutoff() {
-        XCTAssertEqual(Clock.format(CaffeineModel.cutoff(bedtime: 1470)), "2:00pm")
+        // About 8 hours before a 12:30am bedtime for 100 mg (Gardiner 2023: ~8.8 h for a coffee).
+        XCTAssertEqual(Clock.format(CaffeineModel.cutoff(bedtime: 1470)), "4:00pm")
     }
 }
 

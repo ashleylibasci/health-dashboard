@@ -357,7 +357,17 @@ struct CalendarImportCard: View {
                            forYou: "It only reads your calendar, never changes it, and your events stay on your phone. Exams you add or edit here are never overwritten.")
                     .padding(.vertical, -12)
             }
-            if let source = importer.source {
+            if let source = importer.source, importer.needsSignIn {
+                // Google's sign-in ran out: sign in again, or switch to the
+                // calendar link, which doesn't expire.
+                Text("Google signed you out, so new exams aren\u{2019}t coming in.").font(.bodyText).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                connectButton(source, systemImage: "arrow.clockwise", title: "Sign in to Google again")
+                linkEntry
+                Button("Stop using Google Calendar", role: .destructive) { importer.disconnect() }
+                    .font(.bodyEmphasis)
+                    .frame(minHeight: 44)
+            } else if let source = importer.source {
                 Text(status(source)).font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
@@ -380,7 +390,7 @@ struct CalendarImportCard: View {
                 }
                 linkEntry
             }
-            if let error = importer.error {
+            if let error = importer.error, !importer.needsSignIn {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.secondary)
                     .foregroundStyle(Accent.coral.ink(scheme))
@@ -435,11 +445,11 @@ struct CalendarImportCard: View {
         }
     }
 
-    private func connectButton(_ source: CalendarSource, systemImage: String) -> some View {
+    private func connectButton(_ source: CalendarSource, systemImage: String, title: String? = nil) -> some View {
         Button {
             Task { await importer.connect(source, model: model) }
         } label: {
-            Label(source.name, systemImage: systemImage)
+            Label(title ?? source.name, systemImage: systemImage)
                 .font(.bodyEmphasis)
                 .frame(minHeight: 44)
                 .padding(.horizontal, 12)

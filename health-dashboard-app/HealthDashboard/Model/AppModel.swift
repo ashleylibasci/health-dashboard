@@ -451,7 +451,7 @@ final class AppModel: ObservableObject {
 
     /// Caffeine stays about one and a half times as long on the combined pill
     /// (estrogen slows the liver enzyme CYP1A2), and probably on the ring and
-    /// patch: about 8 hours instead of 5.
+    /// patch: about 7 hours instead of 5.
     var caffeineHalfLifeHours: Double {
         switch store.birthControl {
         case .combinedPill?, .ring?, .patch?: return CaffeineModel.estrogenHalfLifeHours
@@ -745,12 +745,15 @@ final class AppModel: ObservableObject {
         let periods = (try? await health.periodStarts(days: 400)) ?? []
         let heart = await loadHeart(main: main, days: days)
         let built = main.map { night($0, heart: heart) }
+        let healthCaffeine = (try? await health.logSamples(.dietaryCaffeine, unit: .gramUnit(with: .milli), days: Self.healthLogDays)) ?? []
+        let healthWater = (try? await health.logSamples(.dietaryWater, unit: .literUnit(with: .milli), days: Self.healthLogDays)) ?? []
 
         guard main.count >= Self.nightsNeeded else {
             // Example data until 14 nights, but her own last night as soon as
             // there is one, her own nights in the history, her own heart
             // readings once there's a baseline, and her own cycle.
             realNightCount = main.count
+            mergeHealthLogs(caffeine: healthCaffeine, water: healthWater)
             applySampleData()
             healthPeriodStarts = periods
             nights = Self.merge(sample: nights, real: built)
@@ -794,7 +797,9 @@ final class AppModel: ObservableObject {
         let resting = ((try? await health.dailySum(.basalEnergyBurned, unit: .kilocalorie(), days: 1)) ?? [:])[today] ?? 0
 
         // From here to the end, no awaits: one redraw.
+        if store.data.ageYears == nil, let age = health.ageYears(), (13...100).contains(age) { store.data.ageYears = age }
         realNightCount = main.count
+        mergeHealthLogs(caffeine: healthCaffeine, water: healthWater)
         usingSampleData = false
         self.sessions = main
         nights = built
@@ -966,6 +971,46 @@ final class AppModel: ObservableObject {
         personalEnergyUsual = energies.count >= 7 ? energies.mean.map { Int($0.rounded()) } : nil
     }
 
+    // MARK: Logs from Apple Health
+
+    /// How far back caffeine and water are read in from Apple Health.
+    static let healthLogDays = 60
+    /// The drink id for caffeine read in from Health that matches none of
+    /// her drinks by name.
+    static let healthCaffeineDrinkID = UUID(uuidString: "6E0C2A51-3F0B-4D8E-9C1A-0D5B2E7F4A10")!
+
+    /// Adds caffeine and water saved in Apple Health that the app's own log
+    /// doesn't have: what the old Health Dashboard logged (it kept its logs
+    /// only in Health), Shortcuts, other apps. Entries this app saved carry
+    /// its id and are skipped, and so are ones she deleted here.
+    func mergeHealthLogs(caffeine: [HealthLogSample], water: [HealthLogSample]) {
+        var data = store.data
+        let removed = data.removedHealthLogIDs
+        var drinkIDs = Set(data.drinkLog.map(\.id)).union(removed)
+        for s in caffeine {
+            let id = s.appID ?? s.id
+            guard !drinkIDs.contains(id), !drinkIDs.contains(s.id) else { continue }
+            let mg = Int(s.value.rounded())
+            guard mg > 0 else { continue }
+            let name = s.name ?? "Caffeine"
+            let drinkID = (data.savedDrinks + Drink.common).first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.id
+                ?? Self.healthCaffeineDrinkID
+            data.drinkLog.append(AppData.LoggedDrink(id: id, drinkID: drinkID, name: name, mg: mg, date: s.date))
+            drinkIDs.insert(id)
+        }
+        var waterIDs = Set(data.waterLog.map(\.id)).union(removed)
+        for s in water {
+            let id = s.appID ?? s.id
+            guard !waterIDs.contains(id), !waterIDs.contains(s.id), s.value > 0 else { continue }
+            data.waterLog.append(AppData.WaterEntry(id: id, date: s.date, ml: s.value))
+            waterIDs.insert(id)
+        }
+        guard data.drinkLog.count != store.data.drinkLog.count || data.waterLog.count != store.data.waterLog.count else { return }
+        data.drinkLog.sort { $0.date < $1.date }
+        data.waterLog.sort { $0.date < $1.date }
+        store.data = data
+    }
+
     // MARK: Actions
 
     /// Log a drink. The time is never in the future: a clock time picked
@@ -1006,6 +1051,7 @@ final class AppModel: ObservableObject {
     func deleteDrink(_ id: UUID) {
         guard store.data.drinkLog.contains(where: { $0.id == id }) else { return }
         store.data.drinkLog.removeAll { $0.id == id }
+        store.data.removedHealthLogIDs.insert(id)
         writeHealth { try await $0.deleteCaffeine(id: id) }
         pushToWatch()
     }
@@ -1047,6 +1093,7 @@ final class AppModel: ObservableObject {
     func deleteWater(_ id: UUID) {
         guard store.data.waterLog.contains(where: { $0.id == id }) else { return }
         store.data.waterLog.removeAll { $0.id == id }
+        store.data.removedHealthLogIDs.insert(id)
         writeHealth { try await $0.deleteWater(id: id) }
     }
 

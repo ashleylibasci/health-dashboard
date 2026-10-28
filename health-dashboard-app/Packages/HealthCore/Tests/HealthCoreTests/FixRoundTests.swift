@@ -96,25 +96,28 @@ final class CycleDisplayFixTests: XCTestCase {
 final class CaffeineFixTests: XCTestCase {
     func testHalfLifeIsUsed() {
         let dose = [CaffeineDose(time: 580, mg: 130)]
-        // About one and a half times the half-life leaves about twice as much by midnight.
-        XCTAssertEqual(CaffeineModel.estrogenHalfLifeHours, 8)
-        XCTAssertGreaterThan(CaffeineModel.amount(at: 1470, doses: dose, halfLifeHours: 8),
-                             CaffeineModel.amount(at: 1470, doses: dose) * 2)
-        XCTAssertLessThan(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: 8), CaffeineModel.cutoff(bedtime: 1470))
+        // About one and a half times the half-life (5 × 7.9/5.4) leaves
+        // nearly twice as much by midnight.
+        let pill = CaffeineModel.estrogenHalfLifeHours
+        XCTAssertEqual(pill, 7.3)
+        XCTAssertGreaterThan(CaffeineModel.amount(at: 1470, doses: dose, halfLifeHours: pill),
+                             CaffeineModel.amount(at: 1470, doses: dose) * 1.8)
+        XCTAssertLessThan(CaffeineModel.cutoff(bedtime: 1470, halfLifeHours: pill), CaffeineModel.cutoff(bedtime: 1470))
     }
 
     func testDoseAwareBedtimeCheck() {
         XCTAssertTrue(CaffeineModel.tooMuchAtBedtime(doses: [CaffeineDose(time: 900, mg: 160)], bedtime: 1470))
         XCTAssertFalse(CaffeineModel.tooMuchAtBedtime(doses: [CaffeineDose(time: 840, mg: 64)], bedtime: 1470))
         XCTAssertTrue(CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: 840, mg: 64), to: [CaffeineDose(time: 840, mg: 64)],
-                                                   bedtime: 1470, halfLifeHours: 8))
+                                                   bedtime: 1470, halfLifeHours: CaffeineModel.estrogenHalfLifeHours))
 
+        let limit = CaffeineModel.bedtimeLimitMg
         let latest = try! XCTUnwrap(CaffeineModel.latestTime(forMg: 160, bedtime: 1470))
-        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: latest, mg: 160)]), 25)
-        XCTAssertGreaterThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: latest + 15, mg: 160)]), 25)
+        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: latest, mg: 160)]), limit)
+        XCTAssertGreaterThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: latest + 15, mg: 160)]), limit)
         // A bigger drink has to come earlier; with the pill's half-life, earlier still.
         XCTAssertLessThan(latest, try! XCTUnwrap(CaffeineModel.latestTime(forMg: 64, bedtime: 1470)))
-        XCTAssertLessThan(try! XCTUnwrap(CaffeineModel.latestTime(forMg: 160, bedtime: 1470, halfLifeHours: 8)), latest)
+        XCTAssertLessThan(try! XCTUnwrap(CaffeineModel.latestTime(forMg: 160, bedtime: 1470, halfLifeHours: CaffeineModel.estrogenHalfLifeHours)), latest)
         // Already over the allowance: nothing more fits.
         XCTAssertNil(CaffeineModel.latestTime(forMg: 64, bedtime: 1470, existing: [CaffeineDose(time: 1200, mg: 200)]))
     }

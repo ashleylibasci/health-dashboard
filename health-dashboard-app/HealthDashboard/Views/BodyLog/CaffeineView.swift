@@ -20,7 +20,7 @@ struct CaffeineView: View {
 
     /// The ring is a gauge against this, not a goal to fill.
     private let dailyLimit = CaffeineModel.dailyGuideMg
-    private let bedtimeGoal = 25
+    private let bedtimeGoal = Int(CaffeineModel.bedtimeLimitMg)
 
     enum TimingDay: String, CaseIterable, Identifiable {
         case today = "Today", tomorrow = "Tomorrow"
@@ -212,7 +212,7 @@ struct CaffeineView: View {
         // 130 mg latte would leave 140 mg" reads as wrong (round 3).
         let withOthers = model.caffeineDoses.isEmpty ? "" : ", counting what you\u{2019}ve had"
         if !tooMuch {
-            text = "\(a) \(name) (\(drink.caffeineMg) mg) \(when) is fine: under 25 mg left by your \(bed) bedtime."
+            text = "\(a) \(name) (\(drink.caffeineMg) mg) \(when) is fine: under \(bedtimeGoal) mg left by your \(bed) bedtime."
         } else if let latest = model.latestTimeForCaffeine(mg: drink.caffeineMg), latest > t {
             text = "\(a) \(name) \(when) would leave about \(left) mg at bedtime\(withOthers). Have it by \(Clock.format(latest)) instead."
         } else {
@@ -347,7 +347,7 @@ struct CaffeineView: View {
         var detail = AppModel.caffeineMeaning(mg: p.mg)
         if abs(p.time - bedtime) <= 10 {
             title += " \u{00B7} your bedtime"
-            detail += p.mg < Double(bedtimeGoal) ? " Under the 25 mg goal, so it shouldn't get in the way of deep sleep." : " Over 25 mg at bedtime makes sleep lighter, even if you fall asleep fine."
+            detail += p.mg < Double(bedtimeGoal) ? " Under the \(bedtimeGoal) mg goal, so it shouldn't get in the way of deep sleep." : " Over \(bedtimeGoal) mg at bedtime makes sleep lighter, even if you fall asleep fine."
         } else if let cutoff = model.caffeineCutoffShown, abs(p.time - cutoff) <= 10 {
             title += " \u{00B7} your cutoff"
             detail += " Caffeine after this is still in you at bedtime."
@@ -413,7 +413,7 @@ struct CaffeineView: View {
                 InfoButton(topic: .caffeineCutoff)
             }
             HowWeGotThisLink(title: "Caffeine in your body",
-                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 8 (one and a half times as long) on the combined pill, which slows how fast the liver clears it, from one small study; the ring and patch probably do the same. The app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below 25 mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
+                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 7 (one and a half times as long) on the combined pill, which slows how fast the liver clears it, from one small study; the ring and patch probably do the same. The app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below \(bedtimeGoal) mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
         }
     }
 
@@ -487,7 +487,7 @@ struct CaffeineView: View {
     private var timingReadout: (title: String, value: String, detail: String) {
         guard let raw = selectedTiming else {
             if noWindow {
-                return (label(timingDay), "No time works for a full coffee", "At no time today would a 12 oz drip coffee (140 mg) be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
+                return (label(timingDay), "Only a small coffee fits today", "Even right after you wake, a 12 oz drip coffee (140 mg) would leave more than \(bedtimeGoal) mg at bedtime. If you have one, keep it small and early.")
             }
             return (label(timingDay), "Best window \(timing.bestWindow.label)",
                     "Caffeine works best once grogginess clears and before your \(Clock.format(timing.cutoff)) cutoff.")

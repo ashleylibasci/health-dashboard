@@ -32,8 +32,8 @@ extension AppModel {
     /// Tonight's bedtime in app-day minutes (12:30am is 1470).
     var bedtimeTonight: Minutes { 1440 + store.data.bedtime }
 
-    /// Dose-aware: today's drinks, at their real sizes and times, leave 25 mg
-    /// or more in your body at bedtime.
+    /// Dose-aware: today's drinks, at their real sizes and times, leave
+    /// `CaffeineModel.bedtimeLimitMg` or more in your body at bedtime.
     var caffeineTooMuchAtBedtime: Bool {
         CaffeineModel.tooMuchAtBedtime(doses: caffeineDoses, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
     }
@@ -58,9 +58,8 @@ extension AppModel {
     /// when it was recorded, else her "up by" time.
     var caffeineWakeTime: Minutes { lastNightIsFresh ? lastNight.wake : store.data.upBy }
 
-    /// Her cutoff for a typical drink falls before she's even up (8-hour
-    /// half-life on the combined pill, ring or patch: about 4:00am for a
-    /// 12:30am bedtime). Screens must not print `caffeineCutoff` as a time then;
+    /// Her cutoff for a typical drink falls before she's even up (possible
+    /// on the combined pill, ring or patch with an early bedtime). Screens must not print `caffeineCutoff` as a time then;
     /// use `caffeineCutoffShown` and the "one small drink early" copy.
     var caffeineCutoffBeforeWake: Bool { caffeineCutoff <= caffeineWakeTime }
 
@@ -68,8 +67,7 @@ extension AppModel {
     var caffeineCutoffShown: Minutes? { caffeineCutoffBeforeWake ? nil : caffeineCutoff }
 
     /// The biggest drink (mg, in 5s) she could have at her wake time and
-    /// still be under 25 mg at bedtime. With an 8-hour half-life and a
-    /// 12:30am bedtime that's about 100 mg at 7:30am.
+    /// still be under `CaffeineModel.bedtimeLimitMg` at bedtime.
     var caffeineLargestDoseAtWake: Int {
         CaffeineModel.largestDose(at: caffeineWakeTime, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
     }
@@ -87,7 +85,7 @@ extension AppModel {
     static func caffeineMeaning(mg: Double) -> String {
         let espresso = 64.0
         if mg < 5 { return "Practically none left in your body." }
-        if mg < 25 { return "A small amount, under the 25 mg you want at bedtime." }
+        if mg < CaffeineModel.bedtimeLimitMg { return "A small amount, under the \(Int(CaffeineModel.bedtimeLimitMg)) mg you want at bedtime." }
         let shots = mg / espresso
         if shots < 0.75 { return "About half an espresso's worth still active." }
         if shots < 1.4 { return "About one espresso's worth still active." }

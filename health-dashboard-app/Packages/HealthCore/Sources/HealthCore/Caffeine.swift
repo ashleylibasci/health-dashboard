@@ -40,24 +40,30 @@ public struct CaffeineDose: Hashable, Codable, Sendable {
 /// Caffeine in the body over time: absorbed over ~45 minutes, then cleared
 /// with a half-life of about 5 hours (it varies from roughly 3 to 7). The
 /// combined pill slows clearance (estrogen slows the liver enzyme CYP1A2) to
-/// about one and a half times as long, about 8 hours (one small study of pill
-/// users: 7.9 vs 5.4 hours, Abernethy & Todd 1985); the ring and patch
-/// probably do the same. Every function takes the half-life so callers can
+/// about one and a half times as long, about 7.3 hours (one small study of
+/// pill users: 7.9 vs 5.4 hours, 1.46 times, Abernethy & Todd 1985); the
+/// ring and patch probably do the same. Every function takes the half-life so callers can
 /// pass hers.
 public enum CaffeineModel {
     public static let absorption = 45.0
     /// The usual half-life, without estrogen-containing birth control.
     public static let typicalHalfLifeHours = 5.0
-    /// With the combined pill, ring or patch: about one and a half times as long.
-    public static let estrogenHalfLifeHours = 8.0
+    /// With the combined pill, ring or patch: about one and a half times as
+    /// long (5 h × 7.9/5.4).
+    public static let estrogenHalfLifeHours = 7.3
     /// More than this in a day is more than is generally fine for healthy
     /// adults (FDA, EFSA).
     public static let dailyGuideMg = 400
     /// The daily amount to stay under when you could be pregnant or are
     /// trying (ACOG), and the most in one go that's generally fine (EFSA).
     public static let lowerGuideMg = 200
-    /// Under this much at bedtime barely affects sleep.
-    public static let bedtimeLimitMg = 25.0
+    /// Under this much at bedtime barely affects sleep. A meta-analysis of
+    /// sleep studies found a coffee (107 mg) needs about 8.8 hours before bed
+    /// and a 217 mg pre-workout about 13.2 hours to avoid losing sleep
+    /// (Gardiner et al. 2023); on this model both leave about 33–37 mg then.
+    /// (It was 25 mg, a guess stricter than the studies, which on the pill
+    /// left no time of day for a coffee.)
+    public static let bedtimeLimitMg = 35.0
 
     /// Absorption starts the moment a drink is logged (a few minutes' worth
     /// at once), so a drink just logged never reads as 0 mg.
@@ -71,10 +77,10 @@ public enum CaffeineModel {
         }
     }
 
-    /// Latest time for one drink of `mg` (100 by default) so under 25 mg is
-    /// left at bedtime, rounded down to the half hour.
+    /// Latest time for one drink of `mg` (100 by default) so under
+    /// `bedtimeLimitMg` is left at bedtime, rounded down to the half hour.
     public static func cutoff(bedtime: Minutes, halfLifeHours: Double = 5, mg: Double = 100) -> Minutes {
-        let hours = halfLifeHours * log2(max(mg, 25) / 25.0) + 0.5
+        let hours = halfLifeHours * log2(max(mg, bedtimeLimitMg) / bedtimeLimitMg) + 0.5
         let raw = bedtime - Int(hours * 60)
         return raw - ((raw % 30) + 30) % 30
     }
@@ -86,13 +92,13 @@ public enum CaffeineModel {
 
     /// Dose-aware: whether these doses (sizes and times as logged) leave
     /// `limitMg` or more in the body at bedtime.
-    public static func tooMuchAtBedtime(doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = 25) -> Bool {
+    public static func tooMuchAtBedtime(doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Bool {
         atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours) >= limitMg
     }
 
     /// Whether adding `dose` to what's already been had would leave `limitMg`
     /// or more at bedtime ("this energy drink now would be too much").
-    public static func wouldBeTooMuch(adding dose: CaffeineDose, to doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = 25) -> Bool {
+    public static func wouldBeTooMuch(adding dose: CaffeineDose, to doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Bool {
         tooMuchAtBedtime(doses: doses + [dose], bedtime: bedtime, halfLifeHours: halfLifeHours, limitMg: limitMg)
     }
 
@@ -103,7 +109,7 @@ public enum CaffeineModel {
     /// (pass now, or the wake time when planning a day). Never a time that
     /// has already gone by.
     public static func latestTime(forMg mg: Int, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5,
-                                  limitMg: Double = 25, notBefore: Minutes? = nil) -> Minutes? {
+                                  limitMg: Double = bedtimeLimitMg, notBefore: Minutes? = nil) -> Minutes? {
         let already = atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours)
         let room = limitMg - already
         guard room > 0 else { return nil }
@@ -122,7 +128,7 @@ public enum CaffeineModel {
     /// The biggest drink (mg, rounded down to 5) that could be had at `t`
     /// and still leave under `limitMg` at bedtime, with what's already been
     /// had. 0 when nothing fits.
-    public static func largestDose(at t: Minutes, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5, limitMg: Double = 25) -> Int {
+    public static func largestDose(at t: Minutes, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Int {
         let room = limitMg - atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours)
         guard room > 0, bedtime > t else { return 0 }
         let perMg = amount(at: bedtime, doses: [CaffeineDose(time: t, mg: 1)], halfLifeHours: halfLifeHours)

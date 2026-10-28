@@ -25,6 +25,8 @@ final class HealthKitService {
             HKQuantityType(.dietaryCaffeine),
             HKQuantityType(.dietaryWater),
             HKCategoryType(.menstrualFlow),
+            // Fitness age, when she hasn't typed her age in the app.
+            HKCharacteristicType(.dateOfBirth),
         ]
         #if os(iOS)
         types.insert(HKQuantityType(.timeInDaylight))
@@ -259,9 +261,31 @@ final class HealthKitService {
 
     /// Deletes the samples this app saved with `id`. Only our own samples can
     /// be deleted, so other apps' entries are never touched.
+    /// Deletes what this app saved under `id`: a sample tagged with it, or
+    /// (for an entry read in from Health, like the old app's) the sample
+    /// whose own id it is.
     private func deleteSamples(_ type: HKQuantityTypeIdentifier, id: UUID) async throws {
-        let predicate = HKQuery.predicateForObjects(withMetadataKey: HKMetadataKeyExternalUUID, allowedValues: [id.uuidString])
+        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+            HKQuery.predicateForObjects(withMetadataKey: HKMetadataKeyExternalUUID, allowedValues: [id.uuidString]),
+            HKQuery.predicateForObject(with: id),
+        ])
         _ = try await store.deleteObjects(of: HKQuantityType(type), predicate: predicate)
+    }
+
+    /// Caffeine or water saved in Apple Health in the last `days`, by any
+    /// app: the old Health Dashboard, Shortcuts, or this app.
+    func logSamples(_ id: HKQuantityTypeIdentifier, unit: HKUnit, days: Int) async throws -> [HealthLogSample] {
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: .now)!
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: start, end: .now))],
+            sortDescriptors: [SortDescriptor(\.startDate)])
+        return try await descriptor.result(for: store).map { s in
+            HealthLogSample(id: s.uuid,
+                            appID: (s.metadata?[HKMetadataKeyExternalUUID] as? String).flatMap(UUID.init(uuidString:)),
+                            name: s.metadata?[HKMetadataKeyFoodType] as? String,
+                            date: s.startDate,
+                            value: s.quantity.doubleValue(for: unit))
+        }
     }
 
     // MARK: Hourly and latest values
@@ -324,6 +348,13 @@ final class HealthKitService {
         return out
     }
 
+    /// Her age from her birthday in Apple Health, or nil if it isn't there
+    /// or reading it isn't allowed.
+    func ageYears() -> Int? {
+        guard let birthday = try? store.dateOfBirthComponents(), let date = Calendar.current.date(from: birthday) else { return nil }
+        return Calendar.current.dateComponents([.year], from: date, to: .now).year
+    }
+
     /// Every sample of a type in the last `days`, oldest first.
     func samples(_ id: HKQuantityTypeIdentifier, unit: HKUnit, days: Int) async throws -> [(date: Date, value: Double)] {
         let start = Calendar.current.date(byAdding: .day, value: -days, to: .now)!
@@ -332,6 +363,18 @@ final class HealthKitService {
             sortDescriptors: [SortDescriptor(\.startDate)])
         return try await descriptor.result(for: store).map { ($0.startDate, $0.quantity.doubleValue(for: unit)) }
     }
+}
+
+/// One caffeine or water entry in Apple Health.
+struct HealthLogSample {
+    /// Health's own id for the sample.
+    var id: UUID
+    /// The app entry it was saved from (this app tags what it saves).
+    var appID: UUID?
+    /// The drink's name, when the app that saved it gave one ("Latte").
+    var name: String?
+    var date: Date
+    var value: Double
 }
 
 extension HKUnit {
