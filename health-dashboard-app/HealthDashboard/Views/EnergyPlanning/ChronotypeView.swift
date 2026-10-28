@@ -293,12 +293,24 @@ private struct ChronotypeSpectrum: View {
     /// Every note the readout can show, so it keeps one height (Weber A1).
     private var slots: [String] {
         Chronotype.Category.allCases.flatMap { [ChronotypeView.plain($0), ChronotypeView.plain($0) + " That's you."] }
+            + [Self.restNote]
+    }
+
+    private static let restNote = "The middle of your sleep on free nights, after catch-up sleep is taken off. The scale runs from very early to very late."
+
+    /// "4th of 6": her type's place on the scale, earliest first.
+    private var position: String {
+        let n = index + 1
+        let suffix = n == 1 ? "st" : n == 2 ? "nd" : n == 3 ? "rd" : "th"
+        return "\(n)\(suffix) of \(Chronotype.Category.allCases.count)"
     }
 
     private var readout: ChartReadout {
         guard let f = dragFraction else {
-            return ChartReadout(title: "You", value: category.rawValue,
-                                detail: ChronotypeView.plain(category), accent: .orange, detailSlots: slots)
+            // At rest: where she sits, not the type the summary already
+            // names (F18).
+            return ChartReadout(title: "You", value: "\(Clock.format(msfsc)) \u{00B7} \(position)",
+                                detail: Self.restNote, accent: .orange, detailSlots: slots)
         }
         let mid = 120 + Int((Double(f) * 360).rounded())
         let cat = Chronotype.category(for: mid)
