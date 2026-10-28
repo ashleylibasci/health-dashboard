@@ -23,6 +23,7 @@ targets:
     dependencies:
       - package: HealthCore
       - target: HealthDashboardWatch
+      - target: HealthDashboardWidgets
     scheme:
       testTargets:
         - HealthDashboardUITests
@@ -32,6 +33,7 @@ targets:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
         com.apple.developer.healthkit.background-delivery: true
+        com.apple.security.application-groups: [group.com.ashleylibasci.healthdashboard]
     info:
       path: HealthDashboard/Resources/Info.plist
       properties:
@@ -73,6 +75,30 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
+  HealthDashboardWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - HealthDashboardWidgets
+      - Shared/WidgetSnapshot.swift
+      - Shared/Theme.swift
+    entitlements:
+      path: HealthDashboardWidgets/HealthDashboardWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.ashleylibasci.healthdashboard]
+    info:
+      path: HealthDashboardWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Health Next
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
   HealthDashboardUITests:
     type: bundle.ui-testing
     platform: iOS

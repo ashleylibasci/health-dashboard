@@ -37,8 +37,11 @@ struct WidgetSnapshot: Codable, Equatable {
     /// "In bed on time" streak, in nights.
     var bedtimeStreak: Int
 
-    static let appGroup = "group.com.ashleylibasci.healthdashboard.next"
-    private static let key = "widgetSnapshot.v1"
+    /// Shared with the older Health Dashboard app from `ios/` (a free
+    /// developer team can't register a new group), so Health Next keeps
+    /// its own key: the two apps' widgets never read each other's numbers.
+    static let appGroup = "group.com.ashleylibasci.healthdashboard"
+    private static let key = "next.widgetSnapshot.v1"
 
     static var defaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
 

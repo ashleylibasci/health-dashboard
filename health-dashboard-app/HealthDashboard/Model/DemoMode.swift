@@ -56,6 +56,11 @@ enum DemoMode {
         case "pill":
             data.cycleSetup = .hormonal
             data.birthControl = BirthControl.combinedPill.rawValue
+            // Pill 18 of 21+7 today. Set in the same save as the method: a
+            // method change on its own resets the pack (normalizePack).
+            data.packActiveDays = 21
+            data.packLength = 28
+            data.packStartDate = cal.date(byAdding: .day, value: -17, to: today)
         case "hormonalIUD":
             data.cycleSetup = .hormonal
             data.birthControl = BirthControl.hormonalIUD.rawValue
@@ -76,9 +81,5 @@ enum DemoMode {
         }
         data.onboarded = true
         store.data = data
-        if cycle == "pill" {
-            model.setPackType(activeDays: 21, packLength: 28)
-            model.setPackDay(18)
-        }
     }
 }
