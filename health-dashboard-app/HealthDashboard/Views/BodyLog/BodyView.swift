@@ -318,12 +318,16 @@ struct BodyView: View {
                      note: model.respiratoryRateDelta == nil ? "Wear your Watch to bed" : breathingNote)
         case .wristTemp:
             BodyTile(title: "Wrist temp", accent: .coral, systemImage: "thermometer.medium",
-                     value: model.wristTempDelta.map { signedDecimal($0, unit: "\u{00B0}C") } ?? "\u{2013}",
+                     value: model.wristTempDelta.map { TempFormat.delta($0) } ?? "\u{2013}",
                      note: model.wristTempDelta == nil ? "Wear your Watch to bed" : wristNote)
         case .fitness:
             BodyTile(title: "Fitness", accent: .mint, systemImage: "figure.run",
                      value: model.fitnessAgeText.map { "Age \($0.lowercased())" } ?? "\u{2013}",
-                     note: model.vo2Max.map { "VO\u{2082} max \(String(format: "%.1f", $0)) \u{00B7} \(model.fitnessLevel ?? "")" } ?? "Needs a few outdoor walks")
+                     note: model.vo2Max.map { v in
+                         let value = "VO\u{2082} max \(String(format: "%.1f", v))"
+                         // No "below average" ranking with an eating-disorder history.
+                         return model.hidesActivityNumbers ? value : "\(value) \u{00B7} \(model.fitnessLevel ?? "")"
+                     } ?? "Needs a few outdoor walks")
         case .calories:
             BodyTile(title: "Calories", accent: .orange, systemImage: "flame.fill",
                      value: Int(model.caloriesToday.rounded()).formatted(), note: "kcal so far")

@@ -64,6 +64,8 @@ struct WaterView: View {
         if have >= goalML { return "Goal reached. Nice." }
         let pace = model.waterPace(at: model.now)
         let gap = pace - have
+        // No "behind" with an eating-disorder history: just what's logged.
+        if model.hidesEffortTargets { return "\(LogFormat.oz(have)) logged so far today." }
         if gap <= bottleML * 0.25 { return "On track for this time of day." }
         if gap < bottleML { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up." }
         return "About \(LogFormat.bottlesPhrase(gap / bottleML)) behind a steady pace for this time of day."

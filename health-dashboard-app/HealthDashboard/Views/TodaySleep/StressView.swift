@@ -41,6 +41,16 @@ struct StressView: View {
         }
     }
 
+    /// 0 Low, 1 Usual, 2 Raised, 3 High (for `StressLevelColor`).
+    nonisolated static func bandIndex(_ level: Int) -> Int {
+        switch StressModel.label(for: level) {
+        case .low: return 0
+        case .usual: return 1
+        case .raised: return 2
+        case .high: return 3
+        }
+    }
+
     nonisolated static func meaning(_ level: Int) -> String {
         switch StressModel.label(for: level) {
         case .low: return "Low: your heart was close to its resting pace while you were still."
@@ -159,13 +169,13 @@ struct StressView: View {
                 .frame(height: 170)
             ScrubHint()
             HStack(spacing: 12) {
-                swatch(Accent.mint.fill(scheme), "Low")
-                swatch(Accent.blue.fill(scheme), "Usual")
-                swatch(Accent.orange.fill(scheme), "Raised")
-                swatch(Accent.coral.fill(scheme), "High")
+                swatch(StressLevelColor.fill(0, scheme), "Low")
+                swatch(StressLevelColor.fill(1, scheme), "Usual")
+                swatch(StressLevelColor.fill(2, scheme), "Raised")
+                swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
                 swatch(p.primary.opacity(0.18), "Active")
             }
-            Text("Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
+            Text("Each hour is colored by level, darkest for High. High hours also get a \u{25B2}, and the highest hour shows its number. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
                 .font(.scaled(size: 13))
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -223,6 +233,7 @@ struct StressView: View {
             .font(.scaled(size: 12, weight: .semibold))
             .foregroundStyle(p.secondary)
             .accessibilityHidden(true)
+            StressCrisisRow(level: model.stressLoggedToday)
             if justLogged {
                 Text("Saved. Logging how you feel lets you compare it with what your body shows.")
                     .font(.scaled(size: 13))
@@ -332,10 +343,15 @@ private struct StressHoursChart: View {
         return min(hs.min() ?? 7, 7)...max((hs.max() ?? 22) + 1, 22)
     }
 
+    /// The counted hour with the highest level (labelled with its number).
+    private var peakHour: Int? {
+        bars.filter { !$0.active }.max { $0.level < $1.level }?.hour
+    }
+
     private func color(_ bar: StressBar) -> Color {
         let base: Color = bar.active
             ? Palette(scheme: scheme).primary.opacity(0.18)
-            : StressView.band(bar.level).accent.fill(scheme)
+            : StressLevelColor.fill(StressView.bandIndex(bar.level), scheme)
         guard let selected else { return base }
         return selected == bar.hour ? base : base.opacity(0.4)
     }
@@ -368,12 +384,23 @@ private struct StressHoursChart: View {
                 BarMark(x: .value("Hour", bar.hour), y: .value("Level", bar.level), width: .fixed(12))
                     .foregroundStyle(color(bar))
                     .cornerRadius(3)
+                    .annotation(position: .top, spacing: 2) {
+                        // Not color alone: the highest hour shows its number,
+                        // and every other High hour gets a ▲.
+                        if !bar.active, bar.hour == peakHour {
+                            Text("\(bar.level)").font(.scaled(size: 11, weight: .heavy))
+                                .foregroundStyle(Palette(scheme: scheme).primary)
+                        } else if !bar.active, StressView.bandIndex(bar.level) == 3 {
+                            Text("\u{25B2}").font(.scaled(size: 8, weight: .heavy))
+                                .foregroundStyle(StressLevelColor.fill(3, scheme))
+                        }
+                    }
             }
             selectionMarks
         }
         .chartScrub($selection)
         .chartXScale(domain: domain)
-        .chartYScale(domain: 0...100)
+        .chartYScale(domain: 0...115)  // room above 100 for the labels
         .chartXAxis {
             AxisMarks(values: [8, 12, 16, 20]) { value in
                 AxisGridLine()

@@ -182,4 +182,107 @@ extension AppModel {
     /// higher resting burn).
     /// Not once she's past her usual length (the period is due around now).
     var inLutealPhase: Bool { trackedCyclePhase == .luteal && !cycleDisplay.isPastUsualLength }
+
+    // MARK: Method-specific wording
+
+    /// Her method usually makes periods rare or stop: hormonal IUD, implant,
+    /// shot, or a pill/ring/patch used continuously (no break). Period
+    /// wording, "log your period" nags and period-count goals don't fit.
+    var periodsUsuallyRare: Bool {
+        switch store.birthControl {
+        case .hormonalIUD?, .implant?, .shot?: return true
+        default: break
+        }
+        if let p = packState, !p.hasBreak { return true }
+        return false
+    }
+
+    /// No bleeding known in the last 60 days (logged here or in Apple
+    /// Health) while she tracks a cycle on hormonal birth control.
+    var noRecentBleed: Bool {
+        guard store.data.cycleSetup == .hormonal else { return false }
+        let cal = Calendar.current
+        guard let cutoff = cal.date(byAdding: .day, value: -60, to: cal.startOfDay(for: .now)) else { return false }
+        let logged = store.data.flowLog.contains { $0.date >= cutoff }
+        let health = allPeriodStarts.contains { $0 >= cutoff }
+        return !logged && !health
+    }
+
+    /// Talk about "bleeding or spotting" instead of "your period".
+    var usesBleedingWording: Bool { periodsUsuallyRare || noRecentBleed }
+
+    /// Pill, ring or patch: her month is a pack, not a cycle.
+    var usesPackWording: Bool { store.birthControl?.hasBreakWeek == true }
+
+    /// When the luteal dip lifts, without promising a period on methods
+    /// where periods are rare or have stopped.
+    var lutealEasesLine: String {
+        usesBleedingWording || store.birthControl == .miniPill
+            ? "This usually eases within a week or so."
+            : "This eases once your period starts."
+    }
+}
+
+/// Temperatures in her own unit (°F in the US, °C elsewhere). Apple Health
+/// stores wrist temperature in °C; a change of 1 °C is a change of 1.8 °F,
+/// so differences are scaled, never shifted by 32.
+enum TempFormat {
+    /// Whether her locale shows temperatures in Fahrenheit.
+    static var usesFahrenheit: Bool {
+        let f = MeasurementFormatter()
+        f.locale = .current
+        f.numberFormatter.maximumFractionDigits = 0
+        // The locale's own unit for 0 °C: "32°F" in the US.
+        return f.string(from: Measurement(value: 0, unit: UnitTemperature.celsius)).contains("32")
+    }
+
+    private static func formatter(digits: Int) -> MeasurementFormatter {
+        let f = MeasurementFormatter()
+        f.locale = .current
+        f.unitOptions = .providedUnit
+        f.unitStyle = .medium
+        f.numberFormatter.minimumFractionDigits = digits
+        f.numberFormatter.maximumFractionDigits = digits
+        return f
+    }
+
+    /// A change in temperature, with a sign: "+0.7°C" or "+1.3°F".
+    static func delta(_ celsius: Double, digits: Int = 1, signed: Bool = true) -> String {
+        let fahrenheit = usesFahrenheit
+        let value = fahrenheit ? celsius * 1.8 : celsius
+        let unit: UnitTemperature = fahrenheit ? .fahrenheit : .celsius
+        let text = formatter(digits: digits).string(from: Measurement(value: abs(value), unit: unit))
+        guard signed else { return text }
+        let rounded = (abs(value) * pow(10, Double(digits))).rounded()
+        if rounded == 0 { return text }
+        return (value < 0 ? "\u{2212}" : "+") + text
+    }
+
+    /// A temperature (not a change): "100.4°F" or "38°C".
+    static func absolute(_ celsius: Double, digits: Int = 1) -> String {
+        let m = Measurement(value: celsius, unit: UnitTemperature.celsius)
+        let unit: UnitTemperature = usesFahrenheit ? .fahrenheit : .celsius
+        return formatter(digits: digits).string(from: m.converted(to: unit))
+    }
+}
+
+extension BirthControl {
+    /// The method's name inside a sentence: "combined pill", "hormonal IUD",
+    /// "copper IUD". Keeps "IUD" in capitals (`rawValue.lowercased()` gave
+    /// "hormonal iud").
+    var inSentence: String {
+        rawValue.lowercased().replacingOccurrences(of: "iud", with: "IUD")
+    }
+
+    /// Whether this method stops ovulation and what the app does about it,
+    /// from the method's own `ovulation`. Settings and Accuracy tips both use
+    /// it, so they always agree.
+    var ovulationLine: String {
+        switch ovulation {
+        case .stopped: return "The \(inSentence) stops ovulation, so the app doesn\u{2019}t show ovulation or luteal phases for you."
+        case .sometimes: return "On the \(inSentence), ovulation may or may not happen, so cycle phases are shown as rough estimates."
+        case .mostStill: return "Most people still ovulate on the \(inSentence), so the app still shows your cycle phases."
+        case .natural: return "You ovulate as normal on the \(inSentence), so the app shows your cycle phases."
+        }
+    }
 }

@@ -52,6 +52,9 @@ struct WatchSnapshot: Codable, Equatable {
     /// Her caffeine cutoff for a typical drink falls before she's up (the
     /// pill, ring or patch slow caffeine down): `caffeineCutoff` is nil then.
     var caffeineCutoffBeforeWake: Bool? = nil
+    /// Today's caffeine leaves 25 mg or more at bedtime: the only time the
+    /// Watch shows a warning (nil from older phone builds).
+    var caffeineTooMuchAtBedtime: Bool? = nil
 
     struct Zone: Codable, Equatable {
         var title: String

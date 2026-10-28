@@ -92,7 +92,7 @@ struct CaffeineView: View {
                         heroStat(label: "No caffeine yet", value: "\u{2014}", accent: .yellow)
                     }
                     HStack(alignment: .bottom, spacing: 0) {
-                        heroStat(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "Early only", accent: .orange)
+                        heroStat(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "None today", accent: .orange)
                         InfoButton(topic: .caffeineCutoff).padding(.bottom, -10)
                     }
                     Text("of \(dailyLimit) mg daily limit")
@@ -173,15 +173,18 @@ struct CaffeineView: View {
         let t = model.appDayMinutes(AppDay.pastTime(logTime.date))
         let tooMuch = model.wouldBeTooMuchAtBedtime(mg: drink.caffeineMg, at: t)
         let text: String
+        let when = logTime == .now ? "now" : logTime.phrase
+        let bed = Clock.format(model.bedtimeTonight)
+        let left = model.caffeineAtBedtime(adding: drink.caffeineMg, at: t)
         if !tooMuch {
-            text = "Your \(drink.name) (\(drink.caffeineMg) mg) \(logTime == .now ? "now" : logTime.phrase) still clears enough by your \(Clock.format(model.bedtimeTonight)) bedtime."
+            text = "Your \(drink.name) (\(drink.caffeineMg) mg) \(when) is fine: under 25 mg would be left by your \(bed) bedtime."
         } else if let latest = model.latestTimeForCaffeine(mg: drink.caffeineMg), latest > t {
-            text = "Your \(drink.name) (\(drink.caffeineMg) mg) \(logTime == .now ? "now" : logTime.phrase) would leave 25 mg or more at bedtime. Have it by \(Clock.format(latest)) instead."
+            text = "Your \(drink.name) \(when) would still be about \(left) mg at bedtime. Have it by \(Clock.format(latest)) instead."
         } else {
             let room = CaffeineModel.largestDose(at: max(t, model.now), bedtime: model.bedtimeTonight, existing: model.caffeineDoses,
                                                  halfLifeHours: model.caffeineHalfLifeHours)
-            let smaller = room >= 5 ? " A smaller drink fits: up to about \(room) mg now." : " Anything more today would still be in you at bedtime."
-            text = "No time left today when your \(drink.name) (\(drink.caffeineMg) mg) clears enough by your \(Clock.format(model.bedtimeTonight)) bedtime." + smaller
+            let smaller = room >= 5 ? " A smaller drink still fits: up to about \(room) mg now." : ""
+            text = "Your \(drink.name) \(when) would still be about \(left) mg at bedtime, so skip more caffeine today." + smaller
                 + (model.caffeineLastsLonger ? " On your birth control caffeine stays about twice as long." : "")
         }
         return Label(text, systemImage: tooMuch ? "exclamationmark.triangle.fill" : "checkmark.circle")
@@ -442,7 +445,7 @@ struct CaffeineView: View {
     private var timingReadout: (title: String, value: String, detail: String) {
         guard let raw = selectedTiming else {
             if noWindow {
-                return (label(timingDay), "One small drink early", "There\u{2019}s no time when a typical drink clears enough by bedtime. If you have one, keep it small, soon after you wake.")
+                return (label(timingDay), "No cutoff time today", "At no time today would a typical 100 mg drink be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
             }
             return (label(timingDay), "Best window \(timing.bestWindow.label)",
                     "Caffeine works best once grogginess clears and before your \(Clock.format(timing.cutoff)) cutoff.")
@@ -499,9 +502,10 @@ struct CaffeineView: View {
                 .accessibilityLabel(timingSummary)
             ScrubHint()
             HStack(spacing: 12) {
-                legend("Grogginess", color: Accent.indigo.fill(scheme).opacity(0.55))
-                if !noWindow { legend("Best for caffeine", color: Accent.mint.fill(scheme).opacity(0.55)) }
-                legend("Afternoon dip", color: Accent.coral.fill(scheme).opacity(0.6))
+                // The blocks carry their own labels; this spells them out.
+                legend("Groggy: still waking up", color: Accent.indigo.fill(scheme).opacity(0.55))
+                if !noWindow { legend("Best: best for caffeine", color: Accent.mint.fill(scheme).opacity(0.55)) }
+                legend("Dip: afternoon dip", color: Accent.coral.fill(scheme).opacity(0.6))
             }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
@@ -658,6 +662,8 @@ private struct TimingZone: Identifiable {
     let name: String
     let range: TimeRange
     let color: Color
+    /// Drawn on the block itself, so the strip never relies on color alone.
+    var short: String = ""
     var id: String { name }
 }
 
@@ -676,10 +682,15 @@ private struct EnergyTimingChart: View {
 
     private var zones: [TimingZone] {
         var out: [TimingZone] = []
-        if let groggy { out.append(TimingZone(name: "Grogginess", range: groggy, color: Accent.indigo.fill(scheme).opacity(0.5))) }
-        if let window { out.append(TimingZone(name: "Best for caffeine", range: window, color: Accent.mint.fill(scheme).opacity(0.45))) }
-        if let dip { out.append(TimingZone(name: "Afternoon dip", range: dip, color: Accent.coral.fill(scheme).opacity(0.6))) }
+        if let groggy { out.append(TimingZone(name: "Grogginess", range: groggy, color: Accent.indigo.fill(scheme).opacity(0.5), short: "Groggy")) }
+        if let window { out.append(TimingZone(name: "Best for caffeine", range: window, color: Accent.mint.fill(scheme).opacity(0.45), short: "Best")) }
+        if let dip { out.append(TimingZone(name: "Afternoon dip", range: dip, color: Accent.coral.fill(scheme).opacity(0.6), short: "Dip")) }
         return out
+    }
+
+    /// Zones wide enough (about an hour) to hold their own label.
+    private func labelFits(_ zone: TimingZone) -> Bool {
+        clamp(zone.range.end) - clamp(zone.range.start) >= 50
     }
 
     private func clamp(_ m: Minutes) -> Minutes { min(max(m, span.lowerBound), span.upperBound) }
@@ -696,6 +707,16 @@ private struct EnergyTimingChart: View {
                 RectangleMark(xStart: .value("Start", clamp(zone.range.start)), xEnd: .value("End", clamp(zone.range.end)),
                               yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
                     .foregroundStyle(zone.color)
+                    .annotation(position: .overlay, alignment: .bottom) {
+                        if labelFits(zone) {
+                            Text(zone.short)
+                                .font(.scaled(size: 11, weight: .bold))
+                                .foregroundStyle(Palette(scheme: scheme).primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .padding(.bottom, 4)
+                        }
+                    }
             }
             cutoffRule
             dots

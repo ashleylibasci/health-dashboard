@@ -56,6 +56,27 @@ enum Accent: CaseIterable {
     }
 }
 
+/// Stress level fills (Low, Usual, Raised, High). Lightness steps with the
+/// level so "High" never differs from "Raised" by hue alone: in light mode
+/// High is a deep red (6.5:1 on white) next to an amber Raised (3.5:1), and
+/// every fill is at least 3:1 on white; in dark mode Raised is a pale amber
+/// and High a strong red, both 5:1 or more on the dark card.
+enum StressLevelColor {
+    /// `level`: 0 Low, 1 Usual, 2 Raised, 3 High.
+    static func fill(_ level: Int, _ scheme: ColorScheme) -> Color {
+        switch (min(max(level, 0), 3), scheme) {
+        case (0, .dark): Color(hex: 0x5EE0C1)
+        case (1, .dark): Color(hex: 0x6FB8FF)
+        case (2, .dark): Color(hex: 0xFFC266)
+        case (_, .dark): Color(hex: 0xFF5A5A)
+        case (0, _): Color(hex: 0x2FA472)
+        case (1, _): Color(hex: 0x2F7FD6)
+        case (2, _): Color(hex: 0xC77700)
+        default: Color(hex: 0xB3261E)
+        }
+    }
+}
+
 /// Neutral tokens.
 struct Palette {
     let scheme: ColorScheme

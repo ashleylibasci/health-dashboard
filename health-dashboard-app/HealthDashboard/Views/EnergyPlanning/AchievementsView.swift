@@ -185,11 +185,13 @@ private struct BadgeCell: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 if !earned {
-                    Text("\(badge.progress) / \(badge.goal)").font(.scaled(size: 11)).foregroundStyle(p.tertiary)
+                    Text("\(badge.progress) / \(badge.goal)").font(.scaled(size: 11)).foregroundStyle(p.secondary)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 44)
-            .opacity(earned ? 1 : 0.75)
+            // Locked badges are told apart by the lock and dashed ring, not
+            // by fading: faded text fell to about 3:1 on the light card.
+            // Full-strength secondary text is 8:1 (light) and 4.5:1+ (dark).
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

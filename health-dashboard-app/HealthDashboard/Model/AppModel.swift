@@ -1179,7 +1179,8 @@ final class AppModel: ObservableObject {
             recoveryMissing: shownRecovery == nil,
             lastNightMissing: !lastNightIsFresh,
             todayDrinkIDs: todaysDrinks.map(\.id),
-            caffeineCutoffBeforeWake: cutoffBeforeWake))
+            caffeineCutoffBeforeWake: cutoffBeforeWake,
+            caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime))
     }
 
     func handle(_ message: WatchMessage) {

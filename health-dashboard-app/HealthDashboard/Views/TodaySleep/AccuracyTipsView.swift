@@ -84,9 +84,26 @@ struct AccuracyTipsView: View {
     private var loggingStatus: TipStatus {
         var text = "Caffeine logged on \(caffeineDays) of the last 7 days"
         if store.data.cycleSetup != .notTracking {
-            text += ", period on \(periodDays) days in 2 months"
+            if model.usesBleedingWording {
+                // No nag on methods where bleeding is rare or has stopped.
+                text += periodDays > 0
+                    ? ", bleeding or spotting on \(periodDays) day\(periodDays == 1 ? "" : "s") in 2 months"
+                    : ". Bleeding or spotting: log it if it happens"
+            } else if model.usesPackWording {
+                text += ", bleeding on \(periodDays) day\(periodDays == 1 ? "" : "s") in 2 months"
+            } else {
+                text += ", period on \(periodDays) day\(periodDays == 1 ? "" : "s") in 2 months"
+            }
         }
         return caffeineDays >= 4 ? .done(text) : .todo(text)
+    }
+
+    /// Why the method matters, from the method's own `ovulation` (the same
+    /// line Settings shows), so the two screens never disagree.
+    private var birthControlWhy: String {
+        let base = "Some methods stop ovulation and some don\u{2019}t, which changes what\u{2019}s normal for your heart rate and temperature."
+        guard let bc = store.birthControl else { return base }
+        return "\(bc.ovulationLine) That changes what\u{2019}s normal for your heart rate and temperature."
     }
 
     private var birthControlStatus: TipStatus {
@@ -157,7 +174,7 @@ struct AccuracyTipsView: View {
                 why: "Missing permissions mean missing numbers. In Settings, go to Health, then Data Access & Devices, then this app, and turn on all.",
                 status: healthStatus, action: .health),
             Tip(icon: "pills.fill", accent: .pink, title: "Set your birth control correctly",
-                why: "Most hormonal methods stop ovulation, which changes what's normal for your heart rate and temperature.",
+                why: birthControlWhy,
                 status: birthControlStatus, action: .settings),
             Tip(icon: "arrow.down.circle.fill", accent: .indigo, title: "Keep watchOS updated",
                 why: "Updates improve sleep and heart tracking. In the Watch app, go to General, then Software Update."),
@@ -169,7 +186,7 @@ struct AccuracyTipsView: View {
             Tip(icon: "sun.horizon.fill", accent: .orange, title: "Do the morning check-in every day",
                 why: "How you feel teaches the app your real sleep need and your best wake time.", status: checkInStatus,
                 action: model.canCheckInNow && !model.checkInDoneToday ? .checkIn : nil),
-            Tip(icon: "cup.and.saucer.fill", accent: .yellow, title: "Log caffeine, drinks and periods",
+            Tip(icon: "cup.and.saucer.fill", accent: .yellow, title: model.usesBleedingWording || model.usesPackWording ? "Log caffeine, drinks and bleeding" : "Log caffeine, drinks and periods",
                 why: "So the app can tell a late coffee or a night out apart from a bad night's sleep.", status: loggingStatus),
             Tip(icon: "calendar", accent: .mint, title: "Give it about 2 weeks",
                 why: "Your usual needs a couple of weeks of nights. Numbers settle down after that.", status: nightsStatus),

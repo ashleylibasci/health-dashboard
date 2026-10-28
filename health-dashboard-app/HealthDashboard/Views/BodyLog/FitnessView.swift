@@ -60,7 +60,15 @@ struct FitnessView: View {
                                    forYou: "Higher is better. It rises with regular cardio (brisk walks, runs, cycling) and drops with time off. It changes over weeks, not days.")
                             .padding(.vertical, -12)
                     }
-                    Text(model.fitnessLevel ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    if hidesTargets {
+                        // No "below average" ranking with an eating-disorder history.
+                        HStack(spacing: 0) {
+                            Text("Your Watch\u{2019}s latest estimate").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                            InfoButton(explanation: Self.noComparisonsExplanation).padding(.vertical, -12)
+                        }
+                    } else {
+                        Text(model.fitnessLevel ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                    }
                 }
                 Spacer()
                 if let fa = model.fitnessAgeText {
@@ -76,16 +84,26 @@ struct FitnessView: View {
                     }
                 }
             }
-            if let fa = model.fitnessAge, age > 0 {
+            if let fa = model.fitnessAge, age > 0, !hidesTargets {
                 Text(ageComparison(fitnessAge: fa, vo2: vo2))
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
             }
-            if let peak = model.vo2MaxPeak, peak.value > vo2 + 0.5 {
-                Text("Your peak was \(String(format: "%.1f", peak.value)) in \(peak.date.formatted(.dateTime.year()))." + (hidesTargets ? "" : " VO\u{2082} max comes back fast, often 3\u{2013}5 points in 8 weeks of regular cardio."))
+            if hidesTargets {
+                Text("Shown as a number only, with no rankings or ups and downs. It\u{2019}s a rough estimate from your Watch, not a score to beat.")
+                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+            } else if let peak = model.vo2MaxPeak, peak.value > vo2 + 0.5 {
+                Text("Your peak was \(String(format: "%.1f", peak.value)) in \(peak.date.formatted(.dateTime.year())). VO\u{2082} max comes back fast, often 3\u{2013}5 points in 8 weeks of regular cardio.")
                     .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
         }
     }
+
+    /// Why Fitness shows no comparisons, like the Calories screen explains
+    /// why calories are hidden.
+    static let noComparisonsExplanation = Explanation(
+        id: "fitnessNoComparisons", title: "Why there are no comparisons",
+        meaning: "You added eating-disorder history to your health conditions, so the app leaves out rankings like \u{201C}below average\u{201D}, your past peak, and ups and downs over time. It also keeps calories, step counts and exercise targets out of sight.",
+        forYou: "VO\u{2082} max is shown as a plain number from your Watch. You can change this in Health conditions.")
 
     private func ageComparison(fitnessAge fa: Int, vo2: Double) -> String {
         if FitnessAge.isTopOfChart(vo2Max: vo2, sex: store.data.sex) {
@@ -108,6 +126,8 @@ struct FitnessView: View {
         guard let p = shown else { return "" }
         let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: store.data.sex) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: store.data.sex))"
         var text = "Fitness age then: \(fa)."
+        // No "up/down since" or "your peak" with an eating-disorder history.
+        if hidesTargets { return text }
         if let first = points.first, p.date != first.date {
             let diff = p.value - first.value
             text += " " + (diff >= 0 ? String(format: "Up %.1f", diff) : String(format: "Down %.1f", -diff)) + " since \(first.date.formatted(.dateTime.month(.abbreviated).year()))."

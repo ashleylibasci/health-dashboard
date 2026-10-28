@@ -36,11 +36,19 @@ struct EnergyPage: View {
         }
     }
 
+    /// "22% left" (energy left, the battery), then the zone of the day she's
+    /// in ("Second wind zone"), so the percentage never reads as a score for
+    /// the zone. Same "left" wording as the Recovery page.
     private var nowRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("\(snapshot.energyNow)%")
-                .font(.number(34))
-                .minimumScaleFactor(0.7)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(snapshot.energyNow)%")
+                    .font(.number(34))
+                    .minimumScaleFactor(0.7)
+                Text("left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(WatchStyle.secondaryText)
+            }
             if !snapshot.energyZoneTitle.isEmpty {
                 Text(zoneLine)
                     .font(.system(size: 14, weight: .bold))
@@ -49,13 +57,14 @@ struct EnergyPage: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Energy left \(snapshot.energyNow) percent" + (snapshot.energyZoneTitle.isEmpty ? "" : ". \(zoneLine)"))
     }
 
-    /// "In your dip", "Morning peak".
+    /// "In your dip zone", "Second wind zone".
     private var zoneLine: String {
         let isDip = snapshot.energyZoneKind.map { $0 == "afternoonDip" } ?? (snapshot.energyZoneTitle == "Afternoon dip")
-        return isDip ? "In your dip" : snapshot.energyZoneTitle
+        return isDip ? "In your dip zone" : "\(snapshot.energyZoneTitle) zone"
     }
 
     @ViewBuilder

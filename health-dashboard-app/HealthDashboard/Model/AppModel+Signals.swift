@@ -30,18 +30,30 @@ extension AppModel {
     /// Stress you logged yourself today (1 calm – 5 very stressed).
     var stressLoggedToday: Int? { AppData.today(store.data.moodLog, date: \.date).last?.stress }
 
-    /// Luteal context for a natural cycle in its luteal phase (not past her
-    /// usual length). When a natural cycle's phase can't be told (irregular,
-    /// PCOS, overdue, due around now, a method that may keep ovulation), the
-    /// same allowance with a caveat (`IllnessSignal.cyclePhaseUnknown`).
+    /// Luteal allowance only for a natural cycle known to be in its luteal
+    /// phase (not past her usual length). When a natural cycle's phase can't
+    /// be told (irregular, PCOS, overdue, due around now, a method that may
+    /// keep ovulation), no allowance is applied: the app doesn't assume a
+    /// phase it can't see. `cyclePhaseUnknown` is still set on the result so
+    /// screens and alerts can say the cycle might be part of it.
     /// "Hard training" is relative to her own usual active energy.
     var illness: IllnessSignal {
         let display = cycleDisplay
-        return IllnessSignal.evaluate(restingHRDelta: restingHRDelta, hrvDeltaPct: hrvDeltaPct,
-                                      respiratoryRateDelta: respiratoryRateDelta, wristTempDelta: wristTempDelta,
-                                      lutealPhase: trackedCyclePhase == .luteal && !display.isPastUsualLength,
-                                      hardTrainingYesterday: hardTrainingYesterday,
-                                      cyclePhaseUnknown: display.cyclePhaseUnknown)
+        let luteal = trackedCyclePhase == .luteal && !display.isPastUsualLength
+        var signal = IllnessSignal.evaluate(restingHRDelta: restingHRDelta, hrvDeltaPct: hrvDeltaPct,
+                                            respiratoryRateDelta: respiratoryRateDelta, wristTempDelta: wristTempDelta,
+                                            lutealPhase: luteal,
+                                            hardTrainingYesterday: hardTrainingYesterday,
+                                            cyclePhaseUnknown: false)
+        signal.cyclePhaseUnknown = display.cyclePhaseUnknown && !luteal
+        return signal
+    }
+
+    /// Possible or Likely: Body's sick check, Today's sick card and "Why do
+    /// I feel off?" (which leads with it) all agree. On example data the
+    /// Today card says it's an example; alerts still need real data.
+    var sickCheckFlagged: Bool {
+        hasHeartData && (illness.confidence == .medium || illness.confidence == .high)
     }
 
     /// Yesterday's active energy was at least 1.5× her usual (and 400 kcal).
@@ -201,7 +213,7 @@ extension AppModel {
         if isLateLuteal {
             out.append(.init(title: "Late in your cycle", detail: "A higher resting heart rate and lower HRV are normal now, so feeling a bit flat is too.", weight: 5, topic: .luteal))
         }
-        if illness.confidence == .medium || illness.confidence == .high {
+        if sickCheckFlagged {
             out.append(.init(title: "Your body may be fighting something", detail: "Several signals are off at once.", weight: 8, topic: .illness))
         }
         if let s = stressToday.label, s == .raised || s == .high {
@@ -215,6 +227,11 @@ extension AppModel {
         if let light = daylightThisAppDay, light < 15, now >= lastNight.wake + 180 {
             out.append(.init(title: "Little daylight", detail: "\(light) min so far. Morning light helps you feel awake.", weight: 2, topic: .daylight))
         }
-        return out.sorted { $0.weight > $1.weight }
+        // The sick check, when it fires, leads: it's the one reason that
+        // changes what she should do today (rest, fluids, no hard training).
+        return out.sorted {
+            let a = $0.topic == .illness, b = $1.topic == .illness
+            return a != b ? a : $0.weight > $1.weight
+        }
     }
 }

@@ -69,9 +69,9 @@ struct CycleView: View {
     private var moreCard: some View {
         let p = Palette(scheme: scheme)
         return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "More about your cycle").padding(.top, 4)
+            SectionLabel(text: model.usesPackWording ? "More about your pack" : "More about your cycle").padding(.top, 4)
             Card {
-                LinkRow(title: "How your cycle affects you", subtitle: model.hidesEffortTargets ? "Energy, sleep, HRV and mood" : "Energy, sleep, HRV, mood and workouts",
+                LinkRow(title: model.usesPackWording ? "How your pack affects you" : "How your cycle affects you", subtitle: model.hidesEffortTargets ? "Energy, sleep, HRV and mood" : "Energy, sleep, HRV, mood and workouts",
                         systemImage: "waveform.path.ecg", accent: .purple) {
                     CyclePhasesView()
                 }
@@ -97,7 +97,7 @@ struct CycleView: View {
     }
 
     private var birthControlSubtitle: String {
-        if let bc = store.birthControl { return "What your \(bc.rawValue.lowercased()) does, and every method compared" }
+        if let bc = store.birthControl { return "What your \(bc.inSentence) does, and every method compared" }
         return "Every method compared"
     }
 
@@ -314,9 +314,9 @@ private struct PhasesSection: View {
     private var noCountdownText: String {
         switch bc {
         case .miniPill?:
-            return "No countdown on the mini pill. Bleeding can come at unexpected times, so a date would often be wrong. Log bleeding days and we'll keep a history."
+            return "No countdown on the mini pill. Bleeding can come at unexpected times, so a date would often be wrong. Bleeding or spotting: log it if it happens, and we\u{2019}ll keep a history."
         case .hormonalIUD?:
-            return "No countdown with a hormonal IUD. Periods often get lighter, irregular or stop, so a date would often be wrong. Log bleeding days and we'll keep a history."
+            return "No countdown with a hormonal IUD. Periods often get lighter, irregular or stop, so a date would often be wrong. Bleeding or spotting: log it if it happens, and we\u{2019}ll keep a history."
         default:
             return "No countdowns for irregular cycles. We\u{2019}ll keep a history of your cycle lengths you can show your doctor."
         }
@@ -348,7 +348,7 @@ private struct PhasesSection: View {
             }
         } else if model.hidesPeriodCountdownOnScreens {
             Card(accent: .coral) {
-                SectionLabel(text: "Next period", accent: .coral)
+                SectionLabel(text: bc == .hormonalIUD || bc == .miniPill ? "Bleeding & spotting" : "Next period", accent: .coral)
                 Text(noCountdownText)
                     .font(.scaled(size: 14))
                     .secondaryText()
@@ -771,7 +771,7 @@ private struct PackSection: View {
                 .font(.scaled(size: 15))
                 .accessibilityLabel("\(item): switched off")
             }
-            Text("Your \(method.rawValue.lowercased()) stops your body from releasing an egg each month, so these natural-cycle changes don't happen to you and the app never predicts them.")
+            Text("Your \(method.inSentence) stops your body from releasing an egg each month, so these natural-cycle changes don't happen to you and the app never predicts them.")
                 .font(.scaled(size: 13))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
@@ -896,7 +896,7 @@ private struct SuppressedSection: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
 
-    private var name: String { method.rawValue.lowercased() }
+    private var name: String { method.inSentence }
     /// Hormonal IUD or mini pill: ovulation may still happen.
     private var mayOvulate: Bool { method.ovulation != .stopped }
 
@@ -941,7 +941,7 @@ private struct SuppressedSection: View {
         Card {
             SectionLabel(text: "What we still track for you")
             Text(mayOvulate
-                 ? "Your temperature, HRV and resting heart rate, compared with your own usual. You may still ovulate, and the app can\u{2019}t tell which part of your cycle you\u{2019}re in, so the sick check allows for the small rise that comes with it."
+                 ? "Your temperature, HRV and resting heart rate, compared with your own usual. You may still ovulate, and the app can\u{2019}t tell which part of your cycle you\u{2019}re in, so the sick check doesn\u{2019}t assume a phase. If it flags something, it says your cycle could be part of it."
                  : "Your temperature, HRV and resting heart rate, compared with your own usual. With no monthly hormone swings, changes in them are more likely to be about sleep, stress or getting sick.")
                 .font(.scaled(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1000,7 +1000,7 @@ private struct PackUnknownSection: View {
             PackSetupControl()
         }
         Card(accent: .indigo) {
-            SectionLabel(text: "On your \(method.rawValue.lowercased())", accent: .indigo)
+            SectionLabel(text: "On your \(method.inSentence)", accent: .indigo)
             Text("It stops your body from releasing an egg, so there are no ovulation or luteal phases and no period countdown. The bleed in your break week is a withdrawal bleed.")
                 .font(.scaled(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1087,16 +1087,39 @@ private struct IrregularSection: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
-    @State private var selectedCycle: Int? = nil
+    @State private var selectedLabel: String? = nil
 
+    /// One finished cycle (start date and length), or the current one so far.
     private struct CycleBar: Identifiable {
         let id: Int
+        let start: Date?
         let days: Int
+        var isCurrent = false
+        /// The x-axis category: the start date ("Aug 3"), or "Now".
+        var label: String {
+            if isCurrent { return "Now" }
+            return start.map { $0.formatted(.dateTime.month(.abbreviated).day()) } ?? "Cycle \(id)"
+        }
     }
 
+    /// Finished cycles: the gaps between known period starts, each labelled
+    /// with the day it started. Never a prediction.
     private var bars: [CycleBar] {
-        Array(model.loggedCycleLengths.suffix(6).enumerated()).map { CycleBar(id: $0.offset + 1, days: $0.element) }
+        let starts = model.allPeriodStarts
+        let lengths = model.loggedCycleLengths
+        let shown = Array(lengths.enumerated()).suffix(6)
+        return shown.enumerated().map { i, pair in
+            CycleBar(id: i + 1, start: pair.offset < starts.count ? starts[pair.offset] : nil, days: pair.element)
+        }
     }
+
+    /// The cycle she's in now, so far (an outlined bar, not a prediction).
+    private var currentBar: CycleBar? {
+        guard !bars.isEmpty, let days = model.daysSinceLastPeriodStart, days > 0 else { return nil }
+        return CycleBar(id: bars.count + 1, start: model.allPeriodStarts.last, days: days + 1, isCurrent: true)
+    }
+
+    private var chartBars: [CycleBar] { bars + (currentBar.map { [$0] } ?? []) }
 
     var body: some View {
         Card(padding: 18) {
@@ -1149,13 +1172,17 @@ private struct IrregularSection: View {
     }
 
     private var shownBar: CycleBar? {
-        guard let s = selectedCycle else { return nil }
-        return bars.min { abs($0.id - s) < abs($1.id - s) }
+        guard let s = selectedLabel else { return nil }
+        return chartBars.first { $0.label == s }
     }
 
-    private var readoutTitle: String { shownBar.map { "Cycle \($0.id) of \(bars.count)" } ?? "Range" }
+    private var readoutTitle: String {
+        guard let b = shownBar else { return "Range" }
+        if b.isCurrent { return "This cycle so far" }
+        return "Started \(b.label) \u{00B7} cycle \(b.id) of \(bars.count)"
+    }
     private var readoutValue: String {
-        if let b = shownBar { return "\(b.days) days" }
+        if let b = shownBar { return b.isCurrent ? "\(b.days) days so far" : "\(b.days) days" }
         let lengths = bars.map(\.days)
         return "\(lengths.min() ?? 0)\u{2013}\(lengths.max() ?? 0) days"
     }
@@ -1163,6 +1190,9 @@ private struct IrregularSection: View {
 
     private var readoutDetail: String {
         if let b = shownBar {
+            if b.isCurrent {
+                return "Still going, so this isn\u{2019}t a length yet and not a prediction. It becomes a full bar when you log your next period."
+            }
             if b.days > 45 {
                 return hasPCOS ? "A long cycle, over 45 days. Common with PCOS. Worth noting for your doctor."
                                : "A long cycle, over 45 days. Worth noting for your doctor."
@@ -1179,15 +1209,59 @@ private struct IrregularSection: View {
     }
 
     private var cycleChart: some View {
-        Chart(bars) { bar in
-            BarMark(x: .value("Cycle", bar.id), y: .value("Days", bar.days), width: .ratio(0.6))
-                .foregroundStyle(BodyLogStyle.phaseFill(.period, scheme))
-                .opacity(shownBar == nil || shownBar?.id == bar.id ? 1 : 0.35)
-                .cornerRadius(6)
+        // A category per cycle (its start date), so every bar gets a real
+        // band to fill; a numeric x gave each bar a sliver and drew nothing.
+        let fill = BodyLogStyle.phaseFill(.period, scheme)
+        let ink = Accent.coral.ink(scheme)
+        let top = max(chartBars.map(\.days).max() ?? 35, 35)
+        return Chart(chartBars) { bar in
+            if bar.isCurrent {
+                // Faint fill with a dashed outline: the current cycle isn't
+                // finished, so it never looks like a measured length.
+                BarMark(x: .value("Cycle", bar.label), y: .value("Days", bar.days), width: .ratio(0.6))
+                    .foregroundStyle(fill.opacity(0.14))
+                    .cornerRadius(6)
+                    .annotation(position: .overlay) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(fill, style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .opacity(shownBar == nil || shownBar?.isCurrent == true ? 1 : 0.35)
+                    }
+                    .annotation(position: .top, spacing: 2) {
+                        Text("\(bar.days) d so far").font(.scaled(size: 11, weight: .bold)).foregroundStyle(ink)
+                    }
+            } else {
+                BarMark(x: .value("Cycle", bar.label), y: .value("Days", bar.days), width: .ratio(0.6))
+                    .foregroundStyle(fill)
+                    .opacity(shownBar == nil || shownBar?.id == bar.id ? 1 : 0.35)
+                    .cornerRadius(6)
+                    .annotation(position: .top, spacing: 2) {
+                        Text("\(bar.days) d").font(.scaled(size: 12, weight: .bold)).foregroundStyle(ink)
+                    }
+            }
         }
-        .chartScrub($selectedCycle)
-        .chartXAxis(.hidden)
-        .frame(height: 140)
-        .accessibilityLabel("Cycle lengths: " + bars.map { "\($0.days) days" }.joined(separator: ", "))
+        .chartXScale(domain: chartBars.map(\.label))
+        .chartYScale(domain: 0...(Double(top) * 1.2))
+        .chartScrub($selectedLabel)
+        .chartXAxis {
+            AxisMarks { _ in
+                AxisValueLabel().font(.scaled(size: 11, weight: .semibold))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
+                AxisGridLine()
+                AxisValueLabel().font(.scaled(size: 11))
+            }
+        }
+        .frame(height: 170)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cycleChartSummary)
+    }
+
+    private var cycleChartSummary: String {
+        var parts = bars.map { "started \($0.label), \($0.days) days" }
+        if let c = currentBar { parts.append("this cycle so far, \(c.days) days") }
+        return "Cycle lengths: " + parts.joined(separator: "; ")
     }
 }

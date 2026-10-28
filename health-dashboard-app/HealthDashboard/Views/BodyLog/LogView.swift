@@ -272,6 +272,7 @@ struct LogView: View {
                         .font(.scaled(size: 13, weight: .semibold))
                         .foregroundStyle(Accent.coral.ink(scheme))
                 }
+                StressCrisisRow(level: model.stressLoggedToday)
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
                 LinkRow(title: "Your stress today", subtitle: "What your heart rate shows, hour by hour",
                         systemImage: "waveform.path.ecg", accent: .coral) {
@@ -338,7 +339,7 @@ struct LogView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Cycle", accent: .pink)
             Card {
-                LinkRow(title: "Period & symptoms", subtitle: cycleSubtitle,
+                LinkRow(title: model.usesBleedingWording || model.usesPackWording ? "Bleeding & symptoms" : "Period & symptoms", subtitle: cycleSubtitle,
                         systemImage: "drop.fill", accent: .pink) {
                     CycleLogView()
                 }

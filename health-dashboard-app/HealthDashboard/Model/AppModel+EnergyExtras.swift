@@ -90,10 +90,10 @@ extension AppModel {
         switch kind {
         case .grogginess: return "The foggy, just-woke-up feeling while your brain switches on."
         case .morningPeak: return "Your sharpest focus of the day."
-        case .afternoonDip: return "A natural energy drop built into your body clock. It isn't caused by lunch."
+        case .afternoonDip: return "A natural energy drop, mostly from your body clock. It happens even without lunch, though a big meal can add to it."
         case .secondWind: return "Your body clock pushes back against the day's tiredness, so your energy lifts again."
         case .windDown: return "The stretch just before your body starts making its own sleep hormone."
-        case .melatonin: return "Your brain starts releasing its own sleep hormone. It's not about taking melatonin pills; it's the best time to be in bed."
+        case .melatonin: return "Your body's own sleep hormone has been rising for a while (it usually starts about 2 hours before you normally fall asleep). Not about melatonin pills. Falling asleep tends to come easiest now."
         }
     }
 
@@ -105,7 +105,7 @@ extension AppModel {
         case .afternoonDip: return "Good time for easy tasks or a walk. A 20-minute nap early in the dip is fine."
         case .secondWind: return "Good for a workout or group study. Wrap up anything intense a couple of hours before bed."
         case .windDown: return "Dim the lights, put screens down and do something calm."
-        case .melatonin: return "Be in bed in this window. Falling asleep is easiest now; much later and you may lie awake."
+        case .melatonin: return "Aim to be in bed in this window. Falling asleep is usually easiest now; much later and you may lie awake."
         }
     }
 
@@ -114,10 +114,10 @@ extension AppModel {
         switch kind {
         case .grogginess: return "the foggy just-woke-up feeling. Skip big decisions; get daylight and water."
         case .morningPeak: return "your sharpest focus of the day. Save it for your hardest studying."
-        case .afternoonDip: return "a natural energy drop built into your body clock, not lunch. Plan easy tasks or a walk."
+        case .afternoonDip: return "a natural energy drop, mostly from your body clock (a big lunch can add to it). Plan easy tasks or a walk."
         case .secondWind: return "your energy lifts again. Good for a workout or group study."
         case .windDown: return "start getting ready for bed: dim lights, screens down."
-        case .melatonin: return "your brain starts releasing its own sleep hormone. It's not about taking melatonin pills; it's the best time to be in bed."
+        case .melatonin: return "your own sleep hormone has been rising for a couple of hours (not about pills). Usually the easiest time to fall asleep."
         }
     }
 
@@ -230,8 +230,8 @@ extension AppModel {
             return "Be in bed by \(Clock.format(store.data.bedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
         case .luteal?:
             return hidesEffortTargets
-                ? "Aim for 20 extra minutes of sleep and go easy on yourself. This eases once your period starts."
-                : "Go easier on hard workouts and aim for 20 extra minutes of sleep. This eases once your period starts."
+                ? "Aim for 20 extra minutes of sleep and go easy on yourself. " + lutealEasesLine
+                : "Go easier on hard workouts and aim for 20 extra minutes of sleep. " + lutealEasesLine
         case .illness?:
             return hidesEffortTargets
                 ? "Take an easy day: extra sleep and plenty of fluids. See a doctor if you feel unwell."
@@ -296,11 +296,20 @@ extension AppModel {
             Badge(title: "30-night streak", systemImage: "flame.fill", accent: .orange,
                   progress: min(onTimeLongest, 30), goal: 30, howTo: "Fall asleep on time 30 nights in a row."),
         ]
-        if store.data.cycleSetup != .notTracking {
+        // A period-count goal only where periods are expected: hidden on
+        // methods where bleeding is rare or has stopped, and a pack goal
+        // (withdrawal bleeds in the break) for the pill, ring and patch.
+        if store.data.cycleSetup != .notTracking, !usesBleedingWording {
             let starts = Self.mergedPeriodStarts(health: [], logged: store.data.flowLog).count
-            out.insert(Badge(title: "Full cycle tracked", systemImage: "heart.fill", accent: .pink,
-                             progress: min(starts, 2), goal: 2, howTo: "Log the start of two periods in the app."), at: 5)
+            let badge = usesPackWording
+                ? Badge(title: "Two breaks tracked", systemImage: "heart.fill", accent: .pink,
+                        progress: min(starts, 2), goal: 2, howTo: "Log your bleed in two break weeks in the app.")
+                : Badge(title: "Full cycle tracked", systemImage: "heart.fill", accent: .pink,
+                        progress: min(starts, 2), goal: 2, howTo: "Log the start of two periods in the app.")
+            out.insert(badge, at: min(5, out.count))
         }
+        // No water target badge with an eating-disorder history.
+        if hidesEffortTargets { out.removeAll { $0.title == "Hydrated week" } }
         return out
     }
 

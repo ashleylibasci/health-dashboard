@@ -88,8 +88,8 @@ struct LogPage: View {
                 } else {
                     Text(confirmation ?? cutoffText(now: context.date))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(confirmation == nil && isPastCutoff(context.date) ? Accent.coral.ink(.dark) : WatchStyle.secondaryText)
-                        .lineLimit(2)
+                        .foregroundStyle(confirmation == nil && showsWarning(context.date) ? Accent.coral.ink(.dark) : WatchStyle.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -119,12 +119,33 @@ struct LogPage: View {
         return now >= cutoff
     }
 
+    /// Drinks logged here since the last phone update, after the cutoff.
+    private func loggedHereAfterCutoff(_ now: Date) -> Bool {
+        let counted = Set(snapshot.todayDrinkIDs ?? [])
+        return isPastCutoff(now) && pending.contains { !counted.contains($0.entryID) && $0.mg > 0 }
+    }
+
+    /// The only warning: today's caffeine would still be around at bedtime
+    /// (from the phone's numbers, or a drink just logged here past the
+    /// cutoff). Never with 0 mg.
+    private func showsWarning(_ now: Date) -> Bool {
+        guard todayMg > 0 else { return false }
+        return snapshot.caffeineTooMuchAtBedtime == true || loggedHereAfterCutoff(now)
+    }
+
     private func cutoffText(now: Date) -> String {
+        if showsWarning(now) {
+            return "Some of today\u{2019}s caffeine will still be in you at bedtime. It may make sleep lighter."
+        }
         if snapshot.caffeineCutoffBeforeWake == true {
-            return "Caffeine lasts longer for you. Keep it to one small drink, early."
+            return "No cutoff time today: caffeine lasts longer for you. One small drink, early."
         }
         guard let cutoff = snapshot.caffeineCutoff else { return "No cutoff set" }
-        if now >= cutoff { return "Past your cutoff. It may cost you sleep." }
+        if now >= cutoff {
+            return todayMg == 0
+                ? "No caffeine today. Cutoff was \(WatchStyle.time(cutoff)), so skip it from here."
+                : "Cutoff was \(WatchStyle.time(cutoff)). More caffeine now would still be in you at bedtime."
+        }
         let minutes = Int(cutoff.timeIntervalSince(now) / 60)
         return "Cutoff in \(Clock.duration(minutes))"
     }

@@ -40,7 +40,7 @@ struct SickView: View {
             helpCard
             Card(accent: .coral) {
                 Text("When to see a doctor").font(.scaled(size: 15, weight: .bold))
-                Text("A fever over 100.4\u{00B0}F (38\u{00B0}C), trouble breathing, or feeling worse after 3 days: contact your campus health center or your doctor.")
+                Text("A fever over \(TempFormat.usesFahrenheit ? "100.4\u{00B0}F (38\u{00B0}C)" : "38\u{00B0}C (100.4\u{00B0}F)"), trouble breathing, or feeling worse after 3 days: contact your campus health center or your doctor.")
                     .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
             Card(padding: 12) {
@@ -50,7 +50,7 @@ struct SickView: View {
             Text("This feature looks for patterns in your Apple Watch data. It is not a medical device, cannot diagnose illness, and may miss things or flag you when you\u{2019}re fine.")
                 .font(.scaled(size: 12)).secondaryText().fixedSize(horizontal: false, vertical: true)
             HowWeGotThisLink(title: "Sick check",
-                             method: "Each morning we compare your resting heart rate, HRV, breathing rate and wrist temperature with your own last 30 days. A signal counts when it moves past a set amount: resting heart rate up 4 bpm or more, HRV down 15% or more, breathing up 1 breath a minute, wrist temperature up 0.4\u{00B0}C. Two things move these on their own, so we allow for them. In the second half of a natural cycle (luteal phase), or when the app can\u{2019}t tell which phase you\u{2019}re in (irregular cycles, PCOS, a cycle running longer than usual, or a method you may still ovulate on): 2 bpm more resting heart rate, 5% more HRV drop, and 0.6\u{00B0}C for temperature. After a hard training day (active energy well above your own usual, at least 1.5 times your median of the last 2 weeks and 400 kcal or more): 3 bpm and 10% more. The more signals move together, the likelier it is: Unlikely, Possible or Likely.")
+                             method: "Each morning we compare your resting heart rate, HRV, breathing rate and wrist temperature with your own last 30 days. A signal counts when it moves past a set amount: resting heart rate up 4 bpm or more, HRV down 15% or more, breathing up 1 breath a minute, wrist temperature up \(TempFormat.delta(0.4, signed: false)). Two things move these on their own, so we allow for them. In the second half of a natural cycle (luteal phase): 2 bpm more resting heart rate, 5% more HRV drop, and \(TempFormat.delta(0.6, signed: false)) for temperature. When the app can\u{2019}t tell which phase you\u{2019}re in (irregular cycles, PCOS, a cycle running longer than usual, or a method you may still ovulate on), it doesn\u{2019}t assume one: no cycle allowance is made, and the result says your cycle could be part of it. After a hard training day (active energy well above your own usual, at least 1.5 times your median of the last 2 weeks and 400 kcal or more): 3 bpm and 10% more. The more signals move together, the likelier it is: Unlikely, Possible or Likely.")
         }
         .onChange(of: store.data.sickAlerts) { _, on in
             if on { Task { await Nudges.requestPermission() } }
@@ -99,6 +99,13 @@ struct SickView: View {
         }
     }
 
+    /// The change as shown: wrist temperature in her own unit (°F in the
+    /// US), the rest as the check worked them out.
+    private func changeText(_ f: IllnessSignal.Factor) -> String {
+        if f.name == "Wrist temperature", let t = model.wristTempDelta { return TempFormat.delta(t) }
+        return f.change
+    }
+
     private var factorsCard: some View {
         Card {
             HStack {
@@ -143,7 +150,7 @@ struct SickView: View {
                     Text(f.name).font(.scaled(size: 15, weight: .bold))
                     InfoButton(explanation: explanation(for: f.name)).padding(.vertical, -12)
                     Spacer()
-                    Text(f.change).font(.scaledNumber(16)).foregroundStyle(f.flagged ? a.ink(scheme) : Palette(scheme: scheme).primary)
+                    Text(changeText(f)).font(.scaledNumber(16)).foregroundStyle(f.flagged ? a.ink(scheme) : Palette(scheme: scheme).primary)
                 }
                 Text(f.note ?? (f.flagged ? flaggedText(f.name) : "Within your normal range."))
                     .font(.scaled(size: 13)).secondaryText()
@@ -170,11 +177,11 @@ struct SickView: View {
             parts.append("Yesterday\u{2019}s active energy was well above your usual, which raises resting heart rate and lowers HRV the next morning, so the check allows 3 bpm and 10% more today.")
         }
         if signal.cyclePhaseUnknown {
-            parts.append("Your cycle can raise these too, and the app can\u{2019}t tell which phase you\u{2019}re in, so the check allows 2 bpm, 5% HRV and 0.6\u{00B0}C temperature for it today.")
+            parts.append("The app can\u{2019}t tell which phase of your cycle you\u{2019}re in, so it doesn\u{2019}t allow for one today. The second half of a cycle can raise resting heart rate and temperature and lower HRV on its own, so part of this could be your cycle.")
         }
         if case let .phases(_, _, phase) = model.cycleDisplay {
             if phase == .luteal {
-                parts.append("You\u{2019}re in the second half of your cycle (luteal phase), which raises resting heart rate and wrist temperature and lowers HRV on its own. The check allows 2 bpm, 5% HRV and 0.6\u{00B0}C temperature for that today.")
+                parts.append("You\u{2019}re in the second half of your cycle (luteal phase), which raises resting heart rate and wrist temperature and lowers HRV on its own. The check allows 2 bpm, 5% HRV and \(TempFormat.delta(0.6, signed: false)) temperature for that today.")
             } else {
                 parts.append("In the second half of your cycle the check allows for the rise in resting heart rate and temperature that comes with it. That doesn\u{2019}t apply today.")
             }
