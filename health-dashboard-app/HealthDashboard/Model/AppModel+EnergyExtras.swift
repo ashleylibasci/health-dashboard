@@ -72,12 +72,6 @@ extension AppModel {
         return moment("Steady stretch", "Use it for whatever's next on your list.")
     }
 
-    /// Every note the curve readout can show on this day, one per moment
-    /// kind, so the readout keeps the height of the longest (Weber A1).
-    func energyMomentNotes(in e: EnergyDay) -> [String] {
-        Array(Set(e.curve.map { energyMoment(at: $0.time, in: e).note }))
-    }
-
     /// "Sleep window", "Morning peak", or "First peak" when that peak
     /// starts after noon (late wake). Names follow the clock, from HealthCore.
     static func zoneTitle(_ zone: EnergyDay.Zone) -> String {

@@ -119,6 +119,16 @@ final class Round3LabelTests: XCTestCase {
             XCTAssertEqual(e.relativeCue(level: hi.rounded() - 3), "3 below today's peak")
         }
     }
+
+    // F2: one peak for Energy's summary, chart and readout, even on a day
+    // whose evening second wind tops the morning peak.
+    func testEnergyDayPeakIsTheCurvesHighestPoint() {
+        let e = EnergyModel.day(.init(wake: 497, asleepMinutes: 330, sleepDebt: 276, habitualMidSleep: 300,
+                                      habitualSleepOnset: 1430, wokeFromLightSleep: true, bedtime: 1430, sleepNeed: 505))
+        XCTAssertEqual(e.dayPeak.level, e.curve.map(\.level).max())
+        XCTAssertGreaterThanOrEqual(e.dayPeak.level, e.highest.level)
+        XCTAssertEqual(e.relativeCue(level: e.dayPeak.level), "today's peak")
+    }
 }
 
 final class Round3CycleTests: XCTestCase {

@@ -132,13 +132,20 @@ public enum StageLayout {
 // MARK: - Energy curve, relative cue
 
 public extension EnergyDay {
+    /// The highest point of the whole curve: the one peak the Energy
+    /// summary, the chart's dot and the readout's "below today's peak" all
+    /// use (F2). `highest` is the first peak, which an evening second wind
+    /// can top.
+    var dayPeak: Point { curve.max { $0.level < $1.level } ?? highest }
+
     /// Where a level sits within today's own range, so a narrow day (53 to
     /// 59) doesn't read flat while scrubbing (Priya U7): "today's peak",
     /// "near today's peak", "3 below today's peak", "near today's low",
     /// "today's low". Uses whole points, as shown on screen.
     func relativeCue(level: Double) -> String {
         let levels = curve.map { Int($0.level.rounded()) }
-        guard let hi = levels.max(), let lo = levels.min() else { return "" }
+        guard let lo = levels.min() else { return "" }
+        let hi = Int(dayPeak.level.rounded())
         let l = Int(level.rounded())
         if l >= hi { return "today's peak" }
         if hi - l <= 1 { return "near today's peak" }

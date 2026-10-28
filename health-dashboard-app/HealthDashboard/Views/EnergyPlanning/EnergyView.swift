@@ -2,35 +2,35 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Energy: today's (or tomorrow's) score first, then one chart (the curve,
-/// or energy left), then the details one tap down: what moved the score,
-/// the day zone by zone, and what to do with it.
+/// Energy: today's day score first, then one chart (the curve, or energy
+/// left), then the details one tap down: what moved the score, the day
+/// zone by zone, what to do with it, and tomorrow's curve (the same screen
+/// for the next day, pushed from a row, F3).
 struct EnergyView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    /// At the largest text sizes the Today/Tomorrow switch moves out of the
-    /// navigation bar into the screen, where it has room.
-    private var pickerInContent: Bool { typeSize >= .xxxLarge }
-
-    private enum Day: String, CaseIterable, Identifiable {
+    enum Day: String, Identifiable {
         case today, tomorrow
         var id: String { rawValue }
     }
 
-    /// "Tomorrow" before midnight; after midnight the next day's short name
-    /// ("Wed"), so the switch's segment never cuts it off.
-    private var nextDayLabel: String {
-        model.isAfterMidnight ? model.nextWakeDay.formatted(.dateTime.weekday(.abbreviated)) : "Tomorrow"
+    /// Today, or the forecast for the next wake day.
+    let day: Day
+
+    init(day: Day = .today) { self.day = day }
+
+    /// "Tomorrow" before midnight; after midnight the next day's name
+    /// ("Wednesday").
+    private var nextDayName: String {
+        model.isAfterMidnight ? model.nextWakeDayName : "Tomorrow"
     }
-    private func label(_ d: Day) -> String { d == .today ? "Today" : nextDayLabel }
 
     /// Her usual score (her own average once there are 7 days), else a typical one.
     private var usualScore: Int { model.energyUsual }
 
-    @State private var day: Day = .today
     @State private var selectedKind: EnergyDay.Zone.Kind? = nil
     /// Counts zone-row taps; each one clears the curve's selection.
     @State private var zoneTaps = 0
@@ -44,11 +44,8 @@ struct EnergyView: View {
     var body: some View {
         let energy: EnergyDay = day == .today ? model.energyToday : model.energyTomorrow
         let zone: EnergyDay.Zone? = selectedZone(in: energy)
-        Screen(title: "Energy", accent: .mint) {
+        Screen(title: day == .today ? "Energy" : "\(nextDayName)'s energy", accent: .mint) {
             SampleDataBanner()
-            if pickerInContent {
-                dayPicker
-            }
             if !model.lastNightIsFresh && day == .today {
                 CalloutBar(text: "No sleep recorded last night", systemImage: "moon.zzz.fill", accent: .purple) {
                     showNoSleep = true
@@ -63,17 +60,6 @@ struct EnergyView: View {
                 LearnMoreRow("Learn more about energy", article: .energyThroughTheDay, accent: .mint)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if !pickerInContent {
-                    dayPicker
-                        .frame(width: min(max(170, Font.scaledSize(170)), 230))
-                }
-            }
-        }
-        .onChange(of: day) {
-            selectedKind = nil
-        }
         .bottomSheet(isPresented: $showNoSleep, title: "No sleep recorded") {
             Text("Today's curve uses your most recent recorded night, so treat it as a rough guide.")
                 .font(.bodyText).secondaryText()
@@ -87,37 +73,47 @@ struct EnergyView: View {
         }
     }
 
-    private var dayPicker: some View {
-        AdaptiveSegmentedPicker("Day", selection: $day, options: Array(Day.allCases), accent: .mint) { d in label(d) }
-    }
-
     /// Today's score is below her usual: a row links to "Why is my energy
     /// low today?".
     private func isLow(_ e: EnergyDay) -> Bool { day == .today && e.score < usualScore - 2 }
 
     // MARK: Summary
 
+    /// The day score, labelled as one so it isn't read as "now" (the chart's
+    /// readout is now), with the day's one peak and its dip (F1, F2).
     private func summary(_ e: EnergyDay) -> some View {
-        SummaryHeader(eyebrow: day == .today ? "Energy today" : "\(model.nextWakeDayName) forecast",
-                      value: "\(e.score)", unit: "of 100", status: status(e), line: line(e),
-                      pairs: [StatPair(label: "Peak", value: "\(Clock.format(e.highest.time)) \u{00B7} \(Int(e.highest.level.rounded()))"),
-                              StatPair(label: "Lowest", value: "\(Clock.format(e.lowest.time)) \u{00B7} \(Int(e.lowest.level.rounded()))")],
-                      accent: .mint, info: Topic.energyScore.explanation)
+        let peak = e.dayPeak
+        return SummaryHeader(eyebrow: day == .today ? "Day score" : "Forecast day score",
+                             value: "\(e.score)", unit: "of 100", status: status(e), line: line(e),
+                             pairs: [StatPair(label: "Peak", value: "\(Clock.format(peak.time)) \u{00B7} \(Int(peak.level.rounded()))"),
+                                     StatPair(label: "Dip", value: "\(Clock.format(e.lowest.time)) \u{00B7} \(Int(e.lowest.level.rounded()))")],
+                             accent: .mint, info: info)
     }
 
-    /// "Below your 74" today; "Up 6" when tomorrow looks better than today.
+    /// "Below your usual 74" (or "a typical 74" until she has 7 days) today;
+    /// "Up 6 on today" when tomorrow looks better.
     private func status(_ e: EnergyDay) -> SummaryStatus? {
         switch day {
         case .today:
-            let usual = model.energyUsualIsPersonal ? "your \(usualScore)" : "\(usualScore)"
+            let usual = model.energyUsualIsPersonal ? "your usual \(usualScore)" : "a typical \(usualScore)"
             // A low day is normal, not a warning: blue, not coral.
             if e.score < usualScore - 2 { return SummaryStatus(text: "Below \(usual)", accent: .blue) }
             if e.score > usualScore + 2 { return SummaryStatus(text: "Above \(usual)", accent: .mint) }
             return SummaryStatus(text: "Around \(usual)", accent: .indigo)
         case .tomorrow:
             let gain = e.score - model.energyToday.score
-            return gain > 0 ? SummaryStatus(text: "Up \(gain)", accent: .mint) : nil
+            return gain > 0 ? SummaryStatus(text: "Up \(gain) on today", accent: .mint) : nil
         }
+    }
+
+    /// The day score's ⓘ, starting with what the number in the badge is.
+    private var info: Explanation {
+        let topic = Topic.energyScore.explanation
+        let usual = model.energyUsualIsPersonal
+            ? "The \(usualScore) in the badge is your usual: your own average day score over recent days."
+            : "The \(usualScore) in the badge is a typical day: until there are 7 days of your own, the app compares with this fixed middle-of-the-range value, not anyone's measured average."
+        return Explanation(id: topic.id, title: topic.title, meaning: topic.meaning,
+                           forYou: usual + " " + topic.forYou, howWeGotIt: topic.howWeGotIt)
     }
 
     /// One sentence: the main reason when it's low, then where she is in
@@ -171,7 +167,7 @@ struct EnergyView: View {
     private func chartSummary(_ e: EnergyDay) -> String {
         let zones = e.zones.map { "\(AppModel.zoneTitle($0)) \(timeLabel($0))" }.joined(separator: ", ")
         let prefix = day == .today ? "Today" : model.nextWakeDayName
-        return "\(prefix): peak \(Int(e.highest.level.rounded())) at \(Clock.format(e.highest.time)), low \(Int(e.lowest.level.rounded())) at \(Clock.format(e.lowest.time)). \(zones)."
+        return "\(prefix): peak \(Int(e.dayPeak.level.rounded())) at \(Clock.format(e.dayPeak.time)), dip \(Int(e.lowest.level.rounded())) at \(Clock.format(e.lowest.time)). \(zones)."
     }
 
     private func timeLabel(_ z: EnergyDay.Zone) -> String {
@@ -213,6 +209,15 @@ struct EnergyView: View {
         ExpandRow(title: "Your day, zone by zone", summary: zonesSummary(e),
                   systemImage: "clock.fill", accent: .mint) { zoneRows(e, zone: zone) }
         if isToday {
+            // Tomorrow is a row down, not a second switch at the top (F3).
+            let tomorrow = model.energyTomorrow
+            let gain = tomorrow.score - e.score
+            RowDivider()
+            MetricRow(title: "\(nextDayName)'s curve",
+                      note: "Forecast if you sleep by \(Clock.format(1440 + model.tonightBedtime))",
+                      value: "\(tomorrow.score)",
+                      verdict: gain > 0 ? RowVerdict(text: "Up \(gain)", accent: .mint) : nil,
+                      systemImage: "chart.line.uptrend.xyaxis", accent: .mint) { EnergyView(day: .tomorrow) }
             RowDivider()
             MetricRow(title: "Make the most of today",
                       note: model.hidesEffortTargets ? "Daylight, best nap and sleep debt" : "Daylight, best nap, sleep debt and effort",
@@ -533,7 +538,7 @@ private struct EnergyCurvePanel: View {
         let start = energy.curve.first?.time ?? 0
         let end = energy.curve.last?.time ?? 0
         if isToday, model.now >= start, model.now <= end { return (model.now, true) }
-        return (energy.highest.time, false)
+        return (energy.dayPeak.time, false)
     }
 
     var body: some View {
@@ -553,12 +558,11 @@ private struct EnergyCurvePanel: View {
                 Text(chartNote).font(.secondary).secondaryText()
             }
             // "58 · 3 below today's peak": the level big, the comparison
-            // beside it (Dubois 5, Hale F8). As tall as its longest note,
-            // so the curve never moves while you drag (Weber A1).
+            // beside it (Dubois 5, Hale F8). One line, so it never changes
+            // height while you drag; what the moment means is the row under
+            // the chart (F3).
             ChartReadout(title: "\(lead) · \(moment.title)", value: "\(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
-                         detail: moment.note, accent: accent,
-                         onClear: selection == nil ? nil : { selection = nil },
-                         detailSlots: model.energyMomentNotes(in: e))
+                         accent: accent, onClear: selection == nil ? nil : { selection = nil })
             // The band shows the highlighted zone only while nothing is
             // selected: a band following the finger jumped across the
             // chart and changed colour at every zone edge (Weber A5).
@@ -572,6 +576,15 @@ private struct EnergyCurvePanel: View {
                 .frame(height: 175)
                 .motion(.dataSwap, value: isToday)
             ScrubHint(each: "moment")
+            // Edge to edge at the foot of the card, like a row in a RowCard.
+            VStack(spacing: 0) {
+                RowDivider(hasIcon: false)
+                ExpandRow(title: "What this moment means", accent: accent) {
+                    Text(moment.note).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, -Space.l)
+            .padding(.bottom, -Space.l)
         }
         .onChange(of: resetKey) { selection = nil }
     }
@@ -747,10 +760,10 @@ private struct EnergyCurveChart: View {
     }
 
     /// Dots only: the "Peak 64 · 12:57pm" and "Dip" labels sat on the Now
-    /// label and the x axis, and the summary's Peak and Lowest already say
-    /// both (Weber C1).
+    /// label and the x axis, and the summary's Peak and Dip already say
+    /// both (Weber C1). The peak is the day's one peak (F2).
     @ChartContentBuilder private var extremeMarks: some ChartContent {
-        PointMark(x: .value("Time", energy.highest.time), y: .value("Energy", energy.highest.level))
+        PointMark(x: .value("Time", energy.dayPeak.time), y: .value("Energy", energy.dayPeak.level))
             .symbolSize(40)
             .foregroundStyle(Accent.mint.ink(scheme))
         PointMark(x: .value("Time", energy.lowest.time), y: .value("Energy", energy.lowest.level))
