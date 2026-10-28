@@ -146,6 +146,34 @@ extension AppModel {
         return store.data.waterGoalML * f
     }
 
+    // MARK: Iron
+
+    /// Resting heart rate this far above her usual, with heavy flow, counts
+    /// as "creeping up" for the iron prompt.
+    static let ironHeartRateRise = 3.0
+
+    /// Heavy flow logged on 2 or more days in the last 45, the last within
+    /// 2 weeks, together with tiredness logged within 3 days of a heavy day
+    /// or a resting heart rate 3+ bpm over her usual (D3). Low iron is
+    /// common in young women and fixable. Only logged heavy flow counts
+    /// (pill bleeds are usually lighter).
+    var ironPrompt: (heavyDays: Int, tired: Bool, heartUp: Bool)? {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        guard let since = cal.date(byAdding: .day, value: -45, to: today) else { return nil }
+        let heavy = Set(store.data.flowLog.filter { $0.flow == .heavy && $0.date >= since }.map { cal.startOfDay(for: $0.date) })
+        guard heavy.count >= 2, let last = heavy.max(),
+              (cal.dateComponents([.day], from: last, to: today).day ?? 99) <= 14 else { return nil }
+        let tired = store.data.symptomLog.contains { entry in
+            entry.symptoms.contains("Fatigue") && heavy.contains { day in
+                abs(cal.dateComponents([.day], from: day, to: cal.startOfDay(for: entry.date)).day ?? 99) <= 3
+            }
+        }
+        let heartUp = heartIsReal && restingHRDelta >= Self.ironHeartRateRise
+        guard tired || heartUp else { return nil }
+        return (heavy.count, tired, heartUp)
+    }
+
     // MARK: Alcohol
 
     /// Alcohol logged in the last `days` days, newest first.
