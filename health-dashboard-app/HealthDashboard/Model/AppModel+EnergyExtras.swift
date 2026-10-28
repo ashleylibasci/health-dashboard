@@ -79,6 +79,18 @@ extension AppModel {
         return moment("Steady stretch", "Your energy is fairly level here.", "Use it for whatever's next on your list.")
     }
 
+    /// The curve readout's note for a moment: what it is, then what to do
+    /// (the zone's action without workout advice where that's hidden).
+    func energyMomentDetail(_ m: EnergyMoment) -> String {
+        "\(m.meaning) \(m.kind.map { zoneActionShown($0) } ?? m.action)"
+    }
+
+    /// Every note the curve readout can show on this day, one per moment
+    /// kind, so the readout keeps the height of the longest (Weber A1).
+    func energyMomentDetails(in e: EnergyDay) -> [String] {
+        Array(Set(e.curve.map { energyMomentDetail(energyMoment(at: $0.time, in: e)) }))
+    }
+
     /// "Sleep window", "Morning peak", or "First peak" when that peak
     /// starts after noon (late wake). Names follow the clock, from HealthCore.
     static func zoneTitle(_ zone: EnergyDay.Zone) -> String {

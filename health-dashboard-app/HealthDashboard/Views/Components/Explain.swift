@@ -186,9 +186,11 @@ struct ExplanationSheet: View {
 /// - Full width, so it never changes width while you scrub.
 /// - The value is one big tabular number. A value written "72 · Take it
 ///   steady" shows "72" big and "Take it steady" beside it.
-/// - The note always keeps room for three lines, so the chart under it
-///   doesn't jump as notes of different lengths come and go (a longer
-///   note still shows in full).
+/// - The note never changes the readout's height while you scrub, so the
+///   chart under it stays put. Pass `detailSlots`, every note the readout
+///   can show: the note area is then as tall as the longest of them, at
+///   every text size, and nothing is cut off. Without slots it keeps room
+///   for three lines, which a longer note still grows past (Weber A1).
 /// - Pass `onClear` while something is selected: tapping the readout then
 ///   clears the selection, back to the summary.
 /// - When VoiceOver steps the chart, the new readout is spoken.
@@ -198,6 +200,9 @@ struct ChartReadout: View {
     var detail: String? = nil
     var accent: Accent = .indigo
     var onClear: (() -> Void)? = nil
+    /// Every note this readout can show while scrubbing (the one shown is
+    /// added). The note area is as tall as the longest.
+    var detailSlots: [String] = []
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -244,7 +249,16 @@ struct ChartReadout: View {
             }
             if let detail {
                 ZStack(alignment: .topLeading) {
-                    if !ax {
+                    if !detailSlots.isEmpty {
+                        // Every note it can show, stacked and hidden, so the
+                        // area is as tall as the longest.
+                        ForEach(slots(with: detail), id: \.self) { slot in
+                            Text(slot)
+                                .font(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                        }
+                    } else if !ax {
                         // Holds the height of three lines.
                         Text(Array(repeating: " ", count: detailLines).joined(separator: "\n"))
                             .font(.secondary)
@@ -261,6 +275,9 @@ struct ChartReadout: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(scheme == .dark ? Color(hex: 0x1C1E30) : .white, in: shape)
         .overlay(shape.strokeBorder(p.cardBorder))
+        // Flattened first, so the shadow isn't worked out again for every
+        // glyph on each scrub step.
+        .compositingGroup()
         .shadow(color: .black.opacity(scheme == .dark ? 0.15 : 0.06), radius: 6, y: 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
@@ -273,23 +290,28 @@ struct ChartReadout: View {
             }
         }
     }
+
+    /// The slots and the note shown, each once.
+    private func slots(with detail: String) -> [String] {
+        Array(Set(detailSlots).union([detail])).sorted()
+    }
 }
 
 /// Tapping the readout clears the chart's selection, only when the readout
-/// was given a way to (otherwise taps pass through untouched).
+/// was given a way to (otherwise taps pass through untouched). The same
+/// view tree either way: swapping trees on the first touch and on clear
+/// rebuilt the readout, a frame late and with its VoiceOver state reset
+/// (Weber A7).
 private struct ClearOnTap: ViewModifier {
     var shape: RoundedRectangle
     var action: (() -> Void)?
 
     func body(content: Content) -> some View {
-        if let action {
-            content
-                .contentShape(shape)
-                .onTapGesture { withMotion(.select) { action() } }
-                .accessibilityAction { action() }
-        } else {
-            content
-        }
+        content
+            .contentShape(shape)
+            .onTapGesture { if let action { withMotion(.select) { action() } } }
+            .allowsHitTesting(action != nil)
+            .accessibilityAction { action?() }
     }
 }
 

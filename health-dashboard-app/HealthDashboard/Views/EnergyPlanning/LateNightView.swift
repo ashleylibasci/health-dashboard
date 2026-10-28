@@ -303,6 +303,13 @@ private struct BedtimeChart: View {
                     }
                 }
             }
+            // The late line's name, in the trailing gutter: on the plot it
+            // sat on the newest late nights' dots (Weber C5).
+            AxisMarks(position: .trailing, values: [threshold]) { _ in
+                AxisValueLabel(horizontalSpacing: Space.xs) {
+                    Text("Late").font(.chartLabel(size: 10, weight: .bold)).foregroundStyle(Accent.coral.ink(scheme))
+                }
+            }
         }
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: 7)) { value in
@@ -321,9 +328,6 @@ private struct BedtimeChart: View {
         RuleMark(y: .value("Late", threshold))
             .foregroundStyle(Accent.coral.fill(scheme).opacity(0.7))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-            .annotation(position: .top, alignment: .trailing, spacing: 2) {
-                Text("Late: \(Clock.format(threshold))").font(.chartLabel(size: 10, weight: .bold)).foregroundStyle(Accent.coral.ink(scheme))
-            }
     }
 
     @ChartContentBuilder private var dots: some ChartContent {

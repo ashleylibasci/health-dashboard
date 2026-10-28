@@ -13,7 +13,7 @@ extension View {
     /// This form ticks once when a touch starts. Pass `snapped:` (below) so
     /// it ticks on every point instead.
     func chartScrub<X: Plottable & Equatable>(_ selection: Binding<X?>) -> some View {
-        modifier(ChartScrubModifier(selection: selection, snapped: nil, steps: [], tracksSnapped: false))
+        modifier(ChartScrubModifier(selection: selection, snapped: nil, steps: [], tracksSnapped: false, feedbackKey: nil))
     }
 
     /// Scrubbing with a selection tick each time the point the screen shows
@@ -21,8 +21,19 @@ extension View {
     /// or nil), and `steps` the chart's x values in order: VoiceOver users
     /// swipe up or down to step through them, and the readout is spoken.
     /// Without `steps`, VoiceOver steps across the chart in twelfths.
-    func chartScrub<X: Plottable & Equatable>(_ selection: Binding<X?>, snapped: X?, steps: [X] = []) -> some View {
-        modifier(ChartScrubModifier(selection: selection, snapped: snapped, steps: steps, tracksSnapped: true))
+    ///
+    /// A chart with more than about 30 points across the plot should pass
+    /// `feedbackKey`, a coarser bucket for the tick (`{ $0 / 30 }`: one tick
+    /// per half hour on a minutes axis). A tick per point there turned into a
+    /// buzz (Weber A6). Ticks are never closer than 40 ms either way.
+    ///
+    /// For a continuous x (minutes), pass a binding that snaps before it
+    /// writes (`Binding.snapping`), so a drag between two points doesn't
+    /// redraw the screen.
+    func chartScrub<X: Plottable & Equatable>(_ selection: Binding<X?>, snapped: X?, steps: [X] = [],
+                                              feedbackKey: ((X) -> Int)? = nil) -> some View {
+        modifier(ChartScrubModifier(selection: selection, snapped: snapped, steps: steps, tracksSnapped: true,
+                                    feedbackKey: feedbackKey))
     }
 
     /// Plays a selection tick each time a scrubbed chart's snapped value
@@ -60,6 +71,21 @@ extension View {
     }
 }
 
+extension Binding {
+    /// A chart selection that stores the snapped point, not the raw finger
+    /// position, and writes only when that point changes. On a minutes axis
+    /// the raw value changes every third of a point of finger travel, and
+    /// each write redrew the screen (Weber A2):
+    /// `.chartScrub($selection.snapping { nearest($0) }, snapped: selection)`.
+    func snapping<T: Equatable>(_ snap: @escaping (T) -> T?) -> Binding<T?> where Value == T? {
+        Binding<T?>(get: { wrappedValue },
+                    set: { raw in
+                        let snapped = raw.flatMap(snap)
+                        if snapped != wrappedValue { wrappedValue = snapped }
+                    })
+    }
+}
+
 /// When VoiceOver last stepped a chart, so the readout above it knows to
 /// speak its new value (and stays quiet when the data just refreshes).
 @MainActor
@@ -81,13 +107,44 @@ private final class ScrubChartGeometry {
     }
 }
 
+/// When the last scrub tick played, so ticks are at least 40 ms apart (a
+/// plain box: changing it never redraws).
+private final class ScrubTickClock {
+    private var last = Date.distantPast
+
+    func allow() -> Bool {
+        let now = Date.now
+        guard now.timeIntervalSince(last) >= 0.04 else { return false }
+        last = now
+        return true
+    }
+}
+
+/// What a scrub tick follows: the snapped point, or its bucket when the
+/// chart has a `feedbackKey`.
+private struct ScrubTickKey<X: Equatable>: Equatable {
+    var value: X?
+    var key: Int?
+
+    static func == (a: Self, b: Self) -> Bool {
+        if a.key != nil || b.key != nil { return a.key == b.key }
+        return a.value == b.value
+    }
+}
+
 private struct ChartScrubModifier<X: Plottable & Equatable>: ViewModifier {
     @Binding var selection: X?
     var snapped: X?
     var steps: [X]
     var tracksSnapped: Bool
+    var feedbackKey: ((X) -> Int)?
     @State private var geometry = ScrubChartGeometry()
+    @State private var tickClock = ScrubTickClock()
     @State private var touchTick = 0
+
+    private var tickKey: ScrubTickKey<X> {
+        ScrubTickKey(value: snapped, key: feedbackKey.flatMap { key in snapped.map(key) })
+    }
 
     /// How close (in points) a tap must be to the selected point to clear it.
     private let clearDistance: CGFloat = 16
@@ -103,7 +160,7 @@ private struct ChartScrubModifier<X: Plottable & Equatable>: ViewModifier {
                 }
             }
             .sensoryFeedback(.selection, trigger: touchTick)
-            .sensoryFeedback(.selection, trigger: snapped)
+            .sensoryFeedback(.selection, trigger: tickKey) { _, _ in tickClock.allow() }
             .chartAxisTextCapped()
             // One VoiceOver element per chart: its summary and audio graph (set
             // after this), never Swift Charts' own per-mark elements, which read
@@ -123,8 +180,10 @@ private struct ChartScrubModifier<X: Plottable & Equatable>: ViewModifier {
         return (x, value)
     }
 
+    /// No write when the value under the finger hasn't changed, so a still
+    /// finger doesn't redraw the screen.
     private func move(to point: CGPoint) {
-        if let hit = value(at: point) { selection = hit.value }
+        if let hit = value(at: point), selection != hit.value { selection = hit.value }
     }
 
     /// A tap on the selected point (or the same bar) clears the selection;

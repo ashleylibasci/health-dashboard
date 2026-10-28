@@ -33,10 +33,12 @@ struct EnergyView: View {
 
     @State private var day: Day = .today
     @State private var selectedKind: EnergyDay.Zone.Kind? = nil
-    /// Raw finger position on the energy curve (minutes); snapped in code.
-    @State private var curveSelection: Int? = nil
-    /// Raw finger position on the energy bank chart (minutes).
-    @State private var bankSelection: Int? = nil
+    /// Counts zone-row taps; each one clears the curve's selection.
+    @State private var zoneTaps = 0
+
+    // The curve and bank selections live in their own cards
+    // (`EnergyCurveCard`, `EnergyBankCard`), so dragging redraws only the
+    // card, never this whole screen (Weber A2).
 
     var body: some View {
         let energy: EnergyDay = day == .today ? model.energyToday : model.energyTomorrow
@@ -59,10 +61,12 @@ struct EnergyView: View {
                 }
             }
             scoreCard(energy)
-            curveCard(energy, zone: zone)
+            EnergyCurveCard(energy: energy, isToday: day == .today, zone: zone,
+                            chartNote: chartNote(energy), summary: chartSummary(energy),
+                            resetKey: "\(day.rawValue)-\(zoneTaps)")
             zonesCard(energy, zone: zone)
             extremes(energy)
-            if day == .today { bankCard }
+            if day == .today { EnergyBankCard() }
             debtAndEffort
             makeTheMostCard(energy)
             notifyCard
@@ -78,7 +82,6 @@ struct EnergyView: View {
         }
         .onChange(of: day) {
             selectedKind = nil
-            curveSelection = nil
         }
     }
 
@@ -175,55 +178,12 @@ struct EnergyView: View {
 
     // MARK: Curve
 
-    /// The time the readout describes: the finger, else now (today) or the peak.
-    private func readoutTime(_ e: EnergyDay) -> (time: Minutes, isNow: Bool) {
-        if let raw = curveSelection, let p = AppModel.nearestPoint(raw, in: e) { return (p.time, false) }
-        let start = e.curve.first?.time ?? 0
-        let end = e.curve.last?.time ?? 0
-        if day == .today, model.now >= start, model.now <= end { return (model.now, true) }
-        return (e.highest.time, false)
-    }
-
-    private func curveCard(_ e: EnergyDay, zone: EnergyDay.Zone?) -> some View {
-        let (t, isNow) = readoutTime(e)
-        let moment = model.energyMoment(at: t, in: e)
-        let accent: Accent = moment.kind.map(Self.accent(for:)) ?? .mint
-        let lead = isNow ? "Now, \(Clock.format(model.now))" : Clock.format(moment.time)
-        let action = moment.kind.map { model.zoneActionShown($0) } ?? moment.action
-        let selected: Minutes? = curveSelection.flatMap { AppModel.nearestPoint($0, in: e)?.time }
-        return Card {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Peaks and dips").font(.cardTitle)
-                InfoButton(title: "Your energy curve",
-                           meaning: "A prediction of how alert you'll feel at each time of day, from 0 (running on empty) to 100 (fully switched on). It comes from when and how long you slept and your body clock.",
-                           forYou: "Plan hard work for the high parts and easy things for the low parts. Drag along the curve to see what each moment means.")
-                    .padding(.vertical, -12)
-                Spacer()
-                Text(chartNote(e)).font(.secondary).secondaryText()
-            }
-            // "58 · 3 below today's peak": the level big, the comparison
-            // beside it (Dubois 5, Hale F8).
-            ChartReadout(title: "\(lead) · \(moment.title)", value: "\(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
-                         detail: "\(moment.meaning) \(action)", accent: accent,
-                         onClear: curveSelection == nil ? nil : { curveSelection = nil })
-            EnergyCurveChart(energy: e,
-                             band: zone,
-                             bandColor: zone.map { Self.accent(for: $0.kind).fill(scheme) } ?? .clear,
-                             now: day == .today ? model.now : nil,
-                             selected: selected,
-                             selection: $curveSelection,
-                             summary: chartSummary(e))
-                .frame(height: 190)
-                .motion(.dataSwap, value: day)
-            ScrubHint(each: "moment")
-        }
-    }
-
+    /// The zone the zones card (and the curve's band) highlights: the one
+    /// she tapped, else the current or next useful one. Never the one under
+    /// her finger: scrubbing the curve must not resize the cards below it
+    /// (Weber A3).
     private func selectedZone(in e: EnergyDay) -> EnergyDay.Zone? {
         if let k = selectedKind, let z = e.zone(k) { return z }
-        if let raw = curveSelection, let p = AppModel.nearestPoint(raw, in: e) {
-            return AppModel.zone(at: p.time, in: e)
-        }
         if day == .today {
             let daytime: [EnergyDay.Zone.Kind] = [.grogginess, .morningPeak, .afternoonDip, .secondWind]
             if let current = e.zones.first(where: { daytime.contains($0.kind) && $0.range.contains(model.now) }) {
@@ -303,7 +263,7 @@ struct EnergyView: View {
                                   oneLiner: model.zoneOneLinerShown(z.kind), accent: Self.accent(for: z.kind),
                                   topic: AppModel.zoneTopic(z.kind), selected: z.kind == zone?.kind) {
                         selectedKind = z.kind
-                        curveSelection = nil
+                        zoneTaps += 1
                     }
                 }
             }
@@ -408,58 +368,6 @@ struct EnergyView: View {
             EnergyExtremeTile(eyebrow: "Lowest", value: Clock.format(e.lowest.time), note: lowNote, accent: .blue)
         }
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // MARK: Energy bank
-
-    private var bankCard: some View {
-        let wake = model.lastNight.wake
-        let bedtime = 1440 + store.data.bedtime
-        let atWake = Int(model.energyBankAtWake.rounded())
-        let now = Int(model.energyBankNow.rounded())
-        let bed = Int(model.energyBankAtBedtime.rounded())
-        let selected: Minutes? = bankSelection.map { min(max($0, wake), bedtime) }
-        return Card {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("Energy left").font(.cardTitle)
-                InfoButton(topic: .energyBank).padding(.vertical, -12)
-                Spacer()
-                Text("charges asleep, drains awake").font(.secondary).secondaryText()
-            }
-            Text("Like a phone battery for your body: sleep charges it, being awake drains it. A different number from your energy score.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            bankReadout(selected: selected, now: now, atWake: atWake, bed: bed, bedtime: bedtime)
-            EnergyBankChart(wake: wake, atWake: model.energyBankAtWake,
-                            now: model.now, atNow: model.energyBankNow,
-                            bedtime: bedtime, atBedtime: model.energyBankAtBedtime,
-                            selected: selected, selectedLevel: selected.map { model.energyBank(at: $0) },
-                            selection: $bankSelection,
-                            summary: "Energy left: charged to \(atWake)% overnight, \(now)% at \(Clock.format(model.now)), projected \(bed)% at \(Clock.format(bedtime))")
-                .frame(height: 110)
-            ScrubHint(each: "moment")
-        }
-    }
-
-    private func bankReadout(selected: Minutes?, now: Int, atWake: Int, bed: Int, bedtime: Minutes) -> some View {
-        guard let t = selected else {
-            return ChartReadout(title: "Now, \(Clock.format(model.now)) \u{00B7} left", value: "\(now)%",
-                                detail: "You woke with \(atWake)%. About \(bed)% by bedtime at \(Clock.format(bedtime)).", accent: .mint)
-        }
-        let level = Int(model.energyBank(at: t).rounded())
-        let ahead = t > model.now
-        let detail: String
-        if t <= model.lastNight.wake + 10 {
-            detail = "What last night's sleep charged you to."
-        } else if ahead {
-            detail = level < 25
-                ? "Projected. Running low here; keep plans light and protect your bedtime."
-                : "Projected, if your day goes as usual. Stress and hard exercise drain it faster."
-        } else {
-            detail = "Earlier today."
-        }
-        return ChartReadout(title: Clock.format(t), value: "\(level)%", detail: detail, accent: .mint,
-                            onClear: { bankSelection = nil })
     }
 
     // MARK: Sleep debt + effort
@@ -610,6 +518,138 @@ struct EnergyView: View {
 
 // MARK: - Subviews
 
+/// "Peaks and dips": the readout and the energy curve. It owns the curve's
+/// selection, so a drag redraws only this card (Weber A2), and the
+/// selection is the snapped point, written only when it changes.
+private struct EnergyCurveCard: View {
+    var energy: EnergyDay
+    var isToday: Bool
+    /// The zone the zones card highlights; drawn as a band while nothing
+    /// is selected.
+    var zone: EnergyDay.Zone?
+    var chartNote: String
+    var summary: String
+    /// Changing it (another day, a zone row tapped) clears the selection.
+    var resetKey: String
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.colorScheme) private var scheme
+    /// The selected curve point's time (snapped), or nil.
+    @State private var selection: Int? = nil
+
+    /// The time the readout describes: the finger, else now (today) or the peak.
+    private var readoutTime: (time: Minutes, isNow: Bool) {
+        if let selection { return (selection, false) }
+        let start = energy.curve.first?.time ?? 0
+        let end = energy.curve.last?.time ?? 0
+        if isToday, model.now >= start, model.now <= end { return (model.now, true) }
+        return (energy.highest.time, false)
+    }
+
+    var body: some View {
+        let e = energy
+        let (t, isNow) = readoutTime
+        let moment = model.energyMoment(at: t, in: e)
+        let accent: Accent = moment.kind.map(EnergyView.accent(for:)) ?? .mint
+        let lead = isNow ? "Now, \(Clock.format(model.now))" : Clock.format(moment.time)
+        Card {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text("Peaks and dips").font(.cardTitle)
+                InfoButton(title: "Your energy curve",
+                           meaning: "A prediction of how alert you'll feel at each time of day, from 0 (running on empty) to 100 (fully switched on). It comes from when and how long you slept and your body clock.",
+                           forYou: "Plan hard work for the high parts and easy things for the low parts. Drag along the curve to see what each moment means.")
+                    .padding(.vertical, -12)
+                Spacer()
+                Text(chartNote).font(.secondary).secondaryText()
+            }
+            // "58 · 3 below today's peak": the level big, the comparison
+            // beside it (Dubois 5, Hale F8). As tall as its longest note,
+            // so the curve never moves while you drag (Weber A1).
+            ChartReadout(title: "\(lead) · \(moment.title)", value: "\(moment.level) · \(e.relativeCue(level: Double(moment.level)))",
+                         detail: model.energyMomentDetail(moment), accent: accent,
+                         onClear: selection == nil ? nil : { selection = nil },
+                         detailSlots: model.energyMomentDetails(in: e))
+            // The band shows the highlighted zone only while nothing is
+            // selected: a band following the finger jumped across the
+            // chart and changed colour at every zone edge (Weber A5).
+            EnergyCurveChart(energy: e,
+                             band: selection == nil ? zone : nil,
+                             bandColor: zone.map { EnergyView.accent(for: $0.kind).fill(scheme) } ?? .clear,
+                             now: isToday ? model.now : nil,
+                             selected: selection,
+                             selection: $selection.snapping { AppModel.nearestPoint($0, in: e)?.time },
+                             summary: summary)
+                .frame(height: 190)
+                .motion(.dataSwap, value: isToday)
+            ScrubHint(each: "moment")
+        }
+        .onChange(of: resetKey) { selection = nil }
+    }
+}
+
+/// "Energy left": the readout and the bank chart, with its own selection
+/// (snapped to 5 minutes), so a drag redraws only this card.
+private struct EnergyBankCard: View {
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var store: DataStore
+    /// The selected time, in minutes, snapped to 5.
+    @State private var selection: Int? = nil
+
+    var body: some View {
+        let wake = model.lastNight.wake
+        let bedtime = 1440 + store.data.bedtime
+        let atWake = Int(model.energyBankAtWake.rounded())
+        let now = Int(model.energyBankNow.rounded())
+        let bed = Int(model.energyBankAtBedtime.rounded())
+        Card {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text("Energy left").font(.cardTitle)
+                InfoButton(topic: .energyBank).padding(.vertical, -12)
+                Spacer()
+                Text("charges asleep, drains awake").font(.secondary).secondaryText()
+            }
+            Text("Like a phone battery for your body: sleep charges it, being awake drains it. A different number from your energy score.")
+                .font(.secondary).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+            readout(now: now, atWake: atWake, bed: bed, bedtime: bedtime)
+            EnergyBankChart(wake: wake, atWake: model.energyBankAtWake,
+                            now: model.now, atNow: model.energyBankNow,
+                            bedtime: bedtime, atBedtime: model.energyBankAtBedtime,
+                            selected: selection, selectedLevel: selection.map { model.energyBank(at: $0) },
+                            selection: $selection.snapping { raw in
+                                min(max(Int((Double(raw) / 5).rounded()) * 5, wake), bedtime)
+                            },
+                            summary: "Energy left: charged to \(atWake)% overnight, \(now)% at \(Clock.format(model.now)), projected \(bed)% at \(Clock.format(bedtime))")
+                .frame(height: 110)
+            ScrubHint(each: "moment")
+        }
+    }
+
+    private static let wakeNote = "What last night's sleep charged you to."
+    private static let lowNote = "Projected. Running low here; keep plans light and protect your bedtime."
+    private static let aheadNote = "Projected, if your day goes as usual. Stress and hard exercise drain it faster."
+    private static let earlierNote = "Earlier today."
+
+    private func readout(now: Int, atWake: Int, bed: Int, bedtime: Minutes) -> some View {
+        let nowNote = "You woke with \(atWake)%. About \(bed)% by bedtime at \(Clock.format(bedtime))."
+        let slots = [nowNote, Self.wakeNote, Self.lowNote, Self.aheadNote, Self.earlierNote]
+        guard let t = selection else {
+            return ChartReadout(title: "Now, \(Clock.format(model.now)) \u{00B7} left", value: "\(now)%",
+                                detail: nowNote, accent: .mint, detailSlots: slots)
+        }
+        let level = Int(model.energyBank(at: t).rounded())
+        let detail: String
+        if t <= model.lastNight.wake + 10 {
+            detail = Self.wakeNote
+        } else if t > model.now {
+            detail = level < 25 ? Self.lowNote : Self.aheadNote
+        } else {
+            detail = Self.earlierNote
+        }
+        return ChartReadout(title: Clock.format(t), value: "\(level)%", detail: detail, accent: .mint,
+                            onClear: { selection = nil }, detailSlots: slots)
+    }
+}
+
 private struct EnergyCurveChart: View {
     var energy: EnergyDay
     var band: EnergyDay.Zone?
@@ -634,9 +674,11 @@ private struct EnergyCurveChart: View {
         let first = ((start + step - 1) / step) * step
         return Array(stride(from: first, through: end, by: step))
     }
-    /// Past the end of the curve (well after bedtime) the marker stays at the end.
+    /// Past the end of the curve (well after bedtime) the marker stays at the
+    /// end. Always drawn, dimmed while a point is selected, so it never pops
+    /// out on the first touch and back in on clear (Weber A4).
     private var nowPoint: (time: Minutes, level: Double)? {
-        guard selected == nil, let now, now >= start else { return nil }
+        guard let now, now >= start else { return nil }
         let t = min(now, end)
         guard let level = energy.level(at: t) ?? energy.curve.last.map({ $0.level }) else { return nil }
         return (t, level)
@@ -648,12 +690,15 @@ private struct EnergyCurveChart: View {
     }
 
     var body: some View {
+        // No mark-level accessibilityHidden: `chartScrub` already makes the
+        // chart one VoiceOver element, and hiding marks risked dropping
+        // their annotations (Weber A8).
         Chart {
-            bandMark.accessibilityHidden(true)
-            curveMarks.accessibilityHidden(true)
-            extremeMarks.accessibilityHidden(true)
-            nowMarks.accessibilityHidden(true)
-            selectionMarks.accessibilityHidden(true)
+            bandMark
+            curveMarks
+            extremeMarks
+            nowMarks
+            selectionMarks
         }
         .chartXScale(domain: start...end)
         .chartYScale(domain: -8.0...112.0)
@@ -679,7 +724,11 @@ private struct EnergyCurveChart: View {
                 }
             }
         }
-        .chartScrub($selection, snapped: selected, steps: energy.curve.map(\.time))
+        // A tick per half hour, not per 10-minute point (Weber A6).
+        .chartScrub($selection, snapped: selected, steps: energy.curve.map(\.time), feedbackKey: { $0 / 30 })
+        // Scrubbing moves the marks with the finger, never animated, so a
+        // mark can't lag a frame behind the readout.
+        .transaction(value: selected) { $0.animation = nil }
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(ClockChartDescriptor(
             title: "Energy through the day", seriesName: "Energy", yTitle: "Energy, 0 to 100",
@@ -709,36 +758,32 @@ private struct EnergyCurveChart: View {
         }
     }
 
+    /// Dots only: the "Peak 64 · 12:57pm" and "Dip" labels sat on the Now
+    /// label and the x axis, and the Highest and Lowest tiles under the
+    /// chart already say both (Weber C1).
     @ChartContentBuilder private var extremeMarks: some ChartContent {
         PointMark(x: .value("Time", energy.highest.time), y: .value("Energy", energy.highest.level))
             .symbolSize(40)
             .foregroundStyle(Accent.mint.ink(scheme))
-            .annotation(position: .top, spacing: 2) {
-                Text("Peak \(Int(energy.highest.level.rounded())) \u{00B7} \(Clock.format(energy.highest.time))")
-                    .font(.chartLabel(size: 10, weight: .bold))
-                    .foregroundStyle(Accent.mint.ink(scheme))
-            }
         PointMark(x: .value("Time", energy.lowest.time), y: .value("Energy", energy.lowest.level))
             .symbolSize(40)
             .foregroundStyle(Accent.blue.ink(scheme))
-            .annotation(position: .bottom, spacing: 2) {
-                Text("Dip \(Clock.format(energy.lowest.time))")
-                    .font(.chartLabel(size: 10, weight: .bold))
-                    .foregroundStyle(Accent.blue.ink(scheme))
-            }
     }
 
     @ChartContentBuilder private var nowMarks: some ChartContent {
         if let p = nowPoint {
+            let dim = selected == nil ? 1.0 : 0.35
             RuleMark(x: .value("Now", p.time))
-                .foregroundStyle(Palette(scheme: scheme).tertiary)
+                .foregroundStyle(Palette(scheme: scheme).tertiary.opacity(dim))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             PointMark(x: .value("Now", p.time), y: .value("Energy", p.level))
                 .symbolSize(110)
-                .foregroundStyle(Palette(scheme: scheme).primary)
-                .annotation(position: .top, spacing: 4) {
+                .foregroundStyle(Palette(scheme: scheme).primary.opacity(dim))
+                .annotation(position: .top, spacing: 4,
+                            overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                     Text(nowIsPastEnd ? "Now: past bedtime" : "Now").font(.chartLabel(size: 11, weight: .bold))
                         .foregroundStyle(Palette(scheme: scheme).primary)
+                        .opacity(dim)
                 }
         }
     }
@@ -792,16 +837,26 @@ private struct EnergyBankChart: View {
         ]
     }
 
+    /// Wake and bedtime, plus now when it's at least 2.5 hours from both:
+    /// closer, its label printed over its neighbour's (Weber C2). The Now
+    /// dot's own label says where now is.
+    private var ticks: [Int] {
+        let nowFits = clampedNow - wake > 150 && bedtime - clampedNow > 150
+        return [wake, bedtime] + (nowFits ? [clampedNow] : [])
+    }
+
     var body: some View {
         Chart {
-            lineMarks.accessibilityHidden(true)
-            markers.accessibilityHidden(true)
+            lineMarks
+            markers
         }
         .chartXScale(domain: wake...max(bedtime, wake + 60))
+        // Room for the end dot, which was half cut off at the right edge.
+        .chartXScale(range: .plotDimension(endPadding: 6))
         .chartYScale(domain: 0.0...100.0)
         .chartYAxis(.hidden)
         .chartXAxis {
-            AxisMarks(values: [wake, clampedNow, bedtime]) { value in
+            AxisMarks(values: ticks) { value in
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
                         Text(Clock.format(m)).font(.chartLabel(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
@@ -809,7 +864,8 @@ private struct EnergyBankChart: View {
                 }
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 30 })
+        .transaction(value: selected) { $0.animation = nil }
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(ClockChartDescriptor(
             title: "Energy left through the day", seriesName: "Energy left", yTitle: "Energy left, percent",
@@ -827,20 +883,23 @@ private struct EnergyBankChart: View {
         }
     }
 
+    /// The Now dot is always drawn (dimmed while a time is selected); the
+    /// selection marks are added on top (Weber A4).
     @ChartContentBuilder private var markers: some ChartContent {
+        let dim = selected == nil ? 1.0 : 0.35
+        PointMark(x: .value("Time", clampedNow), y: .value("Bank", atNow))
+            .symbolSize(70)
+            .foregroundStyle(Palette(scheme: scheme).primary.opacity(dim))
+            .annotation(position: .top, spacing: 4,
+                        overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                Text("Now").font(.chartLabel(size: 11, weight: .bold)).opacity(dim)
+            }
         if let selected, let selectedLevel {
             RuleMark(x: .value("Selected", selected))
                 .foregroundStyle(Palette(scheme: scheme).primary.opacity(0.6))
             PointMark(x: .value("Selected", selected), y: .value("Bank", selectedLevel))
                 .symbolSize(120)
                 .foregroundStyle(Palette(scheme: scheme).primary)
-        } else {
-            PointMark(x: .value("Time", clampedNow), y: .value("Bank", atNow))
-                .symbolSize(70)
-                .foregroundStyle(Palette(scheme: scheme).primary)
-                .annotation(position: .top, spacing: 4) {
-                    Text("Now").font(.chartLabel(size: 11, weight: .bold))
-                }
         }
     }
 }

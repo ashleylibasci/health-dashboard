@@ -652,7 +652,8 @@ private struct WakeHistoryChart: View {
                           yStart: .value("Felt", yDomain.lowerBound),
                           yEnd: .value("Felt", yDomain.upperBound))
                 .foregroundStyle(Accent.mint.fill(scheme).opacity(0.16))
-                .annotation(position: .top, alignment: .center) {
+                .annotation(position: .top, alignment: .center,
+                            overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                     Text("best for you")
                         .font(.chartLabel(size: 11, weight: .bold))
                         .foregroundStyle(Accent.mint.ink(scheme))
@@ -682,6 +683,8 @@ private struct WakeHistoryChart: View {
             selectionMarks
         }
         .chartScrub($selection, snapped: selected?.hours, steps: Array(Set(dots.map(\.hours))).sorted())
+        // Every dot's opacity changes on selection: no animation per drag step.
+        .transaction(value: selected?.hours) { $0.animation = nil }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
         .chartXAxis {

@@ -618,11 +618,8 @@ private struct DoseResponseChart: View {
             RuleMark(x: .value("Hours asleep", fit.knee / 60))
                 .foregroundStyle(Palette(scheme: scheme).secondary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                .annotation(position: .top, alignment: .center) {
-                    Text(Clock.duration(Int(fit.knee)))
-                        .font(.chartLabel(size: 11, weight: .bold))
-                        .foregroundStyle(metric.accent.ink(scheme))
-                }
+            // Its label is a top-axis label (below), not an annotation over
+            // the topmost dots (Weber C8).
         }
     }
 
@@ -669,10 +666,22 @@ private struct DoseResponseChart: View {
                     }
                 }
             }
+            // The knee's time, above the plot where no dot can be.
+            AxisMarks(position: .top, values: fit.map { [$0.knee / 60] } ?? []) { value in
+                AxisValueLabel {
+                    if let h = value.as(Double.self) {
+                        Text(Clock.duration(Int((h * 60).rounded())))
+                            .font(.chartLabel(size: 11, weight: .bold))
+                            .foregroundStyle(metric.accent.ink(scheme))
+                    }
+                }
+            }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
         }
+        // Every dot's opacity changes on selection: no animation per drag step.
+        .transaction(value: selected?.id) { $0.animation = nil }
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(ValueChartDescriptor(
             title: "\(metric.label) the next day against hours asleep", seriesName: "Nights",

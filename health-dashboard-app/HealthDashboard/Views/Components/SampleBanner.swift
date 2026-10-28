@@ -5,12 +5,14 @@ import HealthCore
 /// "Example data · night 3 of 14", shown at the top of a screen while the
 /// app is still on example numbers. Renders nothing once the data is hers.
 ///
-/// Three sizes (Valtonen F14, Whitfield F15):
+/// Two sizes (Valtonen F14, Whitfield F15; structure review, Oct 28):
 /// - Today (`prominent`), the first day it shows: the full banner, with why
 ///   and the Apple Health note.
-/// - Today after that, and at accessibility text sizes: one line, "Example
-///   data · night 3 of 14 ⓘ", the why behind the ⓘ.
-/// - Every other screen: a small "Example data" capsule that opens the why.
+/// - Everywhere else, Today included after that first day (and at
+///   accessibility text sizes): a small "Example data" capsule that opens
+///   the why, so the banner no longer pushes Recovery down the screen.
+///   While Apple Health hasn't sent any sleep, Today keeps a one-line
+///   banner instead, for its "Open Settings" link.
 struct SampleDataBanner: View {
     /// On the Log tab: her logs are real even while the numbers are examples.
     var forLog: Bool = false
@@ -73,7 +75,7 @@ struct SampleDataBanner: View {
                     if showsFullBanner {
                         fullBanner
                             .onAppear { if firstSeen == 0 { firstSeen = Date.now.timeIntervalSince1970 } }
-                    } else if prominent {
+                    } else if prominent && accessNote != nil {
                         compactBanner
                     } else {
                         capsule
@@ -121,7 +123,8 @@ struct SampleDataBanner: View {
     }
 
     /// One line, "Example data · night 3 of 14 ⓘ", with the why behind
-    /// the ⓘ. Today after the first day, and Today at accessibility sizes.
+    /// the ⓘ and the "Open Settings" link under it. Today after the first
+    /// day while Apple Health has sent no sleep.
     private var compactBanner: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Space.xs) {
@@ -142,8 +145,8 @@ struct SampleDataBanner: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// A small "Example data" capsule for every screen but Today. Tapping it
-    /// opens why the numbers aren't hers yet.
+    /// The small "Example data" capsule, on every screen (Today after its
+    /// first day). Tapping it opens why the numbers aren't hers yet.
     private var capsule: some View {
         Button { showingWhy = true } label: {
             HStack(spacing: Space.xs) {

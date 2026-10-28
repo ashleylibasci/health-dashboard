@@ -495,6 +495,14 @@ private struct WakeByClockChart: View {
     private var hi: Int { (dots.map(\.wake).max() ?? 510) + 40 }
     private var line: Color { Accent.orange.fill(scheme) }
 
+    /// Below the dot, unless the line leaves it downward on both sides (a
+    /// peak), where above is the free side.
+    private func labelBelow(_ i: Int) -> Bool {
+        let wake = dots[i].wake
+        let neighbours = [i - 1, i + 1].filter { dots.indices.contains($0) }.map { dots[$0].wake }
+        return !(neighbours.allSatisfy { $0 <= wake } && neighbours.contains { $0 < wake })
+    }
+
     var body: some View {
         Chart {
             BarMark(x: .value("Night", changeLabel), yStart: .value("Low", lo), yEnd: .value("High", hi))
@@ -504,11 +512,13 @@ private struct WakeByClockChart: View {
                     .foregroundStyle(line)
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
             }
-            ForEach(dots) { d in
+            ForEach(Array(dots.enumerated()), id: \.element.id) { i, d in
                 PointMark(x: .value("Night", d.label), y: .value("Up", d.wake))
                     .foregroundStyle(line)
                     .symbolSize(d.label == selectedLabel ? 140 : 60)
-                    .annotation(position: .bottom, spacing: 4) {
+                    // On the side the line leaves from, so the time never
+                    // sits on the segment to the next night (Weber C6).
+                    .annotation(position: labelBelow(i) ? .bottom : .top, spacing: 4) {
                         Text(Clock.format(d.wake, suffix: false))
                             .font(.chartLabel(size: 11, weight: .semibold))
                             .foregroundStyle(Palette(scheme: scheme).secondary)

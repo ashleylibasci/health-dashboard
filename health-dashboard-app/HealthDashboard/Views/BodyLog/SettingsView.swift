@@ -37,6 +37,10 @@ struct SettingsView: View {
     var body: some View {
         Screen(title: "Settings", accent: .indigo) {
             profile
+            Card(density: .compact) {
+                LinkRow(title: "Health guide", subtitle: "Help now, sleep, sick days, birth control, periods",
+                        systemImage: "book.closed.fill", accent: .indigo) { HealthGuideView() }
+            }
             youSection
             bodySection
             sleepSection

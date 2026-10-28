@@ -365,7 +365,8 @@ struct CaffeineView: View {
                          onClear: selectedTime == nil ? nil : { selectedTime = nil })
             CaffeineFalloffChart(points: curve, start: chartStart, end: chartEnd, cutoff: model.caffeineCutoffShown,
                                  bedtime: bedtime, now: model.now, goal: bedtimeGoal,
-                                 selected: selectedPoint, selection: $selectedTime)
+                                 selected: selectedPoint,
+                                 selection: $selectedTime.snapping { t in curve.min { abs($0.time - t) < abs($1.time - t) }?.time })
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(chartSummary)
                 .accessibilityChartDescriptor(ClockChartDescriptor(
@@ -547,7 +548,7 @@ struct CaffeineView: View {
             EnergyTimingChart(span: span, groggy: timingEnergy.zone(.grogginess)?.range, window: noWindow ? nil : timing.bestWindow,
                               dip: timingEnergy.zone(.afternoonDip)?.range, cutoff: noWindow ? nil : timing.cutoff, marker: timingMarker,
                               selected: selectedTiming.map { min(max($0, span.lowerBound), span.upperBound) },
-                              selection: $selectedTiming)
+                              selection: $selectedTiming.snapping { min(max(($0 / 5) * 5, span.lowerBound), span.upperBound) })
                 .frame(height: 74)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timingSummary)
@@ -624,10 +625,6 @@ private struct CaffeineFalloffChart: View {
         return Array(stride(from: first, through: end, by: step))
     }
 
-    /// At accessibility sizes the goal, cutoff and bedtime labels collided
-    /// on the chart ("2pmbed12:30"), so they move to a legend under it.
-    private var labelsInLegend: Bool { typeSize.isAccessibilitySize }
-
     private var nowLevel: Double? {
         guard now >= start, now <= end else { return nil }
         return points.min { abs($0.time - now) < abs($1.time - now) }?.mg
@@ -641,9 +638,12 @@ private struct CaffeineFalloffChart: View {
     }
 
     var body: some View {
+        // The goal, cutoff and bedtime are named in a legend under the
+        // chart at every text size: on the plot, "25 mg" sat on the curve's
+        // rise and "2pm cutoff" ran into "bed 12:30" (Weber C3).
         VStack(alignment: .leading, spacing: 8) {
             chart.frame(height: 180)
-            if labelsInLegend { legend }
+            legend
         }
     }
 
@@ -680,12 +680,15 @@ private struct CaffeineFalloffChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .interpolationMethod(.monotone)
             }
-            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
-            guides.accessibilityHidden(true)
-            markers.accessibilityHidden(true)
+            guides
+            markers
         }
-        .chartScrub($selection, snapped: selected?.time, steps: points.map(\.time))
+        // VoiceOver reads the chart's summary (chartScrub makes it one
+        // element), so no mark-level hiding (Weber A8). A tick per half hour.
+        .chartScrub($selection, snapped: selected?.time, steps: points.map(\.time), feedbackKey: { $0 / 30 })
         .chartXScale(domain: start...end)
+        // The last x label ran past the plot's edge (Weber C11).
+        .chartXScale(range: .plotDimension(endPadding: 10))
         .chartYScale(domain: 0...yMax)
         .chartXAxis {
             AxisMarks(values: ticks) { value in
@@ -712,29 +715,14 @@ private struct CaffeineFalloffChart: View {
         RuleMark(y: .value("Goal", Double(goal)))
             .foregroundStyle(Accent.mint.fill(scheme))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            .annotation(position: .top, alignment: .leading) {
-                if !labelsInLegend {
-                    Text("\(goal) mg").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
-                }
-            }
         if let cutoff, cutoff >= start {
             RuleMark(x: .value("Cutoff", cutoff))
                 .foregroundStyle(Accent.orange.fill(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
-                .annotation(position: .top, alignment: .leading) {
-                    if !labelsInLegend {
-                        Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.orange.ink(scheme))
-                    }
-                }
         }
         RuleMark(x: .value("Bedtime", bedtime))
             .foregroundStyle(Accent.purple.fill(scheme))
             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
-            .annotation(position: .top, alignment: .trailing) {
-                if !labelsInLegend {
-                    Text("bed \(Clock.format(bedtime, suffix: false))").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.purple.ink(scheme))
-                }
-            }
     }
 
     @ChartContentBuilder
@@ -787,9 +775,10 @@ private struct EnergyTimingChart: View {
         return out
     }
 
-    /// Zones wide enough (about an hour) to hold their own label.
+    /// Zones wide enough (two hours, about 45pt on the strip) to hold their
+    /// own label without shrinking it (Weber C4).
     private func labelFits(_ zone: TimingZone) -> Bool {
-        clamp(zone.range.end) - clamp(zone.range.start) >= 50
+        clamp(zone.range.end) - clamp(zone.range.start) >= 120
     }
 
     private func clamp(_ m: Minutes) -> Minutes { min(max(m, span.lowerBound), span.upperBound) }
@@ -807,7 +796,9 @@ private struct EnergyTimingChart: View {
             RectangleMark(xStart: .value("Start", span.lowerBound), xEnd: .value("End", span.upperBound),
                           yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
                 .foregroundStyle(Palette(scheme: scheme).chip)
-            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
+            // No mark-level accessibilityHidden: chartScrub makes the chart
+            // one VoiceOver element, and hiding marks risked dropping the
+            // zone labels (Weber A8).
             ForEach(zones) { zone in
                 RectangleMark(xStart: .value("Start", clamp(zone.range.start)), xEnd: .value("End", clamp(zone.range.end)),
                               yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
@@ -823,9 +814,8 @@ private struct EnergyTimingChart: View {
                         }
                     }
             }
-            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
-            cutoffRule.accessibilityHidden(true)
-            dots.accessibilityHidden(true)
+            cutoffRule
+            dots
         }
         .chartScrub($selection)
         .chartXScale(domain: span.lowerBound...span.upperBound)
@@ -837,6 +827,15 @@ private struct EnergyTimingChart: View {
                     if let m = value.as(Int.self) { Text(BodyLogStyle.shortTime(m)) }
                 }
             }
+            AxisMarks(position: .top, values: cutoff.map { span.contains($0) ? [$0] : [] } ?? []) { value in
+                AxisValueLabel {
+                    if let m = value.as(Int.self) {
+                        Text("\(BodyLogStyle.shortTime(m)) cutoff")
+                            .font(.chartLabel(size: 11, weight: .semibold))
+                            .foregroundStyle(Accent.yellow.ink(scheme))
+                    }
+                }
+            }
         }
     }
 
@@ -846,9 +845,8 @@ private struct EnergyTimingChart: View {
             RuleMark(x: .value("Cutoff", cutoff))
                 .foregroundStyle(Accent.yellow.fill(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 2))
-                .annotation(position: .top, alignment: .center) {
-                    Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.yellow.ink(scheme))
-                }
+            // Its label is a top-axis label (in the chart's own frame), not
+            // an annotation that ran up into the readout (Weber C4).
         }
     }
 

@@ -159,7 +159,8 @@ struct BodyTrendCard: View {
                 ChartReadout(title: selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat),
                              value: format(p.value), detail: meaning(p.value),
                              accent: isWorse(p.value) ? .coral : accent,
-                             onClear: selected == nil ? nil : { selected = nil })
+                             onClear: selected == nil ? nil : { selected = nil },
+                             detailSlots: points.map { meaning($0.value) })
             }
             if points.count >= 2 {
                 NightTrendChart(points: points, usual: usual, band: band, scale: scale, accent: accent,
@@ -221,6 +222,9 @@ struct NightTrendChart: View {
         return max(lo, 0)...hi
     }
 
+    /// "Usual" or "Need", short enough for the axis gutter.
+    private var axisUsualLabel: String { usualLabel == "Your need" ? "Need" : "Usual" }
+
     private var summary: String {
         let values = points.map { format($0.value) }.joined(separator: ", ")
         return "\(seriesName) for the last \(points.count) nights, oldest first: \(values). \(usualLabel) is \(format(usual))."
@@ -233,12 +237,12 @@ struct NightTrendChart: View {
                 RectangleMark(yStart: .value("Low", band.lowerBound), yEnd: .value("High", band.upperBound))
                     .foregroundStyle(p.track.opacity(scheme == .dark ? 0.8 : 0.7))
             }
+            // Labelled in the trailing axis gutter, not on the plot: the
+            // nights hover around her usual, so the label was drawn under
+            // the line (Weber B).
             RuleMark(y: .value("Usual", usual))
                 .foregroundStyle(p.tertiary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .annotation(position: .top, alignment: .leading) {
-                    Text(usualLabel).font(.chartLabel(size: 10, weight: .semibold)).secondaryText()
-                }
             ForEach(points) { point in
                 LineMark(x: .value("Night", point.date, unit: .day), y: .value(seriesName, point.value))
                     .foregroundStyle(accent.ink(scheme))
@@ -266,6 +270,13 @@ struct NightTrendChart: View {
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4))
+            AxisMarks(position: .trailing, values: [usual]) { _ in
+                AxisValueLabel(horizontalSpacing: Space.xs) {
+                    Text(axisUsualLabel)
+                        .font(.chartLabel(size: 10, weight: .semibold))
+                        .foregroundStyle(p.secondary)
+                }
+            }
         }
         .chartScrub($selection, snapped: selected, steps: points.map(\.date))
         .accessibilityLabel(summary)

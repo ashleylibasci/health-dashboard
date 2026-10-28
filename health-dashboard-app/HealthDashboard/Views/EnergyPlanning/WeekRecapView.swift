@@ -515,7 +515,8 @@ private struct WeekEnergyChart: View {
                 }
         }
         .chartXScale(domain: bars.map(\.label))
-        .chartYScale(domain: 0...100)
+        // Headroom above 100, so a 95 bar's label stays on the plot (Weber C7).
+        .chartYScale(domain: 0...115)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartScrub($selection, snapped: selection, steps: bars.map(\.label))

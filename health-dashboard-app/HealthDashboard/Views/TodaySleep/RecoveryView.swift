@@ -147,7 +147,9 @@ struct RecoveryView: View {
             Card {
                 Text("Last \(history.count) days").font(.cardTitle)
                 historyReadout(history)
-                RecoveryHistoryChart(history: history, usual: model.recoveryUsual, lateBedtime: lateBedtime,
+                RecoveryHistoryChart(history: history, usual: model.recoveryUsual,
+                                     usualLabel: model.recoveryUsualIsPersonal ? "Usual" : "Start",
+                                     lateBedtime: lateBedtime,
                                      selected: nearestNight(history)?.day, selection: $selectedDay)
                     .frame(height: 150)
                 HStack {
@@ -225,7 +227,8 @@ struct RecoveryView: View {
                     .font(.bodyText)
                     .secondaryText()
             } else {
-                heartReadout(selected: selected, latest: points.last, usual: usual)
+                heartReadout(selected: selected, latest: points.last, usual: usual,
+                             slots: points.map { heartMeaning($0.value, usual: usual) })
                 NightTrendChart(points: points, usual: usual, band: heartBand,
                                 scale: heartMetric == .hrv ? .percent(0.25) : .points(8),
                                 accent: heartMetric == .hrv ? .indigo : .pink,
@@ -265,13 +268,14 @@ struct RecoveryView: View {
     }
 
     @ViewBuilder
-    private func heartReadout(selected: NightTrendPoint?, latest: NightTrendPoint?, usual: Double) -> some View {
+    private func heartReadout(selected: NightTrendPoint?, latest: NightTrendPoint?, usual: Double, slots: [String]) -> some View {
         if let point = selected ?? latest {
             ChartReadout(title: selected == nil ? "Latest \u{00B7} \(dayText(point.date))" : dayText(point.date),
                          value: heartFormat(point.value),
                          detail: heartMeaning(point.value, usual: usual),
                          accent: heartIsWorse(point.value, usual: usual) ? .coral : (heartMetric == .hrv ? .indigo : .pink),
-                         onClear: selected == nil ? nil : { selectedHeartDay = nil })
+                         onClear: selected == nil ? nil : { selectedHeartDay = nil },
+                         detailSlots: slots)
         }
     }
 
@@ -318,6 +322,9 @@ struct RecoveryView: View {
 private struct RecoveryHistoryChart: View {
     let history: [AppModel.RecoveryNight]
     let usual: Int
+    /// The dashed line's name in the axis gutter: "Usual", or "Start" (the
+    /// starting point) until there are 7 days.
+    let usualLabel: String
     let lateBedtime: Minutes
     let selected: Date?
     @Binding var selection: Date?
@@ -348,14 +355,23 @@ private struct RecoveryHistoryChart: View {
                     .foregroundStyle(color(night))
                     .cornerRadius(4)
             }
-            .accessibilityHidden(true)   // VoiceOver reads the summary (round 3, A9)
-            usualLine.accessibilityHidden(true)
+            usualLine
         }
+        // One VoiceOver element with the summary (chartScrub), so no
+        // mark-level hiding (Weber A8).
         .chartScrub($selection, snapped: selected, steps: history.map(\.day).sorted())
         .chartYScale(domain: 0...100)
         .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading, values: [0, 50, 100])
+            // The dashed line's name, in the gutter where no bar reaches (Weber B).
+            AxisMarks(position: .trailing, values: [usual]) { _ in
+                AxisValueLabel(horizontalSpacing: Space.xs) {
+                    Text(usualLabel)
+                        .font(.chartLabel(size: 10, weight: .semibold))
+                        .foregroundStyle(Palette(scheme: scheme).secondary)
+                }
+            }
         }
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(DateChartDescriptor(

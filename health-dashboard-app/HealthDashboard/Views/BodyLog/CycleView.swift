@@ -1286,7 +1286,8 @@ private struct IrregularSection: View {
                             .opacity(shownBar == nil || shownBar?.isCurrent == true ? 1 : 0.35)
                     }
                     .annotation(position: .top, spacing: 2) {
-                        Text("\(bar.days) d so far").font(.small).fontWeight(.bold).foregroundStyle(ink)
+                        // The same size as the finished bars' labels (Weber C9).
+                        Text("\(bar.days) d so far").font(.secondary).fontWeight(.bold).foregroundStyle(ink)
                     }
             } else {
                 BarMark(x: .value("Cycle", bar.label), y: .value("Days", bar.days), width: .ratio(0.6))

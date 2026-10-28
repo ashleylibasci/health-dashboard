@@ -277,7 +277,7 @@ struct WaterView: View {
                          onClear: selected == nil ? nil : { selected = nil })
             WaterDayChart(run: run, pace: paceLine, goal: hidesGoal ? nil : goalML, start: chartStart, end: chartEnd,
                           now: model.now, selected: selected.map(snap), selectedML: selected.map { model.waterML(by: snap($0)) },
-                          selection: $selected)
+                          selection: $selected.snapping { snap($0) })
                 .frame(height: 180)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(hidesGoal ? "Water today: \(LogFormat.oz(model.waterTodayML)) so far."
@@ -516,18 +516,20 @@ private struct WaterDayChart: View {
                     .foregroundStyle(Accent.blue.fill(scheme))
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
             }
-            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             ForEach(pace) { p in
                 LineMark(x: .value("Time", p.time), y: .value("Water", p.ml), series: .value("Line", "Pace"))
                     .foregroundStyle(Palette(scheme: scheme).tertiary)
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
             }
-            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             goalRule
-            selectionMarks.accessibilityHidden(true)
+            selectionMarks
         }
+        // VoiceOver reads the chart's summary (chartScrub makes it one
+        // element), so no mark-level hiding (Weber A8).
         .chartScrub($selection)
         .chartXScale(domain: start...end)
+        // The last x label ("12am") ran past the plot's edge (Weber C11).
+        .chartXScale(range: .plotDimension(endPadding: 10))
         .chartYScale(domain: 0...yMax)
         .chartXAxis {
             AxisMarks(values: ticks) { value in
