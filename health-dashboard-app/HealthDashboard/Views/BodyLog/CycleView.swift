@@ -596,8 +596,12 @@ private struct PackSection: View {
             }
         }
         header
-        if model.pillToday != nil {
-            RowCard { PillTodayRow() }
+        RowCard {
+            if model.pillToday != nil {
+                PillTodayRow()
+                RowDivider()
+            }
+            RefillRow()
         }
         if skipping { skipNote }
         packCard

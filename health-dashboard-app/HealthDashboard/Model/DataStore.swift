@@ -109,6 +109,10 @@ struct AppData: Codable {
     /// Also count doses logged in Apple Health (Apple's Medications, or any
     /// app that saves doses there). iOS 26 and later.
     var pillReadsHealth = false
+    /// Packs she had when she last counted, counting the one she was on
+    /// (H-A6), and pill 1 of that pack. Nil until she sets it.
+    var refillPacks: Int?
+    var refillCountedFrom: Date?
     /// The day she last changed birth control (or started or stopped one).
     /// Her usual cycle length counts only cycles since then (Okafor M).
     var methodChangedDate: Date?
@@ -180,6 +184,8 @@ struct AppData: Codable {
         pillReminder = get(.pillReminder, d.pillReminder)
         pillTime = min(max(get(.pillTime, d.pillTime), 0), 1439)
         pillReadsHealth = get(.pillReadsHealth, d.pillReadsHealth)
+        refillPacks = get(.refillPacks, d.refillPacks)
+        refillCountedFrom = get(.refillCountedFrom, d.refillCountedFrom)
         methodChangedDate = get(.methodChangedDate, d.methodChangedDate)
         sleepNeedAdjustment = get(.sleepNeedAdjustment, d.sleepNeedAdjustment)
         upBy = get(.upBy, d.upBy)

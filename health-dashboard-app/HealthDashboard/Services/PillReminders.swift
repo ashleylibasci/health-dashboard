@@ -86,8 +86,12 @@ enum PillReminders {
         let mine = UNNotificationCategory(identifier: category, actions: [taken], intentIdentifiers: [],
                                           hiddenPreviewsBodyPlaceholder: PrivateNotice.placeholder,
                                           options: [.hiddenPreviewsShowTitle])
-        let others = await center.notificationCategories().filter { $0.identifier != category }
-        center.setNotificationCategories(others.union([mine]))
+        // Other private notices (the refill reminder): no buttons.
+        let plain = UNNotificationCategory(identifier: PrivateNotice.category, actions: [], intentIdentifiers: [],
+                                           hiddenPreviewsBodyPlaceholder: PrivateNotice.placeholder,
+                                           options: [.hiddenPreviewsShowTitle])
+        let others = await center.notificationCategories().filter { $0.identifier != category && $0.identifier != PrivateNotice.category }
+        center.setNotificationCategories(others.union([mine, plain]))
     }
 }
 
@@ -96,6 +100,8 @@ enum PillReminders {
 /// just "Your 9pm reminder" and the rest waits until the phone is unlocked.
 enum PrivateNotice {
     static let placeholder = "Unlock to see it"
+    /// The category for private notices without buttons.
+    static let category = "private"
 
     /// "Your 9pm reminder", with a body that says nothing more.
     static func content(at minutes: Minutes) -> UNMutableNotificationContent {

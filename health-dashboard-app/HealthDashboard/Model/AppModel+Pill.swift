@@ -117,6 +117,7 @@ extension AppModel {
             || old.pillReadsHealth != new.pillReadsHealth || old.packStartDate != new.packStartDate
             || old.packActiveDays != new.packActiveDays || old.packLength != new.packLength
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
+            || old.refillPacks != new.refillPacks || old.refillCountedFrom != new.refillCountedFrom
     }
 
     /// Reads Apple Health's doses (when she turned that on), then
@@ -128,6 +129,7 @@ extension AppModel {
             if healthPillHasSchedule != doses.hasSchedule { healthPillHasSchedule = doses.hasSchedule }
         }
         await updatePillReminders()
+        await updateRefillReminder()
     }
 
     /// The week ahead's reminders, or none when they're off or there's no

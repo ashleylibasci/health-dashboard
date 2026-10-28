@@ -67,6 +67,9 @@ enum DemoMode {
             // Pills 1–17 marked taken at about 9pm, except pill 11, and the
             // 9pm reminder on (H-A1).
             data.pillReminder = true
+            // On her last pack (H-A6).
+            data.refillPacks = 1
+            data.refillCountedFrom = data.packStartDate
             data.pillsTaken = (1...17).filter { $0 != 11 }.compactMap { day in
                 cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - 18, to: today) ?? today)
             }
