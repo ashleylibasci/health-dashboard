@@ -82,6 +82,14 @@ final class PillScheduleTests: XCTestCase {
         XCTAssertEqual(plan.map(\.kind), [.followUp])
     }
 
+    // Nov 1, 2026 is a clock-change day: still 9pm on the clock.
+    func testClockChangeDayKeepsTheWallTime() {
+        let pack = PillPack(start: date(2026, 10, 11), activeDays: 28, packLength: 28)
+        let plan = PillReminderPlan.reminders(pack: pack, pillTime: 21 * 60, now: date(2026, 11, 1, 8), days: 1,
+                                              isTaken: { _ in false }, calendar: cal)
+        XCTAssertEqual(plan.first?.fire, date(2026, 11, 1, 21))
+    }
+
     func testPastRemindersAreLeftOut() {
         let pack = PillPack(start: date(2026, 10, 11), activeDays: 21, packLength: 28)
         let plan = PillReminderPlan.reminders(pack: pack, pillTime: 21 * 60, now: date(2026, 10, 28, 21, 15), days: 1,

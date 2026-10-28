@@ -101,7 +101,8 @@ public enum PillReminderPlan {
         var out: [PillReminder] = []
         for offset in 0..<days {
             guard let day = calendar.date(byAdding: .day, value: offset, to: today),
-                  let at = calendar.date(byAdding: .minute, value: pillTime, to: day) else { continue }
+                  // Wall-clock, so the clock-change night is still 9pm.
+                  let at = calendar.date(bySettingHour: pillTime / 60, minute: pillTime % 60, second: 0, of: day) else { continue }
             let packDay = pack.day(on: day, calendar: calendar)
             if packDay <= pack.activeDays {
                 guard !isTaken(day) else { continue }
