@@ -21,6 +21,7 @@ struct ExamWeekView: View {
                                             windowLength: AppModel.alarmWindowLead)
                 summary(exam, plan: plan)
                 RowCard {
+                    crunchRow
                     MetricRow(title: "Exam-week mode",
                               note: store.data.examModeOn ? "On \u{00B7} planning for \(exam.course)" : "Off \u{00B7} plans sleep and study",
                               verdict: store.data.examModeOn ? RowVerdict(text: "On", accent: .yellow) : nil,
@@ -46,6 +47,21 @@ struct ExamWeekView: View {
                     LinkRow(title: "Add an exam", systemImage: "plus.circle.fill", accent: .yellow) { ExamListView() }
                 }
             }
+        }
+    }
+
+    // MARK: Crunch week
+
+    /// "Heaviest week · Nov 9–13 · 4 exams", two weeks ahead (H-B3).
+    @ViewBuilder
+    private var crunchRow: some View {
+        if let crunch = model.examCrunch {
+            ExpandRow(title: "Heaviest week", summary: "\(crunch.label) \u{00B7} \(crunch.count) exams",
+                      systemImage: "calendar.badge.exclamationmark", accent: .coral) {
+                Text("Your heaviest week is \(crunch.label), with \(crunch.count) exams. Exam-week mode turns on by itself \(AppModel.crunchModeLead) days before it, so your sleep plan covers the whole stretch, not just one exam. Sleep debt builds fastest in weeks like this, and all-nighters are linked to lower grades.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            RowDivider()
         }
     }
 

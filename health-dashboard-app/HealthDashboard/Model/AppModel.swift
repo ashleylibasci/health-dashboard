@@ -916,6 +916,7 @@ final class AppModel: ObservableObject {
             store.data.alarmOverride = nil   // that morning has passed
         }
         clearOldBrainDump()
+        applyExamCrunch()
         pushToWatch()
         Task {
             await updateHealthConnection()
