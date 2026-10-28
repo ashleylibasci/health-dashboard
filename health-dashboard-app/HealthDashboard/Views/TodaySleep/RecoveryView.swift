@@ -2,105 +2,98 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Today's recovery, what moved it, and the last two weeks.
+/// Today's recovery, the last two weeks, and what moved it.
 struct RecoveryView: View {
     @EnvironmentObject var model: AppModel
-    @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedDay: Date? = nil
-    @State private var heartMetric: HeartMetric = .hrv
-    @State private var selectedHeartDay: Date? = nil
 
     var body: some View {
         Screen(title: "Recovery", accent: .indigo) {
             SampleDataBanner()
-            heroCard
+            header
             historyCard
-            movedCard
-            heartCard
-            Card(density: .compact) {
-                LinkRow(title: "Getting accurate numbers", subtitle: "A checklist of ways to help your Watch",
-                        systemImage: "checklist", accent: .indigo) {
+            RowCard {
+                ExpandRow(title: "What moved today", summary: movedSummary, systemImage: "arrow.left.arrow.right", accent: .indigo) {
+                    movedContent
+                }
+                RowDivider()
+                HeartMetricRows()
+                RowDivider()
+                MetricRow(title: "Getting accurate numbers", note: "A checklist of ways to help your Watch",
+                          systemImage: "checklist", accent: .indigo) {
                     AccuracyTipsView()
                 }
             }
         }
     }
 
-    // MARK: Hero
+    // MARK: Header
 
+    /// HRV, resting heart rate and last night, with the points each moved.
+    private var effects: [(name: String, points: Int)] {
+        [("lower HRV", model.recoveryPointsFromHRV),
+         ("a higher resting heart rate", model.recoveryPointsFromRestingHR),
+         ("a short night", model.recoveryPointsFromSleep)]
+    }
+
+    /// One sentence against her usual.
     private var summary: String {
         guard let score = model.recoveryShown else {
             return "No sleep from last night and no HRV or resting heart rate yet. Wear your Watch to bed tonight."
         }
         let usual = model.recoveryUsualPhrase
         let diff = score - model.recoveryUsual
-        let effects: [(name: String, points: Int)] = [
-            ("lower HRV", model.recoveryPointsFromHRV),
-            ("a higher resting heart rate", model.recoveryPointsFromRestingHR),
-            ("a short night", model.recoveryPointsFromSleep),
-        ]
-        var text: String
         if diff <= -3 {
-            let worst = effects.min { $0.points < $1.points }
-            if let worst, worst.points < 0 {
-                text = "Below \(usual), mostly from \(worst.name)."
-            } else {
-                text = "Below \(usual)."
+            if let worst = effects.min(by: { $0.points < $1.points }), worst.points < 0 {
+                return "Below \(usual), mostly from \(worst.name)."
             }
-        } else if diff >= 3 {
-            text = "Above \(usual). Your body has recovered well."
-        } else {
-            text = "Close to \(usual)."
+            return "Below \(usual)."
         }
-        if model.recoveryIsExample {
-            text += " Example: until your Watch has learned your usual HRV and resting heart rate, example heart readings stand in."
-        } else if !model.hasHeartData {
-            text += " No HRV or resting heart rate yet, so this is from sleep alone."
-        } else if !model.lastNightIsFresh {
-            text += " No sleep was recorded last night, so this is from your heart readings only."
-        }
-        if let cycle = model.recoveryCycleNote {
-            text += " " + cycle
-        }
-        return text
+        if diff >= 3 { return "Above \(usual). Your body has recovered well." }
+        return "Close to \(usual)."
     }
 
-    private var heroCard: some View {
-        Card {
-            HStack(spacing: 0) {
-                SectionLabel(text: "Recovery today")
-                InfoButton(topic: .recovery).padding(.vertical, -14)
-                Spacer()
-            }
-            .padding(.bottom, -8)
-            VStack(spacing: 14) {
-                if let score = model.recoveryShown {
-                    Ring(value: Double(score) / 100, accent: .indigo, lineWidth: 18,
-                         label: "\(score)", caption: model.recoveryLabel(for: score), size: 208,
-                         accessibilityText: "Recovery \(score), \(model.recoveryLabel(for: score))")
-                    if model.recoveryIsExample {
-                        ExampleTag()
-                    }
-                } else {
-                    Text("No recovery yet today").font(.heading)
-                        .accessibilityAddTraits(.isHeader)
-                }
-                Text(summary)
-                    .font(.bodyText)
-                    .multilineTextAlignment(.center)
-                    .secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-                HowWeGotThisLink(title: "Recovery",
-                                 method: "Recovery starts from a fixed starting score of \(AppModel.recoveryAnchor), chosen by the app (not a population average). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. "
-                                    + (model.heartFollowsCycle
-                                       ? "With a natural cycle, the app expects resting heart rate about 1.5 beats higher and HRV about 4% lower in the second half of your cycle, and the reverse in the first 7 days from the start of your period, and takes that out before scoring. It only does this when it knows where you are in your cycle. "
-                                       : "Your birth control stops ovulation, so your heart readings don't swing with a cycle and nothing is adjusted for one. ")
-                                    + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average."))
-            }
-            .frame(maxWidth: .infinity)
+    /// What today's number is missing or allowing for, said where the
+    /// inputs are (in "What moved today").
+    private var caveats: String? {
+        var parts: [String] = []
+        if model.recoveryIsExample {
+            parts.append("Example: until your Watch has learned your usual HRV and resting heart rate, example heart readings stand in.")
+        } else if !model.hasHeartData {
+            parts.append("No HRV or resting heart rate yet, so this is from sleep alone.")
+        } else if !model.lastNightIsFresh {
+            parts.append("No sleep was recorded last night, so this is from your heart readings only.")
         }
+        if let cycle = model.recoveryCycleNote { parts.append(cycle) }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    private var info: Explanation {
+        let topic = Topic.recovery.explanation
+        let method = "Recovery starts from a fixed starting score of \(AppModel.recoveryAnchor), chosen by the app (not a population average). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. "
+            + (model.heartFollowsCycle
+               ? "With a natural cycle, the app expects resting heart rate about 1.5 beats higher and HRV about 4% lower in the second half of your cycle, and the reverse in the first 7 days from the start of your period, and takes that out before scoring. It only does this when it knows where you are in your cycle. "
+               : "Your birth control stops ovulation, so your heart readings don't swing with a cycle and nothing is adjusted for one. ")
+            + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average.")
+        return Explanation(id: topic.id, title: topic.title, meaning: topic.meaning, forYou: topic.forYou, howWeGotIt: method)
+    }
+
+    /// This morning's heart readings against her usual.
+    private var pairs: [StatPair] {
+        guard model.recoveryShown != nil, model.hasHeartData else { return [] }
+        return [StatPair(label: "HRV", value: SleepText.signed(model.hrvDeltaPct) + "%"),
+                StatPair(label: "Resting HR", value: SleepText.signed(model.restingHRDelta) + " bpm")]
+    }
+
+    private var header: some View {
+        let score = model.recoveryShown
+        return SummaryHeader(eyebrow: "Recovery today", value: score.map { "\($0)" } ?? "No recovery yet",
+                             // The screen's Example data capsule says so on example data.
+                             unit: model.recoveryIsExample && !model.usingSampleData ? "example" : nil,
+                             status: score.map { SummaryStatus(text: model.recoveryLabel(for: $0), accent: .indigo) },
+                             line: summary, pairs: pairs, accent: .indigo,
+                             info: info)
     }
 
     // MARK: 14 days
@@ -130,13 +123,14 @@ struct RecoveryView: View {
 
     @ViewBuilder
     private func historyReadout(_ history: [AppModel.RecoveryNight]) -> some View {
+        let slots = history.map(nightDetail)
         if let night = nearestNight(history) {
             ChartReadout(title: "\(dayText(night.day)) \u{00B7} \(model.recoveryLabel(for: night.score))", value: "\(night.score)",
                          detail: nightDetail(night), accent: night.bedtime >= lateBedtime ? .coral : .indigo,
-                         onClear: { selectedDay = nil })
+                         onClear: { selectedDay = nil }, detailSlots: slots)
         } else if let low = history.min(by: { $0.score < $1.score }) {
             ChartReadout(title: "Lowest day \u{00B7} \(dayText(low.day))", value: "\(low.score)",
-                         detail: nightDetail(low), accent: .coral)
+                         detail: nightDetail(low), accent: .coral, detailSlots: slots)
         }
     }
 
@@ -150,7 +144,9 @@ struct RecoveryView: View {
                 RecoveryHistoryChart(history: history, usual: model.recoveryUsual,
                                      usualLabel: model.recoveryUsualIsPersonal ? "Usual" : "Start",
                                      lateBedtime: lateBedtime,
-                                     selected: nearestNight(history)?.day, selection: $selectedDay)
+                                     selected: nearestNight(history)?.day, selection: $selectedDay.snapping { d in
+                                         history.min { abs($0.day.timeIntervalSince(d)) < abs($1.day.timeIntervalSince(d)) }?.day
+                                     })
                     .frame(height: 150)
                 HStack {
                     Text(history.count > 1 ? "\(history.count - 1) days ago" : "")
@@ -179,109 +175,18 @@ struct RecoveryView: View {
         return usualText
     }
 
-    // MARK: HRV and resting heart rate
+    // MARK: What moved
 
-    private var heartPoints: [NightTrendPoint] {
-        model.heartTrend(days: 14).compactMap { n -> NightTrendPoint? in
-            guard let v = heartMetric == .hrv ? n.hrv : n.restingHR else { return nil }
-            return NightTrendPoint(date: n.day, value: v)
+    /// "Mostly lower HRV", or what she compares against.
+    private var movedSummary: String {
+        if let worst = effects.min(by: { $0.points < $1.points }), worst.points < 0 {
+            return "Most of all: \(worst.name)"
         }
-    }
-
-    private var heartUsual: Double { heartMetric == .hrv ? model.baselineHRV : model.baselineRestingHR }
-
-    /// Her usual spread (one standard deviation), or ±12% / ±3 bpm until
-    /// there's enough to know it.
-    private var heartBand: ClosedRange<Double> {
-        let usual = heartUsual
-        if heartMetric == .hrv {
-            let pct = (model.hrvSpreadPct ?? 12) / 100
-            return usual * (1 - pct)...usual * (1 + pct)
-        }
-        let sd = model.restingHRSpread ?? 3
-        return (usual - sd)...(usual + sd)
-    }
-
-    private func heartFormat(_ v: Double) -> String { "\(Int(v.rounded())) \(heartMetric.unit)" }
-
-    private var heartCard: some View {
-        let points = heartPoints
-        let usual = heartUsual
-        let selected = selectedHeartDay.flatMap { d in points.min { abs($0.date.timeIntervalSince(d)) < abs($1.date.timeIntervalSince(d)) } }
-        return Card {
-            HStack(spacing: 0) {
-                Text("HRV and resting heart rate").font(.cardTitle)
-                Spacer(minLength: 0)
-                InfoButton(explanation: heartMetric == .hrv ? model.hrvExplanation : model.restingHRExplanation).padding(.vertical, -12)
-            }
-            HStack(spacing: 6) {
-                ForEach(HeartMetric.allCases) { m in
-                    Chip(title: m.label, selected: heartMetric == m, accent: m == .hrv ? .indigo : .pink) {
-                        heartMetric = m
-                        selectedHeartDay = nil
-                    }
-                }
-            }
-            if points.isEmpty {
-                Text("Not enough mornings with \(heartMetric.label) yet. Wear your Watch to bed.")
-                    .font(.bodyText)
-                    .secondaryText()
-            } else {
-                heartReadout(selected: selected, latest: points.last, usual: usual,
-                             slots: points.map { heartMeaning($0.value, usual: usual) })
-                NightTrendChart(points: points, usual: usual, band: heartBand,
-                                scale: heartMetric == .hrv ? .percent(0.25) : .points(8),
-                                accent: heartMetric == .hrv ? .indigo : .pink,
-                                seriesName: heartMetric == .hrv ? "HRV" : "Resting heart rate",
-                                format: heartFormat, selected: selected?.date, selection: $selectedHeartDay)
-                    .frame(height: 170)
-                    .motion(.dataSwap, value: heartMetric)
-                ScrubHint(each: "morning")
-                Text(heartMetric == .hrv
-                     ? "Higher than your usual (dashed line) means your body is relaxed and recovered. The shaded band is your normal range."
-                     : "Lower than your usual (dashed line) is better. \(Int(HeartBands.restingHRUp)) or more beats up can mean short sleep, stress, drinks or getting sick\(model.heartCycleCause). The shaded band is your normal range.")
-                    .font(.secondary)
-                    .secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func heartMeaning(_ value: Double, usual: Double) -> String {
-        // The same bands and wording as Body (round 4, Brandt F8/F9).
-        if heartMetric == .hrv {
-            let pct = usual > 0 ? (value - usual) / usual * 100 : 0
-            return "\(SleepText.signed(pct))% vs usual. " + model.hrvMeaning(pct)
-        }
-        let d = value - usual
-        return "\(SleepText.signed(d)) bpm vs usual. " + model.restingHRMeaning(d)
-    }
-
-    /// Coral only for a reading worth acting on (Valtonen F4).
-    private func heartIsWorse(_ value: Double, usual: Double) -> Bool {
-        if heartMetric == .hrv {
-            let pct = usual > 0 ? (value - usual) / usual * 100 : 0
-            return HeartBands.hrv(deltaPct: pct, spreadPct: model.hrvSpreadPct) == .wellBelow
-        }
-        let level = HeartBands.restingHR(delta: value - usual)
-        return level == .above || level == .wellBelow
+        return "Against your last 4 weeks"
     }
 
     @ViewBuilder
-    private func heartReadout(selected: NightTrendPoint?, latest: NightTrendPoint?, usual: Double, slots: [String]) -> some View {
-        if let point = selected ?? latest {
-            ChartReadout(title: selected == nil ? "Latest \u{00B7} \(dayText(point.date))" : dayText(point.date),
-                         value: heartFormat(point.value),
-                         detail: heartMeaning(point.value, usual: usual),
-                         accent: heartIsWorse(point.value, usual: usual) ? .coral : (heartMetric == .hrv ? .indigo : .pink),
-                         onClear: selected == nil ? nil : { selectedHeartDay = nil },
-                         detailSlots: slots)
-        }
-    }
-
-    // MARK: What moved
-
-    private var movedCard: some View {
+    private var movedContent: some View {
         let sleepGap = model.lastNight.asleep - model.sleepNeed.minutes
         let sleepText = SleepText.signedCompact(sleepGap)
         let rows = [
@@ -301,18 +206,14 @@ struct RecoveryView: View {
                         points: model.lastNightIsFresh ? model.recoveryPointsFromSleep : 0,
                         explanation: Topic.sleepNeed.explanation),
         ]
-        return Card {
-            AdaptiveStack(spacing: Space.xs, alignment: .firstTextBaseline) {
-                Text("What moved today").font(.cardTitle)
-                if !typeSize.isAccessibilitySize { Spacer() }
-                Text("vs your last 4 weeks").font(.secondary).secondaryText()
-            }
-            MovedDrivers(rows: rows)
-            Text("Bars to the left of the line pulled today down; bars to the right lifted it."
-                 + (model.hasHeartData && model.cycleHeartShift != .none ? " The bars allow for your cycle; the numbers are the raw change." : ""))
-                .font(.secondary)
-                .secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
+        Text("Compared with your last 4 weeks.")
+        MovedDrivers(rows: rows)
+            .foregroundStyle(Palette(scheme: scheme).primary)
+        Text("Bars to the left of the line pulled today down; bars to the right lifted it."
+             + (model.hasHeartData && model.cycleHeartShift != .none ? " The bars allow for your cycle; the numbers are the raw change." : ""))
+            .fixedSize(horizontal: false, vertical: true)
+        if let caveats {
+            Text(caveats).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -378,13 +279,6 @@ private struct RecoveryHistoryChart: View {
             title: "Recovery, last \(history.count) days", seriesName: "Recovery", yTitle: "Recovery",
             points: history.map { ($0.day, Double($0.score)) }, yLabel: { "\(Int($0.rounded()))" }, isContinuous: false))
     }
-}
-
-private enum HeartMetric: String, CaseIterable, Identifiable {
-    case hrv, restingHR
-    var id: String { rawValue }
-    var label: String { self == .hrv ? "HRV" : "Resting HR" }
-    var unit: String { self == .hrv ? "ms" : "bpm" }
 }
 
 /// One row of "What moved today".

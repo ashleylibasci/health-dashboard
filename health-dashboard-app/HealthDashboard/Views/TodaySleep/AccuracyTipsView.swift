@@ -2,7 +2,9 @@ import SwiftUI
 import HealthCore
 
 /// A checklist of ways to make the numbers more accurate, each with a
-/// one-line why and, where the app can tell, whether it's done.
+/// one-line why and, where the app can tell, whether it's done. How many
+/// are done leads; each group of tips is a row that opens in place, the
+/// first group with something to do already open.
 struct AccuracyTipsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -11,11 +13,23 @@ struct AccuracyTipsView: View {
     var body: some View {
         // One title, the nav title, with the same name as every link to it
         // (Valtonen F8, Dubois 12).
+        let groups = [("Wearing your Watch", watchTips), ("Settings on your phone and Watch", settingsTips),
+                      ("Small daily habits", habitTips)]
+        let firstOpen = groups.firstIndex { $0.1.contains { $0.status?.isTodo == true } }
         Screen(title: "Getting accurate numbers", accent: .indigo) {
-            summaryCard
-            section("Wearing your Watch", watchTips)
-            section("Settings on your phone and Watch", settingsTips)
-            section("Small daily habits", habitTips)
+            summaryHeader
+            RowCard {
+                ForEach(Array(groups.enumerated()), id: \.offset) { i, group in
+                    if i > 0 { RowDivider(hasIcon: false) }
+                    ExpandRow(title: group.0, summary: groupSummary(group.1), accent: .indigo,
+                              initiallyExpanded: i == firstOpen) {
+                        ForEach(Array(group.1.enumerated()), id: \.offset) { index, tip in
+                            if index > 0 { Divider() }
+                            tipRow(tip)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -127,23 +141,22 @@ struct AccuracyTipsView: View {
 
     // MARK: Summary
 
-    private var summaryCard: some View {
+    private var summaryHeader: some View {
         let known = allStatuses.filter { if case .unknown = $0 { return false }; return true }
         let done = known.filter { if case .done = $0 { return true }; return false }.count
-        let fraction = known.isEmpty ? 0 : Double(done) / Double(known.count)
-        return Card(accent: .indigo) {
-            AdaptiveStack(spacing: 16) {
-                Ring(value: fraction, accent: .indigo, lineWidth: 10, label: "\(done)/\(known.count)", size: 94,
-                     accessibilityText: "\(done) of \(known.count) checks done")
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Things the app can check").font(.cardTitle)
-                    Text("Your recovery, sleep need and stress are compared with your own usual, so the more good data the app has, the sharper they get.")
-                        .font(.bodyText)
-                        .secondaryText()
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
+        return SummaryHeader(eyebrow: "Things the app can check", value: "\(done) of \(known.count)", unit: "done",
+                             line: "The more good data the app has, the sharper your numbers get.", accent: .indigo,
+                             info: Explanation(id: "accuracyTips", title: "Getting accurate numbers",
+                                               meaning: "Your recovery, sleep need and stress are compared with your own usual, so the more good data the app has, the sharper they get.",
+                                               forYou: ""))
+    }
+
+    /// "2 of 3 done", or the number of tips when the app can't check them.
+    private func groupSummary(_ tips: [Tip]) -> String {
+        let checked = tips.compactMap(\.status).filter { if case .unknown = $0 { return false }; return true }
+        guard !checked.isEmpty else { return "\(tips.count) tips" }
+        let done = checked.filter { if case .done = $0 { return true }; return false }.count
+        return "\(tips.count) tips \u{00B7} \(done) of \(checked.count) checks done"
     }
 
     // MARK: Tips
@@ -191,18 +204,6 @@ struct AccuracyTipsView: View {
         ]
     }
 
-    private func section(_ title: String, _ tips: [Tip]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: title).padding(.horizontal, 4).padding(.top, 6)
-            Card(density: .compact) {
-                ForEach(Array(tips.enumerated()), id: \.offset) { index, tip in
-                    if index > 0 { Divider() }
-                    tipRow(tip)
-                }
-            }
-        }
-    }
-
     private func tipRow(_ tip: Tip) -> some View {
         let p = Palette(scheme: scheme)
         return HStack(alignment: .top, spacing: 12) {
@@ -213,7 +214,7 @@ struct AccuracyTipsView: View {
                 .background(tip.accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(tip.title).font(.bodyEmphasis).fixedSize(horizontal: false, vertical: true)
+                Text(tip.title).font(.bodyEmphasis).foregroundStyle(p.primary).fixedSize(horizontal: false, vertical: true)
                 Text(tip.why)
                     .font(.secondary)
                     .foregroundStyle(p.secondary)
@@ -302,6 +303,8 @@ private enum TipStatus {
     case done(String)
     case todo(String)
     case unknown(String)
+
+    var isTodo: Bool { if case .todo = self { return true }; return false }
 }
 
 private enum TipAction {

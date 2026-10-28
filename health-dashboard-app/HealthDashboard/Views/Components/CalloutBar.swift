@@ -1,21 +1,20 @@
 import SwiftUI
 
 /// The one line that stays on a main screen while something is urgent or
-/// needs her: "Trouble breathing, chest pain or confusion? Call 911.",
+/// needs her: "No period for 3 months: worth seeing a clinician.",
 /// "Google Calendar signed out · Reconnect". A tinted bar with an icon, one
 /// line of copy (about 60 characters, at most 2 lines) and a chevron; the
 /// whole bar opens the full text (a sheet or a page). Optional round call
 /// or text buttons sit at its trailing edge.
 ///
 /// Show it only while its trigger is true (the safety triggers are in the
-/// structure review: 988 after high stress, sick, 4+ drinks, heavy flow,
-/// no period for 90 days), at most one per screen, above the
+/// structure review: 4+ drinks, heavy flow, no period for 90 days), at most one per screen, above the
 /// `SummaryHeader`. Never use it for tips or anything that's always on.
 struct CalloutBar: View {
     var text: String
     var systemImage: String = "exclamationmark.triangle.fill"
     var accent: Accent = .coral
-    /// Round buttons after the text ("Call 911", "Text 988").
+    /// Round buttons after the text ("Call 911").
     var links: [CalloutLink] = []
     var action: () -> Void
     @Environment(\.colorScheme) private var scheme
@@ -91,7 +90,7 @@ struct CalloutLinkButton: View {
                 .font(.scaled(size: 15, weight: .bold))
                 .frame(width: Sizes.minTap, height: Sizes.minTap)
                 // Light: white on the deep ink; dark: near black on the
-                // bright fill (as CrisisLineCard).
+                // bright fill.
                 .foregroundStyle(scheme == .dark ? Color(hex: 0x1A0E00) : .white)
                 .background(scheme == .dark ? accent.fill(.dark) : accent.ink(.light), in: Circle())
         }
@@ -104,7 +103,7 @@ struct CalloutLinkButton: View {
 extension View {
     /// The app's bottom sheet: medium and large detents, a grab bar, a nav
     /// title and Done, on the screen background. For urgent or quick
-    /// reading (when to get care, alcohol poisoning signs, a log form)
+    /// reading (alcohol poisoning signs, a log form)
     /// where she should swipe down back to where she was. Reference
     /// reading is pushed instead (a Health guide article).
     func bottomSheet<Content: View>(isPresented: Binding<Bool>, title: String,

@@ -350,7 +350,7 @@ struct TodayView: View {
         } else if model.inLutealPhase {
             detail += " The late part of your cycle is already allowed for."
         }
-        return detail + " Take it easy, drink water and get extra sleep tonight. Fever or trouble breathing? Get checked."
+        return detail + " Take it easy, drink water and get extra sleep tonight."
     }
 
     private var sickCard: some View {

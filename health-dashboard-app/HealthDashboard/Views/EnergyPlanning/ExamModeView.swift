@@ -71,7 +71,7 @@ struct ExamModeView: View {
     private var supportCard: some View {
         Card {
             Text("Feeling overwhelmed?").font(.cardTitle)
-            Text("Exam weeks are hard, and you don't have to get through them alone. Your campus counseling center can help. If you're sick, dealing with something at home or just can't keep up, your dean of students or accessibility office can talk to you about extensions or a make-up. In a crisis, call or text 988 (US) any time.")
+            Text("Exam weeks are hard, and you don't have to get through them alone. Your campus counseling center can help. If you're sick, dealing with something at home or just can't keep up, your dean of students or accessibility office can talk to you about extensions or a make-up.")
                 .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
