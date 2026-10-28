@@ -141,7 +141,15 @@ extension AppModel {
                                               isTaken: { isPillTaken(on: $0) },
                                               skipOnTime: appleRemindsPill)
         await PillReminders.reschedule(plan, pillTime: store.data.pillTime, packLength: pack.packLength)
+        if DemoMode.pillNotice, !Self.demoNoticeSent, let today = pillToday, today.isPillDay, today.taken == nil {
+            Self.demoNoticeSent = true
+            let soon = PillReminder(kind: .onTime, fire: .now.addingTimeInterval(10), day: today.day, packDay: today.packDay)
+            await PillReminders.add([soon], pillTime: store.data.pillTime, packLength: pack.packLength, exactly: true)
+        }
     }
+
+    /// `-demoPillNotice` fired its one notification.
+    private static var demoNoticeSent = false
 
     /// Apple's Medications already reminds her at her pill time: only the
     /// repeat comes from here.

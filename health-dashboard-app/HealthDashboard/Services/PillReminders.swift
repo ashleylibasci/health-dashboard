@@ -13,6 +13,12 @@ enum PillReminders {
     /// if notifications aren't allowed.
     static func reschedule(_ plan: [PillReminder], pillTime: Minutes, packLength: Int) async {
         await cancelAll()
+        await add(plan, pillTime: pillTime, packLength: packLength)
+    }
+
+    /// Schedules `plan` alongside what's pending. `exactly`: to the second
+    /// (the demo's), not the minute.
+    static func add(_ plan: [PillReminder], pillTime: Minutes, packLength: Int, exactly: Bool = false) async {
         guard !plan.isEmpty, await Nudges.isAllowed() else { return }
         await registerCategory()
         let hidden = await PrivateNotice.bodyHiddenWhenLocked()
@@ -21,8 +27,10 @@ enum PillReminders {
             let content = content(for: r, pillTime: pillTime, packLength: packLength, bodyHiddenWhenLocked: hidden)
             content.threadIdentifier = "pill"
             content.sound = .default
-            let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: r.fire)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+            let trigger: UNNotificationTrigger = exactly
+                ? UNTimeIntervalNotificationTrigger(timeInterval: max(r.fire.timeIntervalSinceNow, 1), repeats: false)
+                : UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: r.fire),
+                                                repeats: false)
             let id = prefix + r.kind.rawValue + "-" + String(Int(r.fire.timeIntervalSince1970))
             try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
         }
@@ -66,11 +74,16 @@ enum PillReminders {
     /// Pill notifications: the title stays on the lock screen while the
     /// body waits for Face ID.
     static let category = "pill"
+    /// The Taken button (`NotificationPresenter` handles it).
+    static let takenAction = "pill.taken"
 
     /// Adds the pill category to the app's others (replacing only its own).
     static func registerCategory() async {
         let center = UNUserNotificationCenter.current()
-        let mine = UNNotificationCategory(identifier: category, actions: [], intentIdentifiers: [],
+        // D-N2: "Taken" right on the notification, without opening the app.
+        let taken = UNNotificationAction(identifier: takenAction, title: "Taken", options: [],
+                                         icon: UNNotificationActionIcon(systemImageName: "checkmark"))
+        let mine = UNNotificationCategory(identifier: category, actions: [taken], intentIdentifiers: [],
                                           hiddenPreviewsBodyPlaceholder: PrivateNotice.placeholder,
                                           options: [.hiddenPreviewsShowTitle])
         let others = await center.notificationCategories().filter { $0.identifier != category }

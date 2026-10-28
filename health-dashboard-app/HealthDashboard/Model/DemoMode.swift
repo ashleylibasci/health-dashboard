@@ -30,8 +30,11 @@ enum DemoMode {
         .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     static let isOn = args.contains("-demo") || sick || cycle != nil
     static let resetData = args.contains("-resetData")
+    /// `-demoPillNotice`: today's pill reminder 10 seconds after launch, to
+    /// see the notification and its Taken button.
+    static let pillNotice = args.contains("-demoPillNotice")
     #else
-    static let isOn = false, sick = false, resetData = false
+    static let isOn = false, sick = false, resetData = false, pillNotice = false
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif

@@ -31,6 +31,8 @@ struct HealthDashboardApp: App {
         WatchSync.shared.activate()
         // Sick alerts and nudges show as banners while the app is open too.
         NotificationPresenter.install()
+        // "Taken" on a pill reminder, even with the app closed.
+        NotificationPresenter.shared.onPillTaken = { at in MainActor.assumeIsolated { model.markPillTaken(at: at) } }
     }
 
     var body: some Scene {

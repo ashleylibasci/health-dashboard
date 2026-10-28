@@ -67,6 +67,13 @@ public struct PillReminder: Hashable, Sendable {
     /// The pack day it's about (1 for a new pack).
     public var packDay: Int
     public var isNewPack: Bool { packDay == 1 && kind != .newPackTomorrow }
+
+    public init(kind: Kind, fire: Date, day: Date, packDay: Int) {
+        self.kind = kind
+        self.fire = fire
+        self.day = day
+        self.packDay = packDay
+    }
 }
 
 /// The pill reminders for the days ahead (H-A1): one at her pill time on
