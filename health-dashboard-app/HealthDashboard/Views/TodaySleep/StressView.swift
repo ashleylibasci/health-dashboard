@@ -30,7 +30,7 @@ struct StressView: View {
         return "\(h12)\(h % 24 < 12 ? "am" : "pm")"
     }
 
-    /// The one label set (Low, Usual, Raised, High), from HealthCore.
+    /// The one label set (Low, Moderate, Raised, High), from HealthCore.
     nonisolated static func band(_ level: Int) -> (name: String, accent: Accent) {
         let label = StressModel.label(for: level)
         switch label {
@@ -41,7 +41,7 @@ struct StressView: View {
         }
     }
 
-    /// 0 Low, 1 Usual, 2 Raised, 3 High (for `StressLevelColor`).
+    /// 0 Low, 1 Moderate, 2 Raised, 3 High (for `StressLevelColor`).
     nonisolated static func bandIndex(_ level: Int) -> Int {
         switch StressModel.label(for: level) {
         case .low: return 0
@@ -55,8 +55,8 @@ struct StressView: View {
         switch StressModel.label(for: level) {
         case .low: return "Low: your heart was close to its resting pace while you were still."
         case .usual: return "Moderate: normal day-to-day ups and downs. Nothing to do."
-        case .raised: return "Raised: your heart rate was up while you were sitting still. A minute of slow breathing helps."
-        case .high: return "High: your body was working hard while you weren't moving. A break, slow breathing or some fresh air brings it down."
+        case .raised: return "Raised: your heart rate was up while you were sitting still. Stress, caffeine, heat or a meal can all do that."
+        case .high: return "High: your heart was working hard while you weren't moving. Stress, caffeine, heat, a meal or getting sick can all do that."
         }
     }
 
@@ -80,9 +80,16 @@ struct StressView: View {
         switch label {
         case .low: return "Your heart stayed close to its resting pace while you were still. A calm day so far."
         case .usual: return "Normal day-to-day ups and downs."
-        case .raised: return "Your heart has been working harder than at rest while you were sitting still."
-        case .high: return "Your heart has been working much harder than at rest while you were still. Try to fit in a break, slow breathing or some fresh air."
+        case .raised: return "Your heart has been working harder than usual while you were sitting still. " + otherCauses
+        case .high: return "Your heart has been working much harder than usual while you were still. " + otherCauses + " A break, slow breathing or some fresh air can help."
         }
+    }
+
+    /// Body signals aren't only stress (round 4, Laurent F2). Her cycle is
+    /// named only when it can move her heart rate.
+    private var otherCauses: String {
+        "That can be stress, but caffeine, some medicines, heat, a big meal or getting sick can do it too"
+            + (model.heartFollowsCycle ? ", and so can the second half of your cycle." : ".")
     }
 
     // MARK: Hero
@@ -92,9 +99,16 @@ struct StressView: View {
         let accent = labelAccent(day.label)
         return Card(accent: .coral) {
             HStack(spacing: 0) {
-                SectionLabel(text: "Today, from heart rate and HRV", accent: .coral)
+                SectionLabel(text: "Body signals, not how you feel", accent: .coral)
                 InfoButton(topic: .stress).padding(.vertical, -14)
                 Spacer()
+            }
+            // What she said comes first; the body's band second (round 4,
+            // Laurent F2). A band only, no 0–100 number (Liu 9).
+            if let felt = model.stressLoggedToday {
+                Text("You said you felt \(feelName(felt).lowercased()) (\(felt) of 5).")
+                    .font(.scaled(size: 17, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
             AdaptiveStack(spacing: 10, alignment: .firstTextBaseline) {
                 Text(day.label?.rawValue ?? "No data yet")
@@ -102,8 +116,8 @@ struct StressView: View {
                     .foregroundStyle(accent.ink(scheme))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
-                if let avg = day.average {
-                    Text("level \(avg) of 100").font(.scaled(size: 15, weight: .semibold)).foregroundStyle(p.secondary)
+                if day.label != nil {
+                    Text("from heart rate at rest").font(.scaled(size: 15, weight: .semibold)).foregroundStyle(p.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -111,13 +125,18 @@ struct StressView: View {
                 .font(.scaled(size: 15))
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HowWeGotThisLink(title: "Your stress level",
-                             method: "Each hour we compare your heart rate with your resting heart rate, and your HRV with your usual HRV, but only in hours when you were awake and still. A heart rate 25 beats above resting, or HRV at half your usual, counts as the top of the scale (100). Hours you were asleep are left out, and so are hours you were moving (\(model.hidesActivityNumbers ? "from your steps and active energy" : "over about \(Int(StressModel.activeSteps)) steps, or \(Int(StressModel.activeKcal)) active calories or more"), which also catches swimming, cycling and lifting) and the hour right after, while your heart rate settles. Without a few days of your resting heart rate, there's no label yet. Today's label comes from the average of the counted hours (\(day.countedHours) so far): under 20 is Low, under 40 Usual, under 60 Raised, and 60 or more High.")
-            if let felt = model.stressLoggedToday {
-                Text("You said you felt \(feelName(felt).lowercased()) (\(felt) of 5).")
-                    .font(.scaled(size: 14, weight: .semibold))
-            }
+            HowWeGotThisLink(title: "Your stress level", method: method(day))
         }
+    }
+
+    private func method(_ day: StressDay) -> String {
+        let heart = model.stressStillBaseline != nil
+            ? "Each hour we compare your heart rate with your own heart rate in still, awake hours over the last 2 weeks: three times your usual spread above it is the top of the scale."
+            : "Each hour we compare your heart rate with your resting heart rate: 25 beats above it is the top of the scale. Once there are enough still hours from the last 2 weeks, we compare with your own still-hour heart rate instead."
+        let cycle = model.heartFollowsCycle
+            ? " In the second half of a natural cycle your heart runs a little faster on its own, so 2 beats and 5% of HRV are allowed for then."
+            : ""
+        return heart + " Your HRV is compared with your usual daytime HRV; half your usual is the top. Only hours when you were awake and still count. Hours you were asleep are left out, and so are hours you were moving (\(model.hidesActivityNumbers ? "from your steps and active energy" : "over about \(Int(StressModel.activeSteps)) steps, or \(Int(model.stressActiveKcal.rounded())) active calories or more, about 1 per kg of your weight"), which also catches swimming, cycling and lifting) and the hour right after, while your heart rate settles." + cycle + " Without a few days of your heart data there's no label yet. Today's band comes from the average of the counted hours (\(day.countedHours) so far), split into four: Low, Moderate, Raised and High. It's shown as a band rather than a number because a Watch reading isn't that precise. It measures your body, not your mood: caffeine, medicines, heat and meals move it too."
     }
 
     // MARK: Hourly chart
@@ -144,7 +163,7 @@ struct StressView: View {
                              accent: .indigo)
             } else if let level = hour.level {
                 let b = Self.band(level)
-                ChartReadout(title: "\(Self.hourText(hour.hour)) \u{00B7} level \(level)", value: b.name,
+                ChartReadout(title: Self.hourText(hour.hour), value: b.name,
                              detail: Self.meaning(level), accent: b.accent)
             } else {
                 ChartReadout(title: Self.hourText(hour.hour), value: "No reading",
@@ -152,7 +171,7 @@ struct StressView: View {
                              accent: .indigo)
             }
         } else if let peak = day.peak, let level = peak.level {
-            ChartReadout(title: "Highest today \u{00B7} \(Self.hourText(peak.hour))", value: "Level \(level)",
+            ChartReadout(title: "Highest today \u{00B7} \(Self.hourText(peak.hour))", value: Self.band(level).name,
                          detail: "Touch the chart to see any hour.", accent: Self.band(level).accent)
         } else {
             ChartReadout(title: "Today", value: "No readings yet",
@@ -177,7 +196,7 @@ struct StressView: View {
                 swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
                 swatch(p.primary.opacity(0.18), "Active")
             }
-            Text("Each hour is colored by level, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}, and the highest hour shows its number. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
+            Text("Each hour is colored by band, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
                 .font(.scaled(size: 13))
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -199,7 +218,7 @@ struct StressView: View {
         AdaptiveStack(spacing: 10) {
             StressStat(title: "Peak",
                        value: day.peak.map { Self.hourText($0.hour) } ?? "\u{2014}",
-                       note: day.peak?.level.map { "level \($0), \(Self.band($0).name.lowercased())" } ?? "no readings yet",
+                       note: day.peak?.level.map { Self.band($0).name } ?? "no readings yet",
                        accent: .coral,
                        explanation: Explanation(id: "stressPeak", title: "Peak hour",
                                                 meaning: "The still hour today when your heart rate was furthest above your resting rate.",
@@ -351,11 +370,6 @@ private struct StressHoursChart: View {
         return min(hs.min() ?? 7, 7)...max((hs.max() ?? 22) + 1, 22)
     }
 
-    /// The counted hour with the highest level (labelled with its number).
-    private var peakHour: Int? {
-        bars.filter { !$0.active }.max { $0.level < $1.level }?.hour
-    }
-
     private func color(_ bar: StressBar) -> Color {
         let base: Color = bar.active
             ? Palette(scheme: scheme).primary.opacity(0.18)
@@ -367,7 +381,7 @@ private struct StressHoursChart: View {
     private var summary: String {
         let counted = hours.compactMap { h -> String? in
             guard let l = h.level else { return nil }
-            return "\(StressView.hourText(h.hour)) \(l)"
+            return "\(StressView.hourText(h.hour)) \(StressView.band(l).name.lowercased())"
         }
         let active = hours.filter(\.active).map { StressView.hourText($0.hour) }
         var text = "Stress by hour today: " + counted.joined(separator: ", ") + "."
@@ -393,12 +407,9 @@ private struct StressHoursChart: View {
                     .foregroundStyle(color(bar))
                     .cornerRadius(3)
                     .annotation(position: .top, spacing: 2) {
-                        // Not color alone: the highest hour shows its number,
-                        // every other High hour gets a ▲ and Raised a ●.
-                        if !bar.active, bar.hour == peakHour {
-                            Text("\(bar.level)").font(.scaled(size: 11, weight: .heavy))
-                                .foregroundStyle(Palette(scheme: scheme).primary)
-                        } else if !bar.active, StressView.bandIndex(bar.level) == 3 {
+                        // Not color alone: High hours get a ▲ and Raised a ●.
+                        // No numbers: a band, not a precise score (round 4, Liu 9).
+                        if !bar.active, StressView.bandIndex(bar.level) == 3 {
                             Text("\u{25B2}").font(.scaled(size: 8, weight: .heavy))
                                 .foregroundStyle(StressLevelColor.fill(3, scheme))
                         } else if !bar.active, StressView.bandIndex(bar.level) == 2 {
@@ -424,13 +435,14 @@ private struct StressHoursChart: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: [0, 50, 100])
+            // Gridlines at the band edges, no numbers.
+            AxisMarks(position: .leading, values: [20, 40, 60]) { _ in AxisGridLine() }
         }
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(ClockChartDescriptor(
-            title: "Stress by hour today", seriesName: "Stress level", yTitle: "Stress, 0 to 100",
+            title: "Stress by hour today", seriesName: "Stress band", yTitle: "Stress band, Low to High",
             points: hours.compactMap { h in h.level.map { (h.hour * 60, Double($0)) } },
-            yLabel: { "level \(Int($0.rounded()))" }))
+            yLabel: { StressView.band(Int($0.rounded())).name }))
     }
 }
 

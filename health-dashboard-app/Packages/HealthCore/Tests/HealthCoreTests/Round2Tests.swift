@@ -92,20 +92,19 @@ final class Round2SignalTests: XCTestCase {
         let athlete = Array(repeating: 700.0, count: 14)
         XCTAssertFalse(IllnessSignal.isHardTraining(yesterdayKcal: 750, earlierDaysKcal: athlete))
         XCTAssertTrue(IllnessSignal.isHardTraining(yesterdayKcal: 1100, earlierDaysKcal: athlete))
-        let light = Array(repeating: 200.0, count: 14)
-        XCTAssertFalse(IllnessSignal.isHardTraining(yesterdayKcal: 350, earlierDaysKcal: light))   // under 400
-        XCTAssertTrue(IllnessSignal.isHardTraining(yesterdayKcal: 450, earlierDaysKcal: light))
-        XCTAssertTrue(IllnessSignal.isHardTraining(yesterdayKcal: 650, earlierDaysKcal: []))       // too little history: 600
+        let light = Array(repeating: 150.0, count: 14)
+        XCTAssertFalse(IllnessSignal.isHardTraining(yesterdayKcal: 280, earlierDaysKcal: light))   // under 5 kcal/kg of 60 kg
+        XCTAssertTrue(IllnessSignal.isHardTraining(yesterdayKcal: 320, earlierDaysKcal: light))
+        XCTAssertTrue(IllnessSignal.isHardTraining(yesterdayKcal: 500, earlierDaysKcal: []))       // too little history: 8 kcal/kg
         XCTAssertFalse(IllnessSignal.isHardTraining(yesterdayKcal: nil, earlierDaysKcal: light))
     }
 
-    // Sam leftover: the level matches the fitness age shown next to it.
+    // Round 2 check, now on the FRIEND women's medians: the fitness age and
+    // the median at that age agree.
     func testFitnessLevelMatchesTheAge() {
-        // Six years older than an average 20-year-old is not "About average".
-        let vo2 = FitnessAge.average(age: 26, sex: .female)
-        XCTAssertEqual(FitnessAge.estimate(vo2Max: vo2, sex: .female), 26)
-        XCTAssertEqual(FitnessAge.level(vo2Max: vo2, sex: .female, age: nil), "Below average for a 20-year-old")
-        XCTAssertEqual(FitnessAge.level(vo2Max: FitnessAge.average(age: 21, sex: .female), sex: .female, age: 20), "About average for your age")
+        let vo2 = FitnessAge.average(age: 40)
+        XCTAssertEqual(FitnessAge.estimate(vo2Max: vo2), 40)
+        XCTAssertEqual(FitnessAge.level(vo2Max: vo2, age: 40), "About average for women in their 40s")
     }
 
     // Sam N8: compared within alarm and free mornings, a weekend habit isn't

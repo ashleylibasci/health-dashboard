@@ -56,7 +56,7 @@ enum Accent: CaseIterable {
     }
 }
 
-/// Stress level fills (Low, Usual, Raised, High). Lightness steps with the
+/// Stress level fills (Low, Moderate, Raised, High). Lightness steps with the
 /// level so "High" never differs from "Raised" by hue alone: in light mode
 /// High is a deep red (6.5:1 on white) next to an amber Raised (3.5:1), and
 /// every fill is at least 3:1 on white; in dark mode Raised is a pale amber

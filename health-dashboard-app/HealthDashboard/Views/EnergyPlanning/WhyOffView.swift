@@ -106,8 +106,8 @@ struct WhyOffView: View {
             LinkRow(title: "Do your morning check-in", systemImage: "checkmark.circle.fill", accent: .indigo) { CheckInView() }
             LinkRow(title: "The cost of a late night", systemImage: "moon.haze.fill", accent: .purple) { LateNightView() }
             Text(model.usingSampleData
-                 ? "Worked out from example data until your own nights come in. Not a diagnosis. See a doctor if you feel unwell."
-                 : "Best guesses from your own data, not a diagnosis. See a doctor if you feel unwell.")
+                 ? "Worked out from example data until your own nights come in. Not a diagnosis. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse."
+                 : "Best guesses from your own data, not a diagnosis. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse.")
                 .font(.scaled(size: 12)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }

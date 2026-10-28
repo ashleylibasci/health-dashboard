@@ -176,10 +176,12 @@ struct TodayView: View {
             note += " No HRV or resting heart rate yet, so this is from sleep alone."
         } else if !model.lastNightIsFresh {
             note += " From your heart readings only; no sleep was recorded."
-        } else if model.hrvDeltaPct <= -3 {
-            note += model.isLateLuteal ? " HRV dipped, which is normal late in your cycle." : " HRV dipped below your usual."
-        } else if model.restingHRDelta >= 3 {
-            note += " Resting heart rate is up a little."
+        } else if model.hrvLevel == .wellBelow || model.hrvLevel == .below {
+            note += model.cycleHeartShift == .luteal ? " HRV dipped, which is normal in this part of your cycle and allowed for." : " HRV dipped below your usual."
+        } else if model.restingHRLevel == .above {
+            note += model.cycleHeartShift == .luteal
+                ? " Resting heart rate is up a little, partly from this part of your cycle (allowed for)."
+                : " Resting heart rate is up a little."
         } else if (recoveryValue ?? 0) >= model.recoveryUsual + 5 {
             note += " HRV and resting heart rate both look strong."
         } else {
@@ -248,21 +250,24 @@ struct TodayView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             AdaptiveStack(spacing: 6, alignment: .top) {
-                MiniGauge(fraction: heart ? model.hrv / 80 : 0, accent: model.hrvDeltaPct < 0 ? .coral : .mint,
+                // HRV and resting heart rate dials show where today sits in
+                // her own 30-day range (round 4, Brandt F10).
+                MiniGauge(fraction: heart ? model.hrvGaugeFraction : 0,
+                          accent: model.hrvLevel == .wellBelow || model.hrvLevel == .below ? .coral : .mint,
                           value: heart ? "\(Int(model.hrv.rounded()))" : "\u{2014}", title: "HRV",
                           note: heart ? SleepText.signed(model.hrvDeltaPct) + "%" : "no reading",
-                          topic: .hrv)
-                MiniGauge(fraction: heart ? model.restingHR / 120 : 0, accent: .pink,
+                          explanation: model.hrvExplanation)
+                MiniGauge(fraction: heart ? model.restingHRGaugeFraction : 0, accent: .pink,
                           value: heart ? "\(Int(model.restingHR.rounded()))" : "\u{2014}", title: "Resting HR",
                           note: heart ? SleepText.signed(model.restingHRDelta) : "no reading",
-                          topic: .restingHR)
+                          explanation: model.restingHRExplanation)
                 MiniGauge(fraction: fresh ? Double(model.lastNight.asleep) / 540 : 0, accent: .mint,
                           // "7h 21m", as the Sleep tile and screen say it (round 3).
                           value: fresh ? Clock.duration(model.lastNight.asleep) : "\u{2014}", title: "Sleep",
-                          note: sleepVsNeedWord, topic: .sleepNeed)
+                          note: sleepVsNeedWord, explanation: Topic.sleepNeed.explanation)
             }
             if !heart {
-                Text("HRV and resting heart rate: no reading yet. Your Watch measures them while you're still, mostly overnight.")
+                Text("HRV and resting heart rate: no reading yet. Your Watch measures HRV while you're still, often overnight, and resting heart rate from still moments during the day.")
                     .font(.scaled(size: 12))
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -299,19 +304,16 @@ struct TodayView: View {
 
     // MARK: Might be getting sick
 
-    /// Whenever the sick check reads Possible or Likely, so Today agrees with
-    /// Body and "Why do I feel off?". On example data it says so.
+    /// Whenever the sick check finds a couple of signs or several, so Today
+    /// agrees with Body and "Why do I feel off?". On example data it says so.
     private var showSickCard: Bool { model.sickCheckFlagged }
 
+    /// Counts signs; never "likely" (round 4, Liu 15).
     private var sickTitle: String {
-        if model.usingSampleData {
-            return model.illness.confidence == .high
-                ? "Example: your body is likely fighting something"
-                : "Example: your body may be fighting something"
-        }
-        return model.illness.confidence == .high
-            ? "Your body is likely fighting something"
+        let title = model.illness.confidence == .high
+            ? "Several signs your body may be fighting something"
             : "Your body may be fighting something"
+        return model.usingSampleData ? "Example: " + title.prefix(1).lowercased() + title.dropFirst() : title
     }
 
     private var sickDetail: String {
@@ -330,7 +332,7 @@ struct TodayView: View {
         } else if model.inLutealPhase {
             detail += " The late part of your cycle is already allowed for."
         }
-        return detail + " Take it easy, drink water and get extra sleep tonight."
+        return detail + " Take it easy, drink water and get extra sleep tonight. Fever or trouble breathing? Get checked."
     }
 
     private var sickCard: some View {
@@ -503,16 +505,19 @@ struct TodayView: View {
         return (count == 1 ? "1 caffeine drink" : "\(count) caffeine drinks") + " \u{00B7} tap to edit"
     }
 
+    /// How she said she feels comes first; the body signals second, as a
+    /// band only (round 4, Laurent F2, Liu 9).
     private var stressValue: String {
-        if let label = model.stressToday.label { return label.rawValue }
         if let felt = model.stressLoggedToday { return "Felt \(felt)/5" }
+        if let label = model.stressToday.label { return label.rawValue }
         return "No data yet"
     }
 
     private var stressNote: String {
-        if let avg = model.stressToday.average {
-            return "Level \(avg) of 100" + (model.stressLoggedToday.map { " \u{00B7} felt \($0)/5" } ?? "")
+        if let label = model.stressToday.label {
+            return model.stressLoggedToday != nil ? "Body signals: \(label.rawValue.lowercased())" : "Body signals at rest"
         }
+        if model.stressLoggedToday != nil { return "What you logged today" }
         return model.restingHRBaselineKnown ? "Wear your Watch today" : "Learning your resting heart rate"
     }
 
@@ -729,7 +734,7 @@ private struct MiniGauge: View {
     var value: String
     var title: String
     var note: String
-    var topic: Topic
+    var explanation: Explanation
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -763,7 +768,7 @@ private struct MiniGauge: View {
                     .multilineTextAlignment(.center)
                 // The tight fit only at regular sizes: at accessibility sizes
                 // the bigger ⓘ sat on the label's letters (round 3).
-                InfoButton(topic: topic).padding(.vertical, -12).padding(.horizontal, typeSize.isAccessibilitySize ? 0 : -10)
+                InfoButton(explanation: explanation).padding(.vertical, -12).padding(.horizontal, typeSize.isAccessibilitySize ? 0 : -10)
             }
             Text(note).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
                 .lineLimit(2).minimumScaleFactor(0.6)

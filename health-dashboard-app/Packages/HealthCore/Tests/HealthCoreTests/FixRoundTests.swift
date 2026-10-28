@@ -200,7 +200,7 @@ final class BodySignalFixTests: XCTestCase {
         let s = IllnessSignal.evaluate(restingHRDelta: 5, hrvDeltaPct: -18, respiratoryRateDelta: nil, wristTempDelta: nil,
                                        lutealPhase: false, hardTrainingYesterday: true)
         XCTAssertEqual(s.factors.first?.note, "Expected after yesterday's hard training")
-        XCTAssertEqual(IllnessSignal.Confidence.allCases.map(\.rawValue), ["All clear", "Unlikely", "Possible", "Likely"])
+        XCTAssertEqual(IllnessSignal.Confidence.allCases.map(\.rawValue), ["All clear", "A little off", "A couple of signs", "Several signs"])
         // Real illness still shows through.
         XCTAssertEqual(IllnessSignal.evaluate(restingHRDelta: 9, hrvDeltaPct: -30, respiratoryRateDelta: 1.5, wristTempDelta: 0.8,
                                               lutealPhase: true, hardTrainingYesterday: true).confidence, .high)
@@ -208,13 +208,11 @@ final class BodySignalFixTests: XCTestCase {
 
     // W12
     func testFitnessAge() {
-        XCTAssertEqual(FitnessAge.estimate(vo2Max: 45, sex: .female), 20)
-        XCTAssertTrue(FitnessAge.isTopOfChart(vo2Max: 45, sex: .female))
-        XCTAssertFalse(FitnessAge.isTopOfChart(vo2Max: 38.2, sex: .female))
-        XCTAssertEqual(FitnessAge.level(vo2Max: 38, sex: .female, age: 20), "Below average for your age")
-        // Round 2: banded by the same years as the fitness age (13 years younger).
-        XCTAssertEqual(FitnessAge.level(vo2Max: 38, sex: .female, age: 40), "Well above average for your age")
-        XCTAssertEqual(FitnessAge.level(vo2Max: 40, sex: .female, age: nil), "About average for a 20-year-old")
+        XCTAssertEqual(FitnessAge.estimate(vo2Max: 45), 25)
+        XCTAssertTrue(FitnessAge.isTopOfChart(vo2Max: 45))
+        XCTAssertFalse(FitnessAge.isTopOfChart(vo2Max: 36))
+        XCTAssertEqual(FitnessAge.level(vo2Max: 38, age: 20), "About average for women in their 20s")
+        XCTAssertEqual(FitnessAge.level(vo2Max: 38, age: 40), "Above average for women in their 40s")
     }
 }
 

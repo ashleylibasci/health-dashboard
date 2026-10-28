@@ -44,18 +44,23 @@ extension AppModel {
             let score = Recovery.score(usual: Double(AppModel.recoveryAnchor),
                                        hrvDeltaPct: n.outcome.hrvDeltaPct ?? 0,
                                        restingHRDelta: n.outcome.restingHRDelta ?? 0,
-                                       sleepShortfall: max(0, need - n.asleepMinutes - SleepNeedEstimator.metNeedToleranceMinutes))
+                                       sleepShortfall: max(0, need - n.asleepMinutes - SleepNeedEstimator.metNeedToleranceMinutes),
+                                       cycle: cycleHeartShift(on: n.wakeDay))
             return RecoveryNight(day: n.wakeDay, score: score, bedtime: n.bedtime, asleep: n.asleepMinutes)
         }
     }
 
     /// How many points each input moved today's recovery, measured by
     /// scoring each input alone against the usual (HealthCore's model).
+    /// HRV and resting heart rate with a natural cycle's own shift taken
+    /// out, as in the score.
     var recoveryPointsFromHRV: Int {
-        Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: hrvDeltaPct, restingHRDelta: 0, sleepShortfall: 0) - AppModel.recoveryAnchor
+        Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: cycleHeartShift.adjust(hrvDeltaPct: hrvDeltaPct),
+                       restingHRDelta: 0, sleepShortfall: 0) - AppModel.recoveryAnchor
     }
     var recoveryPointsFromRestingHR: Int {
-        Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: 0, restingHRDelta: restingHRDelta, sleepShortfall: 0) - AppModel.recoveryAnchor
+        Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: 0,
+                       restingHRDelta: cycleHeartShift.adjust(restingHRDelta: restingHRDelta), sleepShortfall: 0) - AppModel.recoveryAnchor
     }
     var recoveryPointsFromSleep: Int {
         let shortfall = max(0, sleepNeed.minutes - lastNight.asleep - SleepNeedEstimator.metNeedToleranceMinutes)

@@ -200,7 +200,42 @@ public enum StressModel {
     /// An hour counts as active (left out) above this many steps…
     public static let activeSteps = 600.0
     /// …or this much active energy. A still hour burns roughly 5–20 kcal.
+    /// This is the fallback for about a 60 kg woman; `activeKcal(bodyMassKg:)`
+    /// scales it to her weight.
     public static let activeKcal = 60.0
+
+    /// An active hour for her: about 1 kcal per kg of body weight (round 4,
+    /// Ruiz F6), kept between 45 and 100 kcal. Without a weight, 60 kcal.
+    public static func activeKcal(bodyMassKg: Double?) -> Double {
+        guard let kg = bodyMassKg, kg > 0 else { return activeKcal }
+        return min(max(kg * 1.0, 45), 100)
+    }
+
+    /// The luteal phase of a natural cycle raises heart rate at rest by about
+    /// this much on its own (round 4, Laurent F3, Brandt F5).
+    public static let lutealHeartRate = 2.0
+    /// …and lowers HRV by about this share.
+    public static let lutealHRVPct = 5.0
+
+    /// Her own heart rate in still, awake hours over the last two weeks: the
+    /// baseline stress is measured from when there's enough of it.
+    public struct StillBaseline: Hashable, Sendable {
+        public var median: Double
+        /// Day-to-day spread, kept between 4 and 10 bpm so a very steady or
+        /// very jumpy fortnight doesn't make the scale too tight or too loose.
+        public var spread: Double
+        public init(median: Double, spread: Double) { self.median = median; self.spread = spread }
+    }
+
+    /// Still hours needed before her own still-hour baseline is used.
+    public static let stillHoursNeeded = 30
+
+    /// From the heart rate of past still, awake hours (one value per hour).
+    /// Nil with fewer than `stillHoursNeeded`.
+    public static func stillBaseline(heartRates: [Double]) -> StillBaseline? {
+        guard heartRates.count >= stillHoursNeeded, let m = heartRates.median, let sd = heartRates.standardDeviation else { return nil }
+        return StillBaseline(median: m, spread: min(max(sd, 4), 10))
+    }
 
     /// Bands on the 0–100 level, which is already relative to her own resting
     /// heart rate and HRV baseline.
@@ -208,12 +243,21 @@ public enum StressModel {
         level < 20 ? .low : level < 40 ? .usual : level < 60 ? .raised : .high
     }
 
-    /// `restingHR` is her resting heart rate baseline. Without one (0) there
-    /// is nothing to compare against, so no hour gets a level and there is no
-    /// label: "no data", never "High".
-    public static func day(_ samples: [Sample], restingHR: Double, baselineHRV: Double) -> StressDay {
+    /// `restingHR` is her resting heart rate baseline. Without one (0), and
+    /// without a still-hour baseline, there is nothing to compare against, so
+    /// no hour gets a level and there is no label: "no data", never "High".
+    /// With `still` (her own still-hour heart rate), an hour's heart rate is
+    /// scored as (heart rate − her still median) / (3 × her spread), so
+    /// three spreads above her usual still pace is the top. Without it, 25
+    /// beats above resting is the top. `luteal`: the second half of a
+    /// natural cycle, which takes 2 bpm off heart rate and expects 5% lower
+    /// HRV. `activeKcal`: her active-hour threshold.
+    public static func day(_ samples: [Sample], restingHR: Double, baselineHRV: Double, still: StillBaseline? = nil,
+                           luteal: Bool = false, activeKcal: Double = activeKcal) -> StressDay {
         let activeHours = Set(samples.filter { !$0.asleep && ($0.steps > activeSteps || $0.activeKcal >= activeKcal) }.map(\.hour))
-        let hasBaseline = restingHR > 0
+        let hasBaseline = restingHR > 0 || still != nil
+        let hrAllowance = luteal ? lutealHeartRate : 0
+        let hrvBase = baselineHRV * (luteal ? 1 - lutealHRVPct / 100 : 1)
         let hours: [StressDay.Hour] = samples.map { s in
             let active = activeHours.contains(s.hour)
             let coolingDown = !active && !s.asleep && activeHours.contains(s.hour - 1)
@@ -221,8 +265,15 @@ public enum StressModel {
                 return .init(hour: s.hour, level: nil, active: active && !s.asleep, asleep: s.asleep, coolingDown: coolingDown)
             }
             var parts: [Double] = []
-            if let hr = s.heartRate { parts.append(min(max((hr - restingHR) / 25, 0), 1)) }          // +25 bpm at rest = max
-            if let v = s.hrv, baselineHRV > 0 { parts.append(min(max((baselineHRV - v) / (baselineHRV * 0.5), 0), 1)) } // half baseline = max
+            if let hr = s.heartRate {
+                let h = hr - hrAllowance
+                if let still {
+                    parts.append(min(max((h - still.median) / (3 * still.spread), 0), 1))      // 3 spreads above her still pace = max
+                } else {
+                    parts.append(min(max((h - restingHR) / 25, 0), 1))                          // +25 bpm at rest = max
+                }
+            }
+            if let v = s.hrv, hrvBase > 0 { parts.append(min(max((hrvBase - v) / (hrvBase * 0.5), 0), 1)) } // half baseline = max
             guard !parts.isEmpty else { return .init(hour: s.hour, level: nil, active: false) }
             let level = Int(((parts.reduce(0, +) / Double(parts.count)) * 100).rounded())
             return .init(hour: s.hour, level: level, active: false)
@@ -253,7 +304,9 @@ public enum StressModel {
 /// training resting heart rate and HRV do too, so those count for less then.
 public struct IllnessSignal: Hashable, Sendable {
     /// How likely it is she's fighting something (not how good the data is).
-    public enum Confidence: String, Sendable, CaseIterable { case none = "All clear", low = "Unlikely", medium = "Possible", high = "Likely" }
+    /// The words count signs rather than claim a probability (round 4, Liu
+    /// 15): the check can't say how likely illness is.
+    public enum Confidence: String, Sendable, CaseIterable { case none = "All clear", low = "A little off", medium = "A couple of signs", high = "Several signs" }
     public struct Factor: Hashable, Sendable {
         public var name: String
         public var change: String
@@ -273,14 +326,25 @@ public struct IllnessSignal: Hashable, Sendable {
     /// When true it gets the same allowances as the luteal phase and the
     /// result says so. The app passes false (round 3, H4): no allowance for a
     /// phase it can't see, so the sick check matches Today and "Why off".
+    ///
+    /// Cutoffs scale with her own spread when it's known (round 4, Brandt
+    /// F6): resting heart rate counts at max(4, 2 × her spread) bpm, HRV at
+    /// −max(15%, 1.5 × her spread). `periodDay` (the first week of a natural
+    /// period, when resting heart rate runs low and HRV high) lowers both by
+    /// 1 bpm and 3%. The smaller "moved a little" steps are half of those.
     public static func evaluate(restingHRDelta: Double, hrvDeltaPct: Double, respiratoryRateDelta: Double?, wristTempDelta: Double?,
-                                lutealPhase: Bool, hardTrainingYesterday: Bool = false, cyclePhaseUnknown: Bool = false) -> IllnessSignal {
+                                lutealPhase: Bool, hardTrainingYesterday: Bool = false, cyclePhaseUnknown: Bool = false,
+                                periodDay: Bool = false, restingHRSpread: Double? = nil, hrvSpreadPct: Double? = nil) -> IllnessSignal {
         var score = 0.0
         var factors: [Factor] = []
         let cycleAllowance = lutealPhase || cyclePhaseUnknown
         // Allowances: luteal adds ~2 bpm / −5% HRV; hard training ~3 bpm / −10%.
         let rhrAllowance = (cycleAllowance ? 2.0 : 0) + (hardTrainingYesterday ? 3.0 : 0)
         let hrvAllowance = (cycleAllowance ? 5.0 : 0) + (hardTrainingYesterday ? 10.0 : 0)
+        let early = periodDay && !cycleAllowance
+        let rhrCut = max(4, 2 * (restingHRSpread ?? 0)) - (early ? 1 : 0)
+        let hrvCut = max(15, 1.5 * (hrvSpreadPct ?? 0)) - (early ? 3 : 0)
+        let rhrSmall = rhrCut / 2, hrvSmall = hrvCut * 8 / 15
         let cycleNote = lutealPhase ? "Expected in this phase of your cycle" : "Could be your cycle: the app can't tell which phase you're in"
         func context(_ raw: Bool, _ counted: Bool) -> String? {
             guard raw && !counted else { return nil }
@@ -289,14 +353,14 @@ public struct IllnessSignal: Hashable, Sendable {
             return nil
         }
 
-        let rhr = restingHRDelta >= 4 + rhrAllowance
-        score += rhr ? 1 : (restingHRDelta >= 2 + rhrAllowance ? 0.4 : 0)
+        let rhr = restingHRDelta >= rhrCut + rhrAllowance
+        score += rhr ? 1 : (restingHRDelta >= rhrSmall + rhrAllowance ? 0.4 : 0)
         factors.append(.init(name: "Resting heart rate", change: String(format: "%+.0f bpm", restingHRDelta), flagged: rhr,
-                             note: context(restingHRDelta >= 2, rhr)))
-        let hrv = hrvDeltaPct <= -15 - hrvAllowance
-        score += hrv ? 1 : (hrvDeltaPct <= -8 - hrvAllowance ? 0.4 : 0)
+                             note: context(restingHRDelta >= rhrSmall, rhr)))
+        let hrv = hrvDeltaPct <= -hrvCut - hrvAllowance
+        score += hrv ? 1 : (hrvDeltaPct <= -hrvSmall - hrvAllowance ? 0.4 : 0)
         factors.append(.init(name: "HRV", change: String(format: "%+.0f%%", hrvDeltaPct), flagged: hrv,
-                             note: context(hrvDeltaPct <= -8, hrv)))
+                             note: context(hrvDeltaPct <= -hrvSmall, hrv)))
         if let rr = respiratoryRateDelta {
             let up = rr >= 1
             score += up ? 1 : 0
@@ -312,67 +376,120 @@ public struct IllnessSignal: Hashable, Sendable {
         return IllnessSignal(confidence: c, factors: factors, cyclePhaseUnknown: cyclePhaseUnknown && !lutealPhase)
     }
 
+    /// Hard training is about this many active kcal per kg of body weight
+    /// (round 4, Brandt F7, Ruiz F6)…
+    public static let hardKcalPerKg = 8.0
+    /// …and never counts below this many, however low her usual is.
+    public static let hardFloorKcalPerKg = 5.0
+    /// The weight used when Apple Health has none (about a typical young
+    /// woman's, so 480 and 300 kcal).
+    public static let typicalBodyMassKg = 60.0
+
     /// Whether yesterday was a hard training day for her: active energy at
     /// least 1.5× her own usual (the median of earlier days) and at least
-    /// 400 kcal. With fewer than 5 earlier days, a fixed 600 kcal.
-    public static func isHardTraining(yesterdayKcal: Double?, earlierDaysKcal: [Double]) -> Bool {
+    /// 5 kcal per kg of her weight. With fewer than 5 earlier days, about
+    /// 8 kcal per kg. `bodyMassKg` from Apple Health; 60 kg without it.
+    public static func isHardTraining(yesterdayKcal: Double?, earlierDaysKcal: [Double], bodyMassKg: Double? = nil) -> Bool {
         guard let y = yesterdayKcal else { return false }
+        let kg = (bodyMassKg ?? 0) > 0 ? bodyMassKg! : typicalBodyMassKg
         let usable = earlierDaysKcal.filter { $0 > 0 }
-        guard usable.count >= 5, let usual = usable.median else { return y >= 600 }
-        return y >= max(400, usual * 1.5)
+        guard usable.count >= 5, let usual = usable.median else { return y >= kg * hardKcalPerKg }
+        return y >= max(kg * hardFloorKcalPerKg, usual * 1.5)
     }
 }
 
 // MARK: - Fitness age
 
-/// Fitness age from VO2 max: the age at which an average person of the same
-/// sex has her VO2 max. Uses a straight-line approximation of population
-/// norms (about −0.32 ml/kg/min a year for women, −0.35 for men). The line
-/// is only meaningful from 20 up, so anything fitter than an average
-/// 20-year-old reads "Under 20" (`isTopOfChart`).
+/// Fitness age from VO2 max: the age at which a typical woman has her VO2
+/// max. Women only (the app is for women). The norms are the FRIEND
+/// registry's treadmill tests of US women (Kaminsky 2015, Mayo Clin Proc,
+/// Table 3), the reference Apple uses too: the median for each decade from
+/// the 20s to the 70s, placed at the decade's middle (25, 35 … 75) and
+/// joined by straight lines. Below 25 the line is held at the 20s median,
+/// so the youngest fitness age is 25 ("Under 25", `isTopOfChart`).
+/// A Watch estimate is often off by 5 or more points, so the fitness age
+/// is shown as a range (`range`) and the level bands are a quarter of
+/// women wide (round 4, Brandt F1–F3, Liu 2).
 public enum FitnessAge {
-    public enum Sex: String, Codable, Sendable { case female, male }
+    /// Decade middles and FRIEND 2015 women's 25th, 50th and 75th
+    /// percentiles (ml/kg/min) for the 20s, 30s, 40s, 50s, 60s and 70s.
+    static let ages: [Double] = [25, 35, 45, 55, 65, 75]
+    static let p25: [Double] = [30.5, 25.3, 22.1, 19.9, 17.2, 15.6]
+    static let p50: [Double] = [37.6, 30.2, 26.7, 23.4, 20.0, 18.3]
+    static let p75: [Double] = [44.7, 36.1, 32.4, 27.6, 23.8, 20.8]
 
-    static func norm(_ sex: Sex) -> (at20: Double, perYear: Double) { sex == .female ? (40.1, 0.32) : (48.0, 0.35) }
+    /// The youngest fitness age the norms can give.
+    public static let youngest = 25
+    public static let oldest = 90
+    /// How far a Watch estimate is often off (ml/kg/min); sets the range.
+    public static let watchError = 5.0
 
-    /// 20…90. At 20, check `isTopOfChart` and show "Under 20".
-    public static func estimate(vo2Max: Double, sex: Sex) -> Int {
-        let (at20, perYear) = norm(sex)
-        return min(max(Int((20 + (at20 - vo2Max) / perYear).rounded()), 20), 90)
-    }
+    /// The median VO2 max at `age`: held at the 20s median up to 25, then
+    /// along the decade medians, and past 75 on along the last slope.
+    public static func average(age: Int) -> Double { median(atAge: Double(age)) }
 
-    /// At or above the average 20-year-old: the chart's youngest age.
-    public static func isTopOfChart(vo2Max: Double, sex: Sex) -> Bool {
-        vo2Max >= norm(sex).at20 - norm(sex).perYear / 2
-    }
-
-    /// The average VO2 max at `age` on the same line (20 and under use 20).
-    public static func average(age: Int, sex: Sex) -> Double {
-        let (at20, perYear) = norm(sex)
-        return at20 - perYear * Double(max(age, 20) - 20)
-    }
-
-    /// Years her fitness age is above (+) or below (−) her age (20 when her
-    /// age isn't known), on the same line as `estimate` but unclamped.
-    public static func yearsFromAverage(vo2Max: Double, sex: Sex, age: Int?) -> Double {
-        (average(age: age ?? 20, sex: sex) - vo2Max) / norm(sex).perYear
-    }
-
-    /// Plain level against the average for her age when known, else against
-    /// an average 20-year-old. Banded by the same years the fitness age
-    /// shows, so "6 years older" never sits next to "About average":
-    /// within 3 years is about average, 3–10 above/below, 10+ well above/below.
-    public static func level(vo2Max: Double, sex: Sex, age: Int?) -> String {
-        let years = yearsFromAverage(vo2Max: vo2Max, sex: sex, age: age)
-        let band: String
-        switch years {
-        case ...(-10): band = "Well above average"
-        case ...(-3): band = "Above average"
-        case ..<3: band = "About average"
-        case ..<10: band = "Below average"
-        default: band = "Well below average"
+    static func median(atAge a: Double) -> Double {
+        if a <= ages[0] { return p50[0] }
+        for i in 1..<ages.count where a <= ages[i] {
+            let t = (a - ages[i - 1]) / (ages[i] - ages[i - 1])
+            return p50[i - 1] + (p50[i] - p50[i - 1]) * t
         }
-        return band + (age != nil ? " for your age" : " for a 20-year-old")
+        let n = ages.count - 1
+        let slope = (p50[n] - p50[n - 1]) / (ages[n] - ages[n - 1])
+        return max(p50[n] + slope * (a - ages[n]), 1)
+    }
+
+    /// 25…90: the age on the median line with her VO2 max. At 25, check
+    /// `isTopOfChart` and show "Under 25".
+    public static func estimate(vo2Max v: Double) -> Int {
+        if v >= p50[0] { return youngest }
+        var age: Double
+        if let i = (1..<ages.count).first(where: { v >= p50[$0] }) {
+            let t = (p50[i - 1] - v) / (p50[i - 1] - p50[i])
+            age = ages[i - 1] + (ages[i] - ages[i - 1]) * t
+        } else {
+            let n = ages.count - 1
+            let perYear = (p50[n - 1] - p50[n]) / (ages[n] - ages[n - 1])
+            age = ages[n] + (p50[n] - v) / perYear
+        }
+        return min(max(Int(age.rounded()), youngest), oldest)
+    }
+
+    /// At or above the median woman in her 20s: the chart's youngest age.
+    public static func isTopOfChart(vo2Max: Double) -> Bool { vo2Max >= p50[0] }
+
+    /// Fitness ages for her estimate give or take a typical Watch error,
+    /// youngest first.
+    public static func range(vo2Max: Double) -> ClosedRange<Int> {
+        estimate(vo2Max: vo2Max + watchError)...estimate(vo2Max: vo2Max - watchError)
+    }
+
+    /// The range as shown: "31–44", "Under 34" when the young end reaches
+    /// the chart's youngest age, "Under 25" when all of it does.
+    public static func rangeText(vo2Max: Double) -> String {
+        let r = range(vo2Max: vo2Max)
+        if r.upperBound <= youngest { return "Under \(youngest)" }
+        if r.lowerBound <= youngest { return "Under \(r.upperBound)" }
+        return "\(r.lowerBound)\u{2013}\(r.upperBound)"
+    }
+
+    /// The age group she's compared with: her decade, the 20s for anyone
+    /// younger (the norms start at 20), the 70s for anyone older.
+    public static func decade(age: Int) -> Int { min(max(age / 10 * 10, 20), 70) }
+
+    /// Plain level against women in her decade: below the 25th percentile
+    /// "Below average", above the 75th "Above average", the middle half
+    /// "About average". Each band is wider than a Watch's usual error, so
+    /// it doesn't flip from one estimate to the next. Under-20s are
+    /// "compared with women in their 20s".
+    public static func level(vo2Max: Double, age: Int) -> String {
+        let d = decade(age: age)
+        let i = (d - 20) / 10
+        let band: String
+        if vo2Max < p25[i] { band = "Below average" }
+        else if vo2Max > p75[i] { band = "Above average" }
+        else { band = "About average" }
+        return band + (age < 20 ? " compared with women in their 20s" : " for women in their \(d)s")
     }
 }
 

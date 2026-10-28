@@ -43,8 +43,15 @@ public enum TimeChangePlanner {
 /// Readiness from HRV and resting heart rate against her own baseline, plus
 /// sleep against need.
 public enum Recovery {
-    public static func score(usual: Double = 78, hrvDeltaPct: Double, restingHRDelta: Double, sleepShortfall: Int) -> Int {
-        let s = usual + hrvDeltaPct * 1.0 - restingHRDelta * 1.5 - Double(max(sleepShortfall, 0)) * 0.06
+    /// `cycle`: the shift a natural cycle puts on HRV and resting heart rate
+    /// today (`CycleHeartShift`). It's taken out before scoring, so the
+    /// second half of her cycle doesn't read as poor recovery and her period
+    /// week doesn't read as extra good. `.none` on methods that stop
+    /// ovulation (round 4, Brandt F4, Ruiz F4).
+    public static func score(usual: Double = 78, hrvDeltaPct: Double, restingHRDelta: Double, sleepShortfall: Int,
+                             cycle: CycleHeartShift = .none) -> Int {
+        let hrv = cycle.adjust(hrvDeltaPct: hrvDeltaPct), rhr = cycle.adjust(restingHRDelta: restingHRDelta)
+        let s = usual + hrv * 1.0 - rhr * 1.5 - Double(max(sleepShortfall, 0)) * 0.06
         return Int(min(max(s, 1), 100).rounded())
     }
     /// `spread` is how much her own score usually moves day to day (the

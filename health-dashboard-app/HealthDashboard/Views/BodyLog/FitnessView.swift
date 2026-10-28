@@ -47,7 +47,7 @@ struct FitnessView: View {
                 }
             }
             HowWeGotThisLink(title: "Fitness age",
-                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average woman has your VO\u{2082} max, from population averages that drop about 0.32 points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
+                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Estimates like this are often off by 5 points or more, so treat it as a rough guide and watch the trend. Fitness age is the age at which a typical woman has your VO\u{2082} max. It uses the FRIEND registry of treadmill tests in US women (2015), the same kind of reference Apple uses: the middle value for women in their 20s is 37.6, in their 30s 30.2, 40s 26.7, 50s 23.4, 60s 20.0 and 70s 18.3, joined into a smooth line. The line is flat below 25, so anything at or above the middle of women in their 20s shows as \u{201C}Under 25\u{201D}. Because of the Watch\u{2019}s error it\u{2019}s shown as a range: the fitness ages for your estimate 5 points higher and 5 points lower. The level compares you with women in your age group (women in their 20s if you\u{2019}re younger than 20): the middle half of them is \u{201C}about average\u{201D}, the top quarter \u{201C}above average\u{201D} and the bottom quarter \u{201C}below average\u{201D}. Without your age there\u{2019}s no level, only the fitness age.")
         }
     }
 
@@ -93,8 +93,8 @@ struct FitnessView: View {
                     }
                 }
             }
-            if let fa = model.fitnessAge, age > 0, !hidesTargets {
-                Text(ageComparison(fitnessAge: fa, vo2: vo2))
+            if age > 0, !hidesTargets {
+                Text(ageComparison(vo2: vo2))
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
             }
             if hidesTargets {
@@ -114,14 +114,19 @@ struct FitnessView: View {
         meaning: "You added eating-disorder history to your health conditions, so the app leaves out rankings like \u{201C}below average\u{201D} and fitness age, your past peak, and ups and downs over time. It also keeps calories, step counts and exercise targets out of sight.",
         forYou: "VO\u{2082} max is shown as a plain number from your Watch. You can change this in Health conditions.")
 
-    private func ageComparison(fitnessAge fa: Int, vo2: Double) -> String {
-        if FitnessAge.isTopOfChart(vo2Max: vo2, sex: .female) {
-            return age <= 20 ? "Your heart and lungs are at least as fit as an average 20-year-old's." : "Your heart and lungs are fitter than an average 20-year-old's, younger than your \(age) years."
+    /// Her age against the fitness-age range. Below 25 the norms are flat,
+    /// so a younger woman is compared as 25 (women in their 20s).
+    private func ageComparison(vo2: Double) -> String {
+        let range = FitnessAge.range(vo2Max: vo2)
+        let compared = max(age, FitnessAge.youngest)
+        let group = age < 20 ? "women in their 20s" : "women your age"
+        if compared < range.lowerBound {
+            return "Your fitness age is above your age: less fit than a typical woman your age for now." + (hidesTargets ? "" : " Very common for students; it improves quickly with regular brisk walks or runs.")
         }
-        let d = fa - age
-        if d <= -2 { return "Your heart and lungs are as fit as an average \(fa)-year-old's, \(abs(d)) years younger than you." }
-        if d < 2 { return "Your fitness matches your age." + (hidesTargets ? "" : " Regular cardio a few times a week will push it lower.") }
-        return "Your fitness matches an average \(fa)-year-old's, \(d) years older than you." + (hidesTargets ? "" : " Very common for students; it improves quickly with regular brisk walks or runs.")
+        if compared > range.upperBound {
+            return "Your heart and lungs look fitter than a typical woman your age, even allowing for the Watch\u{2019}s error."
+        }
+        return "Your age is inside your fitness-age range, so your fitness is about typical for \(group)." + (hidesTargets ? "" : " Regular cardio a few times a week will push it lower.")
     }
 
     // MARK: History
@@ -134,8 +139,7 @@ struct FitnessView: View {
     private var readoutDetail: String {
         guard let p = shown else { return "" }
         var parts: [String] = []
-        let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: .female) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: .female))"
-        parts.append("Fitness age then: \(fa).")
+        parts.append("Fitness age then: \(FitnessAge.rangeText(vo2Max: p.value).lowercased()).")
         // No "up/down since" or "your peak" with an eating-disorder history.
         if !hidesTargets {
             if let first = points.first, p.date != first.date {
@@ -194,6 +198,12 @@ struct FitnessView: View {
             SectionLabel(text: "What moves it", accent: .mint)
             Text(tipText)
                 .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+            // On hormonal birth control the bleed can't flag under-fuelling
+            // (RED-S), so say what to watch for instead (Ruiz F2).
+            if let bc = store.birthControl, bc != .copperIUD {
+                Text(bc.hasBreakWeek ? CycleCare.packBleedCantShowFuel : CycleCare.methodBleedCantShowFuel)
+                    .font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
+            }
             if !model.hidesEffortTargets {
                 LinkRow(title: "Today's energy", subtitle: "When you have the most energy today", systemImage: "bolt.fill", accent: .yellow) {
                     EnergyView()
@@ -208,7 +218,7 @@ struct FitnessView: View {
             return "Moving in ways you enjoy keeps your heart fit. It changes slowly, over weeks, so there\u{2019}s nothing to chase day to day."
         }
         let level = model.fitnessLevel ?? ""
-        if level.hasPrefix("Well above") || level.hasPrefix("Above") {
+        if level.hasPrefix("Above") {
             return "You\u{2019}re already fitter than average. Keeping up what you do holds it there; hills and short faster bursts can push it further."
         }
         if level.hasPrefix("About") {
