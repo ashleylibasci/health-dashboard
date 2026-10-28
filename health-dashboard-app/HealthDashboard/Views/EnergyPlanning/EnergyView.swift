@@ -138,7 +138,7 @@ struct EnergyView: View {
             }
             return parts.isEmpty ? "Predicted from your sleep and your body clock." : parts.joined(separator: " ")
         case .tomorrow:
-            let bed = Clock.format(1440 + store.data.bedtime)
+            let bed = Clock.format(1440 + model.tonightBedtime)
             guard let plan = model.wakePlan() else { return "If you sleep by \(bed), from tonight's planned bedtime." }
             return "If you sleep by \(bed): about \(Clock.duration(plan.asleep)) asleep, up at \(Clock.format(plan.wake))."
         }
@@ -372,7 +372,7 @@ struct EnergyView: View {
         case .windDown:
             return "About 2 hours before you usually fall asleep, your body's own sleep hormone starts rising. Dim the lights and put screens down from around \(Clock.format(z.range.start))."
         case .melatonin:
-            let bed = 1440 + store.data.bedtime
+            let bed = 1440 + model.tonightBedtime
             if z.range.contains(bed) {
                 return "This is about your own body's sleep hormone, not pills. Your bedtime of \(Clock.format(bed)) lands inside it, so falling asleep should come easily."
             }
@@ -587,7 +587,7 @@ private struct EnergyBankPanel: View {
 
     var body: some View {
         let wake = model.lastNight.wake
-        let bedtime = 1440 + store.data.bedtime
+        let bedtime = 1440 + model.tonightBedtime
         let atWake = Int(model.energyBankAtWake.rounded())
         let now = Int(model.energyBankNow.rounded())
         let bed = Int(model.energyBankAtBedtime.rounded())

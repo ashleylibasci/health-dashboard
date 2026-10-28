@@ -87,7 +87,7 @@ struct WakePlanView: View {
             if !model.bedtimeMatchesBest {
                 RowDivider()
                 MetricRow(title: "Use \(Clock.format(best)) as your usual bedtime",
-                          note: "Now \(Clock.format(store.data.bedtime)); your caffeine cutoff and energy use it",
+                          note: "Now \(Clock.format(store.data.bedtime)); exam plans and your on-time streak use it",
                           systemImage: "moon.fill", accent: .purple,
                           action: { withMotion(.commit) { store.data.bedtime = best } })
             }

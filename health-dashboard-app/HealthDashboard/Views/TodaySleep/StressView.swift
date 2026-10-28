@@ -354,7 +354,7 @@ struct StressView: View {
         HelpTipRow(systemImage: "cup.and.saucer.fill", accent: .yellow, title: "Go easy on late caffeine",
                    detail: "Caffeine raises your heart rate and can make stress feel worse, and it lingers into the night.")
         HelpTipRow(systemImage: "moon.fill", accent: .purple, title: "Protect tonight's sleep",
-                   detail: "A short night makes the next day feel more stressful. Aim for bed by \(Clock.format(store.data.bedtime)).")
+                   detail: "A short night makes the next day feel more stressful. Aim for bed by \(Clock.format(model.tonightBedtime)).")
     }
 }
 

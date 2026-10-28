@@ -394,7 +394,7 @@ final class AppModel: ObservableObject {
 
     private var habitualOnset: Minutes {
         let onsets = workNights.isEmpty ? nights.map(\.sleepOnset) : workNights.map(\.onset)
-        guard !onsets.isEmpty else { return 1440 + store.data.bedtime + 15 }
+        guard !onsets.isEmpty else { return 1440 + tonightBedtime + 15 }
         return 1440 + onsets.reduce(0, +) / onsets.count
     }
     /// Her body clock's mid-sleep: from free (no-alarm) nights when there
@@ -410,7 +410,7 @@ final class AppModel: ObservableObject {
     var energyToday: EnergyDay {
         EnergyModel.day(.init(wake: lastNight.wake, asleepMinutes: lastNight.asleep, sleepDebt: sleepDebtBeforeLastNight,
                               habitualMidSleep: midSleep, habitualSleepOnset: habitualOnset,
-                              wokeFromLightSleep: lastNight.wokeFromLight, bedtime: 1440 + store.data.bedtime,
+                              wokeFromLightSleep: lastNight.wokeFromLight, bedtime: 1440 + tonightBedtime,
                               sleepNeed: sleepNeed.minutes))
     }
 
@@ -420,7 +420,7 @@ final class AppModel: ObservableObject {
         let plan = wakePlan()
         return EnergyModel.day(.init(wake: plan?.wake ?? 502, asleepMinutes: plan?.asleep ?? 460, sleepDebt: sleepDebt,
                                      habitualMidSleep: midSleep, habitualSleepOnset: habitualOnset,
-                                     wokeFromLightSleep: true, bedtime: 1440 + store.data.bedtime,
+                                     wokeFromLightSleep: true, bedtime: 1440 + tonightBedtime,
                                      sleepNeed: sleepNeed.minutes))
     }
 
@@ -447,7 +447,7 @@ final class AppModel: ObservableObject {
         return EnergyBank.atWake(asleepMinutes: lastNight.asleep, sleepDebt: sleepDebtBeforeLastNight, hrvDeltaPct: hrv)
     }
     var energyBankNow: Double { EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(0, now - lastNight.wake)) / 60) }
-    var energyBankAtBedtime: Double { EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(0, 1440 + store.data.bedtime - lastNight.wake)) / 60) }
+    var energyBankAtBedtime: Double { EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(0, 1440 + tonightBedtime - lastNight.wake)) / 60) }
 
     // MARK: Caffeine and water today
 
@@ -484,12 +484,12 @@ final class AppModel: ObservableObject {
     /// For the reference coffee every caffeine line names (12 oz drip, 140 mg),
     /// so the cutoff and the copy describe the same drink (round 3, H10).
     var caffeineCutoff: Minutes {
-        CaffeineModel.cutoff(bedtime: 1440 + store.data.bedtime, halfLifeHours: caffeineHalfLifeHours,
+        CaffeineModel.cutoff(bedtime: 1440 + tonightBedtime, halfLifeHours: caffeineHalfLifeHours,
                              mg: Double(Self.referenceCoffee.caffeineMg))
     }
     var caffeineMgToday: Int { caffeineDoses.map(\.mg).reduce(0, +) }
     var caffeineAtBedtime: Int {
-        Int(CaffeineModel.amount(at: 1440 + store.data.bedtime, doses: caffeineDoses, halfLifeHours: caffeineHalfLifeHours).rounded())
+        Int(CaffeineModel.amount(at: 1440 + tonightBedtime, doses: caffeineDoses, halfLifeHours: caffeineHalfLifeHours).rounded())
     }
     var caffeineTimingToday: CaffeineModel.Timing { CaffeineModel.timing(energy: energyToday, cutoff: caffeineCutoff, firstDrinkAt: caffeineDoses.first?.time) }
     var caffeineTimingTomorrow: CaffeineModel.Timing { CaffeineModel.timing(energy: energyTomorrow, cutoff: caffeineCutoff, firstDrinkAt: nil) }

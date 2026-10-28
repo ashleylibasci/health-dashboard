@@ -60,8 +60,9 @@ extension AppModel {
         return h.finalize()
     }
 
-    /// The bedtime she set (Settings, Sleep plan) is within 15 minutes of
-    /// "bed by", so the caffeine cutoff and energy curve already use it.
+    /// The usual bedtime she set (Settings, Sleep plan) is within 15 minutes
+    /// of "bed by". Tonight's numbers (caffeine cutoff, energy curve) use
+    /// `tonightBedtime` either way; exam plans and streaks use the usual one.
     var bedtimeMatchesBest: Bool { abs(store.data.bedtime - bestTimes.bed.end) <= 15 }
 
     /// Her own sleep onset against next-morning HRV, in 30-minute slots

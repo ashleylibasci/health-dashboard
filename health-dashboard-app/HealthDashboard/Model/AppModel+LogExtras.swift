@@ -30,7 +30,7 @@ extension AppModel {
     }
 
     /// Tonight's bedtime in app-day minutes (12:30am is 1470).
-    var bedtimeTonight: Minutes { 1440 + store.data.bedtime }
+    var bedtimeTonight: Minutes { 1440 + tonightBedtime }
 
     /// Dose-aware: today's drinks, at their real sizes and times, leave
     /// `CaffeineModel.bedtimeLimitMg` or more in your body at bedtime.
@@ -136,7 +136,7 @@ extension AppModel {
     /// Water a steady pace would have reached by `t`, from waking to an hour before bed.
     func waterPace(at t: Minutes) -> Double {
         let start = lastNight.wake
-        let end = 1440 + store.data.bedtime - 60
+        let end = 1440 + tonightBedtime - 60
         guard end > start else { return store.data.waterGoalML }
         let f = min(max(Double(t - start) / Double(end - start), 0), 1)
         return store.data.waterGoalML * f

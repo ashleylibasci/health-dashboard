@@ -210,7 +210,7 @@ struct WaterDayView: View {
         return (min(first, model.lastNight.wake) / 60) * 60
     }
 
-    private var chartEnd: Minutes { max(1440 + store.data.bedtime, model.now + 30) }
+    private var chartEnd: Minutes { max(1440 + model.tonightBedtime, model.now + 30) }
 
     private var run: [WaterRunPoint] { model.waterRun(from: chartStart, to: min(model.now, chartEnd)) }
 
@@ -219,7 +219,7 @@ struct WaterDayView: View {
         // was the "behind a steady pace" nag as a picture (round 3, H6).
         guard !model.hidesActivityNumbers else { return [] }
         let start = model.lastNight.wake
-        let end = 1440 + store.data.bedtime - 60
+        let end = 1440 + model.tonightBedtime - 60
         return [WaterRunPoint(time: start, ml: 0), WaterRunPoint(time: end, ml: goalML)]
     }
 

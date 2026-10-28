@@ -55,7 +55,7 @@ struct ExamWeekView: View {
         let days = exam.daysUntil
         // Tonight's night in the plan: its bedtime, and the wake after it.
         let tonight = plan.first { $0.dayOffset == -days + 1 }
-        var pairs = [StatPair(label: "Bed tonight", value: Clock.format(tonight?.bedtimeBefore ?? store.data.bedtime))]
+        var pairs = [StatPair(label: "Bed tonight", value: Clock.format(tonight?.bedtimeBefore ?? model.tonightBedtime))]
         if let tonight {
             let morning = Calendar.current.date(byAdding: .day, value: tonight.dayOffset, to: exam.date) ?? exam.date
             pairs.append(StatPair(label: "Up \(morning.formatted(.dateTime.weekday(.abbreviated)))", value: Clock.format(tonight.wake)))

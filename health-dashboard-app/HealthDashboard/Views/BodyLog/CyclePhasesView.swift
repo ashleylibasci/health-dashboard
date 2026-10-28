@@ -80,7 +80,7 @@ struct CyclePhasesView: View {
         phaseCards(length: length, today: day)
         if CycleEstimator.isLateLuteal(day: day, length: length) {
             HStack(spacing: 8) {
-                tipPill("Bed by \(Clock.format(store.data.bedtime))", systemImage: "moon.fill", accent: .purple)
+                tipPill("Bed by \(Clock.format(model.tonightBedtime))", systemImage: "moon.fill", accent: .purple)
                 tipPill(model.caffeineCutoffShown.map { "Caffeine cutoff \(BodyLogStyle.shortTime($0))" } ?? "Caffeine: one small drink early", systemImage: "cup.and.saucer.fill", accent: .yellow)
             }
         }

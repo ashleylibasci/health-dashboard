@@ -202,7 +202,7 @@ extension AppModel {
         case .sleepDebt?:
             return "Be in bed by \(Clock.format(tonightAimBedtime)) tonight for your \(tonightNeedText). \(debtPaybackSentence)"
         case .lateNight?:
-            return "Be in bed by \(Clock.format(store.data.bedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
+            return "Be in bed by \(Clock.format(tonightBedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
         case .luteal?:
             // One small number, only on the days it's added (Park 9, Liu 5).
             let sleep = cycleSleepAllowance

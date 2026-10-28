@@ -233,7 +233,7 @@ struct CaffeineBodyView: View {
             ?? "No time today works for a full coffee"
     }
 
-    private var bedtime: Minutes { 1440 + store.data.bedtime }
+    private var bedtime: Minutes { 1440 + model.tonightBedtime }
 
     private var chartStart: Minutes {
         let first = model.caffeineDoses.map(\.time).min() ?? model.lastNight.wake
@@ -372,7 +372,7 @@ struct CaffeineTimingView: View {
         let groggy = energy.zone(.grogginess)?.range
         let start = min(420, ((groggy?.start ?? 420) / 60) * 60)
         return Day(label: label(timingDay), timing: timing, groggy: groggy, dip: energy.zone(.afternoonDip)?.range,
-                   span: start...max(start + 360, 1440 + store.data.bedtime + 60),
+                   span: start...max(start + 360, 1440 + model.tonightBedtime + 60),
                    marker: timingDay == .today ? model.caffeineDoses.first?.time : timing.coffeeNapAt)
     }
 

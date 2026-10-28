@@ -172,7 +172,7 @@ struct ExamModeView: View {
         let unit: String
         if days == 0 { unit = "exam day" } else if days <= 7 { unit = days == 1 ? "night of sleep" : "nights of sleep" } else { unit = "days" }
         let tonight = plan.first { $0.dayOffset == -days + 1 }
-        let bedTonight = tonight?.bedtimeBefore ?? store.data.bedtime
+        let bedTonight = tonight?.bedtimeBefore ?? model.tonightBedtime
         var pairs: [StatPair] = []
         if days <= 2 {
             let studyDays = plan.filter { $0.dayOffset < 0 && $0.dayOffset > -days }
@@ -188,7 +188,7 @@ struct ExamModeView: View {
             pairs.append(StatPair(label: "\(plan.count)-day lead-up", value: plan.first.map { shortDate(dayDate(exam, $0.dayOffset)) } ?? "\u{2013}"))
             pairs.append(clocksChangeBefore(exam)
                          ? StatPair(label: "Clocks fall back", value: shortDate(model.nextFallBack))
-                         : StatPair(label: "Bed tonight", value: Clock.format(store.data.bedtime)))
+                         : StatPair(label: "Bed tonight", value: Clock.format(model.tonightBedtime)))
         }
         return SummaryHeader(eyebrow: "Countdown", value: days == 0 ? "Today" : "\(days)", unit: unit,
                              line: "Until your \(exam.title), \(shortDate(exam.date)) at \(Clock.format(exam.start)).",
@@ -353,7 +353,7 @@ struct ExamModeView: View {
         }
 
         let isToday = d.dayOffset == -exam.daysUntil
-        let bed = next?.bedtimeBefore ?? store.data.bedtime
+        let bed = next?.bedtimeBefore ?? model.tonightBedtime
         let stop = bed - 90
         let peak = energy.zone(.morningPeak)?.range
         var allPassed = true

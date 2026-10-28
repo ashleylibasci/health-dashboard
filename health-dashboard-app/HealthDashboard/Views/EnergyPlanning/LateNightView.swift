@@ -215,7 +215,7 @@ struct LateNightView: View {
     private var tonightCard: some View {
         Card(accent: .indigo) {
             Text("Got a late one coming up?").font(.cardTitle)
-            Text("Keep the next night at your planned \(Clock.format(store.data.bedtime)) bedtime and get morning daylight. That usually helps you bounce back faster than sleeping in.")
+            Text("Keep the next night at your planned \(Clock.format(model.tonightBedtime)) bedtime and get morning daylight. That usually helps you bounce back faster than sleeping in.")
                 .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             // Moreno F7: 24 hours awake impairs driving about as much as a
