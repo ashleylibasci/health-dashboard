@@ -18,7 +18,7 @@ struct BirthControlLearnView: View {
                 Text("You haven't added a birth control method. If you use one (hormonal or a copper IUD), add it in Settings and the app adjusts what it shows.")
                     .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
                 Card {
-                    LinkRow(title: "Cycle & birth control settings", systemImage: "slider.horizontal.3", accent: .purple) { SettingsView() }
+                    LinkRow(title: "Cycle & birth control settings", systemImage: "slider.horizontal.3", accent: .purple) { CycleSettingsView() }
                 }
             }
             comparison

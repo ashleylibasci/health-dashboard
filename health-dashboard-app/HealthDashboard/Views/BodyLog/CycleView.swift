@@ -86,7 +86,7 @@ struct CycleView: View {
                 RowDivider()
                 MetricRow(title: "Cycle & birth control settings", note: setupSummary,
                           systemImage: "slider.horizontal.3", accent: .purple) {
-                    SettingsView()
+                    CycleSettingsView()
                 }
             }
         }
