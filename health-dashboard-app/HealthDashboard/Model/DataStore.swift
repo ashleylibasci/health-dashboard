@@ -316,6 +316,10 @@ final class DataStore: ObservableObject {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         url = dir.appendingPathComponent(filename)
+        if DemoMode.resetData {
+            try? FileManager.default.removeItem(at: url)
+            UserDefaults.standard.removeObject(forKey: AppModel.sampleDataKey)
+        }
         if let raw = try? Data(contentsOf: url), let decoded = try? JSONDecoder().decode(AppData.self, from: raw) {
             data = decoded
         } else {

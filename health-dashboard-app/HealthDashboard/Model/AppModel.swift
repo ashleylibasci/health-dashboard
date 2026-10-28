@@ -482,6 +482,11 @@ final class AppModel: ObservableObject {
         activeCalories = SampleData.activeCalories; restingCalories = SampleData.restingCalories
         activeCaloriesYesterday = nil
         activeCaloriesEarlier = []
+        if DemoMode.sick {
+            // Resting HR up, HRV down, breathing and wrist temperature up.
+            restingHRDelta = 6; hrvDeltaPct = -24
+            respiratoryRateDelta = 1.6; wristTempDelta = 0.7
+        }
     }
 
     /// Settings / onboarding "Connect Apple Health": asks for access (the
@@ -494,7 +499,7 @@ final class AppModel: ObservableObject {
     }
 
     private func syncWithHealth() async {
-        guard HealthKitService.isAvailable else {
+        guard HealthKitService.isAvailable, !DemoMode.isOn else {
             healthConnection = .unavailable
             pushToWatch()
             await updateNudges()
@@ -531,13 +536,13 @@ final class AppModel: ObservableObject {
     func answerSnapshotRequest() {
         pushToWatch()
         let old = lastRefreshed.map { Date().timeIntervalSince($0) > 5 * 60 } ?? true
-        guard old, store.data.onboarded, !prefersSampleData, HealthKitService.isAvailable else { return }
+        guard old, store.data.onboarded, !prefersSampleData, HealthKitService.isAvailable, !DemoMode.isOn else { return }
         Task { try? await refresh() }
     }
 
     private func updateHealthConnection() async {
         if prefersSampleData { healthConnection = .sampleChosen; return }
-        guard HealthKitService.isAvailable else { healthConnection = .unavailable; return }
+        guard HealthKitService.isAvailable, !DemoMode.isOn else { healthConnection = .unavailable; return }
         if realNightCount > 0 {
             healthConnection = .connected
         } else {
@@ -926,7 +931,7 @@ final class AppModel: ObservableObject {
     /// Runs an Apple Health write in the background and records whether it
     /// worked. The app's own log is kept either way.
     private func writeHealth(_ work: @escaping (HealthKitService) async throws -> Void) {
-        guard HealthKitService.isAvailable else { return }
+        guard HealthKitService.isAvailable, !DemoMode.isOn else { return }
         let health = self.health
         Task {
             do {
@@ -1158,7 +1163,7 @@ final class AppModel: ObservableObject {
             // When the numbers were read, not when they were sent: stale data
             // stays marked stale on the Watch. Never refreshed (no Apple
             // Health on this device): the example is as of now.
-            syncedAt: lastRefreshed ?? (HealthKitService.isAvailable ? nil : .now),
+            syncedAt: lastRefreshed ?? (HealthKitService.isAvailable && !DemoMode.isOn ? nil : .now),
             isSample: usingSampleData,
             alarmWeekdaysOnly: store.data.alarmWeekdaysOnly,
             alarmOneOff: override != nil,

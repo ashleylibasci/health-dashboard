@@ -17,16 +17,18 @@ You need a Mac with Xcode 15 or later.
    ```
    This installs [XcodeGen](https://github.com/yonaskolb/XcodeGen) with Homebrew
    if needed, generates `HealthDashboard.xcodeproj`, and opens it.
-2. In Xcode, select the **HealthDashboard** target → **Signing & Capabilities** →
-   pick your **Team**. Do the same for **HealthDashboardWatch**. If Xcode says the
-   bundle ID is taken, change `com.ashleylibasci.healthdashboard` in `project.yml` to
-   something unique (for example `com.yourname.healthdashboard`) and run
-   `./setup.sh` again.
+2. Signing is already set up: `project.yml` sets Ashley's team (`93C3VKR4FJ`)
+   for every target, so Xcode doesn't ask for a Team. The app installs as
+   **Health Next** (`com.ashleylibasci.healthdashboard.next`) next to the older
+   Health Dashboard app.
 3. Press Run with a simulator selected first; it doesn't need your phone.
 4. To run on your iPhone and Watch, see "Your iPhone and Watch" below.
 
 In the simulator, or until Apple Health has at least two weeks of sleep, the
-app shows Ashley's sample data from the designs. On your iPhone it asks for
+app shows Ashley's sample data from the designs. For a simulator run that never
+asks Apple Health, add `-demo` (or `-demoCycle pill`, `-demoSick` and others,
+see `HealthDashboard/Model/DemoMode.swift`) under Product → Scheme → Edit
+Scheme → Run → Arguments. On your iPhone it asks for
 Apple Health access during setup, then uses your own data. Settings has
 "Connect Apple Health" and "Use sample data".
 
@@ -37,7 +39,7 @@ Your logs and settings are kept on the phone and carry over.
 1. Unzip the new version in place of the old folder (or next to it).
 2. Run `./setup.sh` again. New screens are new files, and Xcode only sees
    them after the project is regenerated.
-3. Pick your **Team** again for both targets, then Run.
+3. Run.
 
 ## Your iPhone and Watch
 
@@ -55,15 +57,11 @@ Your logs and settings are kept on the phone and carry over.
 A free Apple ID works for this, but the app expires after 7 days and needs
 re-running from Xcode. A paid developer account ($99/year) lasts a year.
 
-## Put it on GitHub
+## GitHub
 
-```bash
-cd health-dashboard-app
-git init && git add . && git commit -m "Health Dashboard app"
-gh repo create health-dashboard --private --source . --push
-```
-(`gh` is the GitHub CLI: `brew install gh`, then `gh auth login` with the
-account you want.)
+The app lives in `health-dashboard-app/` of
+https://github.com/ashleylibasci/health-dashboard. Commit and push from the repo
+root (`git add health-dashboard-app && git commit && git push`).
 
 ## How it's built
 

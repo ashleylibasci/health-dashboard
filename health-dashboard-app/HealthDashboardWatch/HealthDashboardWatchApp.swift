@@ -29,7 +29,7 @@ struct HealthDashboardWatchApp: App {
                     sync.requestSnapshot()
                     // Heart rate, for the smart alarm. (Drinks logged here are saved to
                     // Apple Health by the phone.)
-                    if HealthKitService.isAvailable { try? await WatchHealth.service.requestAuthorization() }
+                    if HealthKitService.isAvailable, !WatchHealth.demo { try? await WatchHealth.service.requestAuthorization() }
                     alarm.update(with: sync.snapshot)
                 }
                 .onChange(of: sync.snapshot) { _, snapshot in
@@ -68,6 +68,13 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
 /// One HealthKitService for the whole Watch app.
 enum WatchHealth {
     static let service = HealthKitService()
+    /// Debug builds: `-demo` never asks for Apple Health, like the phone's
+    /// demo mode. The numbers still come from the phone.
+    #if DEBUG
+    static let demo = ProcessInfo.processInfo.arguments.contains("-demo")
+    #else
+    static let demo = false
+    #endif
 }
 
 // MARK: - Root
@@ -85,18 +92,34 @@ struct WatchRootView: View {
 }
 
 struct WatchPagesView: View {
+    @State private var page = WatchPagesView.startPage
+
     var body: some View {
-        TabView {
+        TabView(selection: $page) {
             RecoveryPage()
                 .containerBackground(WatchStyle.glow(.indigo), for: .tabView)
+                .tag(0)
             EnergyPage()
                 .containerBackground(WatchStyle.glow(.mint), for: .tabView)
+                .tag(1)
             TonightPage()
                 .containerBackground(WatchStyle.glow(.purple), for: .tabView)
+                .tag(2)
             LogPage()
                 .containerBackground(WatchStyle.glow(.yellow), for: .tabView)
+                .tag(3)
         }
         .tabViewStyle(.verticalPage)
+    }
+
+    /// Debug builds: `-page 2` opens on that page (0 Recovery, 1 Energy,
+    /// 2 Tonight, 3 Log), for simulator screenshots.
+    private static var startPage: Int {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-page"), i + 1 < args.count, let n = Int(args[i + 1]) { return n }
+        #endif
+        return 0
     }
 }
 

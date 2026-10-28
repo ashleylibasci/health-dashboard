@@ -14,6 +14,7 @@ struct HealthDashboardApp: App {
         let model = AppModel(store: store)
         _store = StateObject(wrappedValue: store)
         _model = StateObject(wrappedValue: model)
+        DemoMode.applySetup(store: store, model: model)
         // Wired here rather than in a view, so Watch messages that arrive when
         // iOS wakes the app in the background are still handled.
         WatchSync.shared.onMessage = { model.handle($0) }

@@ -12,7 +12,9 @@ A native iPhone (iOS 17) + Apple Watch (watchOS 10) app in SwiftUI. It reads App
 Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" canvas on claude.ai (dark `Night*` and light `Light*` boards).
 
 ## Layout
-- `project.yml`: XcodeGen spec. Run `./setup.sh` after adding or removing files. Bundle IDs are `com.ashleylibasci.healthdashboard` (+ `.watchkitapp`). DEVELOPMENT_TEAM is blank; pick the Team in Xcode for both targets.
+- `project.yml`: XcodeGen spec. Run `./setup.sh` (or `xcodegen generate`) after adding or removing files. The app installs as **Health Next**, `com.ashleylibasci.healthdashboard.next` (+ `.watchkitapp`), alongside the old app from `ios/`, which keeps `com.ashleylibasci.healthdashboard` until Ashley switches over. Signing team `93C3VKR4FJ` is set for every target, so Xcode never asks.
+- `HealthDashboardUITests/TestRound.swift`: the hands-on test round. It walks onboarding, every tab, the main screens, the pack setting, a coffee at a custom time, water and the chart drags in dark, light and the largest text size, saving a screenshot plus the element tree at each step (`TEST_RUNNER_SHOT_DIR=/folder xcodebuild test …`).
+- `Model/DemoMode.swift`: Debug-only launch arguments (`-demo`, `-demoSick`, `-demoCycle pill|hormonalIUD|natural|copper|irregular`, `-demoConditions`, `-resetData`) that show labelled example data without asking Apple Health. The Watch takes `-demo` and `-page 0…3`.
 - `Packages/HealthCore`: pure Swift logic with XCTest. Run `swift test` there. This is where the math lives: sleep need and debt, the energy model, wake planner, caffeine, cycle and birth control (`CycleDisplay`), stress, illness, fitness age, streaks, and wall-clock time helpers.
 - `HealthDashboard/`: the iPhone app.
   - `Model/AppModel.swift` holds all state. `refresh()` reads Health; it runs on launch and whenever the app becomes active.
@@ -50,7 +52,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 ## What a Mac session can do that the cloud couldn't
 - Build and run in the Simulator:
   ```
-  xcodebuild -scheme HealthDashboard -destination 'platform=iOS Simulator,name=iPhone 16' build
+  xcodebuild -scheme HealthDashboard -destination 'platform=iOS Simulator,name=iPhone 18 Pro' build
   ```
   Then `xcrun simctl` to install, launch and screenshot (`xcrun simctl io booted screenshot shot.png`).
 - Do a hands-on test round on real screens. Check:
@@ -59,7 +61,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
   - chart scrubbing inside scrolling pages,
   - the Watch app in a paired Watch simulator.
 - Fix anything Xcode warns about. The cloud type-checked against stand-in SwiftUI modules, so real-SDK warnings or errors are possible, especially in `ScrubSurface.swift`, `ScaledFont.swift` and the Watch files.
-- Push to her GitHub (`gh repo create health-dashboard --private --source . --push`).
+- Push to her GitHub: the app lives in `health-dashboard-app/` of https://github.com/ashleylibasci/health-dashboard (public). See the repo-root `CLAUDE.md` for the build → install → commit → push routine.
 
 ## Verify first on the Mac
 - Build both targets with the real SDK (Xcode 27.1 / iOS 27 SDK on her Mac; targets are iOS 17 / watchOS 10). The cloud only type-checked the iPhone app against stand-ins and syntax-checked the Watch app.

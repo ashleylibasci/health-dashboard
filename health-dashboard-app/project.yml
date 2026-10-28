@@ -23,6 +23,9 @@ targets:
     dependencies:
       - package: HealthCore
       - target: HealthDashboardWatch
+    scheme:
+      testTargets:
+        - HealthDashboardUITests
     entitlements:
       path: HealthDashboard/Resources/HealthDashboard.entitlements
       properties:
@@ -67,5 +70,19 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp
+        DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
+        CODE_SIGN_STYLE: Automatic
+  HealthDashboardUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - HealthDashboardUITests
+    dependencies:
+      - target: HealthDashboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
