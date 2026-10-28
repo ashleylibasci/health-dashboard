@@ -34,10 +34,11 @@ struct PillSettingsCard: View {
     private var time: String { Clock.format(store.data.pillTime) }
 
     private var reminderDetail: String {
-        if model.appleRemindsPill {
-            return "Apple\u{2019}s Medications already reminds you, so this app only checks back an hour after \(time) if no dose is logged. New-pack day also gets a heads-up the evening before."
-        }
-        return "At \(time) on pill days, and once more an hour later if you haven\u{2019}t tapped Taken. New-pack day gets the most: a heads-up the evening before and two repeats."
+        let when = model.appleRemindsPill
+            ? "Apple\u{2019}s Medications already reminds you, so this app only checks back an hour after \(time) if no dose is logged. New-pack day also gets a heads-up the evening before."
+            : "At \(time) on pill days, and once more an hour later if you haven\u{2019}t tapped Taken. New-pack day gets the most: a heads-up the evening before and two repeats."
+        // H-A5: what a roommate could see.
+        return when + " Your lock screen only shows \u{201C}Your \(BodyLogStyle.shortTime(store.data.pillTime)) reminder\u{201D}."
     }
 
     private var healthDetail: String {
