@@ -315,20 +315,49 @@ private struct ClearOnTap: ViewModifier {
     }
 }
 
-/// Default hint under interactive charts. Hidden from VoiceOver, where
+/// Default hint under interactive charts, last in the chart's card
+/// (readout, plot, axis, legend, then this). Hidden from VoiceOver, where
 /// the chart itself is adjustable (swipe up or down). One wording
 /// everywhere: "Drag across the chart to see each night." (Dubois 30).
+///
+/// It shows until she has scrubbed any chart once, then never again
+/// (D-G1). Whether to show it is read when the screen is built, so it
+/// never disappears under her finger and moves the card mid-drag.
 struct ScrubHint: View {
     var text = "Drag across the chart to see each point."
+    @State private var shows = !ScrubHintMemory.hasScrubbed
 
     init(text: String = "Drag across the chart to see each point.") { self.text = text }
     /// "Drag across the chart to see each \(unit)."
     init(each unit: String) { self.text = "Drag across the chart to see each \(unit)." }
 
     var body: some View {
-        Label(text, systemImage: "hand.point.up.left")
-            .font(.secondary)
-            .secondaryText()
-            .accessibilityHidden(true)
+        if shows {
+            Label(text, systemImage: "hand.point.up.left")
+                .font(.secondary)
+                .secondaryText()
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Whether she has ever scrubbed a chart (or strip): `ScrubSurface` notes
+/// the first drag or tap, and `ScrubHint` stops showing from the next
+/// screen on. `-resetData` forgets it, like a fresh install.
+@MainActor
+enum ScrubHintMemory {
+    private static let key = "charts.hasScrubbed"
+    private static let forgetOnFreshStart: Void = {
+        if DemoMode.resetData { UserDefaults.standard.removeObject(forKey: key) }
+    }()
+
+    static var hasScrubbed: Bool {
+        _ = forgetOnFreshStart
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    static func noteScrub() {
+        guard !hasScrubbed else { return }
+        UserDefaults.standard.set(true, forKey: key)
     }
 }

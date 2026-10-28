@@ -44,12 +44,14 @@ struct ScrubSurface: UIViewRepresentable {
 
         @objc func tap(_ gesture: UITapGestureRecognizer) {
             let point = gesture.location(in: gesture.view)
+            ScrubHintMemory.noteScrub()
             if let onTap = parent.onTap { onTap(point) } else { parent.onChange(point) }
         }
 
         @objc func pan(_ gesture: UIPanGestureRecognizer) {
             switch gesture.state {
             case .began:
+                ScrubHintMemory.noteScrub()
                 parent.onBegin()
                 parent.onChange(gesture.location(in: gesture.view))
             case .changed:

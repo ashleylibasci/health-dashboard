@@ -137,12 +137,12 @@ struct WeekRecapView: View {
                     }
                 }
             }
-            ScrubHint(each: "day")
             FlowLayout(spacing: 14, lineSpacing: 6) {
                 legend(Accent.mint.fill(scheme), "Best day")
                 legend(Accent.coral.fill(scheme), "Lowest day")
                 legend(otherDay, "Other days")
             }
+            ScrubHint(each: "day")
         }
     }
 

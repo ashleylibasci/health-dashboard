@@ -213,8 +213,8 @@ struct StressView: View {
                 readout(day)
                 StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
                     .frame(height: 170)
-                ScrubHint(each: "hour")
                 legend
+                ScrubHint(each: "hour")
             } else {
                 // No empty grid: one line until the first hour comes in.
                 Label("Fills in as your Watch measures your heart rate.", systemImage: "applewatch")

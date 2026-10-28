@@ -7,7 +7,10 @@ import HealthCore
 //     SampleDataBanner()               the small "Example data" capsule
 //     [CalloutBar]                     only while its trigger is true, at most one
 //     SummaryHeader                    the 2-second answer, ≤ 160pt
-//     one chart card                   ≤ 280pt, readout with `detailSlots`
+//     one chart card                   ≤ 280pt, readout with `detailSlots`;
+//                                      inside: readout, plot, axis, a one-line
+//                                      legend, then `ScrubHint` (shown until
+//                                      her first scrub, D-G1)
 //     RowCard { ExpandRow / MetricRow … }   ≤ 5 rows: details, history, drivers
 //     Card(density: .compact) { LearnMoreRow }   "Learn more about X", last
 //
