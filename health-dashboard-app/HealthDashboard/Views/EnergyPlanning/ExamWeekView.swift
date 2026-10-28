@@ -33,6 +33,7 @@ struct ExamWeekView: View {
                     ExpandRow(title: "Right now vs. your normal", summary: comparisonSummary,
                               systemImage: "chart.bar.fill", accent: .purple) { comparison }
                     RowDivider()
+                    ExamReflectionRows(dividerAfter: true)
                     ExamsLinkRow()
                 }
                 Card(density: .compact) {
@@ -45,6 +46,9 @@ struct ExamWeekView: View {
                         .font(.bodyText).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                     LinkRow(title: "Add an exam", systemImage: "plus.circle.fill", accent: .yellow) { ExamListView() }
+                }
+                if ExamReflectionRows.hasContent(model) {
+                    RowCard { ExamReflectionRows() }
                 }
             }
         }
