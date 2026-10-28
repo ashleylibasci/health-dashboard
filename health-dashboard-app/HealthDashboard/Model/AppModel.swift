@@ -975,7 +975,7 @@ final class AppModel: ObservableObject {
         }
         let planRelevant = old.bedtime != new.bedtime || old.upBy != new.upBy
             || old.smartAlarmEnabled != new.smartAlarmEnabled || old.alarmWeekdaysOnly != new.alarmWeekdaysOnly
-            || old.sleepNeedAdjustment != new.sleepNeedAdjustment
+            || old.sleepNeedAdjustment != new.sleepNeedAdjustment || old.phoneBackupAlarm != new.phoneBackupAlarm
         let watchRelevant = planRelevant || old.savedDrinks != new.savedDrinks
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
         // (alarmOverride is written by pushToWatch itself, which then sends.)
@@ -1134,8 +1134,10 @@ final class AppModel: ObservableObject {
     /// a one-off window for one morning (exam mode); it's kept until that
     /// morning has passed, so later pushes don't overwrite it.
     func pushToWatch(alarm: TimeRange? = nil, wakeDay: Date? = nil) {
-        // Widgets and complications get the same moment's numbers.
+        // Widgets and complications get the same moment's numbers, and the
+        // iPhone backup alarm follows the same window.
         publishWidgetSnapshot()
+        updatePhoneBackupAlarm()
         let cal = Calendar.current
         if let alarm {
             let day = wakeDay.map { cal.startOfDay(for: $0) } ?? Self.wakeDay(forWindowEnding: alarm.end)
@@ -1193,7 +1195,9 @@ final class AppModel: ObservableObject {
             logDrink(id: entryID, drinkID: drinkID, name: name, mg: mg, at: at, saveToHealth: true)
         case let .undoDrink(entryID):
             deleteDrink(entryID)
-        case .woke:
+        case let .woke(at, _):
+            // She stopped the Watch's alarm: this morning's backup isn't needed.
+            PhoneBackupAlarm.shared.watchRang(at: at)
             // Pick the night up from Apple Health (fails quietly while locked).
             Task {
                 if prefersSampleData { pushToWatch() } else { await syncWithHealth() }

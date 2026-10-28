@@ -28,3 +28,6 @@ dist-ssr
 export.xml
 export_cda.xml
 apple_health_export/
+
+# Claude Code agent worktrees
+.claude/worktrees/

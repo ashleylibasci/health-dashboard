@@ -37,6 +37,11 @@ extension AppModel {
         ).save()
     }
 
+    /// The iPhone backup alarm at the smart alarm's latest time, or none.
+    func updatePhoneBackupAlarm() {
+        PhoneBackupAlarm.shared.update(at: store.data.phoneBackupAlarm ? nextAlarmWindow?.end : nil)
+    }
+
     /// Lattes logged with Siri, Shortcuts or the widget while the app wasn't
     /// running: add them to today's log. Each keeps the id it was saved to
     /// Apple Health with, so nothing is counted or saved twice.

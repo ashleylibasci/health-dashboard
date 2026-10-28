@@ -107,6 +107,9 @@ struct AppData: Codable {
     var smartAlarmEnabled = false
     /// The smart alarm skips Saturday and Sunday mornings.
     var alarmWeekdaysOnly = true
+    /// A regular iPhone alarm at the smart alarm's latest time, in case the
+    /// Watch can't wake her (iOS 26.1+).
+    var phoneBackupAlarm = false
     var alarmOverride: AlarmOverride?
     var examModeOn = false
     var exams: [Exam] = []
@@ -156,6 +159,7 @@ struct AppData: Codable {
         bedtime = get(.bedtime, d.bedtime)
         smartAlarmEnabled = get(.smartAlarmEnabled, d.smartAlarmEnabled)
         alarmWeekdaysOnly = get(.alarmWeekdaysOnly, d.alarmWeekdaysOnly)
+        phoneBackupAlarm = get(.phoneBackupAlarm, d.phoneBackupAlarm)
         alarmOverride = get(.alarmOverride, d.alarmOverride)
         examModeOn = get(.examModeOn, d.examModeOn)
         exams = get(.exams, d.exams)

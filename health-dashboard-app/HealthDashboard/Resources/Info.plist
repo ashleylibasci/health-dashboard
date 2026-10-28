@@ -20,6 +20,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Health Next sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone.</string>
 	<key>NSHealthUpdateUsageDescription</key>

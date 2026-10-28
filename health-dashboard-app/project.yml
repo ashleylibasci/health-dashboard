@@ -42,10 +42,12 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone."
         NSHealthUpdateUsageDescription: "Saves the caffeine and water you log to Apple Health."
+        NSAlarmKitUsageDescription: "Health Next sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only (portrait-locked)
+        OTHER_LDFLAGS: ["$(inherited)", "-weak_framework", "AlarmKit"]   # AlarmKit is iOS 26+; the app targets 17
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
   HealthDashboardWatch:

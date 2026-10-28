@@ -425,6 +425,28 @@ struct SettingsView: View {
         return "Up by \(Clock.format(store.data.upBy))"
     }
 
+    @ObservedObject private var backupAlarm = PhoneBackupAlarm.shared
+
+    /// Turning it on asks iOS for alarm permission while she's looking.
+    private var backupAlarmBinding: Binding<Bool> {
+        Binding(get: { store.data.phoneBackupAlarm && PhoneBackupAlarm.isAvailable },
+                set: { on in
+                    store.data.phoneBackupAlarm = on
+                    if on { Task { await PhoneBackupAlarm.shared.requestPermission() } }
+                })
+    }
+
+    private var backupAlarmDetail: String {
+        guard PhoneBackupAlarm.isAvailable else { return "Needs iOS 26.1 or later." }
+        if backupAlarm.denied {
+            return "Alarms are off for Health Next in iOS Settings, so the backup can't ring. Turn them on in Settings \u{2192} Health Next."
+        }
+        if store.data.phoneBackupAlarm, let at = backupAlarm.scheduledFor {
+            return "Rings at \(Clock.format(Clock.minutesOfDay(at))) if your Watch hasn't woken you. Stopping the Watch alarm cancels it."
+        }
+        return "A regular iPhone alarm at your smart alarm's latest time, in case your Watch can't wake you. Stopping the Watch alarm cancels it."
+    }
+
     private var watchSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Apple Watch")
@@ -435,6 +457,11 @@ struct SettingsView: View {
                     Divider().overlay(Palette(scheme: scheme).cardBorder)
                     SettingToggleRow(title: "Weekdays only", detail: "Skips Saturday and Sunday mornings.",
                                      systemImage: "calendar", accent: .purple, isOn: $store.data.alarmWeekdaysOnly)
+                    Divider().overlay(Palette(scheme: scheme).cardBorder)
+                    SettingToggleRow(title: "iPhone backup alarm", detail: backupAlarmDetail,
+                                     systemImage: "iphone.radiowaves.left.and.right", accent: .purple,
+                                     isOn: backupAlarmBinding)
+                        .disabled(!PhoneBackupAlarm.isAvailable)
                 }
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
                 LinkRow(title: "Wake plan", subtitle: "Why tonight's alarm is set when it is",
