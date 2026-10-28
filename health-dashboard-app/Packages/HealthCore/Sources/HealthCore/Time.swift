@@ -15,11 +15,12 @@ public enum Clock {
         return suffix ? text + (h < 12 ? "am" : "pm") : text
     }
 
-    /// "7h 40m", or "35 min" under an hour.
+    /// "7h 40m", or "35 min" under an hour. The space is non-breaking, so
+    /// a line never wraps between "7h" and "40m" (design flaw 4).
     public static func duration(_ minutes: Int) -> String {
         let m = abs(minutes)
-        if m < 60 { return "\(m) min" }
-        return "\(m / 60)h " + String(format: "%02d", m % 60) + "m"
+        if m < 60 { return "\(m)\u{00A0}min" }
+        return "\(m / 60)h\u{00A0}" + String(format: "%02d", m % 60) + "m"
     }
 
     /// Minutes after midnight for a date, in the given calendar.
