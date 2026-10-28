@@ -99,7 +99,7 @@ extension AppModel {
     /// one shared cutoff.
     func restingHRMeaning(_ delta: Double) -> String {
         switch HeartBands.restingHR(delta: delta) {
-        case .above, .wellBelow: "Up from your usual. Often short sleep, stress, drinks or a bug coming on\(heartCycleCause)."
+        case .above, .wellBelow: "Up from your usual. Often short sleep, stress, alcohol or a bug coming on\(heartCycleCause)."
         case .below: "A sign of good recovery."
         case .usual: "Normal for you."
         }

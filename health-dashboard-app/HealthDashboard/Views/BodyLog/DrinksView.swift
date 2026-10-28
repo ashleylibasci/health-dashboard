@@ -205,7 +205,7 @@ struct DrinksView: View {
                     EffectTile(title: "Sleep", value: signed(effect.asleepDelta, unit: " min"),
                                good: abs(effect.asleepDelta) < 10 ? nil : effect.asleepDelta > 0,
                                explanation: Explanation(id: "drinkSleep", title: "Sleep after alcohol",
-                                                        meaning: "How much longer or shorter you slept after drinks than on your other nights.",
+                                                        meaning: "How much longer or shorter you slept after alcohol than on your other nights.",
                                                         forYou: "Alcohol often helps you fall asleep, then wakes you more in the second half of the night."))
                     if let h = effect.hrvDeltaPct {
                         EffectTile(title: "HRV", value: signed(Int(h.rounded()), unit: "%"), good: abs(h) < 3 ? nil : h > 0,
@@ -218,16 +218,16 @@ struct DrinksView: View {
                     if let c = effect.checkInDelta {
                         EffectTile(title: "Morning feel", value: String(format: "%+.1f of 5", c), good: abs(c) < 0.3 ? nil : c > 0,
                                    explanation: Explanation(id: "drinkFeel", title: "How you felt",
-                                                            meaning: "Your morning check-in (1 to 5) after drinks compared with other mornings.",
+                                                            meaning: "Your morning check-in (1 to 5) after alcohol compared with other mornings.",
                                                             forYou: "Below zero means you felt less awake than usual the morning after."))
                     }
                 }
-                Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
+                Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
                     .font(.secondary).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Not enough nights yet").font(.bodyEmphasis)
-                Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
+                Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
                     .font(.bodyText).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -262,9 +262,9 @@ struct DrinksView: View {
             let a = drink.isEmpty ? 0 : drink.map(\.asleep).reduce(0, +) / drink.count
             let b = other.isEmpty ? 0 : other.map(\.asleep).reduce(0, +) / other.count
             let detail = drink.isEmpty
-                ? "No nights after drinks in the last two weeks."
-                : "Average sleep \(Clock.duration(a)) after drinks vs \(Clock.duration(b)) on other nights."
-            return ("Last \(points.count) nights", "\(drink.count) after drinks", detail)
+                ? "No nights after alcohol in the last two weeks."
+                : "Average sleep \(Clock.duration(a)) after alcohol vs \(Clock.duration(b)) on other nights."
+            return ("Last \(points.count) nights", "\(drink.count) after alcohol", detail)
         }
         let day = p.night.wakeDay.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         var detail = p.afterDrinks ? "After drinks\(p.drinksText.map { " (\($0))" } ?? "")." : "No drinks the evening before."

@@ -110,7 +110,7 @@ struct BodyTrendCard: View {
             }
         case .restingHR:
             switch HeartBands.restingHR(delta: d) {
-            case .above, .wellBelow: return "\(Int(d.rounded())) beats above your usual: often short sleep, stress, drinks or a bug coming on\(model.heartCycleCause)."
+            case .above, .wellBelow: return "\(Int(d.rounded())) beats above your usual: often short sleep, stress, alcohol or a bug coming on\(model.heartCycleCause)."
             case .usual: return "Right around your usual \(Int(usual.rounded())) bpm."
             case .below: return "Below your usual: a sign of good recovery."
             }
@@ -306,7 +306,7 @@ struct HeartMetricView: View {
         case .restingHR:
             let v = Int(model.restingHRDelta.rounded())
             switch model.restingHRLevel {
-            case .above, .wellBelow: return "\(v) beats above your usual. Often short sleep, stress, drinks or a bug coming on\(model.heartCycleCause)."
+            case .above, .wellBelow: return "\(v) beats above your usual. Often short sleep, stress, alcohol or a bug coming on\(model.heartCycleCause)."
             case .usual: return "Right around your usual."
             case .below: return "\(abs(v)) beats below your usual. A sign of good recovery."
             }
