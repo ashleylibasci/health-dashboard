@@ -15,6 +15,9 @@ import HealthCore
 /// - `-demoConditions "PCOS,PMDD"`: health conditions, by their names in
 ///   Settings.
 /// - `-resetData`: starts from a fresh install (setup, no logs).
+/// - `-demoExams`: with `-demoCycle`, a set of exams: an early quiz in two
+///   days, a four-exam week about two weeks out, and ten past exams (nine
+///   with an after-exam check-in).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -30,8 +33,9 @@ enum DemoMode {
         .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     static let isOn = args.contains("-demo") || sick || cycle != nil
     static let resetData = args.contains("-resetData")
+    static let exams = args.contains("-demoExams")
     #else
-    static let isOn = false, sick = false, resetData = false
+    static let isOn = false, sick = false, resetData = false, exams = false
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif
@@ -79,7 +83,31 @@ enum DemoMode {
             data.birthControl = nil
             data.flowLog = bleed(daysAgo: 70, days: 5) + bleed(daysAgo: 41, days: 5) + bleed(daysAgo: 12, days: 5)
         }
+        if exams { addExams(to: &data, today: today, calendar: cal) }
         data.onboarded = true
         store.data = data
+    }
+
+    /// `-demoExams`: see the list at the top.
+    private static func addExams(to data: inout AppData, today: Date, calendar cal: Calendar) {
+        func day(_ offset: Int) -> Date { cal.date(byAdding: .day, value: offset, to: today) ?? today }
+        func exam(_ title: String, _ kind: String, _ offset: Int, _ start: Minutes) -> AppData.Exam {
+            AppData.Exam(title: title, kind: kind, date: day(offset), start: start)
+        }
+        // The Monday 10 to 16 days out, and three more exams that week.
+        let weekday = cal.component(.weekday, from: today)        // 1 = Sunday, 2 = Monday
+        let nextMonday = (9 - weekday) % 7 + 7
+        let monday = nextMonday < 10 ? nextMonday + 7 : nextMonday
+        data.exams = [exam("BIOL 210", "Quiz", 2, 480),
+                      exam("ECON 201", "Midterm", monday, 600), exam("STAT 400", "Midterm", monday + 1, 540),
+                      exam("PSYC 101", "Exam", monday + 3, 780), exam("CHEM 101", "Final", monday + 4, 480),
+                      exam("ENGL 102", "Essay exam", -2, 600)]
+        let past: [(String, Int, SleepExtrasData.ExamReflection.Felt)] = [
+            ("STAT 400 quiz", -6, .well), ("ECON 201 quiz", -9, .okay), ("BIOL 210 lab", -13, .rough),
+            ("CHEM 101 quiz", -16, .well), ("PSYC 101 quiz", -20, .okay), ("STAT 400 quiz", -27, .well),
+            ("ECON 201 quiz", -30, .rough), ("BIOL 210 quiz", -34, .well), ("CHEM 101 midterm", -41, .okay)]
+        data.sleepExtras.examReflections = past.map {
+            SleepExtrasData.ExamReflection(id: UUID(), title: $0.0, examDay: day($0.1), felt: $0.2)
+        }
     }
 }
