@@ -63,6 +63,7 @@ struct UpcomingExam: Identifiable, Hashable {
 struct ExamListView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
+    @ObservedObject private var importer = CalendarImport.shared
     @Environment(\.colorScheme) private var scheme
 
     @State private var editing: ExamDraft? = nil
@@ -83,10 +84,16 @@ struct ExamListView: View {
     }
 
     var body: some View {
+        // Signed out of Google: the calendar comes first, so reconnecting is
+        // the first thing on the screen, never under the list.
+        let calendarFirst = importer.needsSignIn
         Screen(title: "Your exams", accent: .yellow) {
             Text("Add your exams and the app plans your sleep, study blocks and exam-morning alarm around them. They stay on your phone.")
                 .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            if calendarFirst {
+                CalendarImportCard()
+            }
             if let offer {
                 examModeOffer(offer)
                     .motionTransition(.reveal, edge: .top)
@@ -107,7 +114,9 @@ struct ExamListView: View {
                 }
             }
             PrimaryButton(title: "Add an exam", accent: .yellow) { editing = ExamDraft(nil) }
-            CalendarImportCard()
+            if !calendarFirst {
+                CalendarImportCard()
+            }
             if !past.isEmpty {
                 Button {
                     let today = AppDay.day()
@@ -465,5 +474,41 @@ struct CalendarImportCard: View {
         let checked = importer.lastChecked.map { " Last checked \($0.formatted(date: .omitted, time: .shortened).lowercased())." } ?? ""
         let found = imported == 1 ? "1 exam" : "\(imported) exams"
         return "Reading \(source.name): \(found) from it.\(checked)"
+    }
+}
+
+extension CalendarImport {
+    /// The calendar's state in a few words, for rows that lead to it:
+    /// "Google · Signed out", "Apple Calendar · Connected", "Not connected".
+    var stateText: String {
+        guard let source else { return "Not connected" }
+        let name: String
+        switch source {
+        case .apple: name = "Apple Calendar"
+        case .google: name = "Google"
+        case .link: name = "Calendar link"
+        }
+        if needsSignIn { return "\(name) \u{00B7} Signed out" }
+        return "\(name) \u{00B7} " + (error == nil ? "Connected" : "Needs a look")
+    }
+
+    /// "Reconnect" in coral while Google has signed her out.
+    var stateVerdict: RowVerdict? {
+        needsSignIn ? RowVerdict(text: "Reconnect", accent: .coral) : nil
+    }
+}
+
+/// The row into her exam list, with the calendar's state, so a signed-out
+/// calendar shows wherever her exams do.
+struct ExamsLinkRow: View {
+    @EnvironmentObject var store: DataStore
+    @ObservedObject private var importer = CalendarImport.shared
+
+    var body: some View {
+        let today = AppDay.day()
+        let count = store.data.exams.filter { Calendar.current.startOfDay(for: $0.date) >= today }.count
+        let exams = count == 0 ? "None yet" : (count == 1 ? "1 exam" : "\(count) exams")
+        MetricRow(title: "Your exams", note: "\(exams) \u{00B7} \(importer.stateText)", verdict: importer.stateVerdict,
+                  systemImage: "calendar", accent: .yellow) { ExamListView() }
     }
 }

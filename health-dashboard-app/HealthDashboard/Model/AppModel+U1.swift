@@ -93,13 +93,6 @@ extension AppModel {
         if kind == .secondWind && hidesEffortTargets { return "your energy lifts again. Good for group study or seeing friends." }
         return Self.zoneOneLiner(kind)
     }
-
-    /// The zone action, without workout suggestions when she has an
-    /// eating-disorder history.
-    func zoneActionShown(_ kind: EnergyDay.Zone.Kind) -> String {
-        if kind == .secondWind && hidesEffortTargets { return "Good for group study or seeing friends. Wrap up anything intense a couple of hours before bed." }
-        return Self.zoneAction(kind)
-    }
 }
 
 extension AppModel {
