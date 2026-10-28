@@ -58,12 +58,16 @@ extension AppModel {
     /// when it was recorded, else her "up by" time.
     var caffeineWakeTime: Minutes { lastNightIsFresh ? lastNight.wake : store.data.upBy }
 
-    /// Her cutoff for a typical drink falls before she's even up (possible
-    /// on the combined pill, ring or patch with an early bedtime). Screens must not print `caffeineCutoff` as a time then;
-    /// use `caffeineCutoffShown` and the "one small drink early" copy.
-    var caffeineCutoffBeforeWake: Bool { caffeineCutoff <= caffeineWakeTime }
+    /// Her cutoff for a typical drink falls before she's even up, or within
+    /// half an hour of waking (possible on the combined pill, ring or patch
+    /// with an early bedtime): "Cutoff 8:30am" after an 8:17am wake read as
+    /// a typo (design review F24). The cutoff is rounded down to the half
+    /// hour, so that's as close to "right when you wake" as it gets. Screens
+    /// must not print `caffeineCutoff` as a time then; use
+    /// `caffeineCutoffShown` and the "Early only" copy.
+    var caffeineCutoffBeforeWake: Bool { caffeineCutoff < caffeineWakeTime + 30 }
 
-    /// The cutoff to print, or nil when it falls before she's up.
+    /// The cutoff to print, or nil when it falls before (or right at) waking.
     var caffeineCutoffShown: Minutes? { caffeineCutoffBeforeWake ? nil : caffeineCutoff }
 
     /// The biggest drink (mg, in 5s) she could have at her wake time and

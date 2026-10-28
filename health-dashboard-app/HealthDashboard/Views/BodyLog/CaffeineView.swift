@@ -85,20 +85,26 @@ struct CaffeineView: View {
             "\(model.todaysDrinks.last?.name ?? "Caffeine") \u{00B7} \(Clock.format(dose.time))"
         }
         var out = [StatPair(label: "Last drink", value: last ?? "None yet")]
-        if let cutoff = model.caffeineCutoffShown {
-            out.append(StatPair(label: "Cutoff", value: Clock.format(cutoff)))
-        } else {
-            // No clock time works for a full coffee today: what still fits.
-            out.append(StatPair(label: "Still fits", value: roomNow >= 5 ? "Up to \(roomNow) mg" : "Nothing more"))
-        }
+        // No clock time works for a full coffee today: "Early only", with
+        // the reason in the summary's ⓘ (design review F24).
+        out.append(StatPair(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "Early only"))
         return out
+    }
+
+    /// The daily limit, led by why the cutoff is "Early only" when it is.
+    private var headerInfo: Explanation {
+        guard model.caffeineCutoffShown == nil else { return CaffeineWaterCopy.dailyLimit }
+        let room = roomNow >= 5 ? " Right now, up to \(roomNow) mg still fits." : ""
+        return Explanation(id: "caffeineEarlyOnly", title: "Cutoff: early only",
+                           meaning: model.caffeineEarlyOnlyText + room,
+                           forYou: CaffeineWaterCopy.dailyLimit.meaning + " " + CaffeineWaterCopy.dailyLimitForYou)
     }
 
     private var header: some View {
         let v = verdict
         let mg = model.caffeineMgToday
         return SummaryHeader(eyebrow: "Caffeine today", value: "\(mg)", unit: "mg", status: v.status, line: v.line,
-                             pairs: pairs, accent: .yellow, info: CaffeineWaterCopy.dailyLimit) {
+                             pairs: pairs, accent: .yellow, info: headerInfo) {
             SummaryMeter(fraction: Double(mg) / Double(dailyLimit), accent: .yellow,
                          caption: "Up to \(dailyLimit) mg a day is generally fine")
         }
@@ -139,7 +145,9 @@ struct CaffeineView: View {
                 todayList
             }
             RowDivider()
-            MetricRow(title: "Caffeine in your body", note: "About \(model.caffeineAtBedtime) mg at bedtime",
+            // "0 mg · About 0 mg at bedtime" said 0 twice (design review F23).
+            MetricRow(title: "Caffeine in your body",
+                      note: model.caffeineAtBedtime < 5 ? "Clears by bedtime" : "About \(model.caffeineAtBedtime) mg at bedtime",
                       value: "\(Int(model.caffeineInBody(at: model.now).rounded())) mg",
                       systemImage: "waveform.path.ecg", accent: .yellow) {
                 CaffeineBodyView()
@@ -232,7 +240,7 @@ struct CaffeineBodyView: View {
 
     private var cutoffSummary: String {
         model.caffeineCutoffShown.map { "\(Clock.format($0)) \u{00B7} your last caffeine of the day" }
-            ?? "No time today works for a full coffee"
+            ?? "Early only \u{00B7} right after you wake, or smaller"
     }
 
     private var bedtime: Minutes { 1440 + model.tonightBedtime }
@@ -315,7 +323,7 @@ struct CaffeineBodyView: View {
     private func chartSummary(_ points: [CaffeinePoint]) -> String {
         let peak = points.max { $0.mg < $1.mg }
         let peakText = peak.map { "peaks near \(Int($0.mg.rounded())) mg at \(Clock.format($0.time))" } ?? "stays at zero"
-        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "No cutoff time today: no time works for a full coffee."
+        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "Cutoff: early only, right after you wake."
         return "Caffeine in your body today \(peakText) and falls to about \(model.caffeineAtBedtime) mg by your \(Clock.format(bedtime)) bedtime. \(cutoffText) Goal under \(bedtimeGoal) mg."
     }
 }
