@@ -5,21 +5,6 @@ import HealthCore
 /// Display helpers only; the models themselves live in HealthCore.
 extension AppModel {
 
-    // MARK: Regularity
-
-    /// 0–100: how steady sleep timing was over the last 14 nights. A simple
-    /// stand-in for a full Sleep Regularity Index: it falls as the spread
-    /// (standard deviation) of sleep onset and wake times grows. A spread of
-    /// about 55 minutes scores about 75. Nil with fewer than 5 nights.
-    var sleepRegularityScore: Int? {
-        let recent = Array(nights.sorted { $0.wakeDay > $1.wakeDay }.prefix(14))
-        guard recent.count >= 5 else { return nil }
-        let onsetSD = recent.map { Double($0.sleepOnset) }.standardDeviation ?? 0
-        let wakeSD = recent.map { Double($0.wake) }.standardDeviation ?? 0
-        let spread = (onsetSD + wakeSD) / 2
-        return Int(min(max(100 - spread * 0.45, 0), 100).rounded())
-    }
-
     // MARK: Recovery history
 
     /// Recovery for one past night, scored with the same HealthCore model

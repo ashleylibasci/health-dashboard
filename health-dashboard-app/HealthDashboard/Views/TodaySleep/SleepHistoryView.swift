@@ -134,15 +134,15 @@ struct SleepHistoryView: View {
     private var averagesCard: some View {
         let bed = Clock.circularMean(nights.map(\.bedtime))
         let wake = Clock.circularMean(nights.map(\.wake))
-        let regularity = model.regularity(of: nights)
+        let steadiness = model.steadiness(of: nights)
         return Card {
             Text("Your averages").font(.cardTitle)
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     AverageTile(title: "Asleep", value: Clock.duration(averageAsleep),
                                 note: vsNeed(averageAsleep), explanation: Topic.sleepNeed.explanation)
-                    AverageTile(title: "Regularity", value: regularity.map { "\($0)" } ?? "\u{2014}",
-                                note: regularity.map { $0 >= 75 ? "steady" : $0 >= 55 ? "a bit uneven" : "uneven" } ?? "needs 5 nights",
+                    AverageTile(title: "Regularity", value: steadiness?.word ?? "\u{2014}",
+                                note: steadiness.map { "Times moved \(Clock.duration($0.moved))" } ?? "needs 5 nights",
                                 explanation: Topic.regularity.explanation)
                 }
                 GridRow {
@@ -288,7 +288,8 @@ private struct AverageTile: View {
                 InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -8)
                     .accessibilityHidden(true)
             }
-            Text(value).font(.numberM).minimumScaleFactor(0.7).lineLimit(1)
+            // "All over the place" shrinks to fit rather than wrapping.
+            Text(value).font(.numberM).minimumScaleFactor(0.5).lineLimit(1)
             Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(Accent.purple.ink(scheme))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)

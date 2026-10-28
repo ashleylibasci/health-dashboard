@@ -34,8 +34,11 @@ extension AppModel {
         return nights.filter { $0.wakeDay > cutoff }.sorted { $0.wakeDay < $1.wakeDay }
     }
 
-    /// 0–100 steadiness of sleep and wake times for the given nights, the
-    /// same measure as `sleepRegularityScore`. Nil with fewer than 5 nights.
+    /// 0–100 steadiness of sleep and wake times for the given nights. A
+    /// simple stand-in for a full Sleep Regularity Index: it falls as the
+    /// spread (standard deviation) of sleep onset and wake times grows; a
+    /// spread of about 55 minutes scores about 75. Nil with fewer than 5
+    /// nights. `steadiness(of:)` puts it in words.
     func regularity(of nights: [NightRecord]) -> Int? {
         guard nights.count >= 5 else { return nil }
         let onsetSD = nights.map { Double($0.sleepOnset) }.standardDeviation ?? 0

@@ -199,9 +199,10 @@ struct SleepView: View {
                 }
                 RowDivider()
             }
-            MetricRow(title: "Week & month", note: "Every night, averages",
-                      value: model.sleepRegularityScore.map { "\($0)" },
-                      verdict: model.sleepRegularityScore.map { _ in RowVerdict(text: "Regularity", accent: .purple) },
+            // How regular this week was, in one word; how far her times
+            // moved is one tap down (H-C1).
+            MetricRow(title: "Week & month", note: "Every night, how regular",
+                      verdict: model.weekSteadiness.map { RowVerdict(text: $0.word, accent: $0.accent) },
                       systemImage: "chart.bar.fill", accent: .purple) {
                 SleepHistoryView()
             }
