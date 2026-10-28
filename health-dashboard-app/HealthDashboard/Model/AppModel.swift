@@ -518,6 +518,7 @@ final class AppModel: ObservableObject {
     /// Called when the app comes to the foreground: new day, new numbers.
     func becameActive() async {
         AppDay.rolloverMinutes = AppDay.rollover(forBedtime: store.data.bedtime)
+        importPendingDrinks()
         guard store.data.onboarded else {
             pushToWatch()
             return
@@ -858,7 +859,7 @@ final class AppModel: ObservableObject {
         logDrink(id: UUID(), drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: date, saveToHealth: saveToHealth)
     }
 
-    private func logDrink(id: UUID, drinkID: UUID, name: String, mg: Int, at date: Date, saveToHealth: Bool) {
+    func logDrink(id: UUID, drinkID: UUID, name: String, mg: Int, at date: Date, saveToHealth: Bool) {
         guard !store.data.drinkLog.contains(where: { $0.id == id }) else { return }
         var entry = AppData.LoggedDrink(drinkID: drinkID, name: name, mg: mg, date: AppDay.pastTime(date))
         entry.id = id

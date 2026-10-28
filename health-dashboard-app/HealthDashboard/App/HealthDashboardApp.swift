@@ -17,6 +17,9 @@ struct HealthDashboardApp: App {
         DemoMode.applySetup(store: store, model: model)
         // Apple Health wakes the app with new data (also when it's closed).
         BackgroundHealth.shared.start(model)
+        // Lattes from Siri or the widget: straight into the log when the
+        // intent runs in this process, otherwise on the next activation.
+        PendingDrinks.onAdded = { model.importPendingDrinks() }
         // Wired here rather than in a view, so Watch messages that arrive when
         // iOS wakes the app in the background are still handled.
         WatchSync.shared.onMessage = { model.handle($0) }

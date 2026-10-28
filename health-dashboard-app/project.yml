@@ -82,14 +82,18 @@ targets:
       - HealthDashboardWidgets
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
+      - Shared/LogLatteIntent.swift
     entitlements:
       path: HealthDashboardWidgets/HealthDashboardWidgets.entitlements
       properties:
         com.apple.security.application-groups: [group.com.ashleylibasci.healthdashboard]
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     info:
       path: HealthDashboardWidgets/Info.plist
       properties:
         CFBundleDisplayName: Health Next
+        NSHealthUpdateUsageDescription: "Saves the latte you log from the widget to Apple Health."
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

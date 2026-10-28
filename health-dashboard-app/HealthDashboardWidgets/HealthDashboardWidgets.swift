@@ -284,7 +284,7 @@ struct TodayWidget: Widget {
                 .containerBackground(for: .widget) { WidgetBackground(accent: .yellow) }
         }
         .configurationDisplayName("Caffeine & water")
-        .description("Today's caffeine, your cutoff, and water in ounces.")
+        .description("Today's caffeine, your cutoff and water in ounces, with a button to log your latte.")
         .supportedFamilies([.systemSmall, .accessoryRectangular])
     }
 }
@@ -320,9 +320,20 @@ private struct TodayWidgetView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Accent.blue.ink(scheme))
                     Spacer(minLength: 0)
+                    if let drink = s.quickDrink {
+                        // Logs it right here, no need to open the app.
+                        Button(intent: LogLatteIntent()) {
+                            Label("\(drink.name) \(drink.mg) mg", systemImage: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .tint(Accent.yellow.fill(scheme))
+                        .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams")
+                    }
                 }
                 .foregroundStyle(p.primary)
-                .accessibilityElement(children: .combine)
             }
         } else {
             OpenAppPrompt()

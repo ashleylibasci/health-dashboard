@@ -36,6 +36,14 @@ struct WidgetSnapshot: Codable, Equatable {
     var bedtime: Date?
     /// "In bed on time" streak, in nights.
     var bedtimeStreak: Int
+    /// The drink "Log a latte" logs: her saved Latte, or her first saved drink.
+    var quickDrink: QuickDrink? = nil
+
+    struct QuickDrink: Codable, Equatable {
+        var id: UUID
+        var name: String
+        var mg: Int
+    }
 
     /// Shared with the older Health Dashboard app from `ios/` (a free
     /// developer team can't register a new group), so Health Next keeps
@@ -64,12 +72,13 @@ struct WidgetSnapshot: Codable, Equatable {
     /// Today's totals, or 0 once the app day they belong to has ended.
     func caffeineMg(at date: Date) -> Int { isCurrent(at: date) ? caffeineMg : 0 }
     func waterML(at date: Date) -> Double { isCurrent(at: date) ? waterML : 0 }
-    private func isCurrent(at date: Date) -> Bool { date.timeIntervalSince(appDayStart) < 24 * 3600 }
+    func isCurrent(at date: Date) -> Bool { date.timeIntervalSince(appDayStart) < 24 * 3600 }
 
     /// A believable example for widget galleries and previews.
     static let example = WidgetSnapshot(
         updated: .now, isSample: true, recovery: 69, recoveryLabel: "Take it steady", energyLeft: 58,
         cycleLine: "Pack day 18 \u{00B7} Active pill", cycleNumber: 18, cycleNumberLabel: "Pill",
         appDayStart: Calendar.current.startOfDay(for: .now), caffeineMg: 130, caffeineNote: "One small drink early",
-        waterML: 1060, waterGoalML: 1893, bottleML: 710, bedtime: nil, bedtimeStreak: 4)
+        waterML: 1060, waterGoalML: 1893, bottleML: 710, bedtime: nil, bedtimeStreak: 4,
+        quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130))
 }

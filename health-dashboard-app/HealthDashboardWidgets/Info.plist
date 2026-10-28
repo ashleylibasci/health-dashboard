@@ -25,5 +25,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Saves the latte you log from the widget to Apple Health.</string>
 </dict>
 </plist>

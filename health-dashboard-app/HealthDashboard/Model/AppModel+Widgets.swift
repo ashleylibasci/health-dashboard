@@ -14,6 +14,8 @@ extension AppModel {
             }
         }()
         let onTime = streaks.first { $0.title == "In bed on time" }?.current ?? 0
+        let latte = store.data.savedDrinks.first { $0.name.localizedCaseInsensitiveContains("latte") }
+            ?? store.data.savedDrinks.first
         WidgetSnapshot(
             updated: lastRefreshed ?? .now,
             isSample: usingSampleData,
@@ -30,7 +32,19 @@ extension AppModel {
             waterGoalML: store.data.waterGoalML,
             bottleML: store.data.bottleSizeML,
             bedtime: AppDay.date(store.data.bedtime, relativeTo: nextWakeDay),
-            bedtimeStreak: onTime
+            bedtimeStreak: onTime,
+            quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) }
         ).save()
+    }
+
+    /// Lattes logged with Siri, Shortcuts or the widget while the app wasn't
+    /// running: add them to today's log. Each keeps the id it was saved to
+    /// Apple Health with, so nothing is counted or saved twice.
+    func importPendingDrinks() {
+        for p in PendingDrinks.takeAll() {
+            // Saved to Apple Health by the intent already, unless it couldn't.
+            logDrink(id: p.entryID, drinkID: p.drinkID, name: p.name, mg: p.mg, at: p.date,
+                     saveToHealth: !p.savedToHealth)
+        }
     }
 }
