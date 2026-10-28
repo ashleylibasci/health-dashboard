@@ -92,100 +92,243 @@ struct WatchRootView: View {
 }
 
 struct WatchPagesView: View {
-    @State private var page = WatchPagesView.startPage
+    @EnvironmentObject private var sync: WatchSync
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isLuminanceReduced) private var luminanceReduced
+    @State private var page = WatchPagesView.startPage(bedtime: nil)
+    /// When the app last went to the background, so a return after a long
+    /// break opens on the page that fits the time of day again.
+    @State private var backgroundedAt: Date?
 
     var body: some View {
-        TabView(selection: $page) {
-            RecoveryPage()
-                .containerBackground(WatchStyle.glow(.indigo), for: .tabView)
-                .tag(0)
-            EnergyPage()
-                .containerBackground(WatchStyle.glow(.mint), for: .tabView)
-                .tag(1)
-            TonightPage()
-                .containerBackground(WatchStyle.glow(.purple), for: .tabView)
-                .tag(2)
-            LogPage()
-                .containerBackground(WatchStyle.glow(.yellow), for: .tabView)
-                .tag(3)
+        // One NavigationStack around the pages: each page puts its title in
+        // the toolbar, next to the clock, instead of using the top of the
+        // screen for it.
+        NavigationStack {
+            TabView(selection: $page) {
+                RecoveryPage(openEnergy: { withAnimation(.snappy(duration: 0.35)) { page = 1 } })
+                    .containerBackground(glow(.indigo), for: .tabView)
+                    .tag(0)
+                EnergyPage()
+                    .containerBackground(glow(.mint), for: .tabView)
+                    .tag(1)
+                TonightPage()
+                    .containerBackground(glow(.purple), for: .tabView)
+                    .tag(2)
+                LogPage()
+                    .containerBackground(glow(.yellow), for: .tabView)
+                    .tag(3)
+            }
+            .tabViewStyle(.verticalPage)
         }
-        .tabViewStyle(.verticalPage)
         // A tapped complication opens its page (healthnext://page/2).
         .onOpenURL { url in
             if url.host == "page", let n = Int(url.lastPathComponent), (0...3).contains(n) { page = n }
         }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background:
+                backgroundedAt = .now
+            case .active:
+                // Back after an hour or more: start where the time of day
+                // points, as on a fresh launch.
+                if let away = backgroundedAt, Date().timeIntervalSince(away) > 3600, !Self.pageArgument {
+                    page = Self.startPage(bedtime: sync.snapshot.bedtime)
+                }
+                backgroundedAt = nil
+            default:
+                break
+            }
+        }
     }
 
+    /// The glow behind a page, dimmed in always-on.
+    private func glow(_ accent: Accent) -> RadialGradient {
+        WatchStyle.glow(accent, dimmed: luminanceReduced)
+    }
+
+    /// Debug builds: `-page 2` was passed.
+    private static var pageArgument: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-page")
+        #else
+        return false
+        #endif
+    }
+
+    /// The page for the time of day: Recovery in the morning, Energy through
+    /// the day, Tonight from two hours before bed (or 8pm) until 4am.
     /// Debug builds: `-page 2` opens on that page (0 Recovery, 1 Energy,
     /// 2 Tonight, 3 Log), for simulator screenshots.
-    private static var startPage: Int {
+    static func startPage(bedtime: Date?, now: Date = .now, calendar: Calendar = .current) -> Int {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-page"), i + 1 < args.count, let n = Int(args[i + 1]) { return n }
         #endif
-        return 0
+        let minutes = Clock.minutesOfDay(now, calendar: calendar)
+        // Two hours before bed, kept between 6pm and 10pm (a 12:30am
+        // bedtime counts as 24:30).
+        var eveningStart = 20 * 60
+        if let bedtime {
+            let bed = Clock.minutesOfDay(bedtime, calendar: calendar)
+            eveningStart = min(max((bed < 12 * 60 ? bed + 1440 : bed) - 120, 18 * 60), 22 * 60)
+        }
+        if minutes < 4 * 60 || minutes >= eveningStart { return 2 }
+        if minutes < 11 * 60 { return 0 }
+        return 1
     }
 }
 
 // MARK: - Shared Watch styling
 
 /// The Watch is always dark, so every color uses the `.dark` tokens.
+/// Colors that aren't in the shared palette live here, so the pages don't
+/// carry their own hex values.
 enum WatchStyle {
     static let palette = Palette(scheme: .dark)
     /// Secondary text on the tinted backgrounds (#C3C7E6 in the designs).
     static let secondaryText = Color(hex: 0xC3C7E6)
+    /// Small labels and axis text.
+    static let tertiaryText = Color.white.opacity(0.62)
+    /// Rows and chips on the page backgrounds.
+    static let surface = Color.white.opacity(0.1)
+    /// The lighter start of the recovery ring.
+    static let recoveryRingStart = Color(hex: 0x9AA6FF)
+    /// The sleep arc runs from night (indigo violet) to sunrise (peach).
+    static let nightArc = Color(hex: 0x8E7BFF)
+    static let sunrise = Color(hex: 0xFFB27A)
+    /// The dark disc behind the dial's moon and sun.
+    static let dialKnob = Color(hex: 0x1A1245)
+    /// Secondary text on the yellow Log page.
+    static let caffeineText = Color(hex: 0xE6DAB0)
+    /// Secondary text on the ringing alarm.
+    static let alarmText = Color(hex: 0xE6D2BC)
+    static let alarmGlow = [Color(hex: 0x7A3A00), Color(hex: 0x331700), .black]
+    /// The system's switch green.
+    static let switchOn = Color.green
 
-    /// The colored glow at the top of each page, fading to black.
-    static func glow(_ accent: Accent) -> RadialGradient {
-        RadialGradient(colors: [accent.fill(.dark).opacity(0.55), accent.fill(.dark).opacity(0.14), .black],
-                       center: UnitPoint(x: 0.2, y: 0), startRadius: 0, endRadius: 200)
+    /// The colored glow at the top of each page, fading to black. Always-on
+    /// keeps only a faint trace of it.
+    static func glow(_ accent: Accent, dimmed: Bool = false) -> RadialGradient {
+        let strength = dimmed ? 0.18 : 1
+        return RadialGradient(colors: [accent.fill(.dark).opacity(0.55 * strength), accent.fill(.dark).opacity(0.14 * strength), .black],
+                              center: UnitPoint(x: 0.2, y: 0), startRadius: 0, endRadius: 200)
     }
 
     /// "2:00pm" for a date.
     static func time(_ date: Date) -> String {
         Clock.format(Clock.minutesOfDay(date))
     }
+
+    /// Rounded bold numbers with even-width digits, on a text style so they
+    /// follow the Watch's text size.
+    static func number(_ style: Font.TextStyle) -> Font {
+        .system(style, design: .rounded, weight: .bold).monospacedDigit()
+    }
+
+    /// Small caption labels ("Bed by", "Wake").
+    static let label: Font = .footnote.weight(.semibold)
 }
 
-/// Page title in the page's accent color, as in the designs.
-struct PageHeader<Trailing: View>: View {
+/// A Watch page: the title in the toolbar beside the clock, with an "EX"
+/// badge on example data, and the content in a scroll view under it.
+struct WatchPage<Content: View>: View {
     let title: String
     let accent: Accent
-    @ViewBuilder var trailing: () -> Trailing
+    @ViewBuilder var content: () -> Content
+    @EnvironmentObject private var sync: WatchSync
+    private static var end: String { "end" }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(accent.ink(.dark))
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 4)
-            trailing()
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if sync.snapshot == .empty {
+                        NotSyncedView()
+                    } else {
+                        content()
+                    }
+                    Color.clear.frame(height: 0).id(Self.end)
+                }
+                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .task(id: sync.snapshot == .empty) {
+                // Debug builds: `-scrollToEnd` shows the bottom of each page,
+                // for simulator screenshots.
+                #if DEBUG
+                guard ProcessInfo.processInfo.arguments.contains("-scrollToEnd"), sync.snapshot != .empty else { return }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                reader.scrollTo(Self.end, anchor: .bottom)
+                #endif
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                PageTitle(title: title, accent: accent, isSample: sync.snapshot.isSample == true)
+            }
         }
     }
 }
 
-extension PageHeader where Trailing == EmptyView {
-    init(title: String, accent: Accent) {
-        self.init(title: title, accent: accent, trailing: { EmptyView() })
+/// "Recovery" in the page's accent color, plus "EX" while the phone shows
+/// example data.
+struct PageTitle: View {
+    let title: String
+    let accent: Accent
+    let isSample: Bool
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(accent.ink(.dark))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            if isSample {
+                Text("EX")
+                    .font(.system(.caption2, design: .rounded, weight: .heavy))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Accent.yellow.ink(.dark)))
+                    .accessibilityLabel("Example data")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
 // MARK: - Freshness
 
 extension WatchSnapshot {
-    /// Older than 6 hours, or from before this morning's 4am rollover: the
-    /// numbers are yesterday's or out of date. Unknown (older phone build)
-    /// counts as fresh.
+    /// 4am on the app day that contains `now` (the day rolls over at 4am).
+    static func appDayStart(for now: Date, calendar: Calendar = .current) -> Date {
+        let midnight = calendar.startOfDay(for: now)
+        let rollover = calendar.date(bySettingHour: 4, minute: 0, second: 0, of: midnight) ?? midnight
+        if now >= rollover { return rollover }
+        return calendar.date(byAdding: .day, value: -1, to: rollover) ?? rollover
+    }
+
+    /// The numbers are from an earlier app day (before this morning's 4am
+    /// rollover): recovery, energy and today's caffeine aren't today's, so
+    /// the pages don't show them. Unknown (older phone build) counts as today.
+    func isFromEarlierDay(now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let syncedAt else { return false }
+        return syncedAt < Self.appDayStart(for: now, calendar: calendar)
+    }
+
+    /// Older than 6 hours, or from an earlier app day: greyed out and
+    /// marked with their time.
     func isStale(now: Date = Date(), calendar: Calendar = .current) -> Bool {
         guard let syncedAt else { return false }
         if now.timeIntervalSince(syncedAt) > 6 * 3600 { return true }
-        let midnight = calendar.startOfDay(for: now)
-        let rollover = calendar.date(bySettingHour: 4, minute: 0, second: 0, of: midnight) ?? midnight
-        return now >= rollover && syncedAt < rollover
+        return isFromEarlierDay(now: now, calendar: calendar)
     }
 
-    /// "As of 9:40am" once the snapshot is more than 15 minutes old.
+    /// "As of 9:40am", or "As of Mon 9:40pm" from another day, once the
+    /// snapshot is more than 15 minutes old.
     func asOfText(now: Date = Date()) -> String? {
         guard let syncedAt, now.timeIntervalSince(syncedAt) > 15 * 60 else { return nil }
         let sameDay = Calendar.current.isDate(syncedAt, inSameDayAs: now)
@@ -194,22 +337,38 @@ extension WatchSnapshot {
     }
 }
 
-/// "Example data" and "As of 9:40am" under a page title. Empty when the
-/// numbers are hers and current.
+/// "As of 9:40am" under a page title. Empty when the numbers are current.
+/// (Example data is marked in the title.)
 struct SnapshotStatusLine: View {
     let snapshot: WatchSnapshot
+    var now: Date = .now
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
-            let parts = [snapshot.isSample == true ? "Example data" : nil, snapshot.asOfText(now: context.date)].compactMap { $0 }
-            if !parts.isEmpty {
-                Text(parts.joined(separator: " · "))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(snapshot.isSample == true ? Accent.yellow.ink(.dark) : WatchStyle.secondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        if let asOf = snapshot.asOfText(now: now) {
+            Text(asOf)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(WatchStyle.secondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// From an earlier day: say so instead of showing yesterday's numbers.
+struct NotTodayView: View {
+    let what: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("No \(what) for today yet")
+                .font(.headline)
+            Text("Open Health Dashboard on your iPhone to update.")
+                .font(.footnote)
+                .foregroundStyle(WatchStyle.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -217,6 +376,16 @@ extension View {
     /// Greys out numbers that are out of date.
     func staleStyle(_ stale: Bool) -> some View {
         self.saturation(stale ? 0 : 1).opacity(stale ? 0.55 : 1)
+    }
+}
+
+/// Buttons and tiles: a quick press-in, then spring back.
+struct WatchPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -229,7 +398,7 @@ struct NotSyncedView: View {
                 .foregroundStyle(WatchStyle.secondaryText)
                 .accessibilityHidden(true)
             Text("Open Health Dashboard on your iPhone to sync.")
-                .font(.system(size: 14, weight: .medium))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(WatchStyle.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }

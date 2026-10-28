@@ -45,12 +45,26 @@ final class SmartAlarmManager: NSObject, ObservableObject {
     }
 
     @Published private(set) var status: Status = .off {
-        didSet { if status != oldValue { reportStatus() } }
+        didSet { if status != oldValue { reportStatus(); saveForComplication() } }
     }
     /// The phone sent a new window while this app was in the background. The
     /// alarm already scheduled stays until the app is opened and the new one
     /// can be scheduled.
-    @Published private(set) var pendingChange = false
+    @Published private(set) var pendingChange = false {
+        didSet { if pendingChange != oldValue { saveForComplication() } }
+    }
+
+    /// Tells the Bedtime complication whether tomorrow's alarm is armed, or
+    /// needs the app opened ("Tap to arm").
+    private func saveForComplication() {
+        var state = WatchAlarmState(armedEnd: nil, needsOpen: pendingChange)
+        switch status {
+        case let .scheduled(_, end), let .listening(end): state.armedEnd = end
+        case .needsForeground: state.needsOpen = true
+        default: break
+        }
+        state.save()
+    }
 
     /// Lets her skip the alarm from the wrist without changing the phone's plan.
     @Published var enabledOnWatch: Bool = UserDefaults.standard.object(forKey: "smartAlarm.enabledOnWatch") as? Bool ?? true {
@@ -619,6 +633,7 @@ final class HeartRateRiseDetector: @unchecked Sendable {
 /// Full screen while the alarm rings, with one big Stop button.
 struct AlarmView: View {
     @EnvironmentObject private var alarm: SmartAlarmManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var fromLightSleep: Bool {
         if case let .ringing(fromLightSleep) = alarm.status { return fromLightSleep }
@@ -628,18 +643,20 @@ struct AlarmView: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "alarm.fill")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
+                .symbolEffect(.pulse, isActive: !reduceMotion)
                 .foregroundStyle(Accent.orange.ink(.dark))
                 .accessibilityHidden(true)
             TimelineView(.everyMinute) { context in
                 Text(Clock.format(Clock.minutesOfDay(context.date)))
-                    .font(.number(40))
+                    .font(WatchStyle.number(.largeTitle))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
             }
-            Text(fromLightSleep ? "You were stirring. Good time to get up." : "End of your wake window.")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color(hex: 0xE6D2BC))
+            // The Watch only sees movement and heart rate, not sleep stages.
+            Text(fromLightSleep ? "You started stirring. A good time to get up." : "End of your wake window.")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(WatchStyle.alarmText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
@@ -647,7 +664,7 @@ struct AlarmView: View {
                 alarm.stop()
             } label: {
                 Text("Stop")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity, minHeight: 60)
                     .background(Capsule().fill(Accent.orange.fill(.dark)))
@@ -659,7 +676,7 @@ struct AlarmView: View {
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RadialGradient(colors: [Color(hex: 0x7A3A00), Color(hex: 0x331700), .black],
+            RadialGradient(colors: WatchStyle.alarmGlow,
                            center: UnitPoint(x: 0.8, y: 0), startRadius: 0, endRadius: 220)
                 .ignoresSafeArea()
         )

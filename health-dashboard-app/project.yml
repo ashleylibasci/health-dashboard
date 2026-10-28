@@ -88,6 +88,8 @@ targets:
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
       - Shared/LogLatteIntent.swift
+    dependencies:
+      - package: HealthCore   # Clock.format, so widget times read like the app's
     entitlements:
       path: HealthDashboardWidgets/HealthDashboardWidgets.entitlements
       properties:
@@ -115,6 +117,8 @@ targets:
       - HealthDashboardWatchWidgets
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
+    dependencies:
+      - package: HealthCore   # Clock.format, so complication times read like the app's
     entitlements:
       path: HealthDashboardWatchWidgets/HealthDashboardWatchWidgets.entitlements
       properties:
