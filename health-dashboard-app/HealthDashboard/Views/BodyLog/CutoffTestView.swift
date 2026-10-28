@@ -17,54 +17,37 @@ struct CutoffTestView: View {
         Screen(title: "Find your caffeine limit", accent: .yellow) {
             SampleDataBanner()
             header
-            progressCard
             resultCard
-            howCard
-            HowWeGotThisLink(title: "Find your caffeine limit",
-                             method: "From the day you first logged caffeine, we take each night's last caffeinated drink (from 4am the day before until you fell asleep) and how long you slept (from your Apple Watch). Nights go into groups: no caffeine, last caffeine before 12pm, 12 to 3pm, and after 3pm (drinks after midnight count as late). Each bar is the average sleep in that group. We compare the earliest and latest caffeine groups once each has at least \(HabitEffect.minimumNights) nights, and a difference has to be big enough to stand out from ordinary night-to-night swings: about 45 minutes with 5 nights in each group, shrinking to about 20 minutes with 30 or more.")
+            RowCard {
+                ExpandRow(title: "How to do the test", summary: "Three steps, about three weeks",
+                          systemImage: "list.number", accent: .yellow) {
+                    step(1, "Log every caffeinated drink at the time you had it. You can change times later on the Caffeine screen.")
+                    step(2, "Mix it up a little: some days stop before noon, some days a bit later.")
+                    step(3, "Wear your watch to bed. That's it.")
+                    Text("A night counts when your watch tracked your sleep. Days you logged no caffeine count too, as \u{201C}No caffeine\u{201D}.")
+                        .font(.secondary)
+                }
+            }
+            Card(density: .compact) {
+                HowWeGotThisLink(title: "Find your caffeine limit",
+                                 method: "From the day you first logged caffeine, we take each night's last caffeinated drink (from 4am the day before until you fell asleep) and how long you slept (from your Apple Watch). Nights go into groups: no caffeine, last caffeine before 12pm, 12 to 3pm, and after 3pm (drinks after midnight count as late). Each bar is the average sleep in that group. We compare the earliest and latest caffeine groups once each has at least \(HabitEffect.minimumNights) nights, and a difference has to be big enough to stand out from ordinary night-to-night swings: about 45 minutes with 5 nights in each group, shrinking to about 20 minutes with 30 or more.")
+            }
         }
     }
 
-    // MARK: Header
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 0) {
-            Text("Does a later coffee cost you sleep? Your own nights answer it.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            InfoButton(topic: .cutoffTest).padding(.vertical, -10)
-        }
-        .padding(.top, 4)
-    }
-
-    // MARK: Progress
+    // MARK: Summary
 
     private var progress: Double { test.target > 0 ? min(Double(test.nightsLogged) / Double(test.target), 1) : 0 }
 
-    private var progressCard: some View {
-        Card(accent: .yellow) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(min(test.nightsLogged, test.target)) of \(test.target) nights").font(.numberM)
-                Spacer()
-                Text(test.nightsLogged >= test.target ? "Done" : "\(test.target - test.nightsLogged) to go")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(Accent.yellow.ink(scheme))
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Palette(scheme: scheme).track)
-                    Capsule().fill(Accent.yellow.fill(scheme)).frame(width: geo.size.width * CGFloat(progress))
-                }
-            }
-            .frame(height: 10)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(test.nightsLogged) of \(test.target) nights logged")
-            Text(test.nightsLogged >= test.target
-                 ? "You've logged enough nights for a solid answer. It keeps updating as you log more."
-                 : "A night counts when your watch tracked your sleep. Days you logged no caffeine count too, as \u{201C}No caffeine\u{201D}.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
+    private var done: Bool { test.nightsLogged >= test.target }
+
+    private var header: some View {
+        SummaryHeader(eyebrow: "Nights logged", value: "\(min(test.nightsLogged, test.target)) of \(test.target)",
+                      status: SummaryStatus(text: done ? "Done" : "\(test.target - test.nightsLogged) to go", accent: done ? .mint : .yellow),
+                      line: done ? "You've logged enough nights for a solid answer. It keeps updating as you log more."
+                                 : "Does a later coffee cost you sleep? Your own nights answer it.",
+                      accent: .yellow, info: Topic.cutoffTest.explanation) {
+            SummaryMeter(fraction: progress, accent: .yellow, caption: "\(test.nightsLogged) of \(test.target) nights logged")
         }
     }
 
@@ -113,8 +96,8 @@ struct CutoffTestView: View {
         return test.groups.first { $0.label == selected }
     }
 
-    private var readout: (title: String, value: String, detail: String) {
-        guard let g = selectedGroup else {
+    private func readout(for group: CaffeineCutoffTest.Group?) -> (title: String, value: String, detail: String) {
+        guard let g = group else {
             let best = test.groups.max { $0.averageAsleep < $1.averageAsleep }
             return ("Average sleep by last caffeine", best.map { "Best: \($0.label.lowercased())" } ?? "No nights yet",
                     best.map { "\(Clock.duration($0.averageAsleep)) on average over \($0.nights) nights." } ?? "Log caffeine to start the test.")
@@ -133,16 +116,14 @@ struct CutoffTestView: View {
     private var resultCard: some View {
         Card {
             let c = conclusion
-            HStack {
-                Text(c.title).font(.cardTitle)
-                if model.usingSampleData { ExampleTag() }
-            }
+            Text(c.title).font(.cardTitle).accessibilityAddTraits(.isHeader)
             Text(c.detail).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if !test.groups.isEmpty {
-                let r = readout
+                let r = readout(for: selectedGroup)
                 ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .yellow,
-                             onClear: selected == nil ? nil : { selected = nil })
+                             onClear: selected == nil ? nil : { selected = nil },
+                             detailSlots: test.groups.map { readout(for: $0).detail } + [readout(for: nil).detail])
                 CutoffBarChart(groups: test.groups, selected: selectedGroup?.label, selection: $selected)
                     .frame(height: 190)
                     .accessibilityElement(children: .ignore)
@@ -152,20 +133,6 @@ struct CutoffTestView: View {
                         points: test.groups.map { ($0.label, Double($0.averageAsleep)) },
                         yLabel: { Clock.duration(Int($0.rounded())) }))
                 ScrubHint(each: "group")
-            }
-        }
-    }
-
-    private var howCard: some View {
-        Card(accent: .yellow) {
-            Text("How to do the test").font(.bodyEmphasis)
-            VStack(alignment: .leading, spacing: 8) {
-                step(1, "Log every caffeinated drink at the time you had it. You can change times later on the Caffeine screen.")
-                step(2, "Mix it up a little: some days stop before noon, some days a bit later.")
-                step(3, "Wear your watch to bed. That's it.")
-            }
-            LinkRow(title: "Caffeine today", subtitle: "Log or edit drinks", systemImage: "cup.and.saucer.fill", accent: .yellow) {
-                CaffeineView()
             }
         }
     }

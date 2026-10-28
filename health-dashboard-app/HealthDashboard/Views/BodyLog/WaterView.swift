@@ -2,54 +2,43 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Water today: progress, adding water at any time, the running total
-/// through the day, today's entries (editable), and your bottle size and goal.
+/// Water today, summary first: how far to the goal and the Log tab's add
+/// buttons. Today's entries open in place; the running total through the
+/// day and the bottle size and goal are pages one tap down.
 struct WaterView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
 
-    @State private var time: LogTime = .now
-    /// What she typed, parsed only when she taps Add / Set, so the button
-    /// always uses the number on screen.
-    @State private var customOz = ""
-    @State private var customBottle = ""
     @State private var editing: AppData.WaterEntry?
-    @State private var selected: Int?
     @State private var toast: UndoToast?
+    @State private var showsAdd = false
     @State private var goalCount = 0
-    /// Why a typed amount wasn't used (out of range), instead of a silent change.
-    @State private var amountNote: String?
-    @State private var bottleNote: String?
     @State private var logCount = 0
-    @FocusState private var focused: Field?
-
-    private enum Field: Hashable { case amount, bottle }
-
-    /// Common bottles in fluid ounces: a can-size cup, a store water bottle, 24, 32 and 40 oz tumblers.
-    private static let bottlePresetsOz: [Double] = [12, 16.9, 24, 32, 40]
 
     var body: some View {
         Screen(title: "Water", accent: .blue) {
-            hero
-            addCard
-            chartCard
-            entriesCard
-            bottleCard
-            if !hidesGoal { goalCard }
+            SampleDataBanner()
+            header
+            WaterQuickLog(toast: $toast, showsTotal: false) { showsAdd = true }
+            rows
+            if !hidesGoal {
+                Card(density: .compact) {
+                    LearnMoreRow("Learn more about water", article: .waterGoal, accent: .blue)
+                }
+            }
         }
         .sheet(item: $editing) { entry in
             editor(entry)
         }
+        .bottomSheet(isPresented: $showsAdd, title: "Add water") {
+            WaterAddSheet { ml, label, time in add(ml: ml, label: label, time: time) }
+                .environmentObject(model)
+                .environmentObject(store)
+        }
         .undoToast($toast)
         .sensoryFeedback(.increase, trigger: logCount)
         .sensoryFeedback(.success, trigger: goalCount)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { focused = nil }
-            }
-        }
     }
 
     /// "8", "8.5" or "8,5" as a number; nil if it isn't one.
@@ -62,11 +51,146 @@ struct WaterView: View {
     /// Eating-disorder history: no goal, percentage, "goal reached" or pace
     /// anywhere, just the total (Cole 5, Ruiz F13).
     private var hidesGoal: Bool { model.hidesEffortTargets }
-    /// Over about 135 oz (4 L) a day is a lot for most women (Ruiz F10).
-    private static let highGoalOz = 135.0
 
-    // MARK: Hero
+    // MARK: Summary
 
+    /// The same answer, short: a chip and one line for the summary.
+    private var pace: (status: SummaryStatus?, line: String) {
+        let have = model.waterTodayML
+        if have >= goalML { return (nil, "Goal reached. Nice.") }
+        let steady = model.waterPace(at: model.now)
+        let gap = steady - have
+        if gap <= bottleML * 0.25 {
+            return (SummaryStatus(text: "On track", accent: .mint), "A steady pace would be about \(LogFormat.oz(steady)) by now.")
+        }
+        if gap < min(bottleML, 1000) {
+            return (SummaryStatus(text: "A little behind", accent: .yellow), "About \(LogFormat.oz(gap)) to catch up over the next hour or two.")
+        }
+        let behind = gap / bottleML
+        return (SummaryStatus(text: "Behind pace", accent: .yellow),
+                "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind. Spread it out: no more than about 1 liter (34 oz) an hour.")
+    }
+
+    private var lastPair: StatPair {
+        StatPair(label: "Last drink", value: model.todaysWater.last.map { LogFormat.time($0.date) } ?? "None yet")
+    }
+
+    @ViewBuilder
+    private var header: some View {
+        let have = model.waterTodayML
+        if hidesGoal {
+            // With an eating-disorder history: the total only, no goal or bar.
+            SummaryHeader(eyebrow: "Water today", value: LogFormat.ozNumber(have), unit: "oz",
+                          line: "\(LogFormat.bottlesPhrase(model.waterBottlesToday)) logged today.", pairs: [lastPair],
+                          accent: .blue,
+                          info: Explanation(id: "waterToday", title: "Water today",
+                                            meaning: "The water you logged today, added up. Bottles are counted with your own bottle size, which you can change in Bottle and goal.",
+                                            forYou: "Drink to thirst, and a bit more on hot days. Drinks like tea, milk and juice count too, and food adds more."))
+        } else {
+            let p = pace
+            let toGo = max(goalML - have, 0)
+            SummaryHeader(eyebrow: "Water today", value: LogFormat.ozNumber(have), unit: "of \(LogFormat.oz(goalML))",
+                          status: p.status, line: p.line,
+                          pairs: [lastPair, StatPair(label: "To go", value: toGo > 0 ? LogFormat.oz(toGo) : "Done")],
+                          accent: .blue, info: CaffeineWaterCopy.waterGoal) {
+                SummaryMeter(fraction: goalML > 0 ? have / goalML : 0, accent: .blue,
+                             caption: "\(LogFormat.bottles(model.waterBottlesToday)) of \(LogFormat.bottlesPhrase(model.waterGoalBottles))")
+            }
+        }
+    }
+
+    // MARK: Add
+
+    private func add(ml: Double, label: String, time: LogTime) {
+        let id = UUID()
+        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        withMotion(.log) { model.addWater(ml: ml, at: time.date, id: id) }
+        let when = store.data.waterLog.first { $0.id == id }?.date ?? .now
+        var message = LogFormat.loggedLine(label, time: time, at: when).replacingOccurrences(of: "Logged ", with: "Added ")
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+            message += " That\u{2019}s today\u{2019}s goal."
+            goalCount += 1
+        } else {
+            logCount += 1
+        }
+        toast = UndoToast(message) { withMotion(.undo) { model.deleteWater(id) } }
+    }
+
+    // MARK: Rows
+
+    private var entriesSummary: String {
+        guard let last = model.todaysWater.last else { return "None yet" }
+        return "\(model.todaysWater.count) logged \u{00B7} last \(LogFormat.time(last.date))"
+    }
+
+    private var rows: some View {
+        RowCard {
+            MetricRow(title: "Water through the day",
+                      note: hidesGoal ? "Your total, hour by hour" : "Pace: \(LogFormat.oz(model.waterPace(at: model.now))) by now",
+                      systemImage: "chart.xyaxis.line", accent: .blue) {
+                WaterDayView()
+            }
+            RowDivider()
+            ExpandRow(title: "Today\u{2019}s entries", summary: entriesSummary, systemImage: "list.bullet", accent: .blue) {
+                if model.todaysWater.isEmpty {
+                    Text("Nothing logged yet today.")
+                } else {
+                    LogEntryList(items: model.todaysWater.reversed(), onTap: { editing = $0 },
+                                 onDelete: { model.deleteWater($0.id) }) { entry in
+                        LogEntryRow(systemImage: "drop.fill", accent: .blue, title: LogFormat.oz(entry.ml),
+                                    detail: LogFormat.bottlesPhrase(entry.ml / max(bottleML, 1)),
+                                    time: LogFormat.time(entry.date))
+                    }
+                    .foregroundStyle(Palette(scheme: scheme).primary)
+                    Text("Tap an entry to change its time or amount. Swipe left to delete.")
+                        .font(.secondary)
+                }
+            }
+            RowDivider()
+            MetricRow(title: hidesGoal ? "Your bottle" : "Bottle and goal",
+                      note: hidesGoal ? "\(LogFormat.oz(bottleML)) bottle" : "\(LogFormat.oz(bottleML)) bottle \u{00B7} \(LogFormat.oz(goalML)) goal",
+                      systemImage: "waterbottle.fill", accent: .blue) {
+                WaterBottleGoalView()
+            }
+        }
+    }
+
+    private func editor(_ entry: AppData.WaterEntry) -> some View {
+        // The sheet works in ounces; storage stays in ml.
+        let toOz = { (ml: Double) in ((ml / LogFormat.mlPerOunce) * 10).rounded() / 10 }
+        let presets: [(label: String, value: Double)] = [("\u{00BD} bottle", toOz(bottleML / 2)), ("1 bottle", toOz(bottleML))]
+        return LogEditSheet(title: "Edit water", accent: .blue, date: entry.date, amount: toOz(entry.ml), unit: "oz",
+                            step: 1, range: 1...100, presets: presets,
+                            onSave: { date, oz in model.updateWater(entry.id, date: date, ml: oz * LogFormat.mlPerOunce) },
+                            onDelete: { model.deleteWater(entry.id) })
+            .environmentObject(model)
+            .environmentObject(store)
+    }
+}
+
+// MARK: - Water through the day
+
+/// The running total through today against a steady pace to the goal,
+/// scrubbable hour by hour. One tap down from Water.
+struct WaterDayView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @State private var selected: Int?
+
+    private var bottleML: Double { store.data.bottleSizeML }
+    private var goalML: Double { store.data.waterGoalML }
+    /// Eating-disorder history: no goal, percentage or pace (Cole 5, Ruiz F13).
+    private var hidesGoal: Bool { model.hidesEffortTargets }
+
+    var body: some View {
+        Screen(title: "Water through the day", accent: .blue) {
+            SampleDataBanner()
+            chartCard
+        }
+    }
+
+    /// Where she is against a steady pace, in full (the chart's readout).
     private var status: String {
         let have = model.waterTodayML
         // No goal or "behind" with an eating-disorder history: just what's logged.
@@ -80,147 +204,6 @@ struct WaterView: View {
         let behind = gap / bottleML
         return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 1 liter (34 oz) an hour."
     }
-
-    @ViewBuilder
-    private var hero: some View {
-        if hidesGoal { totalHero } else { goalHero }
-    }
-
-    /// With an eating-disorder history: the total only, no ring or goal.
-    private var totalHero: some View {
-        Card {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(LogFormat.oz(model.waterTodayML)).font(.display)
-                InfoButton(title: "Water today",
-                           meaning: "The water you logged today, added up. Bottles are counted with your own bottle size, which you can change below.",
-                           forYou: "Drink to thirst, and a bit more on hot days. Drinks like tea, milk and juice count too, and food adds more.")
-                    .padding(.vertical, -12)
-            }
-            Text("\(LogFormat.bottlesPhrase(model.waterBottlesToday)) logged today")
-                .font(.bodyEmphasis)
-                .foregroundStyle(Accent.blue.ink(scheme))
-        }
-    }
-
-    private var goalHero: some View {
-        Card {
-            AdaptiveStack(spacing: 16) {
-                Ring(value: goalML > 0 ? model.waterTodayML / goalML : 0, accent: .blue,
-                     label: LogFormat.bottles(model.waterBottlesToday),
-                     caption: "of \(LogFormat.bottlesPhrase(model.waterGoalBottles))", size: 146)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(LogFormat.oz(model.waterTodayML)).font(.numberL)
-                    HStack(spacing: 0) {
-                        Text("of \(LogFormat.oz(goalML)) goal").font(.secondary).fontWeight(.semibold).secondaryText()
-                        InfoButton(title: "Daily water goal",
-                                   meaning: "How much you want to drink across the day. Bottles are counted with your own bottle size, which you can change below.",
-                                   forYou: "For women, US guidance is about 9 cups (74 oz) a day from drinks; food adds more. You need more if you\u{2019}re pregnant or breastfeeding, and on hot days and workout days. These are averages, not requirements: drink to thirst, and pale yellow pee usually means you\u{2019}re drinking enough. During long workouts, don\u{2019}t drink much more than you sweat out; far too much water can be dangerous.")
-                            .padding(.vertical, -12)
-                    }
-                    Text(status).font(.secondary).fontWeight(.semibold)
-                        .foregroundStyle(Accent.blue.ink(scheme))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    // MARK: Add
-
-    private func add(ml: Double, label: String) {
-        let chosen = time
-        let id = UUID()
-        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
-        withMotion(.log) { model.addWater(ml: ml, at: chosen.date, id: id) }
-        let when = store.data.waterLog.first { $0.id == id }?.date ?? .now
-        var message = LogFormat.loggedLine(label, time: chosen, at: when).replacingOccurrences(of: "Logged ", with: "Added ")
-        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
-            message += " That\u{2019}s today\u{2019}s goal."
-            goalCount += 1
-        } else {
-            logCount += 1
-        }
-        toast = UndoToast(message) { withMotion(.undo) { model.deleteWater(id) } }
-        time = .now
-    }
-
-    private var addCard: some View {
-        Card {
-            Text("Add water").font(.cardTitle).accessibilityAddTraits(.isHeader)
-            LogTimeSelector(time: $time, accent: .blue)
-            HStack(spacing: 10) {
-                addButton(title: "1 bottle", detail: LogFormat.oz(bottleML)) { add(ml: bottleML, label: "1 bottle") }
-                addButton(title: "\u{00BD} bottle", detail: LogFormat.oz(bottleML / 2)) { add(ml: bottleML / 2, label: "half a bottle") }
-            }
-            LabeledControlRow(spacing: 10) {
-                Text("Other amount").font(.bodyEmphasis)
-                    .fixedSize(horizontal: false, vertical: true)
-            } control: {
-              HStack(spacing: 10) {
-                TextField("8", text: $customOz)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .font(.bodyEmphasis)
-                    .focused($focused, equals: .amount)
-                    .padding(.horizontal, 10)
-                    .frame(width: Font.scaledSize(80))
-                    .frame(minHeight: 44)
-                    .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityLabel("Other amount in ounces")
-                Text("oz").font(.bodyText).secondaryText()
-                Button {
-                    focused = nil
-                    guard let oz = Self.parse(customOz), oz > 0 else { return }
-                    guard oz <= 100 else {
-                        amountNote = "\(customOz) oz is more than 100 oz at once, so it wasn\u{2019}t added. Log it in parts, or check the number."
-                        return
-                    }
-                    amountNote = nil
-                    let ml = max(oz, 1) * LogFormat.mlPerOunce
-                    add(ml: ml, label: LogFormat.oz(ml))
-                    customOz = ""
-                } label: {
-                    Text("Add")
-                        .font(.bodyEmphasis)
-                        .fixedSize()   // never squeezed into letters (round 3)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 44)
-                        .foregroundStyle(Color(hex: 0x00111F))
-                        .background(Accent.blue.fill(scheme), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled((Self.parse(customOz) ?? 0) <= 0)
-                .accessibilityLabel("Add \(customOz.isEmpty ? "the amount you typed" : customOz + " ounces"), \(time.phrase)")
-              }
-            }
-            if let amountNote { rangeNote(amountNote) }
-        }
-    }
-
-    private func rangeNote(_ text: String) -> some View {
-        Label(text, systemImage: "exclamationmark.circle")
-            .font(.secondary).fontWeight(.semibold)
-            .foregroundStyle(Accent.orange.ink(scheme))
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func addButton(title: String, detail: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Label(title, systemImage: "plus").font(.bodyEmphasis)
-                Text(detail).font(.secondary).fontWeight(.semibold).secondaryText()
-            }
-            .frame(maxWidth: .infinity, minHeight: 60)
-            .foregroundStyle(Accent.blue.ink(scheme))
-            .background(Accent.blue.fill(scheme).opacity(0.18), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous).strokeBorder(Accent.blue.fill(scheme).opacity(0.35)))
-        }
-        .buttonStyle(.pressable)
-        .accessibilityLabel("Add \(title), \(detail), \(time.phrase)")
-    }
-
-    // MARK: Chart
 
     private var chartStart: Minutes {
         let first = model.todaysWater.first.map { model.appDayMinutes($0.date) } ?? model.lastNight.wake
@@ -248,12 +231,12 @@ struct WaterView: View {
         return (clamped / 15) * 15
     }
 
-    private var readout: (title: String, value: String, detail: String) {
-        guard let raw = selected else {
+    /// The readout at a snapped time, or for now when nothing is selected.
+    private func readout(at time: Int?) -> (title: String, value: String, detail: String) {
+        guard let t = time else {
             let have = model.waterTodayML
             return ("Now \u{00B7} \(Clock.format(model.now))", "\(LogFormat.oz(have)) \u{00B7} \(LogFormat.bottlesPhrase(model.waterBottlesToday))", status)
         }
-        let t = snap(raw)
         let have = model.waterML(by: t)
         let pct = goalML > 0 ? Int((have / goalML * 100).rounded()) : 0
         let atThatTime = model.todaysWater.filter { model.appDayMinutes($0.date) == t }.map(\.ml).reduce(0, +)
@@ -269,14 +252,21 @@ struct WaterView: View {
         return ("By \(Clock.format(t))", "\(LogFormat.oz(have)) \u{00B7} \(LogFormat.bottlesPhrase(have / max(bottleML, 1)))", detail)
     }
 
+    /// Every note the readout can show today, so it keeps one height.
+    private var detailSlots: [String] {
+        let times = Set(stride(from: chartStart, through: chartEnd, by: 15).map(snap) + model.todaysWater.map { model.appDayMinutes($0.date) })
+        return [readout(at: nil).detail] + times.map { readout(at: $0).detail }
+    }
+
     private var chartCard: some View {
         Card(accent: .blue) {
-            Text("Water through the day").font(.bodyEmphasis)
-            let r = readout
+            Text("Today").font(.bodyEmphasis).accessibilityAddTraits(.isHeader)
+            let r = readout(at: selected)
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .blue,
-                         onClear: selected == nil ? nil : { selected = nil })
+                         onClear: selected == nil ? nil : { selected = nil },
+                         detailSlots: detailSlots)
             WaterDayChart(run: run, pace: paceLine, goal: hidesGoal ? nil : goalML, start: chartStart, end: chartEnd,
-                          now: model.now, selected: selected.map(snap), selectedML: selected.map { model.waterML(by: snap($0)) },
+                          now: model.now, selected: selected, selectedML: selected.map { model.waterML(by: $0) },
                           selection: $selected.snapping { snap($0) })
                 .frame(height: 180)
                 .accessibilityElement(children: .ignore)
@@ -288,9 +278,11 @@ struct WaterView: View {
                     yLabel: { "\(Int($0.rounded())) oz" }))
             ScrubHint(each: "hour")
             if !hidesGoal {
+                // The goal is named here, not on the plot (Arai 4).
                 HStack(spacing: 14) {
                     legend("You", color: Accent.blue.fill(scheme), dashed: false)
                     legend("Steady pace", color: Palette(scheme: scheme).tertiary, dashed: true)
+                    legend("Goal", color: Accent.blue.ink(scheme), dashed: true)
                 }
                 .accessibilityHidden(true)
             }
@@ -310,44 +302,154 @@ struct WaterView: View {
         .secondaryText()
     }
 
-    // MARK: Entries
+}
 
-    private var entriesCard: some View {
+// MARK: - Add water at another time or amount
+
+/// The Water screen's "Earlier, or another amount" sheet: when she had it,
+/// a bottle or half, or any amount in ounces. Closes after adding, so the
+/// Undo toast shows on the screen.
+private struct WaterAddSheet: View {
+    var onAdd: (_ ml: Double, _ label: String, _ time: LogTime) -> Void
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dismiss) private var dismiss
+    @State private var time: LogTime = .now
+    /// What she typed, parsed only when she taps Add, so the button always
+    /// uses the number on screen.
+    @State private var customOz = ""
+    /// Why a typed amount wasn't used (out of range), instead of a silent change.
+    @State private var amountNote: String?
+    @FocusState private var focused: Bool
+
+    private var bottleML: Double { store.data.bottleSizeML }
+
+    var body: some View {
         Card {
-            HStack {
-                Text("Today").font(.cardTitle).accessibilityAddTraits(.isHeader)
-                Spacer()
-                Text("\(model.todaysWater.count) logged").font(.secondary).fontWeight(.semibold).secondaryText()
-            }
-            if model.todaysWater.isEmpty {
-                Text("Nothing logged yet today. Add water above, at the time you had it.")
-                    .font(.bodyText).secondaryText()
-            } else {
-                LogEntryList(items: model.todaysWater.reversed(), onTap: { editing = $0 },
-                             onDelete: { model.deleteWater($0.id) }) { entry in
-                    LogEntryRow(systemImage: "drop.fill", accent: .blue, title: LogFormat.oz(entry.ml),
-                                detail: LogFormat.bottlesPhrase(entry.ml / max(bottleML, 1)),
-                                time: LogFormat.time(entry.date))
+            LogTimeSelector(time: $time, accent: .blue)
+        }
+        HStack(spacing: 10) {
+            addButton(title: "1 bottle", detail: LogFormat.oz(bottleML)) { add(bottleML, label: "1 bottle") }
+            addButton(title: "\u{00BD} bottle", detail: LogFormat.oz(bottleML / 2)) { add(bottleML / 2, label: "half a bottle") }
+        }
+        Card {
+            LabeledControlRow(spacing: 10) {
+                Text("Other amount").font(.bodyEmphasis)
+                    .fixedSize(horizontal: false, vertical: true)
+            } control: {
+                HStack(spacing: 10) {
+                    TextField("8", text: $customOz)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .font(.bodyEmphasis)
+                        .focused($focused)
+                        .padding(.horizontal, 10)
+                        .frame(width: Font.scaledSize(80))
+                        .frame(minHeight: 44)
+                        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                        .accessibilityLabel("Other amount in ounces")
+                    Text("oz").font(.bodyText).secondaryText()
+                    Button(action: addTyped) {
+                        Text("Add")
+                            .font(.bodyEmphasis)
+                            .fixedSize()   // never squeezed into letters (round 3)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 44)
+                            .foregroundStyle(Color(hex: 0x00111F))
+                            .background(Accent.blue.fill(scheme), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled((WaterView.parse(customOz) ?? 0) <= 0)
+                    .accessibilityLabel("Add \(customOz.isEmpty ? "the amount you typed" : customOz + " ounces"), \(time.phrase)")
                 }
-                Text("Tap an entry to change its time or amount. Swipe left to delete.")
-                    .font(.secondary).secondaryText()
+            }
+            if let amountNote { WaterRangeNote(text: amountNote) }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { focused = false }
             }
         }
     }
 
-    private func editor(_ entry: AppData.WaterEntry) -> some View {
-        // The sheet works in ounces; storage stays in ml.
-        let toOz = { (ml: Double) in ((ml / LogFormat.mlPerOunce) * 10).rounded() / 10 }
-        let presets: [(label: String, value: Double)] = [("\u{00BD} bottle", toOz(bottleML / 2)), ("1 bottle", toOz(bottleML))]
-        return LogEditSheet(title: "Edit water", accent: .blue, date: entry.date, amount: toOz(entry.ml), unit: "oz",
-                            step: 1, range: 1...100, presets: presets,
-                            onSave: { date, oz in model.updateWater(entry.id, date: date, ml: oz * LogFormat.mlPerOunce) },
-                            onDelete: { model.deleteWater(entry.id) })
-            .environmentObject(model)
-            .environmentObject(store)
+    private func add(_ ml: Double, label: String) {
+        onAdd(ml, label, time)
+        dismiss()
     }
 
-    // MARK: Bottle and goal
+    private func addTyped() {
+        focused = false
+        guard let oz = WaterView.parse(customOz), oz > 0 else { return }
+        guard oz <= 100 else {
+            amountNote = "\(customOz) oz is more than 100 oz at once, so it wasn\u{2019}t added. Log it in parts, or check the number."
+            return
+        }
+        let ml = max(oz, 1) * LogFormat.mlPerOunce
+        add(ml, label: LogFormat.oz(ml))
+    }
+
+    private func addButton(title: String, detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Label(title, systemImage: "plus").font(.bodyEmphasis)
+                Text(detail).font(.secondary).fontWeight(.semibold).secondaryText()
+            }
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .foregroundStyle(Accent.blue.ink(scheme))
+            .background(Accent.blue.fill(scheme).opacity(0.18), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.inner, style: .continuous).strokeBorder(Accent.blue.fill(scheme).opacity(0.35)))
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel("Add \(title), \(detail), \(time.phrase)")
+    }
+}
+
+/// Why a typed amount wasn't used, in orange.
+private struct WaterRangeNote: View {
+    var text: String
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.circle")
+            .font(.secondary).fontWeight(.semibold)
+            .foregroundStyle(Accent.orange.ink(scheme))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - Bottle and goal
+
+/// Her bottle size and daily water goal: settings, not data, so a page one
+/// tap down from Water (and Settings' Water bottle row).
+struct WaterBottleGoalView: View {
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @State private var customBottle = ""
+    @State private var bottleNote: String?
+    @FocusState private var focused: Bool
+
+    /// Common bottles in fluid ounces: a can-size cup, a store water bottle, 24, 32 and 40 oz tumblers.
+    private static let bottlePresetsOz: [Double] = [12, 16.9, 24, 32, 40]
+    /// Over about 135 oz (4 L) a day is a lot for most women (Ruiz F10).
+    private static let highGoalOz = 135.0
+
+    private var bottleML: Double { store.data.bottleSizeML }
+    private var goalML: Double { store.data.waterGoalML }
+
+    var body: some View {
+        Screen(title: model.hidesEffortTargets ? "Your bottle" : "Bottle and goal", accent: .blue) {
+            bottleCard
+            if !model.hidesEffortTargets { goalCard }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { focused = false }
+            }
+        }
+    }
 
     private var bottleBinding: Binding<Double> {
         // In ounces. Storage stays in ml.
@@ -396,7 +498,7 @@ struct WaterView: View {
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .font(.bodyEmphasis)
-                    .focused($focused, equals: .bottle)
+                    .focused($focused)
                     .padding(.horizontal, 10)
                     .frame(width: Font.scaledSize(80))
                     .frame(minHeight: 44)
@@ -404,8 +506,8 @@ struct WaterView: View {
                     .accessibilityLabel("Exact bottle size in ounces")
                 Text("oz").font(.bodyText).secondaryText()
                 Button {
-                    focused = nil
-                    guard let oz = Self.parse(customBottle), oz >= 4 else { return }
+                    focused = false
+                    guard let oz = WaterView.parse(customBottle), oz >= 4 else { return }
                     guard oz <= 68 else {
                         bottleNote = "\(customBottle) oz is bigger than the 68 oz limit, so your bottle size didn\u{2019}t change."
                         return
@@ -423,10 +525,10 @@ struct WaterView: View {
                         .background(Accent.blue.tint(scheme), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled((Self.parse(customBottle) ?? 0) < 4)
+                .disabled((WaterView.parse(customBottle) ?? 0) < 4)
               }
             }
-            if let bottleNote { rangeNote(bottleNote) }
+            if let bottleNote { WaterRangeNote(text: bottleNote) }
             Text("Between 4 and 68 oz.").font(.secondary).secondaryText()
         }
     }
@@ -452,7 +554,10 @@ struct WaterView: View {
 
     private var goalCard: some View {
         Card {
-            Text("Daily goal").font(.cardTitle).accessibilityAddTraits(.isHeader)
+            HStack(spacing: 0) {
+                Text("Daily goal").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                InfoButton(explanation: CaffeineWaterCopy.waterGoal).padding(.vertical, -12)
+            }
             Stepper(value: goalBinding, in: 16...170, step: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LogFormat.oz(goalML)).font(.numberM)
@@ -465,11 +570,8 @@ struct WaterView: View {
             .accessibilityLabel("Daily goal")
             .accessibilityValue("\(LogFormat.ozNumber(goalML)) ounces, \(LogFormat.bottlesPhrase(model.waterGoalBottles))")
             if goalML / LogFormat.mlPerOunce > Self.highGoalOz {
-                rangeNote("Over about 135 oz (4 liters) a day is a lot for most women, and drinking far more than your body needs can be dangerous. Unless a doctor told you to, a lower goal is safer.")
+                WaterRangeNote(text: CaffeineWaterCopy.highGoal)
             }
-            Text("For women, US guidance is about 9 cups (74 oz) a day from drinks. Drinks like tea, milk and juice count too, and food adds more on top.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -526,7 +628,7 @@ private struct WaterDayChart: View {
         }
         // VoiceOver reads the chart's summary (chartScrub makes it one
         // element), so no mark-level hiding (Weber A8).
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 30 })
         .chartXScale(domain: start...end)
         // The last x label ("12am") ran past the plot's edge (Weber C11).
         .chartXScale(range: .plotDimension(endPadding: 10))
@@ -552,13 +654,11 @@ private struct WaterDayChart: View {
     @ChartContentBuilder
     private var goalRule: some ChartContent {
         if let goal {
-            // Water is blue on this screen, goal included (Tanaka F4).
+            // Water is blue on this screen, goal included (Tanaka F4); its
+            // label is in the legend under the chart, off the plot.
             RuleMark(y: .value("Goal", goal))
                 .foregroundStyle(Accent.blue.ink(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                .annotation(position: .top, alignment: .leading) {
-                    Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.blue.ink(scheme))
-                }
         }
     }
 

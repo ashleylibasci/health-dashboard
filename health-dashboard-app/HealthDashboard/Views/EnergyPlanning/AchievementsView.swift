@@ -1,15 +1,17 @@
 import SwiftUI
 import HealthCore
 
-/// Streaks and wins: current and longest streaks, plus badges worked out
-/// from what she already tracks. Locked badges say what earns them.
+/// Streaks and wins: how many streaks are going and the next badge first,
+/// then each streak as a row and the badges as a grid. A badge's details
+/// open in a sheet, so the page never grows under her finger.
 struct AchievementsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    @State private var selectedBadge: String? = nil
+    @State private var openBadge: AppModel.Badge? = nil
+    @State private var openStreak: AppModel.StreakInfo? = nil
 
     var body: some View {
         let badges = model.badges
@@ -17,26 +19,40 @@ struct AchievementsView: View {
         // Dubois 9).
         Screen(title: "Streaks and badges", accent: .yellow) {
             SampleDataBanner()
-            streaksCard
-            badgesCard(badges)
-            if let next = model.nextBadge {
-                nextCard(next)
+            summary
+            RowCard {
+                ForEach(Array(model.streaks.enumerated()), id: \.element.id) { i, s in
+                    if i > 0 { RowDivider() }
+                    MetricRow(title: s.title, note: "\(s.unit.prefix(1).uppercased() + s.unit.dropFirst()) in a row \u{00B7} longest \(s.longest)", value: "\(s.current)",
+                              systemImage: "flame.fill", accent: accent(for: s.title), action: { openStreak = s })
+                }
             }
+            badgesCard(badges)
+        }
+        .bottomSheet(item: $openStreak, title: { $0.title }) { s in
+            let m = meaning(for: s.title)
+            Text("\(s.current) \(s.unit) in a row \u{00B7} longest \(s.longest)").font(.cardTitle)
+            Text(m.0).font(.bodyText).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+            Text(m.1).font(.bodyText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .bottomSheet(item: $openBadge, title: { $0.title }) { b in
+            badgeDetail(b)
         }
     }
 
-    // MARK: Streaks
+    // MARK: Summary
 
-    private var streaksCard: some View {
-        Card {
-            SectionLabel(text: "Your streaks")
-            ForEach(model.streaks) { s in
-                StreakRow(streak: s, accent: accent(for: s.title), meaning: meaning(for: s.title))
-            }
-            Text("A streak counts days in a row. Until today's night or check-in is in, it runs through yesterday. Miss a day and it starts again, but your longest stays.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private var summary: some View {
+        let going = model.streaks.filter { $0.current > 0 }.count
+        let line = model.nextBadge.map { "Next badge: \($0.title), \($0.progress) of \($0.goal)." }
+            ?? "You've earned every badge."
+        return SummaryHeader(eyebrow: "Streaks", value: "\(going) of \(model.streaks.count)", unit: "going",
+                             line: line, accent: .yellow,
+                             info: Explanation(id: "streaks", title: "Streaks",
+                                               meaning: "A streak counts days in a row. Until today's night or check-in is in, it runs through yesterday.",
+                                               forYou: "Miss a day and it starts again, but your longest stays."))
     }
 
     private func accent(for title: String) -> Accent {
@@ -65,114 +81,39 @@ struct AchievementsView: View {
 
     private func badgesCard(_ badges: [AppModel.Badge]) -> some View {
         let earned = badges.filter(\.earned).count
-        let selected = badges.first { $0.id == selectedBadge }
         let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: typeSize.isAccessibilitySize ? 2 : 3)
         return Card {
-            AdaptiveStack(spacing: 4) {
-                SectionLabel(text: "Badges")
+            AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
+                Text("Badges").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 if !typeSize.isAccessibilitySize { Spacer() }
-                Text("\(earned) of \(badges.count) earned").font(.secondary).fontWeight(.semibold).secondaryText()
+                Text("\(earned) of \(badges.count) earned \u{00B7} tap one").font(.secondary).fontWeight(.semibold).secondaryText()
             }
             LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(badges) { b in
-                    BadgeCell(badge: b, selected: b.id == selectedBadge) {
-                        selectedBadge = selectedBadge == b.id ? nil : b.id
-                    }
+                    BadgeCell(badge: b) { openBadge = b }
                 }
-            }
-            if let selected {
-                badgeDetail(selected)
-            } else {
-                Text("Tap a badge to see what earns it.").font(.secondary).secondaryText()
             }
         }
     }
 
     private func badgeDetail(_ b: AppModel.Badge) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AdaptiveStack(spacing: 4) {
-                Text(b.title).font(.bodyEmphasis)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !typeSize.isAccessibilitySize { Spacer() }
-                Text(b.earned ? "Earned" : "\(b.progress) / \(b.goal)")
-                    .font(.secondary).fontWeight(.bold)
-                    .foregroundStyle(b.earned ? Accent.mint.ink(scheme) : Palette(scheme: scheme).secondary)
-            }
+        VStack(alignment: .leading, spacing: Space.m) {
+            Text(b.earned ? "Earned" : "\(b.progress) of \(b.goal)")
+                .font(.cardTitle)
+                .foregroundStyle(b.earned ? Accent.mint.ink(scheme) : Palette(scheme: scheme).primary)
             Text(b.howTo).font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             if !b.earned {
                 BarRow(label: "Progress", fraction: b.fraction, valueText: "\(Int((b.fraction * 100).rounded()))%", accent: b.accent)
             }
         }
-        .padding(Space.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(b.accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(b.title), \(b.earned ? "earned" : "\(b.progress) of \(b.goal)"). \(b.howTo)")
-    }
-
-    private func nextCard(_ b: AppModel.Badge) -> some View {
-        Card(accent: .yellow) {
-            SectionLabel(text: "Next up", accent: .yellow)
-            AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
-                Text(b.title).font(.cardTitle)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !typeSize.isAccessibilitySize { Spacer() }
-                Text("\(b.progress) / \(b.goal)").font(.numberM).foregroundStyle(Accent.yellow.ink(scheme))
-                    .keepsOnOneLine()
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(b.title), \(b.progress) of \(b.goal)")
-            BarRow(label: "Progress", fraction: b.fraction, valueText: "\(Int((b.fraction * 100).rounded()))%", accent: .yellow)
-            Text(b.howTo).font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }
 
 // MARK: - Subviews
 
-private struct StreakRow: View {
-    var streak: AppModel.StreakInfo
-    var accent: Accent
-    var meaning: (String, String)
-    @Environment(\.colorScheme) private var scheme
-    @State private var explaining = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 0) {
-                Text("\(streak.current)").font(.numberL).foregroundStyle(accent.ink(scheme))
-                    .keepsOnOneLine()
-                Image(systemName: "flame.fill").font(.small).foregroundStyle(accent.ink(scheme))
-                    .accessibilityHidden(true)
-            }
-            .frame(width: 56, height: 56)
-            .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 0) {
-                    Text(streak.title).font(.bodyEmphasis)
-                    InfoButton(title: streak.title, meaning: meaning.0, forYou: meaning.1).padding(.vertical, -12)
-                        .accessibilityHidden(true)
-                }
-                Text("\(streak.current) \(streak.unit) in a row · longest \(streak.longest)")
-                    .font(.secondary).secondaryText()
-            }
-            Spacer(minLength: 0)
-        }
-        // One stop per streak; its explanation is an action (Ortiz F9).
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(streak.title), \(streak.current) \(streak.unit) in a row, longest \(streak.longest)")
-        .accessibilityAction(named: "Explain") { explaining = true }
-        .sheet(isPresented: $explaining) {
-            ExplanationSheet(explanation: Explanation(id: streak.title, title: streak.title, meaning: meaning.0, forYou: meaning.1))
-        }
-    }
-}
-
 private struct BadgeCell: View {
     var badge: AppModel.Badge
-    var selected: Bool
     var action: () -> Void
     @Environment(\.colorScheme) private var scheme
 
@@ -184,22 +125,22 @@ private struct BadgeCell: View {
                 ZStack {
                     if earned {
                         Circle().fill(badge.accent.tint(scheme))
-                        Circle().strokeBorder(badge.accent.fill(scheme).opacity(0.45), lineWidth: selected ? 3 : 1)
+                        Circle().strokeBorder(badge.accent.fill(scheme).opacity(0.45), lineWidth: 1)
                     } else {
                         Circle().fill(p.chip)
-                        Circle().strokeBorder(p.tertiary.opacity(0.5), style: StrokeStyle(lineWidth: selected ? 2 : 1, dash: [4, 3]))
+                        Circle().strokeBorder(p.tertiary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     }
                     Image(systemName: earned ? badge.systemImage : "lock.fill")
                         .font(.section)
                         .foregroundStyle(earned ? badge.accent.ink(scheme) : p.tertiary)
                 }
                 .frame(width: 60, height: 60)
+                // Two lines at most; the full name is in the sheet title.
                 Text(badge.title)
                     .font(.secondary).fontWeight(earned ? .bold : .semibold)
                     .foregroundStyle(earned ? p.primary : p.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
                 if !earned {
                     Text("\(badge.progress) / \(badge.goal)").font(.small).foregroundStyle(p.secondary)
                 }
@@ -213,6 +154,5 @@ private struct BadgeCell: View {
         .buttonStyle(.plain)
         .accessibilityLabel(earned ? "\(badge.title), earned" : "\(badge.title), locked, \(badge.progress) of \(badge.goal)")
         .accessibilityHint(badge.howTo)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
