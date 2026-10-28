@@ -8,10 +8,23 @@ extension AppModel {
     /// Minutes to fall asleep, the same as the wake planner's default.
     static let planLatency = 12
 
+    /// Tonight from the one bedtime (`tonightBedtime`: her best times,
+    /// earlier on a night that needs more sleep).
     var tonightPlan: TonightPlan {
-        let bed = store.data.bedtime, up = store.data.upBy
-        return TonightPlan(need: tonightNeed, bedtime: bed, upBy: up, latency: Self.planLatency,
-                           clockShift: clockShiftTonight(bedtime: bed, deadline: up), plan: wakePlan())
+        let bed = tonightBedtime, up = store.data.upBy
+        return TonightPlan(need: tonightNeed, bedtime: bed, upBy: up, latency: bestTimes.latency,
+                           clockShift: clockShiftTonight(bedtime: bed, deadline: up), plan: wakePlan(bedtime: bed))
+    }
+
+    /// "Bed at your usual 12:30am gets you about 7h 40m, 45 min short."
+    /// Nil when the bedtime she set is no later than tonight's.
+    var usualBedtimeNote: String? {
+        let usual = store.data.bedtime, up = store.data.upBy
+        guard usual > tonightBedtime + 10 else { return nil }
+        let p = TonightPlan(need: tonightNeed, bedtime: usual, upBy: up, latency: bestTimes.latency,
+                            clockShift: clockShiftTonight(bedtime: usual, deadline: up), plan: wakePlan(bedtime: usual))
+        guard !p.coversNeed else { return nil }
+        return "Bed at your usual \(Clock.format(usual)) gets you about \(Clock.duration(p.expectedAsleep)), \(Clock.duration(p.shortfall)) short."
     }
 
     /// "Bed by 12:30am, up 8:22am" (always with am/pm). Without a plan, the
@@ -44,9 +57,9 @@ extension AppModel {
         return text
     }
 
-    /// The bedtime to aim for tonight: the one that covers tonight's need
-    /// when the planned bedtime doesn't, else the planned bedtime.
-    var tonightAimBedtime: Minutes { tonightPlan.bedtimeToCoverNeed ?? store.data.bedtime }
+    /// The bedtime to aim for tonight: the one bedtime, or the one that
+    /// covers tonight's need if a plan ever falls short of it.
+    var tonightAimBedtime: Minutes { tonightPlan.bedtimeToCoverNeed ?? tonightBedtime }
 
     /// "Aim for 8h 25m tonight: bed by 11:05pm." The same need and bedtime
     /// Today and Sleep show.

@@ -332,10 +332,12 @@ final class AppModel: ObservableObject {
     /// after, or the 25 minutes up to up-by.
     static let alarmWindowLead = 22
 
+    /// Tomorrow's wake plan, by default from tonight's one bedtime
+    /// (`tonightBedtime`, her best times).
     func wakePlan(upBy: Minutes? = nil, bedtime: Minutes? = nil) -> WakePlan? {
-        let bed = bedtime ?? store.data.bedtime
+        let bed = bedtime ?? tonightBedtime
         let deadline = upBy ?? store.data.upBy
-        return WakePlanner.plan(.init(bedtime: bed, cycleLength: sleepCycleLength,
+        return WakePlanner.plan(.init(bedtime: bed, latency: bestTimes.latency, cycleLength: sleepCycleLength,
                                       deadline: deadline, tonightNeed: tonightNeed.total,
                                       bestWindow: wakeHistory.bestWindow,
                                       currentAlarmLatest: store.data.smartAlarmEnabled ? activeAlarmOverride?.end : nil,
@@ -1286,7 +1288,7 @@ final class AppModel: ObservableObject {
             await Nudges.cancelAlarmArm()
             return
         }
-        let fire = AppDay.date(store.data.bedtime - 60, relativeTo: next.wakeDay)
+        let fire = AppDay.date(tonightBedtime - 60, relativeTo: next.wakeDay)
         guard fire > .now, fire < next.start else {
             await Nudges.cancelAlarmArm()
             return
@@ -1334,7 +1336,7 @@ final class AppModel: ObservableObject {
             energyNow: Int(energyBankNow.rounded()),
             energyZoneTitle: current?.title ?? "", nextZoneTitle: next?.title ?? "",
             nextZoneStart: next.map { AppDay.date($0.range.start, relativeTo: today) },
-            bedtime: AppDay.date(store.data.bedtime, relativeTo: nextWakeDay),
+            bedtime: AppDay.date(tonightBedtime, relativeTo: nextWakeDay),
             alarmWindowStart: window.map { AppDay.date($0.start, relativeTo: windowDay) },
             alarmWindowEnd: window.map { AppDay.date($0.end, relativeTo: windowDay) },
             alarmEnabled: store.data.smartAlarmEnabled,
