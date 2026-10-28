@@ -299,7 +299,8 @@ private struct RecoveryHistoryChart: View {
                     .foregroundStyle(color(night))
                     .cornerRadius(4)
             }
-            usualLine
+            .accessibilityHidden(true)   // VoiceOver reads the summary (round 3, A9)
+            usualLine.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartYScale(domain: 0...100)
@@ -368,7 +369,8 @@ private struct HeartTrendChart: View {
     var body: some View {
         let line = accent.fill(scheme)
         Chart {
-            usualLine
+            // VoiceOver reads the chart's summary instead (round 3, A9).
+            usualLine.accessibilityHidden(true)
             ForEach(points) { point in
                 LineMark(x: .value("Day", point.day, unit: .day), y: .value(metric.label, point.value))
                     .foregroundStyle(line)
@@ -378,7 +380,8 @@ private struct HeartTrendChart: View {
                     .foregroundStyle(line)
                     .symbolSize(24)
             }
-            selectionMarks
+            .accessibilityHidden(true)
+            selectionMarks.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartYScale(domain: yDomain)
