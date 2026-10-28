@@ -36,7 +36,7 @@ struct SettingsView: View {
                 RowDivider()
                 MetricRow(title: "Sleep & alarm",
                           note: "Usual bed \(Clock.format(store.data.bedtime)) \u{00B7} up by \(Clock.format(store.data.upBy))",
-                          systemImage: "alarm.fill", accent: .orange) { SleepSettingsView() }
+                          systemImage: "alarm.fill", accent: .purple) { SleepSettingsView() }
                 RowDivider()
                 MetricRow(title: "Tracking", note: trackingNote,
                           systemImage: "slider.horizontal.3", accent: .blue) { TrackingSettingsView() }

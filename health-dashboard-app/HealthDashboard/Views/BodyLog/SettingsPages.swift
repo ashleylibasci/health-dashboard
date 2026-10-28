@@ -202,7 +202,7 @@ struct SleepSettingsView: View {
 
     var body: some View {
         let p = Palette(scheme: scheme)
-        Screen(title: "Sleep & alarm", accent: .orange) {
+        Screen(title: "Sleep & alarm", accent: .purple) {
             Card {
                 SleepScheduleControl()
             }
