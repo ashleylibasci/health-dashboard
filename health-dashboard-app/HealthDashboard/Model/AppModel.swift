@@ -496,6 +496,7 @@ final class AppModel: ObservableObject {
     func connectHealth() async {
         setPrefersSampleData(false)
         await syncWithHealth()
+        BackgroundHealth.shared.start(self)
     }
 
     private func syncWithHealth() async {

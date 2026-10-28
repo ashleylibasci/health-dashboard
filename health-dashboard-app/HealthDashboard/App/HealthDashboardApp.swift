@@ -15,6 +15,8 @@ struct HealthDashboardApp: App {
         _store = StateObject(wrappedValue: store)
         _model = StateObject(wrappedValue: model)
         DemoMode.applySetup(store: store, model: model)
+        // Apple Health wakes the app with new data (also when it's closed).
+        BackgroundHealth.shared.start(model)
         // Wired here rather than in a view, so Watch messages that arrive when
         // iOS wakes the app in the background are still handled.
         WatchSync.shared.onMessage = { model.handle($0) }
