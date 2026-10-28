@@ -147,6 +147,18 @@ struct BodyTrendCard: View {
 
     private var dayFormat: Date.FormatStyle { .dateTime.weekday(.abbreviated).month(.abbreviated).day() }
 
+    /// The readout before she touches the chart: "14-night average · 46 ms",
+    /// "Range 42–49 ms · your usual 46 ms". Nil with fewer than 2 nights.
+    private var atRest: (title: String, value: String, detail: String)? {
+        let values = points.map(\.value)
+        guard values.count >= 2, let lo = values.min(), let hi = values.max() else { return nil }
+        let average = values.reduce(0, +) / Double(values.count)
+        // "42–49 ms" (one unit) for HRV and resting HR; durations keep both.
+        let range = metric == .sleep ? "\(format(lo))\u{2013}\(format(hi))" : "\(Int(lo.rounded()))\u{2013}\(format(hi))"
+        let reference = metric == .sleep ? "your need" : "your usual"
+        return ("\(values.count)-night average", format(average), "Range \(range) \u{00B7} \(reference) \(format(usual))")
+    }
+
     var body: some View {
         Card {
             HStack {
@@ -155,12 +167,17 @@ struct BodyTrendCard: View {
             }
             AdaptiveSegmentedPicker("Measure", selection: $metric, options: Array(Metric.allCases)) { m in m.rawValue }
                 .onChange(of: metric) { _, _ in selected = nil }
-            if let p = shown {
+            if selected == nil, let rest = atRest {
+                // At rest, the period, not last night again: the screen's
+                // summary already says that (F17).
+                ChartReadout(title: rest.title, value: rest.value, detail: rest.detail, accent: accent,
+                             detailSlots: points.map { meaning($0.value) })
+            } else if let p = shown {
                 ChartReadout(title: selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat),
                              value: format(p.value), detail: meaning(p.value),
                              accent: isWorse(p.value) ? .coral : accent,
                              onClear: selected == nil ? nil : { selected = nil },
-                             detailSlots: points.map { meaning($0.value) })
+                             detailSlots: points.map { meaning($0.value) } + [atRest?.detail].compactMap { $0 })
             }
             if points.count >= 2 {
                 NightTrendChart(points: points, usual: usual, band: band, scale: scale, accent: accent,
