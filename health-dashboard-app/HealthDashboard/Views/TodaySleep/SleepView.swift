@@ -210,6 +210,22 @@ struct SleepView: View {
         }
     }
 
+    /// "Learning you · 2 of 7 ready", while anything still learns (D-L1).
+    @ViewBuilder
+    private var learningRow: some View {
+        let items = model.learningItems
+        let ready = items.filter(\.isReady).count
+        if ready < items.count {
+            RowDivider()
+            MetricRow(title: "Learning you",
+                      note: model.usingSampleData ? "Example numbers for now" : "\(ready) of \(items.count) ready",
+                      verdict: model.usingSampleData ? RowVerdict(text: "Example", accent: .yellow) : nil,
+                      systemImage: "sparkles", accent: .purple) {
+                LearningView()
+            }
+        }
+    }
+
     /// Two or three nights before an early exam (or during exam-week mode):
     /// "Bed 20 minutes earlier tonight gives you a cushion" (H-C3).
     @ViewBuilder
@@ -279,6 +295,7 @@ struct SleepView: View {
                     TimeChangeView()
                 }
             }
+            learningRow
             RowDivider(hasIcon: false)
             LearnMoreRow("Learn more about trouble sleeping", article: .troubleSleeping, accent: .purple)
                 .padding(.horizontal, Space.l)
