@@ -110,6 +110,10 @@ struct WatchPagesView: View {
                 .tag(3)
         }
         .tabViewStyle(.verticalPage)
+        // A tapped complication opens its page (healthnext://page/2).
+        .onOpenURL { url in
+            if url.host == "page", let n = Int(url.lastPathComponent), (0...3).contains(n) { page = n }
+        }
     }
 
     /// Debug builds: `-page 2` opens on that page (0 Recovery, 1 Energy,

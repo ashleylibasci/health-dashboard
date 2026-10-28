@@ -56,10 +56,12 @@ targets:
       - Shared
     dependencies:
       - package: HealthCore
+      - target: HealthDashboardWatchWidgets
     entitlements:
       path: HealthDashboardWatch/HealthDashboardWatch.entitlements
       properties:
         com.apple.developer.healthkit: true
+        com.apple.security.application-groups: [group.com.ashleylibasci.healthdashboard]
     info:
       path: HealthDashboardWatch/Info.plist
       properties:
@@ -100,6 +102,29 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.widgets
         TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+  HealthDashboardWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - HealthDashboardWatchWidgets
+      - Shared/WidgetSnapshot.swift
+      - Shared/Theme.swift
+    entitlements:
+      path: HealthDashboardWatchWidgets/HealthDashboardWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.ashleylibasci.healthdashboard]
+    info:
+      path: HealthDashboardWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Health Next
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.next.watchkitapp.widgets
         DEVELOPMENT_TEAM: 93C3VKR4FJ   # Ashley Libasci (Personal Team)
         CODE_SIGN_STYLE: Automatic
         SKIP_INSTALL: YES

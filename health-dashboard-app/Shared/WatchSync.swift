@@ -117,8 +117,32 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     func send(_ snapshot: WatchSnapshot) {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated,
               let data = try? JSONEncoder().encode(snapshot) else { return }
-        try? WCSession.default.updateApplicationContext(["snapshot": data])
+        var context: [String: Any] = ["snapshot": data]
+        // The watch-face complications' numbers ride along.
+        if let widget = WidgetSnapshot.savedData { context["widget"] = widget }
+        try? WCSession.default.updateApplicationContext(context)
+        #if os(iOS)
+        sendComplicationUpdate()
+        #endif
     }
+
+    #if os(iOS)
+    private var lastComplicationUpdate: Date?
+    private var lastComplicationData: Data?
+
+    /// Complications on her watch face update without opening the Watch app,
+    /// using the daily complication budget sparingly: only when the numbers
+    /// changed, and at most every 30 minutes.
+    private func sendComplicationUpdate() {
+        let session = WCSession.default
+        guard session.isComplicationEnabled, session.remainingComplicationUserInfoTransfers > 0,
+              let widget = WidgetSnapshot.savedData, widget != lastComplicationData else { return }
+        if let last = lastComplicationUpdate, Date().timeIntervalSince(last) < 30 * 60 { return }
+        lastComplicationUpdate = .now
+        lastComplicationData = widget
+        session.transferCurrentComplicationUserInfo(["widget": widget])
+    }
+    #endif
 
     /// Queues a message for the phone. Returns false when it couldn't even be
     /// queued; a later delivery failure shows up in `deliveryError`.
@@ -201,6 +225,10 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        if let widget = userInfo["widget"] as? Data {
+            WidgetSnapshot.receive(widget)
+            return
+        }
         guard let data = userInfo["message"] as? Data, let message = try? JSONDecoder().decode(WatchMessage.self, from: data) else { return }
         Task { @MainActor in self.onMessage?(message) }
     }
@@ -233,6 +261,9 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     #endif
 
     private func receive(context: [String: Any]) {
+        #if os(watchOS)
+        if let widget = context["widget"] as? Data { WidgetSnapshot.receive(widget) }
+        #endif
         guard let data = context["snapshot"] as? Data, let s = try? JSONDecoder().decode(WatchSnapshot.self, from: data) else { return }
         snapshot = s
         clearDeliveryError()

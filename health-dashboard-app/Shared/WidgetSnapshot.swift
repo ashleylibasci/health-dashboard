@@ -58,6 +58,16 @@ struct WidgetSnapshot: Codable, Equatable {
         return try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
     }
 
+    /// The saved snapshot as sent to the Watch (which keeps its own copy for
+    /// the watch-face complications).
+    static var savedData: Data? { defaults?.data(forKey: key) }
+
+    /// Watch side: the phone's snapshot arrived.
+    static func receive(_ data: Data) {
+        guard let s = try? JSONDecoder().decode(WidgetSnapshot.self, from: data) else { return }
+        s.save()
+    }
+
     /// Saves it and asks every widget to redraw (only when something changed,
     /// to stay inside WidgetKit's reload budget).
     func save() {
