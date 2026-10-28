@@ -42,10 +42,11 @@ struct WhyOffView: View {
                         + " Telling the app how awake you feel each morning makes the next guess better.")
     }
 
+    /// No stat pair: a lone "Recovery start 78" read as jargon (F13); the
+    /// badge already compares today's recovery with her usual.
     private func header(_ reasons: [AppModel.OffReason]) -> some View {
         let recovery = model.recoveryShown
         let below = recovery.map { $0 < model.recoveryUsual - 5 } ?? false
-        let usualWord = model.recoveryUsualIsPersonal ? "usual" : "start"
         return SummaryHeader(eyebrow: reasons.isEmpty ? "Why you might feel off" : "Most likely",
                              value: reasons.first?.title ?? "Nothing stands out",
                              status: recovery.map { SummaryStatus(text: "Recovery \($0)", accent: below ? .coral : .mint) },
@@ -54,7 +55,6 @@ struct WhyOffView: View {
                                 : model.usingSampleData
                                     ? "Example reasons, ranked by how far each one is from the example normal."
                                     : "Your top reasons, ranked by how far each one is from your normal.",
-                             pairs: recovery == nil ? [] : [StatPair(label: "Recovery \(usualWord)", value: "\(model.recoveryUsual)")],
                              accent: .coral, info: info)
     }
 
@@ -74,13 +74,38 @@ struct WhyOffView: View {
         let both = second.map { s in
             bedtimeFix.contains(top.topic ?? .daylight) && bedtimeFix.contains(s.topic ?? .daylight)
         } ?? false
-        return Card(accent: .indigo) {
-            SectionLabel(text: "The one thing to do", accent: .indigo)
-            Text(model.tryThis(for: top)).font(.cardTitle)
-                .fixedSize(horizontal: false, vertical: true)
-            if both {
-                Text("It helps with your top two reasons at once.").font(.secondary).secondaryText()
+        // One line to act on; the arithmetic behind it opens in place (F14).
+        return RowCard(accent: .indigo) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                SectionLabel(text: "The one thing to do", accent: .indigo)
+                Text(headline(for: top)).font(.cardTitle)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(Space.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            RowDivider(hasIcon: false)
+            ExpandRow(title: "Why this helps", summary: both ? "It helps with your top two reasons at once" : nil,
+                      accent: .indigo) {
+                Text(model.tryThis(for: top)).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// The one thing to do, in a few words. The full tip (`tryThis`) is in
+    /// the row under it.
+    private func headline(for reason: AppModel.OffReason) -> String {
+        switch reason.topic {
+        case .sleepDebt?: return "Bed by \(Clock.format(model.tonightAimBedtime)) tonight"
+        case .lateNight?: return "Bed by \(Clock.format(model.tonightBedtime)) tonight and tomorrow"
+        case .luteal?: return "Extra rest is fine right now"
+        case .illness?: return "Take an easy day"
+        case .stress?: return "Five minutes of slow breathing"
+        case .caffeineCutoff?:
+            return model.caffeineCutoffBeforeWake
+                ? "One small drink, soon after you wake"
+                : "Last caffeine before \(Clock.format(model.caffeineCutoff)) tomorrow"
+        case .daylight?: return "10 to 20 minutes outside"
+        default: return "Go easy on yourself today"
         }
     }
 }
@@ -97,7 +122,7 @@ private struct WhyOffReasonRow: View {
     @State private var explaining: Explanation? = nil
 
     var body: some View {
-        ExpandRow(title: reason.title, summary: reason.detail,
+        ExpandRow(title: reason.title, summary: reason.detail, summaryLines: 2,
                   systemImage: "\(number).circle.fill", accent: number == 1 ? .coral : (number == 2 ? .orange : .indigo)) {
             Text(reason.detail).fixedSize(horizontal: false, vertical: true)
             if let tryThis {

@@ -230,6 +230,9 @@ struct ExpandRow<Content: View>: View {
     var summary: String? = nil
     var systemImage: String? = nil
     var accent: Accent = .indigo
+    /// Lines the closed summary may use at the default text sizes (2 for
+    /// a sentence that would otherwise be cut off mid-thought, F13).
+    var summaryLines = 1
     private var external: Binding<Bool>?
     @State private var internalExpanded: Bool
     @ViewBuilder var content: Content
@@ -238,10 +241,11 @@ struct ExpandRow<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// State kept by the row itself (not remembered between visits).
-    init(title: String, summary: String? = nil, systemImage: String? = nil, accent: Accent = .indigo,
-         initiallyExpanded: Bool = false, @ViewBuilder content: () -> Content) {
+    init(title: String, summary: String? = nil, summaryLines: Int = 1, systemImage: String? = nil,
+         accent: Accent = .indigo, initiallyExpanded: Bool = false, @ViewBuilder content: () -> Content) {
         self.title = title
         self.summary = summary
+        self.summaryLines = summaryLines
         self.systemImage = systemImage
         self.accent = accent
         self.external = nil
@@ -306,7 +310,7 @@ struct ExpandRow<Content: View>: View {
                     Text(summary)
                         .font(.secondary)
                         .foregroundStyle(p.secondary)
-                        .lineLimit(ax ? 2 : 1)
+                        .lineLimit(ax ? max(2, summaryLines) : summaryLines)
                         .minimumScaleFactor(ax ? 1 : 0.9)
                 }
             }
