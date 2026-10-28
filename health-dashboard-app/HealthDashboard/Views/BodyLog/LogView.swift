@@ -366,16 +366,16 @@ struct LogView: View {
 
 // MARK: - Shared by the Log, Caffeine, Water and Drinks screens
 
-/// The caffeine log card, on the Log tab and on the Caffeine screen (one
-/// implementation, so a fix lands in both): when she had it, her saved
-/// drinks as one-tap rows, and a new drink. Logging shows the Undo toast
-/// through `toast`.
+/// The caffeine log card, on the Log tab and on the Caffeine screen: one
+/// component that looks and works the same in both (design review F27).
+/// When she had it is one pill (`LogTimeMenu`); her first three saved
+/// drinks are one-tap rows; the rest, the common drinks and "New caffeine
+/// drink" are in a More drinks sheet. Logging shows the Undo toast through
+/// `toast`.
 ///
-/// On the Log tab (`compact == false`) it leads with today's total, the
-/// time chips and every saved drink. On the Caffeine screen the summary
-/// above has the total, so it's titled "Log caffeine" with the time as one
-/// pill (`LogTimeMenu`), shows her first three saved drinks, and puts the
-/// rest, the common drinks and "New caffeine drink" in a More drinks sheet.
+/// Only the title differs: on the Log tab (`compact == false`) it's
+/// today's total; on the Caffeine screen, whose summary has the total,
+/// it's "Log caffeine".
 struct CaffeineQuickLog: View {
     @Binding var toast: UndoToast?
     var compact = false
@@ -392,9 +392,7 @@ struct CaffeineQuickLog: View {
 
     private static let shownSaved = 3
 
-    private var shownDrinks: [Drink] {
-        compact ? Array(store.data.savedDrinks.prefix(Self.shownSaved)) : store.data.savedDrinks
-    }
+    private var shownDrinks: [Drink] { Array(store.data.savedDrinks.prefix(Self.shownSaved)) }
 
     /// Saved drinks past the first three, then common drinks she hasn't saved.
     private var moreDrinks: [Drink] {
@@ -408,27 +406,17 @@ struct CaffeineQuickLog: View {
         VStack(spacing: 0) {
             titleRow(p)
                 .padding(.horizontal, Space.l)
-                .padding(.top, Space.m)
-                .padding(.bottom, compact ? Space.m : 0)
-            if !compact {
-                LogTimeSelector(time: $time, accent: .yellow, title: "When did you have it?")
-                    .padding(.horizontal, Space.l)
-                    .padding(.vertical, Space.m)
-            }
+                .padding(.vertical, Space.m)
             Divider().overlay(p.cardBorder)
             ForEach(shownDrinks) { drink in
                 drinkButton(drink)
                 Divider().overlay(p.cardBorder)
             }
-            if compact {
-                Button { showsMore = true } label: {
-                    plainRowLabel(title: "More drinks", systemImage: "ellipsis")
-                }
-                .buttonStyle(.pressable)
-                .accessibilityHint("Common drinks, and a new caffeine drink")
-            } else {
-                newDrinkLink
+            Button { showsMore = true } label: {
+                plainRowLabel(title: "More drinks", systemImage: "ellipsis")
             }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Common drinks, and a new caffeine drink")
         }
         .background(Accent.yellow.tint(scheme), in: shape)
         .sensoryFeedback(.increase, trigger: addCount)
@@ -439,24 +427,22 @@ struct CaffeineQuickLog: View {
         }
     }
 
-    @ViewBuilder
     private func titleRow(_ p: Palette) -> some View {
-        if compact {
-            HStack(spacing: Space.s) {
+        HStack(spacing: Space.s) {
+            if compact {
                 Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Space.s)
-                LogTimeMenu(time: $time, accent: .yellow)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                    Text("\(model.caffeineMgToday)")
+                        .font(.numberM)
+                        .contentTransition(reduceMotion ? .opacity : .numericText())
+                        .motion(.log, value: model.caffeineMgToday)
+                    Text("mg today").font(.secondary).foregroundStyle(p.secondary)
+                }
+                .accessibilityElement(children: .combine)
             }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                Text("\(model.caffeineMgToday)")
-                    .font(.numberM)
-                    .contentTransition(reduceMotion ? .opacity : .numericText())
-                    .motion(.log, value: model.caffeineMgToday)
-                Text("mg today").font(.secondary).foregroundStyle(p.secondary)
-                Spacer(minLength: 0)
-            }
-            .accessibilityElement(children: .combine)
+            Spacer(minLength: Space.s)
+            LogTimeMenu(time: $time, accent: .yellow)
         }
     }
 
@@ -688,9 +674,8 @@ struct WaterQuickLog: View {
 
 /// "When did you have it?" as one pill ("Now ▾", "30m ago", "9:10am") that
 /// opens a menu of the same presets as `LogTimeSelector`, plus another
-/// time in a sheet. For log cards under a summary, where the always-open
-/// chips cost a row (the Caffeine and Alcohol screens; the Log tab keeps
-/// the chips).
+/// time in a sheet. For log cards, where the always-open chips cost a row
+/// (the caffeine card on the Log tab and Caffeine screen, and Alcohol).
 struct LogTimeMenu: View {
     @Binding var time: LogTime
     var accent: Accent
