@@ -118,6 +118,8 @@ struct SleepStagesView: View {
         return slices.last
     }
 
+    private var donutSlots: [String] { [inBedSummary] + SleepStage.allCases.map(StageStyle.oneLiner) }
+
     private var donutReadout: some View {
         let night = model.lastNight
         let total = max(slices.map(\.minutes).reduce(0, +), 1)
@@ -127,12 +129,12 @@ struct SleepStagesView: View {
                              value: Clock.duration(slice.minutes),
                              detail: StageStyle.oneLiner(slice.stage),
                              accent: StageStyle.accent(slice.stage),
-                             onClear: { selectedAngle = nil })
+                             onClear: { selectedAngle = nil }, detailSlots: donutSlots)
             } else {
                 // At rest: the night's total and its shape (Valtonen F13).
                 ChartReadout(title: "Last night \u{00B7} asleep", value: Clock.duration(night.asleep),
                              detail: inBedSummary,
-                             accent: .purple)
+                             accent: .purple, detailSlots: donutSlots)
             }
         }
     }

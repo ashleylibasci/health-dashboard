@@ -8,6 +8,7 @@ struct SleepView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedDay: Date? = nil
 
     var body: some View {
@@ -22,9 +23,6 @@ struct SleepView: View {
             BestTimesCard()
             weekCard
             rows
-            Card(density: .compact) {
-                LearnMoreRow("Learn more about trouble sleeping", article: .troubleSleeping, accent: .purple)
-            }
         }
     }
 
@@ -39,19 +37,18 @@ struct SleepView: View {
         return "Right on your \(Clock.duration(need)) need"
     }
 
-    /// Dial beside the times when they fit; at large text sizes the times
-    /// go under the dial.
+    /// Dial beside the times and last night against her need; at
+    /// accessibility text sizes they go under the dial.
     private var lastNightCard: some View {
         Card {
-            ViewThatFits(in: .horizontal) {
+            if typeSize.isAccessibilitySize {
+                lastNightDial.frame(maxWidth: .infinity)
+                lastNightStats
+            } else {
                 HStack(spacing: Space.l) {
                     lastNightDial
                     lastNightStats
                     Spacer(minLength: 0)
-                }
-                VStack(alignment: .leading, spacing: Space.m) {
-                    lastNightDial.frame(maxWidth: .infinity)
-                    lastNightStats
                 }
             }
         }
@@ -59,7 +56,7 @@ struct SleepView: View {
 
     private var lastNightDial: some View {
         let night = model.lastNight
-        return SleepArcDial(start: night.onset, end: night.wake, size: 132, lineWidth: 12,
+        return SleepArcDial(start: night.onset, end: night.wake, size: 124, lineWidth: 12,
                             colors: [Accent.purple.ink(scheme), Accent.purple.fill(scheme)],
                             label: Clock.duration(night.asleep), labelSize: 22,
                             caption: "last night", showHours: true)
@@ -67,7 +64,7 @@ struct SleepView: View {
 
     private var lastNightStats: some View {
         let night = model.lastNight
-        return VStack(alignment: .leading, spacing: Space.m) {
+        return VStack(alignment: .leading, spacing: Space.s) {
             statBlock("Fell asleep", night.onset)
             statBlock("Woke up", night.wake)
             Text(needLine)
@@ -151,7 +148,7 @@ struct SleepView: View {
                                 weekNights.min { abs($0.wakeDay.timeIntervalSince(d)) < abs($1.wakeDay.timeIntervalSince(d)) }?.wakeDay
                             },
                             barWidth: 22)
-                    .frame(height: 150)
+                    .frame(height: 100)
                 NeedLegend(need: model.sleepNeed.minutes)
             }
         }
@@ -165,9 +162,32 @@ struct SleepView: View {
         return "Deep \(Clock.duration(m[.deep] ?? 0)) \u{00B7} REM \(Clock.duration(m[.rem] ?? 0))"
     }
 
-    private var weekendShift: Int? {
-        guard !model.workNights.isEmpty, !model.freeNights.isEmpty else { return nil }
-        return model.chronotype?.socialJetlag
+    private static func average(_ nights: [Chronotype.Night]) -> TimeRange? {
+        guard !nights.isEmpty else { return nil }
+        let n = Double(nights.count)
+        let onset = Double(nights.map(\.onset).reduce(0, +)) / n
+        let wake = Double(nights.map(\.wake).reduce(0, +)) / n
+        return TimeRange(Int(onset.rounded()), Int(wake.rounded()))
+    }
+
+    /// School nights against free nights, in place (the body clock itself
+    /// lives on the Body tab).
+    @ViewBuilder
+    private var weekendRow: some View {
+        if let work = Self.average(model.workNights), let free = Self.average(model.freeNights) {
+            let shift = model.chronotype?.socialJetlag ?? abs((free.start + free.end) / 2 - (work.start + work.end) / 2)
+            RowDivider()
+            ExpandRow(title: "Weekend shift", summary: "Free nights \(Clock.duration(shift)) later than school nights",
+                      systemImage: "calendar", accent: shift >= 60 ? .coral : .indigo) {
+                ShiftBar(title: "School nights", range: work, color: Accent.purple.fill(scheme))
+                ShiftBar(title: "Free nights", range: free,
+                         color: shift >= 60 ? Accent.coral.fill(scheme) : Accent.purple.ink(scheme).opacity(0.6))
+                Text(shift >= 60
+                     ? "Like flying a time zone west every weekend. Keeping free days within an hour of school days makes Mondays easier."
+                     : "Under an hour, which is the goal. Your body clock stays steady through the week.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private var rows: some View {
@@ -179,7 +199,7 @@ struct SleepView: View {
                 }
                 RowDivider()
             }
-            MetricRow(title: "Week & month", note: "Every night and your averages",
+            MetricRow(title: "Week & month", note: "Every night, averages",
                       value: model.sleepRegularityScore.map { "\($0)" },
                       verdict: model.sleepRegularityScore.map { _ in RowVerdict(text: "Regularity", accent: .purple) },
                       systemImage: "chart.bar.fill", accent: .purple) {
@@ -193,15 +213,7 @@ struct SleepView: View {
                       systemImage: "bed.double.fill", accent: .purple) {
                 SleepNeedView()
             }
-            if let shift = weekendShift {
-                RowDivider()
-                MetricRow(title: "Weekend shift", note: "Free nights against school nights",
-                          value: Clock.duration(shift),
-                          verdict: RowVerdict(text: "Later", accent: shift >= 60 ? .coral : .mint),
-                          systemImage: "calendar", accent: .indigo) {
-                    ChronotypeView()
-                }
-            }
+            weekendRow
             if model.daysUntilFallBack <= 28 {
                 RowDivider()
                 MetricRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
@@ -210,6 +222,9 @@ struct SleepView: View {
                     TimeChangeView()
                 }
             }
+            RowDivider(hasIcon: false)
+            LearnMoreRow("Learn more about trouble sleeping", article: .troubleSleeping, accent: .purple)
+                .padding(.horizontal, Space.l)
         }
     }
 }
@@ -234,5 +249,44 @@ struct NeedLegend: View {
         .foregroundStyle(p.secondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Dashed line: your need, \(Clock.duration(need)). Coral bars are nights under it.")
+    }
+}
+
+/// One sleep window on an 8pm-to-noon track.
+private struct ShiftBar: View {
+    var title: String
+    var range: TimeRange
+    var color: Color
+    @Environment(\.colorScheme) private var scheme
+
+    private let trackStart = -240   // 8pm the evening before
+    private let trackLength = 960.0 // to noon
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        VStack(spacing: 5) {
+            HStack {
+                Text(title)
+                Spacer()
+                // With am/pm: "1:22" alone is ambiguous for a night owl (round 3).
+                Text("\(Clock.format(range.start)) \u{2013} \(Clock.format(range.end))")
+            }
+            .font(.scaled(size: 12, weight: .semibold))
+            .foregroundStyle(p.secondary)
+            GeometryReader { geo in
+                let w = geo.size.width
+                let x = CGFloat(Double(range.start - trackStart) / trackLength) * w
+                let width = CGFloat(Double(range.length) / trackLength) * w
+                ZStack(alignment: .leading) {
+                    Capsule().fill(p.track)
+                    Capsule().fill(color)
+                        .frame(width: max(8, min(width, w - max(x, 0))))
+                        .offset(x: max(x, 0))
+                }
+            }
+            .frame(height: 12)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(Clock.format(range.start)) to \(Clock.format(range.end))")
     }
 }

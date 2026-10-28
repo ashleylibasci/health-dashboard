@@ -23,17 +23,16 @@ struct BestTimesCard: View {
                 HStack(spacing: Space.s) {
                     CapsLabel("Your best sleep times", color: Accent.purple.ink(scheme))
                     Spacer(minLength: Space.xs)
-                    if !typeSize.isAccessibilitySize { StatusChip(status: status) }
                     Image(systemName: "chevron.right")
                         .font(.scaled(size: 13, weight: .semibold))
                         .foregroundStyle(p.tertiary)
                 }
-                if typeSize.isAccessibilitySize { StatusChip(status: status) }
                 AdaptiveStack(spacing: Space.m, alignment: .top) {
-                    column("Bed by", model.tonightBedtime, note: BestTimesText.bedNote(model))
+                    column("Bed by", model.tonightBedtime, note: "Best \(best.bed.label)")
                     column("Up at", plan.wake ?? plan.upBy, note: BestTimesText.alarmNote(model, plan: plan))
                 }
-                Text(BestTimesText.line(best))
+                StatusChip(status: status)
+                Text(BestTimesText.line(model))
                     .font(.bodyText)
                     .foregroundStyle(p.secondary)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 3)
@@ -65,9 +64,9 @@ struct BestTimesCard: View {
 
     private func spoken(_ best: SleepTiming.Result, plan: TonightPlan, status: SummaryStatus) -> String {
         ["Your best sleep times, \(status.text)",
-         "Bed by \(Clock.format(model.tonightBedtime)), \(BestTimesText.bedNote(model))",
+         "Bed by \(Clock.format(model.tonightBedtime)), best window \(best.bed.label)",
          "Up at \(Clock.format(plan.wake ?? plan.upBy)), \(BestTimesText.alarmNote(model, plan: plan))",
-         BestTimesText.line(best)].joined(separator: ". ")
+         BestTimesText.line(model)].joined(separator: ". ")
     }
 }
 
@@ -92,19 +91,24 @@ enum BestTimesText {
         }
     }
 
-    /// The one line: her own finding, else what's holding it back, else
-    /// what the window is based on.
-    static func line(_ r: SleepTiming.Result) -> String {
-        if r.evidence != nil { return r.why }
-        if let caveat = r.caveat { return caveat.text }
-        return r.why
+    /// The one line: her own finding, else why tonight is earlier than
+    /// her window, else what's holding the finding back, else what the
+    /// window is based on. The rest is in `otherLines`.
+    static func line(_ model: AppModel) -> String {
+        lines(model).first ?? model.bestTimes.why
     }
 
-    /// Under "Bed by": the best window, or why tonight is earlier.
-    static func bedNote(_ model: AppModel) -> String {
-        let earlier = model.tonightEarlierThanBest
-        guard earlier > 0 else { return "Best \(model.bestTimes.bed.label)" }
-        return "\(Clock.duration(earlier)) early tonight"
+    /// Everything the one line could have said, after it (for the ⓘ).
+    static func otherLines(_ model: AppModel) -> [String] { Array(lines(model).dropFirst()) }
+
+    private static func lines(_ model: AppModel) -> [String] {
+        let r = model.bestTimes
+        var out: [String] = []
+        if r.evidence != nil { out.append(r.why) }
+        if let earlier = earlierReason(model) { out.append(earlier) }
+        if let caveat = r.caveat { out.append(caveat.text) }
+        if r.evidence == nil { out.append(r.why) }
+        return out
     }
 
     /// Why tonight is earlier than her usual best: "Tonight 30 min earlier

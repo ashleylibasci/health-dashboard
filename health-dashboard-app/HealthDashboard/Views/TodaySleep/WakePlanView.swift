@@ -36,15 +36,15 @@ struct WakePlanView: View {
         SummaryHeader(eyebrow: "Your best sleep times",
                       value: Clock.format(model.tonightBedtime), unit: "bed by",
                       status: BestTimesText.status(best),
-                      line: BestTimesText.line(best),
+                      line: BestTimesText.line(model),
                       pairs: [StatPair(label: "Up at", value: Clock.format(tonight.wake ?? tonight.upBy)),
                               StatPair(label: "Best window", value: best.bed.label)],
                       accent: .purple, info: explanation(best))
     }
 
     private func explanation(_ best: SleepTiming.Result) -> Explanation {
-        let forYou = [best.confidenceText, best.clockNote, BestTimesText.earlierReason(model), model.usualBedtimeNote,
-                      model.wakeTimesExplained].compactMap { $0 }
+        let forYou = BestTimesText.otherLines(model)
+            + [best.confidenceText, best.clockNote, model.usualBedtimeNote, model.wakeTimesExplained].compactMap { $0 }
         return Explanation(id: "best-sleep-times", title: "Your best sleep times",
                            meaning: "Bed by is the latest bedtime that still covers your sleep need before your up-by time, or your body clock's bedtime when that's earlier. After 28 school nights of your own, the nights your body did best on can move it earlier, never later. Up at is your best wake time: the end of a sleep cycle just before up-by, or up-by itself.",
                            forYou: forYou.joined(separator: " "))
@@ -657,8 +657,11 @@ private struct CycleTimeline: View {
                         .fontWeight(.bold)
                         .foregroundStyle(p.primary)
                         .position(x: min(max(x(wake, w), 70), w - 70), y: max(16, Font.scaledSize(16)) / 2)
-                    Text(Clock.format(deadline))
-                        .position(x: max(w - 30, w / 2), y: max(16, Font.scaledSize(16)) / 2)
+                    // Up-by only when it isn't the wake time itself.
+                    if Double(deadline - wake) >= span * 0.2 {
+                        Text(Clock.format(deadline))
+                            .position(x: max(w - 30, w / 2), y: max(16, Font.scaledSize(16)) / 2)
+                    }
                 }
                 .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(p.secondary)
