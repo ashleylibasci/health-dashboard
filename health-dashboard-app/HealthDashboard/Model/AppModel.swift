@@ -933,8 +933,12 @@ final class AppModel: ObservableObject {
         addWater(ml: store.data.bottleSizeML * bottles, at: date)
     }
 
-    func addWater(ml: Double, at date: Date = .now) {
-        let entry = AppData.WaterEntry(date: AppDay.pastTime(date), ml: ml)
+    /// `id`: the entry's own id, e.g. one the Watch made, so it's never
+    /// added twice and can be undone from the Watch.
+    func addWater(ml: Double, at date: Date = .now, id: UUID = UUID()) {
+        guard !store.data.waterLog.contains(where: { $0.id == id }) else { return }
+        var entry = AppData.WaterEntry(date: AppDay.pastTime(date), ml: ml)
+        entry.id = id
         store.data.waterLog.append(entry)
         writeHealth { try await $0.saveWater(ml: entry.ml, at: entry.date, id: entry.id) }
     }
@@ -1215,7 +1219,11 @@ final class AppModel: ObservableObject {
             upBy: AppDay.date(tonight.upBy, relativeTo: nextWakeDay),
             tonightNeedMinutes: tonight.need,
             plannedAsleepMinutes: tonight.plan == nil ? nil : tonight.expectedAsleep,
-            caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime))
+            caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime,
+            waterTodayML: waterTodayML,
+            waterGoalML: store.data.waterGoalML,
+            bottleML: store.data.bottleSizeML,
+            todayWaterIDs: todaysWater.map(\.id)))
     }
 
     func handle(_ message: WatchMessage) {
@@ -1228,6 +1236,12 @@ final class AppModel: ObservableObject {
             logDrink(id: entryID, drinkID: drinkID, name: name, mg: mg, at: at, saveToHealth: true)
         case let .undoDrink(entryID):
             deleteDrink(entryID)
+        case let .loggedWater(entryID, ml, at):
+            addWater(ml: ml, at: at, id: entryID)
+            pushToWatch()
+        case let .undoWater(entryID):
+            deleteWater(entryID)
+            pushToWatch()
         case let .woke(at, _):
             // She stopped the Watch's alarm: this morning's backup isn't needed.
             PhoneBackupAlarm.shared.watchRang(at: at)

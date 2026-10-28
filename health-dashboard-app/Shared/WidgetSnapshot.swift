@@ -38,6 +38,9 @@ struct WidgetSnapshot: Codable, Equatable {
     var bedtimeStreak: Int
     /// The drink "Log a latte" logs: her saved Latte, or her first saved drink.
     var quickDrink: QuickDrink? = nil
+    /// Today's caffeine cutoff; nil when it falls before she's up (then
+    /// `caffeineNote` says "One small drink early") and from older app builds.
+    var caffeineCutoff: Date? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
@@ -84,6 +87,18 @@ struct WidgetSnapshot: Codable, Equatable {
     func waterML(at date: Date) -> Double { isCurrent(at: date) ? waterML : 0 }
     func isCurrent(at date: Date) -> Bool { date.timeIntervalSince(appDayStart) < 24 * 3600 }
 
+    /// Today's day-bound numbers, or nil once the app day they belong to has
+    /// ended: yesterday's recovery, energy, cycle day and bedtime never show
+    /// as today's.
+    func recovery(at date: Date) -> Int? { isCurrent(at: date) ? recovery : nil }
+    func energyLeft(at date: Date) -> Int? { isCurrent(at: date) ? energyLeft : nil }
+    func cycleLine(at date: Date) -> String? { isCurrent(at: date) ? cycleLine : nil }
+    func cycleNumber(at date: Date) -> Int? { isCurrent(at: date) ? cycleNumber : nil }
+    func bedtime(at date: Date) -> Date? { isCurrent(at: date) ? bedtime : nil }
+    func caffeineCutoff(at date: Date) -> Date? { isCurrent(at: date) ? caffeineCutoff : nil }
+    /// Six hours or more since the app last read Apple Health.
+    func isStale(at date: Date) -> Bool { date.timeIntervalSince(updated) >= 6 * 3600 || !isCurrent(at: date) }
+
     /// A believable example for widget galleries and previews.
     static let example = WidgetSnapshot(
         updated: .now, isSample: true, recovery: 69, recoveryLabel: "Take it steady", energyLeft: 58,
@@ -91,4 +106,32 @@ struct WidgetSnapshot: Codable, Equatable {
         appDayStart: Calendar.current.startOfDay(for: .now), caffeineMg: 130, caffeineNote: "One small drink early",
         waterML: 1060, waterGoalML: 1893, bottleML: 710, bedtime: nil, bedtimeStreak: 4,
         quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130))
+}
+
+/// The Watch's smart alarm, for the Bedtime complication. Written to the App
+/// Group by the Watch app whenever the alarm's state changes (the phone
+/// never writes it).
+struct WatchAlarmState: Codable, Equatable {
+    /// Armed: rings by this time at the latest.
+    var armedEnd: Date?
+    /// On, but watchOS needs the app opened to arm it (or to use a new window).
+    var needsOpen: Bool
+
+    private static let key = "next.watchAlarm.v1"
+
+    static func load() -> WatchAlarmState? {
+        guard let data = WidgetSnapshot.defaults?.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(WatchAlarmState.self, from: data)
+    }
+
+    /// Saves it and redraws the Bedtime complication when it changed.
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        let old = WidgetSnapshot.defaults?.data(forKey: Self.key)
+        guard old != data else { return }
+        WidgetSnapshot.defaults?.set(data, forKey: Self.key)
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: "WatchBedtime")
+        #endif
+    }
 }

@@ -1,9 +1,11 @@
 import WidgetKit
 import SwiftUI
+import HealthCore
 
 /// Home Screen and Lock Screen widgets. They show the last numbers the app
 /// saved (`WidgetSnapshot`): recovery, cycle, today's caffeine and water, and
-/// the bedtime streak. Example data is always labelled.
+/// the bedtime streak. Example data is always labelled, and yesterday's
+/// numbers never show as today's.
 @main
 struct HealthDashboardWidgets: WidgetBundle {
     var body: some Widget {
@@ -29,21 +31,35 @@ struct SnapshotProvider: TimelineProvider {
         completion(SnapshotEntry(date: .now, snapshot: context.isPreview ? (WidgetSnapshot.load() ?? .example) : WidgetSnapshot.load()))
     }
 
-    /// Now, plus the moment the app day rolls over (caffeine and water go
-    /// back to 0). The app reloads the widgets whenever its numbers change.
+    /// Now; the caffeine cutoff (the latte button says so after it); when the
+    /// numbers turn six hours old (greyed); and the moment the app day rolls
+    /// over (caffeine and water back to 0, recovery and the cycle day to "—").
+    /// The app reloads the widgets whenever its numbers change.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SnapshotEntry>) -> Void) {
         let snap = WidgetSnapshot.load()
-        var dates: [Date] = [.now]
+        let now = Date.now
+        var dates: [Date] = [now]
         if let s = snap {
-            let rollover = s.appDayStart.addingTimeInterval(24 * 3600)
-            if rollover > .now { dates.append(rollover) }
+            dates.append(s.appDayStart.addingTimeInterval(24 * 3600))
+            dates.append(s.updated.addingTimeInterval(6 * 3600))
+            if let cutoff = s.caffeineCutoff { dates.append(cutoff) }
         }
-        completion(Timeline(entries: dates.map { SnapshotEntry(date: $0, snapshot: snap) },
-                            policy: .after(.now.addingTimeInterval(3600))))
+        let entries = Set(dates.filter { $0 >= now }).sorted().map { SnapshotEntry(date: $0, snapshot: snap) }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(3600))))
     }
 }
 
 // MARK: - Shared pieces
+
+/// Widget type: rounded numbers with even-width digits, as in the app.
+private enum WidgetType {
+    /// Big numbers on Home Screen widgets.
+    static let hero: Font = .system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit()
+    /// Numbers on Lock Screen widgets.
+    static let number: Font = .system(.title3, design: .rounded, weight: .bold).monospacedDigit()
+}
+
+private let dash = "\u{2014}"
 
 private struct WidgetHeader: View {
     let title: String
@@ -56,10 +72,11 @@ private struct WidgetHeader: View {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(accent.ink(scheme))
+                .widgetAccentable()
             Spacer(minLength: 2)
             if snapshot.isSample {
                 Text("Example")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Accent.yellow.ink(scheme))
                     .accessibilityLabel("Example data")
             }
@@ -67,28 +84,56 @@ private struct WidgetHeader: View {
     }
 }
 
-/// "As of 7:22pm", so old numbers never pass as current.
+/// "As of 7:22pm", or "As of Mon 7:22pm" from another day, so old numbers
+/// never pass as current.
 private struct AsOf: View {
     let snapshot: WidgetSnapshot
+    let now: Date
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Text("As of \(snapshot.updated.formatted(date: .omitted, time: .shortened).lowercased())")
-            .font(.system(size: 10))
+        Text(asOfText(snapshot, now: now))
+            .font(.system(size: 11))
             .foregroundStyle(Palette(scheme: scheme).tertiary)
     }
 }
 
+private func asOfText(_ s: WidgetSnapshot, now: Date) -> String {
+    let sameDay = Calendar.current.isDate(s.updated, inSameDayAs: now)
+    let day = sameDay ? "" : s.updated.formatted(.dateTime.weekday(.abbreviated)) + " "
+    return "As of \(day)\(time(s.updated))"
+}
+
+/// Before the app has run once, in a size that fits each family.
 private struct OpenAppPrompt: View {
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "heart.text.square")
-                .font(.title2)
-            Text("Open Health Dashboard to see your numbers")
-                .font(.caption)
-                .multilineTextAlignment(.center)
+        switch family {
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: "heart.text.square").font(.title3)
+            }
+            .accessibilityLabel("Open Health Dashboard to see your numbers")
+        case .accessoryInline:
+            Text("Open Health Dashboard")
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Health Dashboard").font(.caption2.weight(.semibold))
+                Text("Open the app to see your numbers").font(.headline).lineLimit(2).minimumScaleFactor(0.8)
+            }
+            .accessibilityElement(children: .combine)
+        default:
+            VStack(spacing: 4) {
+                Image(systemName: "heart.text.square")
+                    .font(.title2)
+                Text("Open Health Dashboard to see your numbers")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+            }
+            .accessibilityElement(children: .combine)
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -97,8 +142,14 @@ private func ounces(_ ml: Double) -> String {
     return oz >= 10 ? "\(Int(oz.rounded())) oz" : String(format: "%.1f oz", oz)
 }
 
-private func shortTime(_ date: Date) -> String {
-    date.formatted(date: .omitted, time: .shortened).lowercased().replacingOccurrences(of: ":00", with: "")
+/// "8:15am", like everywhere in the app.
+private func time(_ date: Date) -> String {
+    Clock.format(Clock.minutesOfDay(date))
+}
+
+extension View {
+    /// Greys out numbers six hours or more old.
+    fileprivate func stale(_ stale: Bool) -> some View { opacity(stale ? 0.55 : 1) }
 }
 
 /// The app's own background in both modes.
@@ -134,79 +185,107 @@ private struct RecoveryView: View {
 
     var body: some View {
         if let s = entry.snapshot {
+            let now = entry.date
+            let value = s.recovery(at: now)
+            let stale = s.isStale(at: now)
             switch family {
             case .accessoryCircular:
-                Gauge(value: Double(s.recovery ?? 0), in: 0...100) {
-                    Text("Rec")
+                Gauge(value: Double(value ?? 0), in: 0...100) {
+                    Text("Recovery")
                 } currentValueLabel: {
-                    Text(s.recovery.map(String.init) ?? "\u{2014}")
+                    Text(value.map(String.init) ?? dash)
+                        .font(WidgetType.number)
+                        .contentTransition(.numericText(value: Double(value ?? 0)))
                 }
                 .gaugeStyle(.accessoryCircularCapacity)
-                .accessibilityLabel(recoverySentence(s))
+                .widgetAccentable()
+                .stale(stale)
+                .accessibilityLabel(recoverySentence(s, now: now))
             case .accessoryRectangular:
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Recovery\(s.isSample ? " \u{00B7} Example" : "")").font(.caption2.weight(.semibold))
-                    Text(s.recovery.map { "\($0) \u{00B7} \(s.recoveryLabel)" } ?? "No reading yet")
+                        .widgetAccentable()
+                    Text(headline(s, now: now))
                         .font(.headline)
-                    if let e = s.energyLeft { Text("Energy left \(e)%").font(.caption2) }
+                        .stale(stale)
+                    if stale {
+                        Text(asOfText(s, now: now)).font(.caption2)
+                    } else if let e = s.energyLeft(at: now) {
+                        Text("Energy left \(e)%").font(.caption2)
+                    }
                 }
                 .accessibilityElement(children: .combine)
             case .accessoryInline:
-                Text(s.recovery.map { "Recovery \($0) \u{00B7} \(s.recoveryLabel)" } ?? "Recovery: no reading yet")
+                Text(value.map { "Recovery \($0) \u{00B7} \(s.recoveryLabel)" } ?? "Recovery: \(headline(s, now: now).lowercased())")
             default:
                 let p = Palette(scheme: scheme)
                 VStack(alignment: .leading, spacing: 6) {
                     WidgetHeader(title: "Recovery", accent: .indigo, snapshot: s)
                     HStack(alignment: .center, spacing: 12) {
                         ZStack {
-                            Circle().stroke(p.track, lineWidth: 7)
-                            Circle().trim(from: 0, to: Double(s.recovery ?? 0) / 100)
+                            Circle().inset(by: 3.5).stroke(p.track, lineWidth: 7)
+                            Circle().inset(by: 3.5).trim(from: 0, to: Double(value ?? 0) / 100)
                                 .stroke(Accent.indigo.fill(scheme), style: StrokeStyle(lineWidth: 7, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
-                            Text(s.recovery.map(String.init) ?? "\u{2014}")
-                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .widgetAccentable()
+                            Text(value.map(String.init) ?? dash)
+                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                                 .minimumScaleFactor(0.6)
+                                .contentTransition(.numericText(value: Double(value ?? 0)))
                         }
                         .frame(width: 64, height: 64)
                         .accessibilityHidden(true)
-                        if family == .systemMedium { details(s) }
+                        if family == .systemMedium { details(s, now: now) }
                     }
+                    .stale(stale)
                     if family != .systemMedium {
-                        Text(s.recovery == nil ? "No reading yet" : s.recoveryLabel)
+                        Text(headline(s, now: now, withValue: false))
                             .font(.system(size: 13, weight: .semibold))
                             .lineLimit(2)
                             .minimumScaleFactor(0.8)
                     }
                     Spacer(minLength: 0)
-                    AsOf(snapshot: s)
+                    AsOf(snapshot: s, now: now)
                 }
                 .foregroundStyle(p.primary)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(recoverySentence(s))
+                .accessibilityLabel(recoverySentence(s, now: now))
             }
         } else {
             OpenAppPrompt()
         }
     }
 
-    private func details(_ s: WidgetSnapshot) -> some View {
+    /// "68 · Take it steady"; "No reading yet"; or, once a new day has
+    /// started, "Not updated today".
+    private func headline(_ s: WidgetSnapshot, now: Date, withValue: Bool = true) -> String {
+        guard s.isCurrent(at: now) else { return "Not updated today" }
+        guard let value = s.recovery else { return "No reading yet" }
+        return withValue ? "\(value) \u{00B7} \(s.recoveryLabel)" : s.recoveryLabel
+    }
+
+    private func details(_ s: WidgetSnapshot, now: Date) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(s.recovery == nil ? "No reading yet" : s.recoveryLabel)
+            Text(headline(s, now: now, withValue: false))
                 .font(.system(size: 15, weight: .semibold))
-            if let e = s.energyLeft {
+            if let e = s.energyLeft(at: now) {
+                // Energy is mint everywhere.
                 Label("Energy left \(e)%", systemImage: "bolt.fill")
                     .font(.system(size: 13))
-                    .foregroundStyle(Accent.yellow.ink(scheme))
+                    .foregroundStyle(Accent.mint.ink(scheme))
             }
-            if let line = s.cycleLine {
-                Text(line).font(.system(size: 12)).foregroundStyle(Palette(scheme: scheme).secondary).lineLimit(1)
+            if let line = s.cycleLine(at: now) {
+                Label(line, systemImage: "drop.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette(scheme: scheme).secondary)
+                    .lineLimit(1)
             }
         }
     }
 
-    private func recoverySentence(_ s: WidgetSnapshot) -> String {
-        var parts = [s.recovery.map { "Recovery \($0) out of 100, \(s.recoveryLabel)" } ?? "Recovery: no reading yet"]
-        if let e = s.energyLeft { parts.append("energy left \(e) percent") }
+    private func recoverySentence(_ s: WidgetSnapshot, now: Date) -> String {
+        var parts = [s.recovery(at: now).map { "Recovery \($0) out of 100, \(s.recoveryLabel)" } ?? "Recovery: \(headline(s, now: now).lowercased())"]
+        if let e = s.energyLeft(at: now) { parts.append("energy left \(e) percent") }
         if s.isSample { parts.append("example data") }
         return parts.joined(separator: ", ")
     }
@@ -218,7 +297,7 @@ struct CycleWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "Cycle", provider: SnapshotProvider()) { entry in
             CycleWidgetView(entry: entry)
-                .containerBackground(for: .widget) { WidgetBackground(accent: .purple) }
+                .containerBackground(for: .widget) { WidgetBackground(accent: .pink) }
         }
         .configurationDisplayName("Cycle")
         .description("Your cycle day or pill, with no countdowns.")
@@ -233,38 +312,50 @@ private struct CycleWidgetView: View {
 
     var body: some View {
         if let s = entry.snapshot {
+            let now = entry.date
+            let number = s.cycleNumber(at: now)
+            let line = s.isCurrent(at: now) ? (s.cycleLine ?? "Not tracking a cycle") : "Not updated today"
             switch family {
             case .accessoryCircular:
-                VStack(spacing: 0) {
-                    Text(s.cycleNumber.map(String.init) ?? "\u{2014}").font(.title2.weight(.bold))
-                    Text(s.cycleNumberLabel ?? "Cycle").font(.caption2)
+                ZStack {
+                    AccessoryWidgetBackground()
+                    VStack(spacing: 0) {
+                        Text(number.map(String.init) ?? dash)
+                            .font(WidgetType.number)
+                            .widgetAccentable()
+                            .contentTransition(.numericText(value: Double(number ?? 0)))
+                        Text(s.cycleNumberLabel ?? "Cycle").font(.caption2)
+                    }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(s.cycleLine ?? "Not tracking a cycle")
+                .accessibilityLabel(line)
             case .accessoryRectangular:
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Cycle").font(.caption2.weight(.semibold))
-                    Text(s.cycleLine ?? "Not tracking a cycle").font(.headline).lineLimit(2)
+                    Text("Cycle\(s.isSample ? " \u{00B7} Example" : "")").font(.caption2.weight(.semibold))
+                        .widgetAccentable()
+                    Text(line).font(.headline).lineLimit(2)
                 }
                 .accessibilityElement(children: .combine)
             default:
                 let p = Palette(scheme: scheme)
                 VStack(alignment: .leading, spacing: 6) {
-                    WidgetHeader(title: "Cycle", accent: .purple, snapshot: s)
-                    if let n = s.cycleNumber {
+                    WidgetHeader(title: "Cycle", accent: .pink, snapshot: s)
+                    if let n = number {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(s.cycleNumberLabel ?? "Day").font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(p.secondary)
-                            Text("\(n)").font(.system(size: 34, weight: .bold, design: .rounded))
+                            Text("\(n)")
+                                .font(WidgetType.hero)
+                                .contentTransition(.numericText(value: Double(n)))
                         }
                     }
-                    Text(s.cycleLine ?? "Not tracking a cycle")
+                    Text(line)
                         .font(.system(size: 13))
                         .foregroundStyle(p.secondary)
                         .lineLimit(3)
                         .minimumScaleFactor(0.8)
                     Spacer(minLength: 0)
-                    AsOf(snapshot: s)
+                    AsOf(snapshot: s, now: now)
                 }
                 .foregroundStyle(p.primary)
                 .accessibilityElement(children: .combine)
@@ -296,12 +387,24 @@ private struct TodayWidgetView: View {
 
     var body: some View {
         if let s = entry.snapshot {
-            let mg = s.caffeineMg(at: entry.date)
-            let water = s.waterML(at: entry.date)
+            let now = entry.date
+            let mg = s.caffeineMg(at: now)
+            let water = s.waterML(at: now)
+            // Past today's cutoff: the note turns coral and the button says so.
+            let cutoff = s.caffeineCutoff(at: now)
+            let pastCutoff = cutoff.map { now >= $0 } ?? false
+            let note: String = {
+                if !s.isCurrent(at: now) { return "Open the app for today\u{2019}s cutoff" }
+                if let cutoff, pastCutoff { return "Past your \(time(cutoff)) cutoff" }
+                return s.caffeineNote
+            }()
             if family == .accessoryRectangular {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(mg) mg caffeine").font(.headline)
-                    Text(s.caffeineNote).font(.caption2)
+                    Text("\(mg) mg caffeine")
+                        .font(.headline)
+                        .contentTransition(.numericText(value: Double(mg)))
+                        .invalidatableContent()
+                    Text(note).font(.caption2)
                     Text("\(ounces(water)) of \(ounces(s.waterGoalML)) water").font(.caption2)
                 }
                 .accessibilityElement(children: .combine)
@@ -310,27 +413,37 @@ private struct TodayWidgetView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     WidgetHeader(title: "Today", accent: .yellow, snapshot: s)
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(mg)").font(.system(size: 26, weight: .bold, design: .rounded))
+                        Text("\(mg)")
+                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                            .contentTransition(.numericText(value: Double(mg)))
+                            .invalidatableContent()
                         Text("mg").font(.system(size: 13, weight: .semibold)).foregroundStyle(p.secondary)
                     }
-                    Text(s.caffeineNote).font(.system(size: 12)).foregroundStyle(p.secondary).lineLimit(1)
+                    // With the button there's no room for the note: the
+                    // button carries the cutoff instead.
+                    if s.quickDrink == nil {
+                        Text(note).font(.system(size: 12))
+                            .foregroundStyle(pastCutoff ? Accent.coral.ink(scheme) : p.secondary)
+                            .lineLimit(1)
+                    }
                     ProgressView(value: min(water / max(s.waterGoalML, 1), 1))
                         .tint(Accent.blue.fill(scheme))
                     Text("\(ounces(water)) of \(ounces(s.waterGoalML))")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Accent.blue.ink(scheme))
+                        .contentTransition(.numericText(value: water))
                     Spacer(minLength: 0)
                     if let drink = s.quickDrink {
                         // Logs it right here, no need to open the app.
                         Button(intent: LogLatteIntent()) {
-                            Label("\(drink.name) \(drink.mg) mg", systemImage: "plus")
+                            Label(pastCutoff ? "\(drink.name) \u{00B7} past cutoff" : "\(drink.name) \(drink.mg) mg", systemImage: "plus")
                                 .font(.system(size: 12, weight: .bold))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .minimumScaleFactor(0.7)
                                 .frame(maxWidth: .infinity)
                         }
-                        .tint(Accent.yellow.fill(scheme))
-                        .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams")
+                        .tint(pastCutoff ? Accent.coral.fill(scheme) : Accent.yellow.fill(scheme))
+                        .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams" + (pastCutoff ? ", past your cutoff" : ""))
                     }
                 }
                 .foregroundStyle(p.primary)
@@ -365,12 +478,14 @@ private struct StreakWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 WidgetHeader(title: "In bed on time", accent: .purple, snapshot: s)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(s.bedtimeStreak)").font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text("\(s.bedtimeStreak)")
+                        .font(WidgetType.hero)
+                        .contentTransition(.numericText(value: Double(s.bedtimeStreak)))
                     Text(s.bedtimeStreak == 1 ? "night" : "nights").font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(p.secondary)
                 }
-                if let bed = s.bedtime {
-                    Label("Bed by \(shortTime(bed))", systemImage: "moon.fill")
+                if let bed = s.bedtime(at: entry.date) {
+                    Label("Bed by \(time(bed))", systemImage: "moon.fill")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Accent.purple.ink(scheme))
                 }

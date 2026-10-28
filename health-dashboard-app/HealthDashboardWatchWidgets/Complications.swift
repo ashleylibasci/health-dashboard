@@ -1,9 +1,11 @@
 import WidgetKit
 import SwiftUI
+import HealthCore
 
 /// Watch-face complications: recovery, cycle, caffeine & water, and tonight's
-/// bedtime. They show the numbers the iPhone last sent (`WidgetSnapshot`),
-/// say "Ex" for example data, and open the matching Watch page when tapped.
+/// bedtime with the smart alarm. They show the numbers the iPhone last sent
+/// (`WidgetSnapshot`), say "Example" for example data, never show yesterday's
+/// numbers as today's, and open the matching Watch page when tapped.
 @main
 struct HealthNextComplications: WidgetBundle {
     var body: some Widget {
@@ -17,26 +19,53 @@ struct HealthNextComplications: WidgetBundle {
 struct ComplicationEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?
+    /// The Watch app's smart alarm (Bedtime only).
+    var alarm: WatchAlarmState? = nil
+    var relevance: TimelineEntryRelevance? = nil
 }
 
 struct ComplicationProvider: TimelineProvider {
+    /// The Bedtime complication: rises in the Smart Stack from 90 minutes
+    /// before bed, and knows the alarm's state.
+    var bedtime = false
+
     func placeholder(in context: Context) -> ComplicationEntry { ComplicationEntry(date: .now, snapshot: .example) }
 
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-        completion(ComplicationEntry(date: .now, snapshot: context.isPreview ? (WidgetSnapshot.load() ?? .example) : WidgetSnapshot.load()))
+        completion(ComplicationEntry(date: .now, snapshot: context.isPreview ? (WidgetSnapshot.load() ?? .example) : WidgetSnapshot.load(),
+                                     alarm: bedtime ? WatchAlarmState.load() : nil))
     }
 
-    /// Now, and the app-day rollover (caffeine goes back to 0). New numbers
-    /// from the phone reload the timeline themselves.
+    /// Now; when the numbers turn six hours old (greyed, with their time);
+    /// the app-day rollover (caffeine back to 0, recovery and the cycle day
+    /// to "—"); and for Bedtime, the stretch before bed. New numbers from the
+    /// phone reload the timeline themselves.
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
         let snap = WidgetSnapshot.load()
-        var dates: [Date] = [.now]
+        let alarm = bedtime ? WatchAlarmState.load() : nil
+        let now = Date.now
+        var dates: [Date] = [now]
+        var relevantFrom: Date?
+        var relevantUntil: Date?
         if let s = snap {
-            let rollover = s.appDayStart.addingTimeInterval(24 * 3600)
-            if rollover > .now { dates.append(rollover) }
+            dates.append(s.appDayStart.addingTimeInterval(24 * 3600))
+            dates.append(s.updated.addingTimeInterval(6 * 3600))
+            if bedtime, let bed = s.bedtime(at: now) {
+                relevantFrom = bed.addingTimeInterval(-90 * 60)
+                relevantUntil = bed.addingTimeInterval(60 * 60)
+                dates += [relevantFrom!, relevantUntil!]
+            }
         }
-        completion(Timeline(entries: dates.map { ComplicationEntry(date: $0, snapshot: snap) },
-                            policy: .after(.now.addingTimeInterval(30 * 60))))
+        let entries = Set(dates.filter { $0 >= now }).sorted().map { date -> ComplicationEntry in
+            var relevance: TimelineEntryRelevance?
+            if let from = relevantFrom, let until = relevantUntil {
+                relevance = date >= from && date < until
+                    ? TimelineEntryRelevance(score: 80, duration: until.timeIntervalSince(date))
+                    : TimelineEntryRelevance(score: 0)
+            }
+            return ComplicationEntry(date: date, snapshot: snap, alarm: alarm, relevance: relevance)
+        }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(30 * 60))))
     }
 }
 
@@ -45,7 +74,37 @@ private func page(_ n: Int) -> URL { URL(string: "healthnext://page/\(n)")! }
 
 private let families: [WidgetFamily] = [.accessoryCircular, .accessoryCorner, .accessoryRectangular, .accessoryInline]
 
-private func sampleTag(_ s: WidgetSnapshot) -> String { s.isSample ? " \u{00B7} Ex" : "" }
+/// "Recovery · Example".
+private func title(_ name: String, _ s: WidgetSnapshot?) -> String {
+    s?.isSample == true ? "\(name) \u{00B7} Example" : name
+}
+
+/// Rounded numbers with even-width digits.
+private let numberFont: Font = .system(.title3, design: .rounded, weight: .bold).monospacedDigit()
+
+private let dash = "\u{2014}"
+
+/// "As of 9:40am", or "As of Mon 9:40pm" from another day.
+private func asOf(_ s: WidgetSnapshot, now: Date) -> String {
+    let sameDay = Calendar.current.isDate(s.updated, inSameDayAs: now)
+    let day = sameDay ? "" : s.updated.formatted(.dateTime.weekday(.abbreviated)) + " "
+    return "As of \(day)\(Clock.format(Clock.minutesOfDay(s.updated)))"
+}
+
+/// "8:15am".
+private func time(_ date: Date) -> String { Clock.format(Clock.minutesOfDay(date)) }
+
+/// The line under the numbers when there's nothing current to show: never
+/// synced, or a new day since the phone last updated.
+private func missingLine(_ s: WidgetSnapshot?, now: Date) -> String? {
+    guard let s else { return "Open on iPhone" }
+    return s.isCurrent(at: now) ? nil : "Open on iPhone to update"
+}
+
+extension View {
+    /// Greys out numbers six hours or more old.
+    fileprivate func stale(_ stale: Bool) -> some View { opacity(stale ? 0.55 : 1) }
+}
 
 // MARK: - Recovery
 
@@ -68,34 +127,59 @@ private struct RecoveryComplicationView: View {
 
     var body: some View {
         let s = entry.snapshot
-        let value = s?.recovery
+        let now = entry.date
+        let value = s?.recovery(at: now)
+        let stale = s?.isStale(at: now) ?? false
+        let label = value.map { "Recovery \($0)" } ?? "Recovery, no reading yet"
         switch family {
         case .accessoryCircular:
             Gauge(value: Double(value ?? 0), in: 0...100) {
-                Text("REC")
+                Image(systemName: "bolt.heart.fill")
             } currentValueLabel: {
-                Text(value.map(String.init) ?? "\u{2014}")
+                Text(value.map(String.init) ?? dash)
+                    .font(numberFont)
+                    .contentTransition(.numericText(value: Double(value ?? 0)))
             }
             .gaugeStyle(.accessoryCircular)
             .tint(Accent.indigo.fill(.dark))
-            .accessibilityLabel(value.map { "Recovery \($0)" } ?? "Recovery, no reading yet")
+            .widgetAccentable()
+            .stale(stale)
+            .accessibilityLabel(label)
         case .accessoryCorner:
-            Text(value.map(String.init) ?? "\u{2014}")
-                .font(.title3.weight(.bold))
+            Text(value.map(String.init) ?? dash)
+                .font(numberFont)
+                .widgetAccentable()
                 .widgetLabel {
-                    Gauge(value: Double(value ?? 0), in: 0...100) { Text("Recovery") }
-                        .tint(Accent.indigo.fill(.dark))
+                    if let line = missingLine(s, now: now) {
+                        Text(line)
+                    } else {
+                        Gauge(value: Double(value ?? 0), in: 0...100) { Text("Recovery") }
+                            .tint(Accent.indigo.fill(.dark))
+                    }
                 }
-                .accessibilityLabel(value.map { "Recovery \($0)" } ?? "Recovery, no reading yet")
+                .stale(stale)
+                .accessibilityLabel(label)
         case .accessoryInline:
-            Text(s.flatMap { snap in snap.recovery.map { "Recovery \($0) \u{00B7} \(snap.recoveryLabel)" } } ?? "Recovery: no reading yet")
+            if let s, let value {
+                Text("Recovery \(value) \u{00B7} \(s.recoveryLabel)")
+            } else {
+                Text("Recovery: \(missingLine(s, now: now)?.lowercased() ?? "no reading yet")")
+            }
         default:
             VStack(alignment: .leading, spacing: 1) {
-                Text("Recovery\(s.map(sampleTag) ?? "")").font(.caption2.weight(.semibold))
+                Text(title("Recovery", s)).font(.caption2.weight(.semibold))
                     .foregroundStyle(Accent.indigo.ink(.dark))
-                Text(s.flatMap { snap in snap.recovery.map { "\($0) \u{00B7} \(snap.recoveryLabel)" } } ?? "No reading yet")
+                    .widgetAccentable()
+                Text(s.flatMap { snap in value.map { "\($0) \u{00B7} \(snap.recoveryLabel)" } } ?? (s?.isCurrent(at: now) == true ? "No reading yet" : dash))
                     .font(.headline).lineLimit(1).minimumScaleFactor(0.7)
-                if let e = s?.energyLeft { Text("Energy left \(e)%").font(.caption2) }
+                    .stale(stale)
+                if let line = missingLine(s, now: now) {
+                    Text(line).font(.caption2)
+                } else if let s, stale {
+                    Text(asOf(s, now: now)).font(.caption2)
+                } else if let e = s?.energyLeft(at: now) {
+                    Text("Energy left \(e)%").font(.caption2)
+                }
             }
             .accessibilityElement(children: .combine)
         }
@@ -109,6 +193,7 @@ struct CycleComplication: Widget {
         StaticConfiguration(kind: "WatchCycle", provider: ComplicationProvider()) { entry in
             CycleComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
+                // The Recovery page carries the cycle line.
                 .widgetURL(page(0))
         }
         .configurationDisplayName("Cycle")
@@ -123,28 +208,38 @@ private struct CycleComplicationView: View {
 
     var body: some View {
         let s = entry.snapshot
-        let number = s?.cycleNumber.map(String.init) ?? "\u{2014}"
+        let now = entry.date
+        let number = s?.cycleNumber(at: now).map(String.init) ?? dash
         let label = s?.cycleNumberLabel ?? "Cycle"
+        let missing = missingLine(s, now: now)
+        let line = missing ?? s?.cycleLine(at: now) ?? "Not tracking a cycle"
         switch family {
         case .accessoryCircular:
-            VStack(spacing: -2) {
-                Text(number).font(.title3.weight(.bold))
-                Text(label).font(.system(size: 10, weight: .semibold))
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: -2) {
+                    Text(number).font(numberFont)
+                        .widgetAccentable()
+                    Text(label).font(.system(size: 10, weight: .semibold))
+                }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(s?.cycleLine ?? "Not tracking a cycle")
+            .accessibilityLabel(line)
         case .accessoryCorner:
             Image(systemName: "drop.fill")
-                .foregroundStyle(Accent.purple.fill(.dark))
-                .widgetLabel("\(label) \(number)")
-                .accessibilityLabel(s?.cycleLine ?? "Not tracking a cycle")
+                .font(.title3)
+                .foregroundStyle(Accent.pink.fill(.dark))
+                .widgetAccentable()
+                .widgetLabel(missing == nil ? "\(label) \(number)" : "Open on iPhone")
+                .accessibilityLabel(line)
         case .accessoryInline:
-            Text(s?.cycleLine ?? "Not tracking a cycle")
+            Text(line)
         default:
             VStack(alignment: .leading, spacing: 1) {
-                Text("Cycle\(s.map(sampleTag) ?? "")").font(.caption2.weight(.semibold))
-                    .foregroundStyle(Accent.purple.ink(.dark))
-                Text(s?.cycleLine ?? "Not tracking a cycle").font(.headline).lineLimit(2).minimumScaleFactor(0.7)
+                Text(title("Cycle", s)).font(.caption2.weight(.semibold))
+                    .foregroundStyle(Accent.pink.ink(.dark))
+                    .widgetAccentable()
+                Text(line).font(.headline).lineLimit(2).minimumScaleFactor(0.7)
             }
             .accessibilityElement(children: .combine)
         }
@@ -174,30 +269,56 @@ private struct CaffeineComplicationView: View {
 
     var body: some View {
         let s = entry.snapshot
-        let mg = s?.caffeineMg(at: entry.date) ?? 0
-        let water = s?.waterML(at: entry.date) ?? 0
+        let now = entry.date
+        let mg = s?.caffeineMg(at: now) ?? 0
+        let water = s?.waterML(at: now) ?? 0
+        // Past today's cutoff with caffeine on board: the one coral state.
+        let pastCutoff = s?.caffeineCutoff(at: now).map { now >= $0 } ?? false
+        let spoken = s == nil ? "Caffeine: open on iPhone" : "\(mg) milligrams of caffeine today" + (pastCutoff ? ", past your cutoff" : "")
         switch family {
         case .accessoryCircular:
-            VStack(spacing: -2) {
-                Image(systemName: "cup.and.saucer.fill").font(.system(size: 11))
-                Text("\(mg)").font(.title3.weight(.bold)).minimumScaleFactor(0.6)
-                Text("mg").font(.system(size: 10, weight: .semibold))
+            // The ring fills toward 400 mg, the usual daily ceiling for adults.
+            Gauge(value: Double(min(mg, 400)), in: 0...400) {
+                Image(systemName: "cup.and.saucer.fill")
+            } currentValueLabel: {
+                Text(s == nil ? dash : "\(mg)")
+                    .font(numberFont)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText(value: Double(mg)))
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(mg) milligrams of caffeine today")
+            .gaugeStyle(.accessoryCircular)
+            .tint(pastCutoff && mg > 0 ? Accent.coral.fill(.dark) : Accent.yellow.fill(.dark))
+            .widgetAccentable()
+            .accessibilityLabel(spoken)
         case .accessoryCorner:
             Image(systemName: "cup.and.saucer.fill")
+                .font(.title3)
                 .foregroundStyle(Accent.yellow.fill(.dark))
-                .widgetLabel("\(mg) mg")
-                .accessibilityLabel("\(mg) milligrams of caffeine today")
+                .widgetAccentable()
+                .widgetLabel(s == nil ? "Open on iPhone" : "\(mg) mg")
+                .accessibilityLabel(spoken)
         case .accessoryInline:
-            Text("\(mg) mg \u{00B7} \(oz(water)) water")
+            Text(s == nil ? "Caffeine: open on iPhone" : "\(mg) mg \u{00B7} \(oz(water)) water")
         default:
             VStack(alignment: .leading, spacing: 1) {
-                Text("Today\(s.map(sampleTag) ?? "")").font(.caption2.weight(.semibold))
+                Text(title("Today", s)).font(.caption2.weight(.semibold))
                     .foregroundStyle(Accent.yellow.ink(.dark))
-                Text("\(mg) mg caffeine").font(.headline)
-                Text("\(oz(water)) of \(oz(s?.waterGoalML ?? 0)) water").font(.caption2)
+                    .widgetAccentable()
+                if let s {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text("\(mg) mg caffeine").font(.headline)
+                        if pastCutoff {
+                            Text(" \u{00B7} past cutoff").font(.caption.weight(.semibold))
+                                .foregroundStyle(Accent.coral.ink(.dark))
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    Text("\(oz(water)) of \(oz(s.waterGoalML)) water").font(.caption2)
+                } else {
+                    Text(dash).font(.headline)
+                    Text("Open on iPhone").font(.caption2)
+                }
             }
             .accessibilityElement(children: .combine)
         }
@@ -208,13 +329,13 @@ private struct CaffeineComplicationView: View {
 
 struct BedtimeComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchBedtime", provider: ComplicationProvider()) { entry in
+        StaticConfiguration(kind: "WatchBedtime", provider: ComplicationProvider(bedtime: true)) { entry in
             BedtimeComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 .widgetURL(page(2))
         }
         .configurationDisplayName("Bedtime")
-        .description("Tonight's bedtime and your on-time streak.")
+        .description("Tonight's bedtime and whether your smart alarm is armed.")
         .supportedFamilies(families)
     }
 }
@@ -223,34 +344,64 @@ private struct BedtimeComplicationView: View {
     let entry: ComplicationEntry
     @Environment(\.widgetFamily) private var family
 
-    private func time(_ d: Date) -> String {
-        d.formatted(date: .omitted, time: .shortened).lowercased().replacingOccurrences(of: ":00", with: "")
+    /// "Alarm armed · by 7:45am", "Tap to arm the alarm", or nil.
+    private var alarmLine: String? {
+        guard let a = entry.alarm else { return nil }
+        if a.needsOpen { return "Tap to arm the alarm" }
+        if let end = a.armedEnd, end > entry.date { return "Alarm armed \u{00B7} by \(time(end))" }
+        return nil
     }
 
     var body: some View {
         let s = entry.snapshot
-        let bed = s?.bedtime.map(time) ?? "\u{2014}"
+        let now = entry.date
+        let bed = s?.bedtime(at: now).map(time) ?? dash
+        let missing = missingLine(s, now: now)
         switch family {
         case .accessoryCircular:
-            VStack(spacing: -1) {
-                Image(systemName: "moon.fill").font(.system(size: 12)).foregroundStyle(Accent.purple.fill(.dark))
-                Text(bed).font(.system(size: 13, weight: .bold)).minimumScaleFactor(0.6)
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: -1) {
+                    Image(systemName: "moon.fill").font(.system(size: 12))
+                        .foregroundStyle(Accent.purple.fill(.dark))
+                        .widgetAccentable()
+                    Text(bed).font(.system(.footnote, design: .rounded, weight: .bold).monospacedDigit())
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 4)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Bed by \(bed)")
         case .accessoryCorner:
             Image(systemName: "moon.fill")
+                .font(.title3)
                 .foregroundStyle(Accent.purple.fill(.dark))
-                .widgetLabel("Bed \(bed)")
+                .widgetAccentable()
+                .widgetLabel(missing ?? "Bed by \(bed)")
                 .accessibilityLabel("Bed by \(bed)")
         case .accessoryInline:
-            Text("Bed by \(bed)")
+            if let missing {
+                Text("Bedtime: \(missing.lowercased())")
+            } else if let end = entry.alarm?.armedEnd, end > now {
+                Text("Bed by \(bed) \u{00B7} alarm \(time(end))")
+            } else {
+                Text("Bed by \(bed)")
+            }
         default:
             VStack(alignment: .leading, spacing: 1) {
-                Text("Tonight\(s.map(sampleTag) ?? "")").font(.caption2.weight(.semibold))
+                Text(title("Tonight", s)).font(.caption2.weight(.semibold))
                     .foregroundStyle(Accent.purple.ink(.dark))
+                    .widgetAccentable()
                 Text("Bed by \(bed)").font(.headline)
-                if let n = s?.bedtimeStreak { Text("On time \(n) night\(n == 1 ? "" : "s") in a row").font(.caption2) }
+                if let missing {
+                    Text(missing).font(.caption2)
+                } else if let alarmLine {
+                    Text(alarmLine).font(.caption2)
+                        .foregroundStyle(Accent.orange.ink(.dark))
+                } else if let n = s?.bedtimeStreak {
+                    Text("In bed on time \(n) night\(n == 1 ? "" : "s") in a row").font(.caption2)
+                }
             }
             .accessibilityElement(children: .combine)
         }

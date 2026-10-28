@@ -64,6 +64,14 @@ struct WatchSnapshot: Codable, Equatable {
     /// Today's caffeine leaves 25 mg or more at bedtime: the only time the
     /// Watch shows a warning (nil from older phone builds).
     var caffeineTooMuchAtBedtime: Bool? = nil
+    /// Water for the "+ Bottle" tile: today's total, her goal and bottle
+    /// size (ml), and the ids of today's entries, so the Watch knows which
+    /// bottles it sent are already counted. nil from older phone builds,
+    /// which can't log water from the Watch (the tile stays hidden).
+    var waterTodayML: Double? = nil
+    var waterGoalML: Double? = nil
+    var bottleML: Double? = nil
+    var todayWaterIDs: [UUID]? = nil
 
     struct Zone: Codable, Equatable {
         var title: String
@@ -92,6 +100,10 @@ enum WatchMessage: Codable {
     case loggedDrinkEntry(entryID: UUID, drinkID: UUID, name: String, mg: Int, at: Date)
     /// Undo on the Watch, a few seconds after logging.
     case undoDrink(entryID: UUID)
+    /// Water logged on the Watch (one bottle), with its own entry id.
+    case loggedWater(entryID: UUID, ml: Double, at: Date)
+    /// Undo on the Watch, a few seconds after logging water.
+    case undoWater(entryID: UUID)
     case woke(at: Date, fromLightSleep: Bool)
     /// The Watch's smart alarm state: the end of the window it has armed (nil
     /// when nothing is armed), and whether she switched it off on the Watch.
@@ -102,6 +114,7 @@ enum WatchMessage: Codable {
     /// "Latte", for an error message about this message.
     var drinkName: String? {
         if case let .loggedDrinkEntry(_, _, name, _, _) = self { return name }
+        if case .loggedWater = self { return "Water" }
         return nil
     }
 }
@@ -112,6 +125,9 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     @Published private(set) var snapshot: WatchSnapshot = .empty
     /// Set when a message to the phone couldn't be delivered.
     @Published private(set) var deliveryError: String?
+    /// Watch side: the widget numbers that ride along with the snapshot
+    /// (the cycle line for the Recovery page). nil until the phone sends them.
+    @Published private(set) var widget: WidgetSnapshot? = WidgetSnapshot.load()
     var onMessage: ((WatchMessage) -> Void)?
     /// Phone side: the Watch asked for a fresh snapshot (it just opened).
     var onSnapshotRequest: (() -> Void)?
@@ -274,7 +290,10 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
 
     private func receive(context: [String: Any]) {
         #if os(watchOS)
-        if let widget = context["widget"] as? Data { WidgetSnapshot.receive(widget) }
+        if let widget = context["widget"] as? Data {
+            WidgetSnapshot.receive(widget)
+            self.widget = WidgetSnapshot.load()
+        }
         #endif
         guard let data = context["snapshot"] as? Data, let s = try? JSONDecoder().decode(WatchSnapshot.self, from: data) else { return }
         snapshot = s

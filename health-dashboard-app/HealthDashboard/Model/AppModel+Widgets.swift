@@ -27,13 +27,14 @@ extension AppModel {
             cycleNumberLabel: numberLabel,
             appDayStart: appDayStart,
             caffeineMg: caffeineMgToday,
-            caffeineNote: caffeineCutoffShown.map { "Cutoff \(BodyLogStyle.shortTime($0))" } ?? "One small drink early",
+            caffeineNote: caffeineCutoffShown.map { "Cutoff \(Clock.format($0))" } ?? "One small drink early",
             waterML: waterTodayML,
             waterGoalML: store.data.waterGoalML,
             bottleML: store.data.bottleSizeML,
             bedtime: AppDay.date(store.data.bedtime, relativeTo: nextWakeDay),
             bedtimeStreak: onTime,
-            quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) }
+            quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) },
+            caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) }
         ).save()
     }
 
