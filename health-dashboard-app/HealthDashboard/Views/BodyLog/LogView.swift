@@ -308,6 +308,9 @@ struct LogView: View {
     private var checkInSubtitle: String {
         if let today = store.checkIn(on: .now) { return "Done today \u{00B7} \(today.awake) of 5 awake" }
         if !model.canCheckInNow { return "Check in after you wake up" }
+        // "How awake were you this morning?" at 5pm asks about a morning
+        // long gone (design review F28): a quiet line, still tappable.
+        if model.now >= 720 { return "Missed today \u{00B7} back tomorrow" }
         return CheckInView.prompt + " 10 seconds."
     }
 
