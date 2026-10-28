@@ -17,7 +17,11 @@ extension AppModel {
 
     /// Today's stress. No resting heart rate baseline: no levels and no
     /// label ("no data"), never a made-up "High". HRV is compared with her
-    /// daytime HRV baseline (not the overnight one recovery uses).
+    /// daytime HRV baseline (not the overnight one recovery uses). Heart
+    /// rate is compared with her own still-hour heart rate once there's
+    /// enough of it, else with her resting heart rate. In the luteal phase
+    /// of a natural cycle 2 bpm and 5% HRV are allowed for, and an active
+    /// hour is scaled to her weight (round 4).
     var stressToday: StressDay {
         let example = usingSampleData && !heartIsReal
         let hrvBase = example ? SampleData.baselineHRV : (stressHRVBaseline ?? 0)
@@ -35,8 +39,12 @@ extension AppModel {
                 return s
             }
         }
-        return StressModel.day(samples, restingHR: restingHRBaselineKnown ? baselineRestingHR : 0, baselineHRV: hrvBase)
+        return StressModel.day(samples, restingHR: restingHRBaselineKnown ? baselineRestingHR : 0, baselineHRV: hrvBase,
+                               still: example ? nil : stressStillBaseline, luteal: inLutealPhase, activeKcal: stressActiveKcal)
     }
+
+    /// She logged a 4 or 5 ("stressed" or more) today.
+    var feltStressedToday: Bool { (stressLoggedToday ?? 0) >= 4 }
 
     /// No stress level can be given today: no resting heart rate baseline
     /// yet, or no readings while still.
@@ -51,7 +59,10 @@ extension AppModel {
     /// keep ovulation), no allowance is applied: the app doesn't assume a
     /// phase it can't see. `cyclePhaseUnknown` is still set on the result so
     /// screens and alerts can say the cycle might be part of it.
-    /// "Hard training" is relative to her own usual active energy.
+    /// "Hard training" is relative to her own usual active energy and her
+    /// weight. The cutoffs scale with how much her own resting heart rate
+    /// and HRV move, and drop a little in the first week of a natural
+    /// period, when resting heart rate runs low (round 4, Brandt F6).
     var illness: IllnessSignal {
         let display = cycleDisplay
         let luteal = trackedCyclePhase == .luteal && !display.isPastUsualLength
@@ -59,41 +70,44 @@ extension AppModel {
                                             respiratoryRateDelta: respiratoryRateDelta, wristTempDelta: wristTempDelta,
                                             lutealPhase: luteal,
                                             hardTrainingYesterday: hardTrainingYesterday,
-                                            cyclePhaseUnknown: false)
+                                            cyclePhaseUnknown: false,
+                                            periodDay: cycleHeartShift == .period,
+                                            restingHRSpread: restingHRSpread, hrvSpreadPct: hrvSpreadPct)
         signal.cyclePhaseUnknown = display.cyclePhaseUnknown && !luteal
         return signal
     }
 
-    /// Possible or Likely: Body's sick check, Today's sick card and "Why do
-    /// I feel off?" (which leads with it) all agree. On example data the
-    /// Today card says it's an example; alerts still need real data.
+    /// A couple of signs or several: Body's sick check, Today's sick card and
+    /// "Why do I feel off?" (which leads with it) all agree. On example data
+    /// the Today card says it's an example; alerts still need real data.
     var sickCheckFlagged: Bool {
         hasHeartData && (illness.confidence == .medium || illness.confidence == .high)
     }
 
-    /// Yesterday's active energy was at least 1.5× her usual (and 400 kcal).
+    /// Yesterday's active energy was at least 1.5× her usual and 5 kcal per
+    /// kg of her weight (8 kcal per kg with little history).
     var hardTrainingYesterday: Bool {
-        IllnessSignal.isHardTraining(yesterdayKcal: activeCaloriesYesterday, earlierDaysKcal: activeCaloriesEarlier)
+        IllnessSignal.isHardTraining(yesterdayKcal: activeCaloriesYesterday, earlierDaysKcal: activeCaloriesEarlier, bodyMassKg: bodyMassKg)
     }
 
-    /// Fitness age, 20 at the youngest. Show `fitnessAgeText` on screen.
-    /// Compared with women: the app is for women.
+    /// Fitness age on the FRIEND women's medians, 25 at the youngest. Show
+    /// `fitnessAgeText` (a range) on screen.
     var fitnessAge: Int? {
         guard let v = vo2Max else { return nil }
-        return FitnessAge.estimate(vo2Max: v, sex: .female)
+        return FitnessAge.estimate(vo2Max: v)
     }
-    /// "Under 20" when fitter than an average 20-year-old, else the age.
+    /// The fitness age as a range for a Watch's usual error: "31–44",
+    /// "Under 34", "Under 25".
     var fitnessAgeText: String? {
-        guard let v = vo2Max else { return nil }
-        return FitnessAge.isTopOfChart(vo2Max: v, sex: .female) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: .female))"
+        vo2Max.map { FitnessAge.rangeText(vo2Max: $0) }
     }
-    /// "Above average for your age", on the same scale as the fitness age so
-    /// the two never disagree. Nil until she adds her age: without it there
-    /// is no age group to compare with (round 3, N8). Show
+    /// "About average for women in their 20s": the middle half of women her
+    /// decade (under-20s against the 20s). Nil until she adds her age:
+    /// without it there is no age group to compare with (round 3, N8). Show
     /// `fitnessLevelShown` on screen.
     var fitnessLevel: String? {
         guard let age = store.data.ageYears else { return nil }
-        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: .female, age: age) }
+        return vo2Max.map { FitnessAge.level(vo2Max: $0, age: age) }
     }
     /// The level, or a prompt for what's missing to work it out.
     var fitnessLevelShown: String? {
@@ -250,8 +264,13 @@ extension AppModel {
         if sickCheckFlagged {
             out.append(.init(title: "Your body may be fighting something", detail: "Several signals are off at once.", weight: 8, topic: .illness))
         }
+        // What she said comes first: the body-signal "stress" is heart rate
+        // at rest, which caffeine, heat or a meal move too (round 4, Laurent F4).
+        if feltStressedToday {
+            out.append(.init(title: "You said today\u{2019}s been stressful", detail: "You logged \(stressLoggedToday ?? 4) of 5 for stress today.", weight: 6, topic: .stress))
+        }
         if let s = stressToday.label, s == .raised || s == .high {
-            out.append(.init(title: "A stressful day", detail: "Your heart rate has been raised while sitting still.", weight: 4, topic: .stress))
+            out.append(.init(title: "Your heart was busy at rest", detail: "Your heart rate has been up while you were sitting still. Stress can do that, and so can caffeine, heat, a meal or getting sick\(heartCycleCause).", weight: 4, topic: .stress))
         }
         if caffeineTooMuchAtBedtime {
             out.append(.init(title: "Caffeine that will still be around at bedtime", detail: "What you've had today leaves \(caffeineAtBedtime) mg at bedtime. It lightens sleep even when you can fall asleep.", weight: 3, topic: .caffeineCutoff))

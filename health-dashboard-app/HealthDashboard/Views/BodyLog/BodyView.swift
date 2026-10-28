@@ -141,7 +141,10 @@ struct BodyView: View {
         let noData = !model.hasHeartData
         let title = noData ? "Sick check: no reading yet" : "Sick check: \(ill.confidence.rawValue.lowercased())"
         let note: String
-        if noData {
+        if !model.loggedSickSymptoms.isEmpty {
+            // What she logged beats what the Watch shows (round 4, Moreno F1).
+            note = "You logged feeling sick. Trust how you feel; tap to see when to get checked."
+        } else if noData {
             note = "Needs your resting heart rate and HRV from last night. Wear your Watch to bed."
         } else {
             switch ill.confidence {
@@ -248,8 +251,8 @@ struct BodyView: View {
         case .cycle: return cycleInfo
         case .energy: return Topic.energyBank.explanation
         case .stress: return Topic.stress.explanation
-        case .hrv: return Topic.hrv.explanation
-        case .restingHR: return Topic.restingHR.explanation
+        case .hrv: return model.hrvExplanation
+        case .restingHR: return model.restingHRExplanation
         case .breathing: return Topic.breathingRate.explanation
         case .wristTemp: return BodyLogStyle.wristTempExplanation(ovulationStopped: model.ovulationStopped)
         case .fitness: return Topic.fitnessAge.explanation
@@ -406,14 +409,14 @@ struct BodyView: View {
 
     /// The same wording as the Today tab.
     private var stressValue: String {
-        if let label = model.stressToday.label { return label.rawValue }
         if let felt = model.stressLoggedToday { return "Felt \(felt)/5" }
+        if let label = model.stressToday.label { return label.rawValue }
         return "No data yet"
     }
 
     private var stressNote: String {
-        if let avg = model.stressToday.average {
-            return "Level \(avg) of 100" + (model.stressLoggedToday.map { " \u{00B7} felt \($0)/5" } ?? "")
+        if let label = model.stressToday.label {
+            return model.stressLoggedToday != nil ? "Body signals: \(label.rawValue.lowercased())" : "Body signals at rest"
         }
         if model.stressLoggedToday != nil { return "What you logged today" }
         return model.restingHRBaselineKnown ? "Wear your Watch today" : "Learning your resting heart rate"
@@ -510,11 +513,12 @@ private struct BodyTrendCard: View {
         }
     }
 
-    private var topic: Topic {
+    /// HRV and resting heart rate get the wording for her method.
+    private var explanation: Explanation {
         switch metric {
-        case .hrv: .hrv
-        case .restingHR: .restingHR
-        case .sleep: .sleepNeed
+        case .hrv: model.hrvExplanation
+        case .restingHR: model.restingHRExplanation
+        case .sleep: Topic.sleepNeed.explanation
         }
     }
 
@@ -535,16 +539,21 @@ private struct BodyTrendCard: View {
         let d = v - usual
         switch metric {
         case .hrv:
+            // Bands against her own spread; the cycle named only when hers
+            // can move it (round 4, Brandt F8/F9, Laurent F10).
             let pct = usual > 0 ? d / usual * 100 : 0
-            if pct <= -10 { return "Well below your usual \(Int(usual.rounded())) ms: your body was under strain (short sleep, stress, drinks, getting sick or late cycle)." }
-            if pct < -3 { return "A little below your usual \(Int(usual.rounded())) ms. Normal day-to-day wobble." }
-            if pct < 5 { return "Right around your usual \(Int(usual.rounded())) ms." }
-            return "Above your usual \(Int(usual.rounded())) ms: well recovered."
+            switch HeartBands.hrv(deltaPct: pct, spreadPct: model.hrvSpreadPct) {
+            case .wellBelow: return "Well below your usual \(Int(usual.rounded())) ms: your body was under strain (short sleep, stress, drinks or getting sick\(model.heartCycleCause))."
+            case .below: return "A little below your usual \(Int(usual.rounded())) ms. Normal day-to-day wobble."
+            case .usual: return "Right around your usual \(Int(usual.rounded())) ms."
+            case .above: return "Above your usual \(Int(usual.rounded())) ms: well recovered."
+            }
         case .restingHR:
-            if d >= 4 { return "\(Int(d.rounded())) beats above your usual: often short sleep, stress, drinks or a bug coming on." }
-            if d >= 2 { return "A bit above your usual \(Int(usual.rounded())) bpm." }
-            if d > -2 { return "Right around your usual \(Int(usual.rounded())) bpm." }
-            return "Below your usual: a sign of good recovery."
+            switch HeartBands.restingHR(delta: d) {
+            case .above, .wellBelow: return "\(Int(d.rounded())) beats above your usual: often short sleep, stress, drinks or a bug coming on\(model.heartCycleCause)."
+            case .usual: return "Right around your usual \(Int(usual.rounded())) bpm."
+            case .below: return "Below your usual: a sign of good recovery."
+            }
         case .sleep:
             let mins = Int((d * 60).rounded())
             if mins <= -45 { return "\(Clock.duration(-mins)) short of your \(Clock.duration(model.sleepNeed.minutes)) need. Adds to sleep debt." }
@@ -556,7 +565,7 @@ private struct BodyTrendCard: View {
     var body: some View {
         Card {
             HStack {
-                ExplainedTitle(text: "Last 14 nights", topic: topic, size: 17)
+                ExplainedTitle(text: "Last 14 nights", explanation: explanation, size: 17)
                 Spacer()
             }
             AdaptiveSegmentedPicker("Measure", selection: $metric, options: Array(Metric.allCases)) { m in m.rawValue }
@@ -619,7 +628,6 @@ struct HeartMetricView: View {
     @Environment(\.colorScheme) private var scheme
 
     private var title: String { metric == .hrv ? "HRV" : "Resting heart rate" }
-    private var topic: Topic { metric == .hrv ? .hrv : .restingHR }
     private var accent: Accent { metric == .hrv ? .coral : .pink }
 
     private var value: String {
@@ -632,18 +640,23 @@ struct HeartMetricView: View {
         switch metric {
         case .hrv:
             let v = Int(model.hrvDeltaPct.rounded())
-            if v <= -10 { return "\(abs(v))% below your usual. Your body is under some strain: short sleep, stress, drinks or getting sick can all do this." }
-            if v < -3 { return "\(abs(v))% below your usual. Normal day-to-day wobble." }
-            if v < 5 { return "Right around your usual." }
-            return "\(v)% above your usual. Well recovered."
+            switch model.hrvLevel {
+            case .wellBelow: return "\(abs(v))% below your usual. " + model.hrvMeaning(model.hrvDeltaPct)
+            case .below: return "\(abs(v))% below your usual. Normal day-to-day wobble."
+            case .usual: return "Right around your usual."
+            case .above: return "\(v)% above your usual. Well recovered."
+            }
         case .restingHR:
             let v = Int(model.restingHRDelta.rounded())
-            if v >= 4 { return "\(v) beats above your usual. Often short sleep, stress, drinks or a bug coming on." }
-            if v >= 2 { return "\(v) beats above your usual. A little higher than normal." }
-            if v > -2 { return "Right around your usual." }
-            return "\(abs(v)) beats below your usual. A sign of good recovery."
+            switch model.restingHRLevel {
+            case .above, .wellBelow: return "\(v) beats above your usual. Often short sleep, stress, drinks or a bug coming on\(model.heartCycleCause)."
+            case .usual: return "Right around your usual."
+            case .below: return "\(abs(v)) beats below your usual. A sign of good recovery."
+            }
         }
     }
+
+    private var explanation: Explanation { metric == .hrv ? model.hrvExplanation : model.restingHRExplanation }
 
     var body: some View {
         Screen(title: title, accent: accent) {
@@ -651,7 +664,7 @@ struct HeartMetricView: View {
             Card {
                 HStack(spacing: 0) {
                     SectionLabel(text: "This morning", accent: accent)
-                    InfoButton(topic: topic).padding(.vertical, -12)
+                    InfoButton(explanation: explanation).padding(.vertical, -12)
                     Spacer()
                     if model.hasHeartData && !model.heartIsReal { ExampleTag() }
                 }
@@ -668,7 +681,7 @@ struct HeartMetricView: View {
                     RecoveryView()
                 }
             }
-            HowWeGotThisLink(topic: topic)
+            HowWeGotThisLink(explanation: explanation)
         }
     }
 }

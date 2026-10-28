@@ -20,6 +20,8 @@ final class HealthKitService {
             HKQuantityType(.appleSleepingWristTemperature),
             HKQuantityType(.respiratoryRate),
             HKQuantityType(.vo2Max),
+            // Scales "hard training" and an active hour to her (round 4).
+            HKQuantityType(.bodyMass),
             HKQuantityType(.dietaryCaffeine),
             HKQuantityType(.dietaryWater),
             HKCategoryType(.menstrualFlow),
@@ -278,6 +280,33 @@ final class HealthKitService {
             if let q { out[cal.component(.hour, from: stats.startDate)] = q.doubleValue(for: unit) }
         }
         return out
+    }
+
+    /// Hourly averages (or sums) for the `days` days before today, keyed by
+    /// the start of each hour. Used for her still-hour heart rate baseline.
+    func hourly(_ id: HKQuantityTypeIdentifier, unit: HKUnit, sum: Bool, days: Int) async throws -> [Date: Double] {
+        let cal = Calendar.current
+        let end = cal.startOfDay(for: .now)
+        let start = cal.date(byAdding: .day, value: -days, to: end)!
+        let descriptor = HKStatisticsCollectionQueryDescriptor(
+            predicate: .quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: start, end: end)),
+            options: sum ? .cumulativeSum : .discreteAverage, anchorDate: start, intervalComponents: DateComponents(hour: 1))
+        let collection = try await descriptor.result(for: store)
+        var out: [Date: Double] = [:]
+        for stats in collection.statistics() {
+            let q = sum ? stats.sumQuantity() : stats.averageQuantity()
+            if let q { out[stats.startDate] = q.doubleValue(for: unit) }
+        }
+        return out
+    }
+
+    /// The most recent sample of a type in the last `days`, if any.
+    func latest(_ id: HKQuantityTypeIdentifier, unit: HKUnit, days: Int) async throws -> Double? {
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: .now)!
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.quantitySample(type: HKQuantityType(id), predicate: HKQuery.predicateForSamples(withStart: start, end: .now))],
+            sortDescriptors: [SortDescriptor(\.startDate, order: .reverse)], limit: 1)
+        return try await descriptor.result(for: store).first?.quantity.doubleValue(for: unit)
     }
 
     /// The average of a type's samples taken during each sleep session

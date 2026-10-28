@@ -139,7 +139,7 @@ struct ExamWeekView: View {
                 ExamCompareTile(title: "Resting HR", systemImage: "heart.fill", accent: .pink,
                             value: model.hasHeartData ? "\(Int(model.restingHR.rounded())) bpm" : "No reading",
                             normal: model.hasHeartData ? "Normal \(Int(model.usualRestingHR.rounded()))" : "yet today",
-                            worse: model.hasHeartData && model.restingHRDelta >= 2, topic: .restingHR)
+                            worse: model.hasHeartData && model.restingHRLevel == .above, topic: .restingHR)
                 NavigationLink { CaffeineView() } label: {
                     ExamCompareTile(title: "Caffeine", systemImage: "cup.and.saucer.fill", accent: .yellow,
                                 value: "\(model.caffeineMgToday) mg",

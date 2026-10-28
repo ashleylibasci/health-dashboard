@@ -10,8 +10,8 @@ import HealthCore
 ///   one before the dip, for the rest of today and for tomorrow (from
 ///   tonight's plan, so they come even if she doesn't open the app),
 ///   rescheduled every time the data refreshes.
-/// - Sick alerts: at most one a day, when the signals say "Possible" or
-///   "Likely". Never at night: after 10pm or before 8am it waits until 8am.
+/// - Sick alerts: at most one a day, when the check finds "A couple of
+///   signs" or "Several signs". Never at night: after 10pm or before 8am it waits until 8am.
 /// - Smart alarm: "Open the app on your Watch" the evening before a
 ///   morning the Watch hasn't armed yet.
 enum Nudges {
@@ -75,7 +75,7 @@ enum Nudges {
         return calendar.date(bySettingHour: 8, minute: 0, second: 0, of: day)
     }
 
-    /// One notification if the signals reached "Possible" or "Likely" and
+    /// One notification if the check found a couple of signs or several and
     /// none was sent for that day. Marked as sent only once the system took
     /// it. `cyclePhaseUnknown`: says the app couldn't allow for her cycle.
     static func sickAlertIfNeeded(_ confidence: IllnessSignal.Confidence, cyclePhaseUnknown: Bool = false, now: Date = .now) async {
@@ -88,13 +88,14 @@ enum Nudges {
         guard await isAllowed() else { return }
         let id = sickPrefix + String(Int(day.timeIntervalSince1970))
         var body = confidence == .high
-            ? "Several of your overnight signals are off at once. Rest if you can, and see how you feel."
+            ? "Several of your overnight signals are off at once. Rest if you can."
             : "A couple of your overnight signals are off. Worth an easier day."
         if cyclePhaseUnknown {
             body += " The app can't tell which phase of your cycle you're in, so part of this could be your cycle."
         }
+        body += " Open to log how you feel and see when to get checked."
         let content = UNMutableNotificationContent()
-        content.title = confidence == .high ? "You might be getting sick" : "Your body may be fighting something"
+        content.title = confidence == .high ? "Several signs your body may be fighting something" : "Your body may be fighting something"
         content.body = body
         content.sound = .default
         let trigger = later.map {

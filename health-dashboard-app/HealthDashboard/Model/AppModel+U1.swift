@@ -110,6 +110,6 @@ extension AppModel {
         if lastNightIsFresh { return recovery }
         guard hasHeartData else { return nil }
         return Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct,
-                              restingHRDelta: restingHRDelta, sleepShortfall: 0)
+                              restingHRDelta: restingHRDelta, sleepShortfall: 0, cycle: cycleHeartShift)
     }
 }

@@ -241,7 +241,8 @@ final class BodySignalTests: XCTestCase {
     }
 
     func testFitnessAge() {
-        XCTAssertEqual(FitnessAge.estimate(vo2Max: 38.2, sex: .female), 26)
+        // FRIEND 2015 women: 34 sits between the 20s (37.6) and 30s (30.2) medians.
+        XCTAssertEqual(FitnessAge.estimate(vo2Max: 33.9), 30)
     }
 
     func testHabitEffectAndStreaks() {

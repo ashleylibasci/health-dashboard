@@ -104,16 +104,16 @@ enum Topic: String, CaseIterable, Identifiable {
         case .recovery: Explanation(id: id, title: "Recovery",
             meaning: "How ready your body is today, from 0 to 100, compared with your own usual.",
             forYou: "Lower than usual means your body is still catching up (from short sleep, stress, illness, alcohol or a hard workout). Take it easier; higher means it's a good day to push.",
-            howWeGotIt: "Mostly from your HRV (from readings taken while you slept, once there are enough) and resting heart rate compared with your last 30 days, plus last night's sleep compared with your need. Whether a score counts as below or above usual depends on how much yours normally moves. Your usual is your own average once there are 7 days; before that the app compares with a starting point of 78, a fixed middle-of-the-range value, not anyone's measured average. (Sleep need takes longer, 14 nights, because it learns from how your body responds to different amounts of sleep.)")
+            howWeGotIt: "Mostly from your HRV (from readings taken while you slept, once there are enough) and resting heart rate compared with your last 30 days, plus last night's sleep compared with your need. With a natural cycle, the second half of your cycle raises resting heart rate about 1.5 beats and lowers HRV about 4% on its own, and your period week does the reverse; when the app knows where you are in your cycle it takes that out first. On the pill, ring, patch, implant or shot nothing is taken out, because those don't swing with a cycle. Whether a score counts as below or above usual depends on how much yours normally moves. Your usual is your own average once there are 7 days; before that the app compares with a starting point of 78, a fixed middle-of-the-range value, not anyone's measured average. (Sleep need takes longer, 14 nights, because it learns from how your body responds to different amounts of sleep.)")
         case .hrv: Explanation(id: id, title: "HRV (heart rate variability)",
             meaning: "The tiny variation in time between heartbeats. Higher than your usual generally means your body is relaxed and recovered; lower means it's under strain.",
-            forYou: "Only compare HRV with your own usual, never with other people's. It naturally dips late in your cycle, after drinking and when you're getting sick.")
+            forYou: "Only compare HRV with your own usual, never with other people's. It dips after drinking, a short night and when you're getting sick. With a natural cycle it also dips a little in the second half; on the pill, ring, patch, implant or shot it doesn't swing with your cycle.")
         case .restingHR: Explanation(id: id, title: "Resting heart rate",
-            meaning: "Your heart rate when you're fully at rest, mostly measured while you sleep.",
-            forYou: "A few beats above your usual can mean short sleep, stress, alcohol, getting sick, or the second half of a natural cycle (after ovulation, before your period).")
+            meaning: "Your heart rate when you're fully at rest. Your Apple Watch works it out from readings taken while you're still during the day.",
+            forYou: "3 or more beats above your usual can mean short sleep, stress, alcohol or getting sick. With a natural cycle it also runs a little higher in the second half (after ovulation, before your period); on the pill, ring, patch, implant or shot it doesn't swing with your cycle.")
         case .stress: Explanation(id: id, title: "Stress",
-            meaning: "How hard your body seems to be working when you're not moving: a raised heart rate and lower HRV while sitting still.",
-            forYou: "Raised stress isn't bad on its own, but long stretches of it hurt sleep. A few minutes of slow breathing lowers it quickly. Hours you were asleep or working out aren't counted.")
+            meaning: "Body signals, not how you feel: how hard your heart seems to be working when you're not moving, from a raised heart rate and lower HRV while sitting still. It's shown as a band (Low, Moderate, Raised, High), not an exact score.",
+            forYou: "Stress can raise it, and so can caffeine, some medicines, heat, a big meal or getting sick. It often doesn't match how stressed you feel, so log that too. Long stretches of it can hurt sleep, and a few minutes of slow breathing lowers it quickly. Hours you were asleep or working out aren't counted.")
         case .breathingRate: Explanation(id: id, title: "Breathing rate",
             meaning: "Breaths per minute while you sleep. It's very steady for most people.",
             forYou: "A rise of one breath a minute or more is one of the earliest signs of getting sick.")
@@ -122,10 +122,10 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Small ups and downs night to night are normal. If you have a natural cycle, it also rises about \(TempFormat.delta(0.3, signed: false)) after ovulation and falls before your period; on birth control that stops ovulation, it stays flatter. A rise well above your usual can mean you're fighting something off.")
         case .illness: Explanation(id: id, title: "Might be getting sick",
             meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it. A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of them too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.",
-            forYou: "It's a guess, not a diagnosis. Extra sleep, fluids and an easy day help. See a doctor if you feel unwell.")
+            forYou: "It's a guess, not a diagnosis, and it counts signs rather than saying how likely you are to be sick. Extra sleep, fluids and an easy day help. See a doctor if you have a fever, trouble breathing, or you're getting worse.")
         case .fitnessAge: Explanation(id: id, title: "Fitness age",
-            meaning: "The age of an average woman with your cardio fitness (VO2 max, measured by your Apple Watch during walks and runs).",
-            forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks.")
+            meaning: "The age of a typical woman with your cardio fitness (VO2 max, estimated by your Apple Watch during walks and runs). It's shown as a range because a Watch estimate is often off by 5 points or more.",
+            forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks, so watch the trend rather than one reading.")
         case .calories: Explanation(id: id, title: "Calories",
             meaning: "An estimate of the energy your body used today: resting energy just to keep you alive, plus active energy from moving.",
             forYou: "Watch estimates can be off by 10–20%. It's useful for trends, not exact numbers. This is off by default; you can turn it on in Settings.")

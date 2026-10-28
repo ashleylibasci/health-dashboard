@@ -83,6 +83,21 @@ final class AppModel: ObservableObject {
     @Published private(set) var hrvIsOvernight = false
     /// Daytime HRV baseline for stress (median of daily averages, 30 days).
     @Published private(set) var stressHRVBaseline: Double?
+    /// Her heart rate in still, awake hours over the last 14 days. Stress is
+    /// measured from it once there are enough hours (round 4, Brandt F5).
+    @Published private(set) var stressStillBaseline: StressModel.StillBaseline?
+    /// How much her resting heart rate (bpm) and HRV (% of usual) move day
+    /// to day over the 30-day baseline window, once there are 10 days. The
+    /// sick check and the HRV bands scale with them (round 4, Brandt F6/F9).
+    @Published private(set) var restingHRSpread: Double?
+    @Published private(set) var hrvSpreadPct: Double?
+    /// Her own usual range (10th–90th percentile of the last 30 days) for
+    /// the Today dials (round 4, Brandt F10).
+    @Published private(set) var hrvUsualRange: ClosedRange<Double>?
+    @Published private(set) var restingHRUsualRange: ClosedRange<Double>?
+    /// Her latest weight from Apple Health (last year), for "hard training"
+    /// and an active hour. Nil without one.
+    @Published private(set) var bodyMassKg: Double?
     /// Most of her logged cycles ran longer than 45 days: there is no usual
     /// length, and the cycle shows the irregular view.
     @Published private(set) var cycleLengthsRunLong = false
@@ -342,9 +357,10 @@ final class AppModel: ObservableObject {
     var recoveryUsualIsPersonal: Bool { personalRecoveryUsual != nil }
     var energyUsualIsPersonal: Bool { personalEnergyUsual != nil }
 
+    /// A natural cycle's own shift today is allowed for (`cycleHeartShift`).
     var recovery: Int {
         Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct, restingHRDelta: restingHRDelta,
-                       sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15))
+                       sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15), cycle: cycleHeartShift)
     }
     /// The label for today's shown recovery (`recoveryShown`); "" when there
     /// is no number.
@@ -493,6 +509,10 @@ final class AppModel: ObservableObject {
         restingHRBaselineKnown = true
         hrvIsOvernight = false
         stressHRVBaseline = SampleData.baselineHRV
+        stressStillBaseline = nil
+        restingHRSpread = nil; hrvSpreadPct = nil
+        hrvUsualRange = nil; restingHRUsualRange = nil
+        bodyMassKg = nil
         chronotypeIsLearning = false
         personalRecoveryUsual = nil
         personalEnergyUsual = nil
@@ -600,9 +620,14 @@ final class AppModel: ObservableObject {
     /// Her usual value before `day`: the median of the 30 days before it,
     /// once there are at least 5 (one odd day can't set it).
     static func baseline(_ byDay: [Date: Double], before day: Date, calendar: Calendar = .current) -> Double? {
-        guard let from = calendar.date(byAdding: .day, value: -30, to: day) else { return nil }
-        let xs = byDay.filter { $0.key < day && $0.key >= from }.map(\.value)
+        let xs = window(byDay, before: day, calendar: calendar)
         return xs.count >= 5 ? xs.median : nil
+    }
+
+    /// The values of the 30 days before `day` (the baseline window).
+    static func window(_ byDay: [Date: Double], before day: Date, calendar: Calendar = .current) -> [Double] {
+        guard let from = calendar.date(byAdding: .day, value: -30, to: day) else { return [] }
+        return byDay.filter { $0.key < day && $0.key >= from }.map(\.value)
     }
 
     private func night(_ s: SleepSession, heart: HeartData) -> NightRecord {
@@ -639,6 +664,12 @@ final class AppModel: ObservableObject {
         }
         restingHRBaselineKnown = Self.baseline(heart.rhrByDay, before: rhrDay ?? today) != nil
         stressHRVBaseline = Self.baseline(heart.dailyHRV, before: today)
+        let rhrWindow = Self.window(heart.rhrByDay, before: rhrDay ?? today)
+        let hrvWindow = Self.window(heart.hrvByDay, before: hrvDay ?? today)
+        restingHRSpread = HeartBands.spread(rhrWindow)
+        hrvSpreadPct = HeartBands.spread(hrvWindow).flatMap { sd in hrvWindow.median.flatMap { $0 > 0 ? sd / $0 * 100 : nil } }
+        restingHRUsualRange = HeartBands.usualRange(rhrWindow)
+        hrvUsualRange = HeartBands.usualRange(hrvWindow)
         hrvIsOvernight = heart.overnight
         hasHeartData = hrvDay != nil || rhrDay != nil
         return hasHeartData
@@ -709,6 +740,8 @@ final class AppModel: ObservableObject {
                 heartIsReal = true
             } else {
                 (hrv, restingHR, hrvDeltaPct, restingHRDelta, stressHRVBaseline) = sampleHeart
+                restingHRSpread = nil; hrvSpreadPct = nil
+                hrvUsualRange = nil; restingHRUsualRange = nil
                 hasHeartData = true
                 restingHRBaselineKnown = true
                 hrvIsOvernight = false
@@ -756,6 +789,8 @@ final class AppModel: ObservableObject {
         let hrvHourly = (try? await health.hourlyToday(.heartRateVariabilitySDNN, unit: .msUnit, sum: false)) ?? [:]
         let stepsHourly = (try? await health.hourlyToday(.stepCount, unit: .count(), sum: true)) ?? [:]
         let kcalHourly = (try? await health.hourlyToday(.activeEnergyBurned, unit: .kilocalorie(), sum: true)) ?? [:]
+        bodyMassKg = try? await health.latest(.bodyMass, unit: .gramUnit(with: .kilo), days: 365)
+        stressStillBaseline = await stillHourBaseline(sessions: all)
         let asleepSegments = all.filter { $0.wake > today }.flatMap(\.segments).filter { $0.stage != .awake }
         func asleep(inHour h: Int) -> Bool {
             guard let a = cal.date(bySettingHour: h, minute: 0, second: 0, of: today) else { return false }
@@ -786,6 +821,28 @@ final class AppModel: ObservableObject {
         lastWeek = buildLastWeek(daylight: daylight)
         updatePersonalUsuals()
         finishRefresh()
+    }
+
+    /// Her heart rate in still, awake hours over the 14 days before today:
+    /// hours with few steps and little active energy (her own active-hour
+    /// threshold), not the hour after an active one, and not mostly asleep.
+    /// Nil until there are enough such hours (`StressModel.stillHoursNeeded`).
+    private func stillHourBaseline(sessions: [SleepSession], days: Int = 14) async -> StressModel.StillBaseline? {
+        let hr = (try? await health.hourly(.heartRate, unit: .bpm, sum: false, days: days)) ?? [:]
+        guard hr.count >= StressModel.stillHoursNeeded else { return nil }
+        let steps = (try? await health.hourly(.stepCount, unit: .count(), sum: true, days: days)) ?? [:]
+        let kcal = (try? await health.hourly(.activeEnergyBurned, unit: .kilocalorie(), sum: true, days: days)) ?? [:]
+        let activeKcal = StressModel.activeKcal(bodyMassKg: bodyMassKg)
+        func active(_ h: Date) -> Bool { (steps[h] ?? 0) > StressModel.activeSteps || (kcal[h] ?? 0) >= activeKcal }
+        let from = Calendar.current.date(byAdding: .day, value: -(days + 1), to: .now) ?? .distantPast
+        let asleep = sessions.filter { $0.wake > from }.flatMap(\.segments).filter { $0.stage != .awake }
+        let still = hr.compactMap { hour, bpm -> Double? in
+            let end = hour.addingTimeInterval(3600)
+            guard !active(hour), !active(hour.addingTimeInterval(-3600)) else { return nil }
+            let slept = asleep.reduce(0.0) { $0 + max(0, min($1.end, end).timeIntervalSince(max($1.start, hour))) }
+            return slept >= 1800 ? nil : bpm
+        }
+        return StressModel.stillBaseline(heartRates: still)
     }
 
     /// Cycle day and length from Apple Health's period starts plus the
@@ -868,7 +925,8 @@ final class AppModel: ObservableObject {
             .map { n in
                 Double(Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: n.outcome.hrvDeltaPct ?? 0,
                                       restingHRDelta: n.outcome.restingHRDelta ?? 0,
-                                      sleepShortfall: max(0, need - n.asleepMinutes - 15)))
+                                      sleepShortfall: max(0, need - n.asleepMinutes - 15),
+                                      cycle: cycleHeartShift(on: n.wakeDay)))
             }
         personalRecoveryUsual = recoveries.count >= 7 ? recoveries.mean.map { Int($0.rounded()) } : nil
         personalRecoverySpread = recoveries.count >= 14 ? recoveries.standardDeviation : nil

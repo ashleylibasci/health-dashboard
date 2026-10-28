@@ -60,8 +60,8 @@ struct RecoveryView: View {
         } else if !model.lastNightIsFresh {
             text += " No sleep was recorded last night, so this is from your heart readings only."
         }
-        if model.isLateLuteal && model.recoveryPointsFromHRV < 0 {
-            text += " Lower HRV is normal late in your cycle."
+        if let cycle = model.recoveryCycleNote {
+            text += " " + cycle
         }
         return text
     }
@@ -92,7 +92,11 @@ struct RecoveryView: View {
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 HowWeGotThisLink(title: "Recovery",
-                                 method: "Recovery starts from a fixed starting score of \(AppModel.recoveryAnchor), chosen by the app (not a population average). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. " + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average."))
+                                 method: "Recovery starts from a fixed starting score of \(AppModel.recoveryAnchor), chosen by the app (not a population average). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. "
+                                    + (model.heartFollowsCycle
+                                       ? "With a natural cycle, the app expects resting heart rate about 1.5 beats higher and HRV about 4% lower in the second half of your cycle, and the reverse in the first 7 days from the start of your period, and takes that out before scoring. It only does this when it knows where you are in your cycle. "
+                                       : "Your birth control stops ovulation, so your heart readings don't swing with a cycle and nothing is adjusted for one. ")
+                                    + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average."))
             }
             .frame(maxWidth: .infinity)
         }
@@ -185,7 +189,7 @@ struct RecoveryView: View {
             HStack(spacing: 0) {
                 Text("HRV and resting heart rate").font(.scaled(size: 17, weight: .bold))
                 Spacer(minLength: 0)
-                InfoButton(topic: heartMetric == .hrv ? .hrv : .restingHR).padding(.vertical, -12)
+                InfoButton(explanation: heartMetric == .hrv ? model.hrvExplanation : model.restingHRExplanation).padding(.vertical, -12)
             }
             HStack(spacing: 6) {
                 ForEach(HeartMetric.allCases) { m in
@@ -206,7 +210,7 @@ struct RecoveryView: View {
                 ScrubHint()
                 Text(heartMetric == .hrv
                      ? "Higher than your usual (dashed line) means your body is relaxed and recovered."
-                     : "Lower than your usual (dashed line) is better. A few beats up can mean short sleep, stress, drinks or getting sick.")
+                     : "Lower than your usual (dashed line) is better. \(Int(HeartBands.restingHRUp)) or more beats up can mean short sleep, stress, drinks or getting sick\(model.heartCycleCause).")
                     .font(.scaled(size: 13))
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
@@ -215,16 +219,13 @@ struct RecoveryView: View {
     }
 
     private func heartMeaning(_ value: Double, usual: Double) -> String {
+        // The same bands and wording as Body (round 4, Brandt F8/F9).
         if heartMetric == .hrv {
             let pct = usual > 0 ? (value - usual) / usual * 100 : 0
-            if pct <= -10 { return "\(SleepText.signed(pct))% vs usual. Your body was under some strain." }
-            if pct >= 5 { return "\(SleepText.signed(pct))% vs usual. Well recovered." }
-            return "\(SleepText.signed(pct))% vs usual. Normal for you."
+            return "\(SleepText.signed(pct))% vs usual. " + model.hrvMeaning(pct)
         }
         let d = value - usual
-        if d >= 3 { return "\(SleepText.signed(d)) bpm vs usual. Your heart was working a bit harder." }
-        if d <= -2 { return "\(SleepText.signed(d)) bpm vs usual. Nicely rested." }
-        return "\(SleepText.signed(d)) bpm vs usual. Normal for you."
+        return "\(SleepText.signed(d)) bpm vs usual. " + model.restingHRMeaning(d)
     }
 
     @ViewBuilder
@@ -249,14 +250,15 @@ struct RecoveryView: View {
             }
             MovedRow(label: "HRV", valueText: model.hasHeartData ? SleepText.signed(model.hrvDeltaPct) + "%" : "No reading yet",
                      points: model.hasHeartData ? model.recoveryPointsFromHRV : 0,
-                     explanation: Topic.hrv.explanation)
+                     explanation: model.hrvExplanation)
             MovedRow(label: "Resting HR", valueText: model.hasHeartData ? SleepText.signed(model.restingHRDelta) + " bpm" : "No reading yet",
                      points: model.hasHeartData ? model.recoveryPointsFromRestingHR : 0,
-                     explanation: Topic.restingHR.explanation)
+                     explanation: model.restingHRExplanation)
             MovedRow(label: "Sleep", valueText: model.lastNightIsFresh ? SleepText.signedCompact(sleepGap) : "None recorded",
                      points: model.lastNightIsFresh ? model.recoveryPointsFromSleep : 0,
                      explanation: Topic.sleepNeed.explanation)
-            Text("Bars to the left of the line pulled today down; bars to the right lifted it.")
+            Text("Bars to the left of the line pulled today down; bars to the right lifted it."
+                 + (model.hasHeartData && model.cycleHeartShift != .none ? " The bars allow for your cycle; the numbers are the raw change." : ""))
                 .font(.scaled(size: 13))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)

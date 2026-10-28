@@ -484,6 +484,12 @@ struct EnergyView: View {
     private var effortSuggestion: (value: String, note: String) {
         let usual = model.recoveryUsualPhrase
         let steps = "\(model.stepsToday.formatted(.number)) steps so far."
+        // The sick check comes before recovery: training hard while your
+        // body may be fighting something isn't worth it (round 4, Ruiz F3).
+        if model.sickCheckFlagged || !model.loggedSickSymptoms.isEmpty {
+            let why = model.sickCheckFlagged ? "Your sick check found \(model.sickSignsPhrase)." : "You logged feeling sick today."
+            return (Recovery.Level.easy.effort, "\(why) Skip hard training until you feel better; a gentle walk is fine if you feel up to it.")
+        }
         guard model.hasHeartData, let recovery = model.recoveryShown else {
             return ("As planned", "No recovery reading yet, so no change suggested. \(steps)")
         }
