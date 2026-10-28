@@ -126,7 +126,7 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Small ups and downs night to night are normal. If you have a natural cycle, it also rises about \(TempFormat.delta(0.3, signed: false)) after ovulation and falls before your period; on birth control that stops ovulation, it stays flatter. A rise well above your usual can mean you're fighting something off.")
         case .illness: Explanation(id: id, title: "Sick check",
             meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it.",
-            forYou: "It's a guess, not a diagnosis, and it counts signs rather than saying how likely you are to be sick. Extra sleep, fluids and an easy day help. See a doctor if you have a fever, trouble breathing, or you're getting worse.",
+            forYou: "It's a guess, not a diagnosis, and it counts signs rather than saying how likely you are to be sick. Extra sleep, fluids and an easy day help.",
             howWeGotIt: "A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of these signals too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.")
         case .fitnessAge: Explanation(id: id, title: "Fitness age",
             meaning: "The age of a typical woman with your cardio fitness (VO2 max, estimated by your Apple Watch during walks and runs). It's shown as a range, because Watch estimates aren't exact.",

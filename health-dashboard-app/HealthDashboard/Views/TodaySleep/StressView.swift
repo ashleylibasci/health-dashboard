@@ -13,15 +13,31 @@ struct StressView: View {
 
     var body: some View {
         let day = model.stressToday
-        // Stress is orange on every screen (Tanaka F1); the hero takes the
+        // Stress is orange on every screen (Tanaka F1); the header takes the
         // colour of today's band (F6).
         Screen(title: "Stress", accent: .orange) {
             SampleDataBanner()
-            heroCard(day)
+            header(day)
             chartCard(day)
-            momentsCard(day)
             feelCard
-            tipsCard
+            RowCard {
+                if let label = day.label, label == .raised || label == .high {
+                    ExpandRow(title: "What else raises it", summary: "Caffeine, heat, a meal, getting sick\u{2026}",
+                              systemImage: "questionmark.circle.fill", accent: .orange) {
+                        Text(otherCauses + (label == .high ? " A break, slow breathing or some fresh air can help." : ""))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    RowDivider()
+                }
+                ExpandRow(title: "Last 7 days", summary: weekSummary, systemImage: "calendar", accent: .orange) {
+                    weekDots
+                }
+                RowDivider()
+                ExpandRow(title: "What helps", summary: "Breathing, a walk, short work blocks",
+                          systemImage: "leaf.fill", accent: .mint) {
+                    tips
+                }
+            }
         }
     }
 
@@ -72,18 +88,19 @@ struct StressView: View {
         }
     }
 
+    /// One sentence against her usual; what else can raise it is a row.
     private func vsUsual(_ day: StressDay) -> String {
         guard let label = day.label else {
             if !model.restingHRBaselineKnown {
-                return "The app needs a few days of your resting heart rate before it can tell what's raised for you. Wear your Watch, including to bed."
+                return "The app needs a few days of your resting heart rate before it can tell what's raised for you."
             }
-            return "Not enough still hours with heart rate data yet today. Wear your Watch and check back later."
+            return "Not enough still hours with heart rate data yet today. Check back later."
         }
         switch label {
         case .low: return "Your heart stayed close to its resting pace while you were still. A calm day so far."
         case .usual: return "Normal day-to-day ups and downs."
-        case .raised: return "Your heart has been working harder than usual while you were sitting still. " + otherCauses
-        case .high: return "Your heart has been working much harder than usual while you were still. " + otherCauses + " A break, slow breathing or some fresh air can help."
+        case .raised: return "Your heart has been working harder than usual while you were sitting still."
+        case .high: return "Your heart has been working much harder than usual while you were still."
         }
     }
 
@@ -94,41 +111,27 @@ struct StressView: View {
             + (model.heartFollowsCycle ? ", and so can the second half of your cycle." : ".")
     }
 
-    // MARK: Hero
+    // MARK: Header
 
-    private func heroCard(_ day: StressDay) -> some View {
-        let p = Palette(scheme: scheme)
-        let accent = labelAccent(day.label)
-        return Card(accent: accent) {
-            HStack(spacing: 0) {
-                SectionLabel(text: "Body signals, not how you feel", accent: accent)
-                InfoButton(topic: .stress).padding(.vertical, -14)
-                Spacer()
-            }
-            // What she said comes first; the body's band second (round 4,
-            // Laurent F2). A band only, no 0–100 number (Liu 9).
-            if let felt = model.stressLoggedToday {
-                Text("You said you felt \(feelName(felt).lowercased()) (\(felt) of 5).")
-                    .font(.cardTitle)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            AdaptiveStack(spacing: 10, alignment: .firstTextBaseline) {
-                Text(day.label?.rawValue ?? "No data yet")
-                    .font(day.label == nil ? TypeRole.detailTitle : TypeRole.display)
-                    .foregroundStyle(day.label == nil ? p.primary : accent.ink(scheme))
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                if day.label != nil {
-                    Text("from heart rate at rest").font(.bodyEmphasis).foregroundStyle(p.secondary)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            Text(vsUsual(day))
-                .font(.bodyText)
-                .foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HowWeGotThisLink(title: "Your stress level", method: method(day))
+    /// The ⓘ: what the band is, with how it's worked out.
+    private func info(_ day: StressDay) -> Explanation {
+        let topic = Topic.stress.explanation
+        return Explanation(id: topic.id, title: topic.title, meaning: topic.meaning, forYou: topic.forYou, howWeGotIt: method(day))
+    }
+
+    /// What she said comes first; the body's band second (round 4, Laurent
+    /// F2). A band only, no 0–100 number (Liu 9).
+    private func header(_ day: StressDay) -> some View {
+        var pairs: [StatPair] = []
+        if let peak = day.peak, let level = peak.level {
+            pairs.append(StatPair(label: "Peak", value: "\(Self.hourText(peak.hour)) \u{00B7} \(Self.band(level).name)"))
         }
+        if let calm = day.calmestStretch {
+            pairs.append(StatPair(label: "Calmest", value: calm.label))
+        }
+        return SummaryHeader(eyebrow: "Body signals, not how you feel", value: day.label?.rawValue ?? "No data yet",
+                             status: model.stressLoggedToday.map { SummaryStatus(text: "You felt \($0) of 5", accent: .orange) },
+                             line: vsUsual(day), pairs: pairs, accent: labelAccent(day.label), info: info(day))
     }
 
     private func method(_ day: StressDay) -> String {
@@ -148,63 +151,83 @@ struct StressView: View {
         return day.hours.min { abs($0.hour - selectedHour) < abs($1.hour - selectedHour) }
     }
 
+    /// Every note the readout can show, so it keeps one height while she
+    /// drags.
+    private static let readoutSlots = [
+        "Sleep hours aren't counted, so they don't make your day look calmer than it was.",
+        "You were moving. Moving raises heart rate too, so this hour isn't counted as stress.",
+        "The hour after you were moving. Your heart rate is still coming down, so it isn't counted as stress.",
+        "Your Watch had no heart rate for this hour, often because it was off or charging.",
+    ] + (0...100).map(meaning).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+
     @ViewBuilder
     private func readout(_ day: StressDay) -> some View {
+        let slots = Self.readoutSlots
         if let hour = nearestHour(day) {
             if hour.asleep {
-                ChartReadout(title: Self.hourText(hour.hour), value: "Asleep",
-                             detail: "Sleep hours aren't counted, so they don't make your day look calmer than it was.",
-                             accent: .purple, onClear: { selectedHour = nil })
+                ChartReadout(title: Self.hourText(hour.hour), value: "Asleep", detail: slots[0],
+                             accent: .purple, onClear: { selectedHour = nil }, detailSlots: slots)
             } else if hour.active {
-                ChartReadout(title: Self.hourText(hour.hour), value: "Active",
-                             detail: "You were moving. Moving raises heart rate too, so this hour isn't counted as stress.",
-                             accent: .indigo, onClear: { selectedHour = nil })
+                ChartReadout(title: Self.hourText(hour.hour), value: "Active", detail: slots[1],
+                             accent: .indigo, onClear: { selectedHour = nil }, detailSlots: slots)
             } else if hour.coolingDown {
-                ChartReadout(title: Self.hourText(hour.hour), value: "Settling",
-                             detail: "The hour after you were moving. Your heart rate is still coming down, so it isn't counted as stress.",
-                             accent: .indigo, onClear: { selectedHour = nil })
+                ChartReadout(title: Self.hourText(hour.hour), value: "Settling", detail: slots[2],
+                             accent: .indigo, onClear: { selectedHour = nil }, detailSlots: slots)
             } else if let level = hour.level {
                 let b = Self.band(level)
                 ChartReadout(title: Self.hourText(hour.hour), value: b.name,
-                             detail: Self.meaning(level), accent: b.accent, onClear: { selectedHour = nil })
+                             detail: Self.meaning(level), accent: b.accent, onClear: { selectedHour = nil }, detailSlots: slots)
             } else {
-                ChartReadout(title: Self.hourText(hour.hour), value: "No reading",
-                             detail: "Your Watch had no heart rate for this hour, often because it was off or charging.",
-                             accent: .indigo, onClear: { selectedHour = nil })
+                ChartReadout(title: Self.hourText(hour.hour), value: "No reading", detail: slots[3],
+                             accent: .indigo, onClear: { selectedHour = nil }, detailSlots: slots)
             }
         } else if let peak = day.peak, let level = peak.level {
             // At rest the readout sums up the day; the hint under the chart
             // says how to explore it (Valtonen F13).
             ChartReadout(title: "Highest today \u{00B7} \(Self.hourText(peak.hour))", value: Self.band(level).name,
                          detail: "Today overall: \(day.label?.rawValue.lowercased() ?? "no band yet"), from \(day.countedHours) still \(day.countedHours == 1 ? "hour" : "hours").",
-                         accent: Self.band(level).accent)
+                         accent: Self.band(level).accent, detailSlots: slots)
         } else {
             ChartReadout(title: "Today", value: "No readings yet",
-                         detail: "Hours fill in as your Watch measures your heart rate.", accent: .orange)
+                         detail: "Hours fill in as your Watch measures your heart rate.", accent: .orange, detailSlots: slots)
         }
     }
 
+    /// The legend and how to read the chart, behind the card's ⓘ.
+    private static let chartExplanation = Explanation(
+        id: "stressHours", title: "Hour by hour",
+        meaning: "Each hour is colored by band, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}. The short grey marks along the bottom are active hours (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.",
+        forYou: "Peak hour: the still hour today when your heart rate was furthest above your resting rate. Think about what was happening then: a deadline, a class, a hard conversation. Knowing your triggers is the first step to planning around them. Calmest stretch: the two hours in a row, between 8am and 10pm, when your body was calmest. A good time for focused work or anything that needs a clear head.")
+
     private func chartCard(_ day: StressDay) -> some View {
         let p = Palette(scheme: scheme)
+        let hasReadings = day.hours.contains { $0.level != nil || $0.active }
         return Card {
-            Text("Hour by hour").font(.cardTitle)
-            readout(day)
-            StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
-                .frame(height: 170)
-            ScrubHint(each: "hour")
-            // Wraps (one per line at the largest sizes) instead of breaking
-            // the words into letters.
-            FlowLayout(spacing: 12, lineSpacing: 6) {
-                swatch(StressLevelColor.fill(0, scheme), "Low")
-                swatch(StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue)
-                swatch(StressLevelColor.fill(2, scheme), "Raised \u{25CF}")
-                swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
-                swatch(p.tertiary, "Active")
+            HStack(spacing: 0) {
+                Text("Hour by hour").font(.cardTitle)
+                Spacer(minLength: 0)
+                InfoButton(explanation: Self.chartExplanation).padding(.vertical, -12)
             }
-            Text("Each hour is colored by band, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}. The short grey marks along the bottom are active hours (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
-                .font(.secondary)
-                .foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if hasReadings {
+                readout(day)
+                StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
+                    .frame(height: 170)
+                ScrubHint(each: "hour")
+                // Wraps (one per line at the largest sizes) instead of breaking
+                // the words into letters.
+                FlowLayout(spacing: 12, lineSpacing: 6) {
+                    swatch(StressLevelColor.fill(0, scheme), "Low")
+                    swatch(StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue)
+                    swatch(StressLevelColor.fill(2, scheme), "Raised \u{25CF}")
+                    swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
+                    swatch(p.tertiary, "Active")
+                }
+            } else {
+                // No empty grid: one line until the first hour comes in.
+                Label("Fills in as your Watch measures your heart rate.", systemImage: "applewatch")
+                    .font(.bodyText).foregroundStyle(p.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -214,27 +237,6 @@ struct StressView: View {
                 .accessibilityHidden(true)
             Text(text).font(.secondary).fontWeight(.semibold).secondaryText()
                 .keepsOnOneLine(minimumScale: 0.8)
-        }
-    }
-
-    // MARK: Peak and calm
-
-    private func momentsCard(_ day: StressDay) -> some View {
-        AdaptiveStack(spacing: 10) {
-            StressStat(title: "Peak",
-                       value: day.peak.map { Self.hourText($0.hour) } ?? "\u{2014}",
-                       note: day.peak?.level.map { Self.band($0).name } ?? "no readings yet",
-                       accent: .orange,
-                       explanation: Explanation(id: "stressPeak", title: "Peak hour",
-                                                meaning: "The still hour today when your heart rate was furthest above your resting rate.",
-                                                forYou: "Think about what was happening then: a deadline, a class, a hard conversation. Knowing your triggers is the first step to planning around them."))
-            StressStat(title: "Calmest stretch",
-                       value: day.calmestStretch?.label ?? "\u{2014}",
-                       note: day.calmestStretch == nil ? "needs two still hours" : "your body's quietest time",
-                       accent: .mint,
-                       explanation: Explanation(id: "stressCalm", title: "Calmest stretch",
-                                                meaning: "The two hours in a row, between 8am and 10pm, when your body was calmest.",
-                                                forYou: "A good time for focused work or anything that needs a clear head."))
         }
     }
 
@@ -265,31 +267,38 @@ struct StressView: View {
             .font(.secondary).fontWeight(.semibold)
             .foregroundStyle(p.secondary)
             .accessibilityHidden(true)
-            StressCrisisRow(level: model.stressLoggedToday)
             if justLogged {
                 Text("Saved. Logging how you feel lets you compare it with what your body shows.")
                     .font(.secondary)
                     .foregroundStyle(Accent.mint.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Divider()
-            SectionLabel(text: "Last 7 days")
-            HStack(spacing: 6) {
-                ForEach(model.moodWeek, id: \.day) { entry in
-                    VStack(spacing: 4) {
-                        Circle()
-                            .fill(moodColor(entry.stress))
-                            .overlay(Circle().strokeBorder(p.cardBorder))
-                            .frame(width: 26, height: 26)
-                            .overlay(Text(entry.stress.map { "\($0)" } ?? "").font(.small).fontWeight(.bold))
-                        Text(entry.day.formatted(.dateTime.weekday(.narrow)))
-                            .font(.small).fontWeight(.semibold)
-                            .foregroundStyle(p.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(entry.day.formatted(.dateTime.weekday(.wide))): \(entry.stress.map { feelName($0) } ?? "not logged")")
+        }
+    }
+
+    private var weekSummary: String {
+        let logged = model.moodWeek.filter { $0.stress != nil }.count
+        return logged == 0 ? "Nothing logged yet" : "\(logged) of 7 days logged"
+    }
+
+    private var weekDots: some View {
+        let p = Palette(scheme: scheme)
+        return HStack(spacing: 6) {
+            ForEach(model.moodWeek, id: \.day) { entry in
+                VStack(spacing: 4) {
+                    Circle()
+                        .fill(moodColor(entry.stress))
+                        .overlay(Circle().strokeBorder(p.cardBorder))
+                        .frame(width: 26, height: 26)
+                        .overlay(Text(entry.stress.map { "\($0)" } ?? "").font(.small).fontWeight(.bold)
+                            .foregroundStyle(p.primary))
+                    Text(entry.day.formatted(.dateTime.weekday(.narrow)))
+                        .font(.small).fontWeight(.semibold)
+                        .foregroundStyle(p.secondary)
                 }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(entry.day.formatted(.dateTime.weekday(.wide))): \(entry.stress.map { feelName($0) } ?? "not logged")")
             }
         }
     }
@@ -329,25 +338,23 @@ struct StressView: View {
 
     // MARK: Tips
 
-    private var tipsCard: some View {
-        Card {
-            Text("What helps").font(.cardTitle)
-            HelpTipRow(systemImage: "wind", accent: .mint, title: "1 minute of slow breathing",
+    @ViewBuilder
+    private var tips: some View {
+        HelpTipRow(systemImage: "wind", accent: .mint, title: "1 minute of slow breathing",
                    detail: "Breathe in for 4, out for 6. Long out-breaths slow your heart. The Mindfulness app on your Watch can guide you.")
-            if model.hidesEffortTargets {
-                HelpTipRow(systemImage: "sun.max.fill", accent: .blue, title: "A few minutes outside",
-                           detail: "Daylight and a change of scene help stress hormones settle.")
-            } else {
-                HelpTipRow(systemImage: "figure.walk", accent: .blue, title: "A 10-minute walk outside",
-                           detail: "Moving and daylight bring stress hormones down, and walking isn't counted as stress here.")
-            }
-            HelpTipRow(systemImage: "timer", accent: .indigo, title: "Work in 25-minute blocks",
-                   detail: "Short, clear chunks with breaks feel less overwhelming than one long push before a deadline.")
-            HelpTipRow(systemImage: "cup.and.saucer.fill", accent: .yellow, title: "Go easy on late caffeine",
-                   detail: "Caffeine raises your heart rate and can make stress feel worse, and it lingers into the night.")
-            HelpTipRow(systemImage: "moon.fill", accent: .purple, title: "Protect tonight's sleep",
-                   detail: "A short night makes the next day feel more stressful. Aim for bed by \(Clock.format(store.data.bedtime)).")
+        if model.hidesEffortTargets {
+            HelpTipRow(systemImage: "sun.max.fill", accent: .blue, title: "A few minutes outside",
+                       detail: "Daylight and a change of scene help stress hormones settle.")
+        } else {
+            HelpTipRow(systemImage: "figure.walk", accent: .blue, title: "A 10-minute walk outside",
+                       detail: "Moving and daylight bring stress hormones down, and walking isn't counted as stress here.")
         }
+        HelpTipRow(systemImage: "timer", accent: .indigo, title: "Work in 25-minute blocks",
+                   detail: "Short, clear chunks with breaks feel less overwhelming than one long push before a deadline.")
+        HelpTipRow(systemImage: "cup.and.saucer.fill", accent: .yellow, title: "Go easy on late caffeine",
+                   detail: "Caffeine raises your heart rate and can make stress feel worse, and it lingers into the night.")
+        HelpTipRow(systemImage: "moon.fill", accent: .purple, title: "Protect tonight's sleep",
+                   detail: "A short night makes the next day feel more stressful. Aim for bed by \(Clock.format(store.data.bedtime)).")
     }
 }
 
@@ -459,33 +466,6 @@ private struct StressHoursChart: View {
             title: "Stress by hour today", seriesName: "Stress band", yTitle: "Stress band, Low to High",
             points: hours.compactMap { h in h.level.map { (h.hour * 60, Double($0)) } },
             yLabel: { StressView.band(Int($0.rounded())).name }))
-    }
-}
-
-private struct StressStat: View {
-    var title: String
-    var value: String
-    var note: String
-    var accent: Accent
-    var explanation: Explanation
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        let p = Palette(scheme: scheme)
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 0) {
-                Text(title).font(.secondary).fontWeight(.bold).foregroundStyle(p.secondary)
-                Spacer(minLength: 0)
-                InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -8)
-            }
-            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(accent.ink(scheme))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(Space.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(p.card, in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(p.cardBorder))
     }
 }
 

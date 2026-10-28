@@ -1,28 +1,23 @@
 import SwiftUI
-import Charts
 import HealthCore
 
-/// The Body tab. It leads with the two rhythms that change her day, cycle
-/// and energy, then groups everything else into row cards: Vitals and
-/// Progress. Recovery lives on Today, sleep stages on Sleep and stress on
-/// Today, so nothing here repeats another tab (Whitfield F3/F4, Valtonen
-/// F6). Explanations live on the screens each row opens (Valtonen F5).
+/// The Body tab: where she is in her pack (or cycle) and her energy, then
+/// one card of vitals led by the sick check, then fitness and her body
+/// clock. Each row is a one-line answer that opens its screen; the
+/// explanations live there. Recovery lives on Today, sleep on Sleep and
+/// stress on Today, so nothing here repeats another tab.
 struct BodyView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
-    @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Screen(accent: .indigo) {
             BodyLogTabHeader("Body")
             SampleDataBanner()
-            if model.showsCrisisLine { CrisisLineCard() }
-            PackCheckCard()
             rhythms
-            sickCard
             vitals
-            progress
+            activity
         }
     }
 
@@ -33,25 +28,20 @@ struct BodyView: View {
         return true
     }
 
+    @ViewBuilder
     private var rhythms: some View {
-        VStack(alignment: .leading, spacing: Space.m) {
-            SectionHeading("Rhythms")
-            if typeSize.isAccessibilitySize || !cycleShown {
-                VStack(spacing: Space.m) {
-                    if cycleShown { cycleLink }
+        SectionHeading("Rhythms")
+        if typeSize.isAccessibilitySize || !cycleShown {
+            VStack(spacing: Space.m) {
+                if cycleShown { cycleLink }
+                energyLink
+            }
+        } else {
+            Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
+                GridRow {
+                    cycleLink
                     energyLink
                 }
-            } else {
-                Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
-                    GridRow {
-                        cycleLink
-                        energyLink
-                    }
-                }
-            }
-            Card(density: .compact) {
-                BodyRow(title: "Body clock", value: chronotypeValue, note: "When your body prefers to sleep",
-                        systemImage: "sun.and.horizon.fill", accent: .purple) { ChronotypeView() }
             }
         }
     }
@@ -64,9 +54,7 @@ struct BodyView: View {
     private var energyLink: some View {
         NavigationLink { EnergyView() } label: {
             BodyTile(title: "Energy left", accent: .mint, systemImage: "bolt.fill",
-                     ring: model.energyBankNow / 100,
-                     ringLabel: "\(Int(model.energyBankNow.rounded()))%", ringCaption: nil,
-                     value: "Now",
+                     value: "\(Int(model.energyBankNow.rounded()))%", progress: model.energyBankNow / 100,
                      note: model.lastNightIsFresh ? "About \(Int(model.energyBankAtBedtime.rounded()))% at bedtime"
                                                   : "No sleep recorded last night, so a rough guess")
         }
@@ -75,28 +63,28 @@ struct BodyView: View {
     }
 
     /// Cycle is pink in every state (Tanaka F4); coral is kept for "worse".
+    /// On a pack it's named for the pack: "Pill pack · Day 18 of 28".
     @ViewBuilder
     private var cycleTile: some View {
         switch model.cycleDisplay {
         case let .phases(day, length, phase):
             BodyTile(title: "Cycle", accent: .pink, systemImage: "drop.fill",
-                     ring: min(Double(day) / Double(max(length, 1)), 1), ringLabel: "\(day)", ringCaption: "Day",
-                     value: day > length ? (model.showsDueAroundNow ? "Due around now" : "Day \(day)")
-                                         : BodyLogStyle.phaseName(phase, birthControl: store.birthControl),
-                     note: day > length ? "Around \(model.usualLengthPhrase(length))" : periodNote)
+                     value: day > length ? (model.showsDueAroundNow ? "Due around now" : "Day \(day)") : "Day \(day)",
+                     progress: min(Double(day) / Double(max(length, 1)), 1),
+                     note: day > length ? "Around \(model.usualLengthPhrase(length))"
+                                        : "\(BodyLogStyle.phaseName(phase, birthControl: store.birthControl)) \u{00B7} \(periodNote)")
         case let .pack(day, activeDays, packLength):
             let hasBreak = activeDays < packLength
             let isBreak = hasBreak && day > activeDays
             let toBreak = activeDays - day + 1
-            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
-                     ring: Double(day) / Double(max(packLength, 1)), ringLabel: "\(day)", ringCaption: "Pack",
-                     value: isBreak ? model.packBreakName : model.packActiveName,
+            BodyTile(title: packTitle, accent: .pink, systemImage: "pills.fill",
+                     value: "Day \(day) of \(packLength)", progress: Double(day) / Double(max(packLength, 1)),
                      note: !hasBreak ? "Continuous, no break"
-                         : isBreak ? "Withdrawal bleed days"
+                         : isBreak ? "\(model.packBreakName) \u{00B7} withdrawal bleed"
                          : model.packSkippingBreak ? "Skipping this break"
                          : "Break in \(toBreak) day\(toBreak == 1 ? "" : "s")")
         case let .suppressed(bc) where bc.hasBreakWeek:
-            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
+            BodyTile(title: packTitle, accent: .pink, systemImage: "pills.fill",
                      value: bc.rawValue, note: "Set where you are in your pack")
         case let .suppressed(bc) where bc.ovulation != .stopped:
             BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
@@ -117,19 +105,36 @@ struct BodyView: View {
         }
     }
 
+    /// "Pill pack", "Ring", "Patch": what she'd call it (Dana, task 6).
+    private var packTitle: String {
+        switch store.birthControl {
+        case .ring?: "Ring"
+        case .patch?: "Patch"
+        default: "Pill pack"
+        }
+    }
+
     private var periodNote: String {
-        guard let days = model.periodCountdownDays else { return "No countdowns" }
-        return days <= 1 ? "Period in about 1 day" : "Period in about \(days) days"
+        guard let days = model.periodCountdownDays else { return "no countdown" }
+        return days <= 1 ? "period in about 1 day" : "period in about \(days) days"
     }
 
-    private var chronotypeValue: String {
-        guard let type = model.chronotype else { return "Learning" }
-        return type.category.rawValue.replacingOccurrences(of: " type", with: "")
+    // MARK: Vitals
+
+    private var vitals: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeading("Vitals")
+            RowCard {
+                sickRow
+                RowDivider()
+                HeartMetricRows()
+            }
+        }
     }
 
-    // MARK: Might be getting sick
-
-    private var sickCard: some View {
+    /// The sick check's answer in one row. Breathing rate and wrist
+    /// temperature are two of its four signals, so they live on its page.
+    private var sickRow: some View {
         let ill = model.illness
         let flagged = ill.factors.filter(\.flagged).count
         let accent: Accent
@@ -138,252 +143,66 @@ struct BodyView: View {
         case .medium: accent = .orange
         case .high: accent = .coral
         }
-        let noData = !model.hasHeartData
-        let title = noData ? "Sick check: no reading yet" : "Sick check: \(ill.confidence.rawValue.lowercased())"
+        let feelsSick = !model.loggedSickSymptoms.isEmpty
+        let verdict: RowVerdict
         let note: String
-        if !model.loggedSickSymptoms.isEmpty {
+        if feelsSick {
             // What she logged beats what the Watch shows (round 4, Moreno F1).
-            note = "You logged feeling sick. Trust how you feel; tap to see when to get checked."
-        } else if noData {
-            note = "Needs your resting heart rate and HRV from last night. Wear your Watch to bed."
+            verdict = RowVerdict(text: "You feel sick", accent: .coral)
+            note = "Trust how you feel"
+        } else if !model.hasHeartData {
+            verdict = RowVerdict(text: "No reading", accent: .indigo)
+            note = "Wear your Watch to bed"
         } else {
+            verdict = RowVerdict(text: ill.confidence.rawValue, accent: accent)
             switch ill.confidence {
-            case .none: note = "Heart rate, HRV, breathing and temperature look like your usual."
-            case .low: note = "\(flagged == 0 ? "A signal" : "\(flagged) signal\(flagged == 1 ? "" : "s")") moved a little. Probably nothing; tap to see."
-            case .medium, .high: note = "\(flagged) signals moved together. Tap to see what to do."
+            case .none: note = "Your signals look like your usual"
+            case .low: note = "\(flagged == 0 ? "A signal" : "\(flagged) signal\(flagged == 1 ? "" : "s")") moved a little"
+            case .medium, .high: note = "\(flagged) signals moved together"
             }
         }
-        let p = Palette(scheme: scheme)
-        return NavigationLink { SickView() } label: {
-            HStack(spacing: Space.m) {
-                Image(systemName: ill.confidence == .none || ill.confidence == .low ? "checkmark.shield.fill" : "thermometer.medium")
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(accent.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(title).font(.bodyEmphasis)
-                    Text(note).font(.secondary).foregroundStyle(p.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Space.s)
-                Image(systemName: "chevron.right")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(p.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .padding(Space.l)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .tileSurface()
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressable)
-        .accessibilityElement(children: .combine)
-        .padding(.top, Space.s)
-    }
-
-    // MARK: Vitals
-
-    private var vitals: some View {
-        let heart = model.hasHeartData
-        return VStack(alignment: .leading, spacing: Space.m) {
-            SectionHeading("Vitals")
-            Card(density: .compact) {
-                BodyRow(title: "HRV", value: heart ? "\(Int(model.hrv.rounded())) ms" : "No reading",
-                        note: heart ? hrvNote : "Wear your Watch to bed", trend: heart ? hrvTrend : nil,
-                        systemImage: "waveform.path.ecg", accent: .indigo) { HeartMetricView(metric: .hrv) }
-                divider
-                BodyRow(title: "Resting HR", value: heart ? "\(Int(model.restingHR.rounded())) bpm" : "No reading",
-                        note: heart ? restingHRNote : "Wear your Watch to bed", trend: heart ? restingHRTrend : nil,
-                        systemImage: "heart.fill", accent: .pink) { HeartMetricView(metric: .restingHR) }
-                divider
-                BodyRow(title: "Breathing", value: model.respiratoryRateDelta.map { signedDecimal($0, unit: "/min") } ?? "\u{2013}",
-                        note: model.respiratoryRateDelta == nil ? "Wear your Watch to bed" : breathingNote,
-                        systemImage: "lungs.fill", accent: .blue) { SickView() }
-                    .accessibilityHint("Opens the sick check")
-                divider
-                BodyRow(title: "Wrist temp", value: model.wristTempDelta.map { TempFormat.delta($0) } ?? "\u{2013}",
-                        note: model.wristTempDelta == nil ? "Wear your Watch to bed" : wristNote,
-                        systemImage: "thermometer.medium", accent: .orange) { SickView() }
-                    .accessibilityHint("Opens the sick check")
-            }
+        let calm = !feelsSick && (ill.confidence == .none || ill.confidence == .low)
+        return MetricRow(title: "Sick check", note: note, verdict: verdict,
+                         systemImage: calm ? "checkmark.shield.fill" : "thermometer.medium",
+                         accent: feelsSick ? .coral : accent) {
+            SickView()
         }
     }
 
-    private var divider: some View {
-        Divider().overlay(Palette(scheme: scheme).cardBorder).padding(.leading, Sizes.icon + Space.m)
-    }
+    // MARK: Activity and body clock
 
-    private var hrvNote: String {
-        let v = Int(model.hrvDeltaPct.rounded())
-        if v == 0 { return "Right at your usual" }
-        return "\(abs(v))% \(v > 0 ? "above" : "below") your usual"
-    }
-
-    private var hrvTrend: RowTrend? {
-        let v = Int(model.hrvDeltaPct.rounded())
-        guard v != 0 else { return nil }
-        let tone: RowTrend.Tone = model.hrvLevel == .wellBelow ? .worse : model.hrvLevel == .above ? .better : .neutral
-        return .init(up: v > 0, tone: tone)
-    }
-
-    private var restingHRNote: String {
-        let v = Int(model.restingHRDelta.rounded())
-        if v == 0 { return "Right at your usual" }
-        return "\(abs(v)) bpm \(v > 0 ? "above" : "below") your usual"
-    }
-
-    private var restingHRTrend: RowTrend? {
-        let v = Int(model.restingHRDelta.rounded())
-        guard v != 0 else { return nil }
-        let level = model.restingHRLevel
-        let tone: RowTrend.Tone = level == .above || level == .wellBelow ? .worse : level == .below ? .better : .neutral
-        return .init(up: v > 0, tone: tone)
-    }
-
-    private func signedDecimal(_ value: Double, unit: String) -> String {
-        let s = String(format: "%.1f", abs(value))
-        return (value < -0.05 ? "\u{2212}" : "+") + s + unit
-    }
-
-    private var breathingNote: String {
-        guard let d = model.respiratoryRateDelta else { return "" }
-        return d >= 1 ? "Higher than usual" : "Compared with your usual"
-    }
-
-    private var wristNote: String {
-        guard let d = model.wristTempDelta else { return "" }
-        if model.inLutealPhase && d > 0 && d < 0.6 { return "Normal this phase" }
-        return d >= 0.4 ? "Warmer than usual" : "Compared with your usual"
-    }
-
-    // MARK: Progress
-
-    private var progress: some View {
+    private var activity: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            SectionHeading("Progress")
-            Card(density: .compact) {
-                BodyRow(title: "Your week", value: model.weekRecap.map { "\($0.averageEnergy)" } ?? "Soon",
-                        note: model.weekRecap == nil ? "Needs a week of nights" : "Average energy score, last week",
-                        systemImage: "calendar", accent: .indigo) { WeekRecapView() }
-                divider
-                BodyRow(title: "Streaks", value: winsValue, note: winsNote,
-                        systemImage: "flame.fill", accent: .orange) { AchievementsView() }
-                divider
-                BodyRow(title: "Fitness",
-                        // "Fitness age", so it never reads as her own age (round 3).
-                        // Under eating-disorder history: VO₂ max as a plain number,
-                        // with no fitness age or ranking (round 3, H6).
-                        value: model.hidesActivityNumbers
-                            ? (model.vo2Max.map { String(format: "%.1f", $0) } ?? "\u{2013}")
-                            : (model.fitnessAgeText.map { "Fitness age \($0.lowercased())" } ?? "\u{2013}"),
-                        note: model.vo2Max.map { v in
-                            let value = "VO\u{2082} max \(String(format: "%.1f", v))"
-                            return model.hidesActivityNumbers ? "VO\u{2082} max" : "\(value) \u{00B7} \(model.fitnessLevelShown ?? "")"
-                        } ?? "Needs a few outdoor walks",
-                        systemImage: "figure.run", accent: .mint) { FitnessView() }
+            SectionHeading("Fitness and body clock")
+            RowCard {
+                // "Fitness age", so it never reads as her own age (round 3).
+                // Under eating-disorder history: VO₂ max as a plain number,
+                // with no fitness age or ranking (round 3, H6).
+                MetricRow(title: "Fitness",
+                          note: fitnessNote,
+                          value: model.vo2Max.map { String(format: "%.1f", $0) },
+                          systemImage: "figure.run", accent: .mint) { FitnessView() }
+                RowDivider()
+                MetricRow(title: "Body clock", note: chronotypeNote,
+                          systemImage: "sun.and.horizon.fill", accent: .purple) { ChronotypeView() }
                 if model.showsCalories {
-                    divider
-                    BodyRow(title: "Calories", value: Int(model.caloriesToday.rounded()).formatted(), note: "kcal so far today",
-                            systemImage: "bolt.heart.fill", accent: .orange) { CaloriesView() }
+                    RowDivider()
+                    MetricRow(title: "Calories", note: "kcal so far today", value: Int(model.caloriesToday.rounded()).formatted(),
+                              systemImage: "bolt.heart.fill", accent: .orange) { CaloriesView() }
                 }
             }
         }
     }
 
-    private var winsValue: String {
-        let best = model.streaks.max { $0.current < $1.current }
-        return best.map { "\($0.current)" } ?? "0"
+    private var fitnessNote: String {
+        guard model.vo2Max != nil else { return "Needs a few outdoor walks" }
+        if model.hidesActivityNumbers { return "VO\u{2082} max" }
+        return model.fitnessAgeText.map { "VO\u{2082} max \u{00B7} fitness age \($0.lowercased())" } ?? "VO\u{2082} max"
     }
 
-    private var winsNote: String {
-        guard let best = model.streaks.max(by: { $0.current < $1.current }), best.current > 0 else { return "Start one tonight" }
-        return "\(best.unit.capitalized): \(best.title.lowercased())"
-    }
-}
-
-/// A row in a Body card: icon tile, title and note, the value on the right
-/// and a chevron. At accessibility sizes the value goes under the title.
-struct BodyRow<Destination: View>: View {
-
-    var title: String
-    var value: String
-    var note: String
-    var trend: RowTrend? = nil
-    var systemImage: String
-    var accent: Accent
-    @ViewBuilder var destination: Destination
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        let p = Palette(scheme: scheme)
-        NavigationLink { destination } label: {
-            HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: Space.m) {
-                Image(systemName: systemImage)
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(accent.ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                    .accessibilityHidden(true)
-                if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: Space.xxs) {
-                        Text(title).font(.bodyEmphasis)
-                        valueText
-                        noteLine(p)
-                    }
-                    Spacer(minLength: 0)
-                } else {
-                    VStack(alignment: .leading, spacing: Space.xxs) {
-                        Text(title).font(.bodyEmphasis)
-                        noteLine(p)
-                    }
-                    Spacer(minLength: Space.s)
-                    valueText
-                        .multilineTextAlignment(.trailing)
-                }
-                Image(systemName: "chevron.right")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(p.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .frame(minHeight: Sizes.tallRow)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(value), \(note)")
-        .accessibilityAddTraits(.isButton)
-    }
-
-    private var valueText: some View {
-        Text(value)
-            .font(.cardTitle)
-            .monospacedDigit()
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func noteLine(_ p: Palette) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            if let trend {
-                Image(systemName: trend.up ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .font(.scaled(size: 8, weight: .bold))
-                    .foregroundStyle(trendColor(trend.tone, p))
-                    .accessibilityHidden(true)
-            }
-            Text(note).font(.secondary).foregroundStyle(p.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func trendColor(_ tone: RowTrend.Tone, _ p: Palette) -> Color {
-        switch tone {
-        case .worse: Accent.coral.ink(scheme)
-        case .better: Accent.mint.ink(scheme)
-        case .neutral: p.tertiary
-        }
+    private var chronotypeNote: String {
+        guard let type = model.chronotype else { return "Learning when your body prefers to sleep" }
+        return type.category.rawValue
     }
 }
 
@@ -395,21 +214,20 @@ struct RowTrend {
     var tone: Tone
 }
 
-/// A Body tile on the neutral card surface, the icon and title in the
-/// feature's colour. With `ring` set it shows a small ring next to the
-/// value.
+/// A Body tile on the neutral card surface: the icon and title in the
+/// feature's colour, a one-line value, an optional progress bar (pack day,
+/// energy left) and a short note.
 private struct BodyTile: View {
     var title: String
     var accent: Accent
     var systemImage: String
-    var ring: Double? = nil
-    var ringLabel: String = ""
-    var ringCaption: String? = nil
     var value: String
+    var progress: Double? = nil
     var note: String
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let p = Palette(scheme: scheme)
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.s) {
                 Image(systemName: systemImage)
@@ -417,44 +235,35 @@ private struct BodyTile: View {
                     .frame(width: Font.scaledSize(18))
                     .accessibilityHidden(true)
                 Text(title).font(.bodyEmphasis)
-                    .lineLimit(2).minimumScaleFactor(0.8)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(accent.ink(scheme))
-            if let ring {
-                HStack(spacing: Space.m) {
-                    Ring(value: ring, accent: accent, lineWidth: 7, label: ringLabel, caption: ringCaption, size: 68)
-                    Text(value)
-                        .font(.scaledNumber(18))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
+            Text(value)
+                .font(.cardTitle)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if let progress {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(p.track)
+                        Capsule().fill(accent.fill(scheme))
+                            .frame(width: max(6, geo.size.width * min(max(progress, 0), 1)))
+                    }
                 }
-            } else {
-                Text(value)
-                    .font(.numberM)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
+                .frame(height: 6)
+                .accessibilityHidden(true)
             }
-            if !note.isEmpty {
-                Text(note).font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(note).font(.secondary).secondaryText()
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
         .padding(Space.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .tileSurface()
         .contentShape(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-    }
-
-    private var accessibilityText: String {
-        var parts = [title]
-        if ring != nil {
-            parts.append(ringCaption.map { "\($0) \(ringLabel)" } ?? ringLabel)
-        }
-        parts.append(value)
-        if !note.isEmpty { parts.append(note) }
-        return parts.joined(separator: ", ")
+        .accessibilityLabel([title, value, note].joined(separator: ", "))
     }
 }

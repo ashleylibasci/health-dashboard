@@ -2,9 +2,9 @@ import SwiftUI
 import Charts
 import HealthCore
 
-// HRV and resting heart rate: the detail screen behind the Body tiles, the
-// 14-night trend card (also on the Body tab) and the chart both share with
-// Recovery. Moved out of BodyView.swift so the detail screens own them.
+// HRV and resting heart rate: the detail screen behind the Body tab's
+// vitals and Recovery, the rows that open it, its 14-night trend card and
+// the chart. Moved out of BodyView.swift so the detail screens own them.
 
 /// HRV, resting heart rate or sleep over the last 14 nights. Drag across it
 /// to read any night against your usual.
@@ -286,16 +286,15 @@ struct NightTrendChart: View {
     }
 }
 
-/// HRV or resting heart rate on its own: today against her usual, the last
-/// 14 nights, and how it feeds recovery. Opened from the Body tiles.
+/// HRV or resting heart rate on its own: this morning against her usual,
+/// then the last 14 nights. Opened from the Body tab's vitals and Recovery.
 struct HeartMetricView: View {
     enum Metric { case hrv, restingHR }
     let metric: Metric
     @EnvironmentObject var model: AppModel
-    @Environment(\.colorScheme) private var scheme
 
     private var title: String { metric == .hrv ? "HRV" : "Resting heart rate" }
-    /// HRV indigo, resting HR pink, on the tile, screen and chart (Tanaka F1).
+    /// HRV indigo, resting HR pink, on the row, screen and chart (Tanaka F1).
     private var accent: Accent { metric == .hrv ? .indigo : .pink }
 
     private var value: String {
@@ -303,13 +302,14 @@ struct HeartMetricView: View {
         return metric == .hrv ? "\(Int(model.hrv.rounded())) ms" : "\(Int(model.restingHR.rounded())) bpm"
     }
 
+    /// One sentence; the chart's readout under it says what can move it.
     private var change: String {
         guard model.hasHeartData else { return "Wear your Watch to bed. The first reading comes in after a night\u{2019}s sleep." }
         switch metric {
         case .hrv:
             let v = Int(model.hrvDeltaPct.rounded())
             switch model.hrvLevel {
-            case .wellBelow: return "\(abs(v))% below your usual. " + model.hrvMeaning(model.hrvDeltaPct)
+            case .wellBelow: return "\(abs(v))% below your usual. Your body was under some strain."
             case .below: return "\(abs(v))% below your usual. Normal day-to-day wobble."
             case .usual: return "Right around your usual."
             case .above: return "\(v)% above your usual. Well recovered."
@@ -317,42 +317,80 @@ struct HeartMetricView: View {
         case .restingHR:
             let v = Int(model.restingHRDelta.rounded())
             switch model.restingHRLevel {
-            case .above, .wellBelow: return "\(v) beats above your usual. Often short sleep, stress, alcohol or a bug coming on\(model.heartCycleCause)."
+            case .above, .wellBelow: return "\(v) beats above your usual."
             case .usual: return "Right around your usual."
             case .below: return "\(abs(v)) beats below your usual. A sign of good recovery."
             }
         }
     }
 
-    private var explanation: Explanation { metric == .hrv ? model.hrvExplanation : model.restingHRExplanation }
+    private var pairs: [StatPair] {
+        guard model.hasHeartData else { return [] }
+        var out = [StatPair(label: "Your usual", value: metric == .hrv ? "\(Int(model.baselineHRV.rounded())) ms"
+                                                                        : "\(Int(model.baselineRestingHR.rounded())) bpm")]
+        if metric == .hrv && model.hrvIsOvernight {
+            out.append(StatPair(label: "Measured", value: "While you slept"))
+        }
+        return out
+    }
+
+    /// Only when her sleep is real but the heart readings aren't yet;
+    /// otherwise the screen's Example data capsule already says so.
+    private var status: SummaryStatus? {
+        model.hasHeartData && !model.heartIsReal && !model.usingSampleData ? SummaryStatus(text: "Example", accent: .yellow) : nil
+    }
 
     var body: some View {
         Screen(title: title, accent: accent) {
             SampleDataBanner()
-            Card {
-                HStack(spacing: 0) {
-                    SectionLabel(text: "This morning", accent: accent)
-                    InfoButton(explanation: explanation).padding(.vertical, -12)
-                    Spacer()
-                    // Only when her sleep is real but the heart readings aren't yet;
-                    // otherwise the screen's Example data capsule already says so.
-                    if model.hasHeartData && !model.heartIsReal && !model.usingSampleData { ExampleTag() }
-                }
-                Text(value).font(model.hasHeartData ? .display : .detailTitle)
-                    .contentTransition(.numericText())
-                Text(change).font(.bodyText).fixedSize(horizontal: false, vertical: true)
-                if model.hasHeartData && metric == .hrv && model.hrvIsOvernight {
-                    Text("From readings taken while you slept.").font(.secondary).secondaryText()
-                }
-                HowWeGotThisLink(explanation: explanation)
-            }
+            SummaryHeader(eyebrow: "This morning", value: value, status: status, line: change, pairs: pairs,
+                          accent: accent, info: metric == .hrv ? model.hrvExplanation : model.restingHRExplanation)
             BodyTrendCard(metric: metric == .hrv ? .hrv : .restingHR)
-            Card(density: .compact) {
-                LinkRow(title: "Recovery", subtitle: "How this and your other numbers add up today",
-                        systemImage: "heart.fill", accent: .indigo) {
-                    RecoveryView()
-                }
-            }
         }
+    }
+}
+
+/// The HRV and resting heart rate rows (for a `RowCard`): this morning's
+/// value, the change from her usual and a trend arrow, each opening its
+/// `HeartMetricView`. On the Body tab's vitals and on Recovery.
+struct HeartMetricRows: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let heart = model.hasHeartData
+        MetricRow(title: "HRV", note: heart ? hrvNote : "Wear your Watch to bed",
+                  value: heart ? "\(Int(model.hrv.rounded())) ms" : nil, trend: heart ? hrvTrend : nil,
+                  systemImage: "waveform.path.ecg", accent: .indigo) { HeartMetricView(metric: .hrv) }
+        RowDivider()
+        MetricRow(title: "Resting heart rate", note: heart ? restingHRNote : "Wear your Watch to bed",
+                  value: heart ? "\(Int(model.restingHR.rounded())) bpm" : nil, trend: heart ? restingHRTrend : nil,
+                  systemImage: "heart.fill", accent: .pink) { HeartMetricView(metric: .restingHR) }
+    }
+
+    private var hrvNote: String {
+        let v = Int(model.hrvDeltaPct.rounded())
+        if v == 0 { return "Right at your usual" }
+        return "\(abs(v))% \(v > 0 ? "above" : "below") your usual"
+    }
+
+    private var hrvTrend: RowTrend? {
+        let v = Int(model.hrvDeltaPct.rounded())
+        guard v != 0 else { return nil }
+        let tone: RowTrend.Tone = model.hrvLevel == .wellBelow ? .worse : model.hrvLevel == .above ? .better : .neutral
+        return .init(up: v > 0, tone: tone)
+    }
+
+    private var restingHRNote: String {
+        let v = Int(model.restingHRDelta.rounded())
+        if v == 0 { return "Right at your usual" }
+        return "\(abs(v)) bpm \(v > 0 ? "above" : "below") your usual"
+    }
+
+    private var restingHRTrend: RowTrend? {
+        let v = Int(model.restingHRDelta.rounded())
+        guard v != 0 else { return nil }
+        let level = model.restingHRLevel
+        let tone: RowTrend.Tone = level == .above || level == .wellBelow ? .worse : level == .below ? .better : .neutral
+        return .init(up: v > 0, tone: tone)
     }
 }

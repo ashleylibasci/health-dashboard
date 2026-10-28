@@ -417,7 +417,6 @@ struct LogView: View {
                         stressButton(level)
                     }
                 }
-                StressCrisisRow(level: model.stressLoggedToday)
             }
         }
     }

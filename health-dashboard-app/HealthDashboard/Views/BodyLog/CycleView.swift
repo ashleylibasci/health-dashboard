@@ -9,18 +9,15 @@ import HealthCore
 struct CycleView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Screen(title: "Cycle", accent: .pink) {
             SampleDataBanner()
-            if model.showsCrisisLine { CrisisLineCard() }
+            NoPeriodCallout()
             PackCheckCard()
             if let reason = model.irregularReasonText { reasonNote(reason) }
             content
-            if store.data.cycleSetup != .notTracking { logCard }
-            moreCard
-            settingsCard
+            links
         }
     }
 
@@ -57,57 +54,47 @@ struct CycleView: View {
 
     // MARK: Links
 
-    private var logCard: some View {
-        Card {
-            LinkRow(title: "Log bleeding and symptoms", subtitle: "Flow, cramps, headaches, mood. Today or a past day",
-                    systemImage: "drop.fill", accent: .pink) {
-                CycleLogView()
-            }
-        }
-    }
-
-    private var moreCard: some View {
-        let p = Palette(scheme: scheme)
-        return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: model.usesPackWording ? "More about your pack" : "More about your cycle").padding(.top, 4)
-            Card {
-                LinkRow(title: model.usesPackWording ? "How your pack affects you" : "How your cycle affects you", subtitle: model.hidesEffortTargets ? "Energy, sleep, HRV and mood" : "Energy, sleep, HRV, mood and workouts",
-                        systemImage: "waveform.path.ecg", accent: .purple) {
+    /// Logging, the longer reading and the settings, as one card of rows.
+    private var links: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeading(model.usesPackWording ? "More about your pack" : "More about your cycle")
+            RowCard {
+                if store.data.cycleSetup != .notTracking {
+                    MetricRow(title: "Log bleeding and symptoms", note: "Flow, cramps, headaches, mood",
+                              systemImage: "drop.fill", accent: .pink) {
+                        CycleLogView()
+                    }
+                    RowDivider()
+                }
+                MetricRow(title: model.usesPackWording ? "How your pack affects you" : "How your cycle affects you",
+                          note: model.hidesEffortTargets ? "Energy, sleep, HRV and mood" : "Energy, sleep, HRV, mood and workouts",
+                          systemImage: "waveform.path.ecg", accent: .purple) {
                     CyclePhasesView()
                 }
-                Divider().overlay(p.cardBorder)
-                LinkRow(title: "Birth control and your Watch", subtitle: birthControlSubtitle,
-                        systemImage: "pills.fill", accent: .indigo) {
+                RowDivider()
+                MetricRow(title: "Birth control and your Watch", note: birthControlSubtitle,
+                          systemImage: "pills.fill", accent: .indigo) {
                     BirthControlLearnView()
                 }
                 if store.data.conditions.contains("PCOS") || store.data.cycleSetup == .irregular {
-                    Divider().overlay(p.cardBorder)
-                    LinkRow(title: "About PCOS", subtitle: "What it is and what the app does differently",
-                            systemImage: "heart.text.square.fill", accent: .mint) {
+                    RowDivider()
+                    MetricRow(title: "About PCOS", note: "What it is and what the app does differently",
+                              systemImage: "heart.text.square.fill", accent: .mint) {
                         PCOSView()
                     }
                 }
-                Divider().overlay(p.cardBorder)
-                LinkRow(title: "Recovery", subtitle: "Your HRV and resting heart rate today",
-                        systemImage: "heart.fill", accent: .indigo) {
-                    RecoveryView()
+                RowDivider()
+                MetricRow(title: "Cycle & birth control settings", note: setupSummary,
+                          systemImage: "slider.horizontal.3", accent: .purple) {
+                    SettingsView()
                 }
             }
         }
     }
 
     private var birthControlSubtitle: String {
-        if let bc = store.birthControl { return "What your \(bc.inSentence) does, and every method compared" }
+        if store.birthControl != nil { return "What it does, and every method" }
         return "Every method compared"
-    }
-
-    private var settingsCard: some View {
-        Card {
-            LinkRow(title: "Cycle & birth control settings", subtitle: setupSummary,
-                    systemImage: "slider.horizontal.3", accent: .purple) {
-                SettingsView()
-            }
-        }
     }
 
     private var setupSummary: String {
@@ -157,8 +144,7 @@ private struct PhasesSection: View {
         timelineCard
         CycleCalendarCard()
         nextPeriodCard
-        if bc == .miniPill { MissedDoseCard(method: .miniPill) }
-        if bc == .hormonalIUD { BleedingCheckCard(extra: nil) }
+        if let bc { MethodSafetyRows(method: bc) }
         CycleCareNotes()
         HowWeGotThisLink(title: "Your cycle day and phases",
                          method: "Your cycle day counts from the first day of your last period, from Apple Health and the bleeding days you log here. Your average length is the middle value of the gaps between your last 12 periods\(store.data.methodChangedDate == nil ? "" : " since your last birth-control change"). Phases are placed from that: your period (\(model.periodLength) days, \(store.data.flowLog.isEmpty ? "a typical length until you log one" : "from the bleeding you logged")), then the follicular phase, a 3-day mid-cycle estimate about 13 days before your next period, then the luteal phase (its last 7 days count as late luteal). The day you really ovulate can be several days either side, so the mid-cycle days are not your fertile days. Treat every day as an estimate.")
@@ -558,7 +544,9 @@ private struct CycleDayCell: View {
 // MARK: - Pill pack
 
 /// Combined pill, ring or patch: pack day, active pills and break week.
-/// These stop ovulation, so no phases or fertile days appear here.
+/// These stop ovulation, so no phases or fertile days appear here. The
+/// summary and the pack lead; setting the pack day and the safety reading
+/// (missed pills, being sick, medicines…) are rows.
 private struct PackSection: View {
     let day: Int
     let activeDays: Int
@@ -567,7 +555,6 @@ private struct PackSection: View {
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     @State private var selected: Int? = nil
-
     @State private var editing = false
 
     private var method: BirthControl { store.birthControl ?? .combinedPill }
@@ -602,26 +589,56 @@ private struct PackSection: View {
     }
 
     var body: some View {
+        if model.packDayIsEstimated {
+            CalloutBar(text: "This pack day is a guess from your last bleed. Set today\u{2019}s \(unit).",
+                       systemImage: "questionmark.circle.fill", accent: .yellow) {
+                withMotion(.reveal) { editing = true }
+            }
+        }
         header
-        if model.packDayIsEstimated { estimateNote }
         if skipping { skipNote }
         packCard
-        statusCard
-        MissedDoseCard(method: method)
-        setDayCard
-        offCard
-        trackCard
-        HowWeGotThisLink(title: "Your pack day", method: methodText)
+        RowCard {
+            ExpandRow(title: "Not right? Set your pack day",
+                      summary: model.packSummaryLineShown ?? "Pack type and today\u{2019}s \(unit)",
+                      systemImage: "slider.horizontal.3", accent: .indigo, isExpanded: $editing) {
+                PackSetupControl()
+                    .foregroundStyle(Palette(scheme: scheme).primary)
+            }
+        }
+        MethodSafetyRows(method: method)
     }
 
-    private var estimateNote: some View {
-        Card(accent: .yellow) {
-            Label("This pack day is a guess from your last bleed", systemImage: "questionmark.circle.fill")
-                .font(.bodyEmphasis)
-                .foregroundStyle(Accent.yellow.ink(scheme))
-            Text("Set today\u{2019}s \(unit) below so your break week lands on the right days.")
-                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
+    // MARK: Summary
+
+    /// The status in one or two sentences. Why the bleed isn't a period is
+    /// behind the ⓘ on the break-week legend line.
+    private var statusLine: String {
+        let newPack = packLength - day + 1
+        if isBreak {
+            return "A withdrawal bleed usually comes in these days. New \(method == .combinedPill ? "pack" : "cycle") in \(newPack) day\(newPack == 1 ? "" : "s")."
         }
+        if !hasBreak {
+            return "You skip the break, so no withdrawal bleed is due. Some spotting can happen, especially in the first months; that's common."
+        }
+        let toBreak = activeDays - day + 1
+        if skipping {
+            return "You\u{2019}re skipping this break: \(toBreak) active day\(toBreak == 1 ? "" : "s") left, then straight into your next \(method == .combinedPill ? "pack" : unitName)."
+        }
+        return "Your \(breakName) start\(breakName.hasSuffix("s") ? "" : "s") in \(toBreak) day\(toBreak == 1 ? "" : "s") (\(breakDateText)). Expect a withdrawal bleed then."
+    }
+
+    private var info: Explanation {
+        let topic = Topic.pillPack.explanation
+        return Explanation(id: topic.id, title: topic.title, meaning: topic.meaning, forYou: topic.forYou, howWeGotIt: methodText)
+    }
+
+    private var header: some View {
+        SummaryHeader(eyebrow: method.rawValue,
+                      value: method == .combinedPill ? "Pill \(day) of \(packLength)" : "Day \(day) of \(packLength)",
+                      status: SummaryStatus(text: isBreak ? model.packBreakName : model.packActiveName,
+                                            accent: isBreak ? .pink : .indigo),
+                      line: statusLine, accent: .pink, info: info)
     }
 
     private var skipNote: some View {
@@ -638,79 +655,17 @@ private struct PackSection: View {
         }
     }
 
-    /// "Not right? Set your pack day": the same control as in Settings.
-    private var setDayCard: some View {
-        Card {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { editing.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(Accent.indigo.ink(scheme))
-                        .frame(width: 32, height: 32)
-                        .background(Accent.indigo.tint(scheme), in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Not right? Set your pack day").font(.bodyEmphasis)
-                        Text(model.packSummaryLineShown ?? "Pack type and today\u{2019}s \(unit)")
-                            .font(.secondary).secondaryText()
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: editing ? "chevron.up" : "chevron.down")
-                        .font(.secondary).fontWeight(.bold)
-                        .foregroundStyle(Palette(scheme: scheme).tertiary)
-                        .accessibilityHidden(true)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(editing ? "Hides the pack settings" : "Shows the pack settings")
-            if editing {
-                PackSetupControl()
-            }
-        }
-    }
-
-    private var header: some View {
-        let titles = VStack(alignment: .leading, spacing: 2) {
-            Text(BodyLogStyle.todayLine).font(.secondary).fontWeight(.semibold).secondaryText()
-            Text(method == .combinedPill ? "Pill \(day) of \(packLength)" : "Day \(day) of \(packLength)")
-                .font(.detailTitle).accessibilityAddTraits(.isHeader)
-            if !hasBreak {
-                Text("Continuous \u{00B7} no break").font(.secondary).fontWeight(.semibold).secondaryText()
-            }
-        }
-        let pill = HStack(spacing: 6) {
-            Image(systemName: "pills.fill").foregroundStyle(Accent.indigo.ink(scheme)).accessibilityHidden(true)
-            Text(method.rawValue).font(.secondary).fontWeight(.semibold)
-                .fixedSize()
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: Font.scaledSize(32))
-        .background(Accent.indigo.tint(scheme), in: Capsule())
-        // Beside the title when it fits, under it otherwise: the method name
-        // never breaks into "Com/bined/pill" (Ortiz F4, Brennan F10).
-        return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .bottom) {
-                titles
-                Spacer(minLength: Space.s)
-                pill
-            }
-            VStack(alignment: .leading, spacing: Space.s) {
-                titles
-                pill
-            }
-        }
-    }
+    // MARK: Pack
 
     private var packCard: some View {
         let r = CycleCopy.packReadout(day: shown, activeDays: activeDays, packLength: packLength, isToday: shown == day,
                                       activeName: model.packActiveName, breakName: model.packBreakName)
         return Card {
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: r.accent)
-            PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping, selected: $selected)
+            // Title and value only: what each part of the pack does to
+            // energy, sleep and mood is on "How your pack affects you".
+            ChartReadout(title: r.title, value: r.value, accent: r.accent)
+            PillGrid(day: day, activeDays: activeDays, packLength: packLength, skipped: skipping,
+                     selected: $selected)
             ScrubHint(each: "day of the pack")
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
@@ -731,92 +686,6 @@ private struct PackSection: View {
                 }
             }
             .secondaryText()
-        }
-    }
-
-    private var statusTitle: String {
-        if isBreak { return model.packBreakName }
-        if !hasBreak { return "\(model.packActiveName) \u{00B7} continuous" }
-        return "\(model.packActiveName) \u{00B7} day \(day) of \(activeDays)"
-    }
-
-    private var statusText: String {
-        let newPack = packLength - day + 1
-        if isBreak {
-            return "A withdrawal bleed usually comes in these days. It's caused by the pause in hormones, so it isn't a period, and it's fine if it's light. New \(method == .combinedPill ? "pack" : "cycle") in \(newPack) day\(newPack == 1 ? "" : "s")."
-        }
-        if !hasBreak {
-            return "You skip the break, so no withdrawal bleed is due. Some spotting can happen, especially in the first months; that's common."
-        }
-        let toBreak = activeDays - day + 1
-        if skipping {
-            return "You\u{2019}re skipping this break: \(toBreak) active day\(toBreak == 1 ? "" : "s") left, then straight into your next \(method == .combinedPill ? "pack" : unitName). No withdrawal bleed is due, though some spotting is common."
-        }
-        return "Your \(breakName) start\(breakName.hasSuffix("s") ? "" : "s") in \(toBreak) day\(toBreak == 1 ? "" : "s") (\(breakDateText)). Expect a withdrawal bleed then. That's from the hormone pause, not a period."
-    }
-
-    private var statusCard: some View {
-        Card(accent: isBreak ? .coral : .indigo) {
-            Text(statusTitle)
-                .font(.cardTitle)
-            Text(statusText)
-                .font(.bodyText)
-                .fixedSize(horizontal: false, vertical: true)
-            if hasBreak && !skipping {
-                Text(CycleCare.noBleedAdvice(method))
-                    .font(.secondary)
-                    .secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var offCard: some View {
-        Card {
-            // Plain words and plain rows: "ovulation", no strikethrough
-            // (Dubois 15).
-            SectionLabel(text: "Not shown on the \(method.inSentence)")
-            ForEach(["Ovulation estimate", "Fertile days", "Luteal heart-rate bump", "Period countdown"], id: \.self) { item in
-                HStack(spacing: 10) {
-                    Image(systemName: "nosign").foregroundStyle(Palette(scheme: scheme).tertiary).accessibilityHidden(true)
-                    Text(item).secondaryText()
-                }
-                .font(.bodyText)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(item): not shown")
-            }
-            Text("Your \(method.inSentence) stops your body from releasing an egg each month, so these natural-cycle changes don't happen to you and the app never predicts them.")
-                .font(.secondary)
-                .secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var trackCard: some View {
-        Card(accent: .indigo) {
-            SectionLabel(text: "Still tracked", accent: .indigo)
-            trackRow("thermometer.medium", .orange, "Temperature running a bit higher and flat. Normal on your method.")
-            trackRow("drop.fill", .pink, "Withdrawal bleeds and spotting, from what you log.")
-            trackRow("face.smiling", .purple, "Headaches, mood and other symptoms you log, by date. Some people notice headaches in the break week.")
-            Text(hasBreak ? CycleCare.packBleedCantShowFuel : CycleCare.methodBleedCantShowFuel)
-                .font(.secondary)
-                .secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            LinkRow(title: "Learn how the \(unitName) affects your body", systemImage: "book.fill", accent: .indigo) {
-                BirthControlLearnView()
-            }
-        }
-    }
-
-    private func trackRow(_ symbol: String, _ accent: Accent, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol)
-                .font(.bodyEmphasis)
-                .foregroundStyle(accent.ink(scheme))
-                .frame(width: 32, height: 32)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-                .accessibilityHidden(true)
-            Text(text).font(.bodyText).fixedSize(horizontal: false, vertical: true).padding(.top, 5)
         }
     }
 }
@@ -849,7 +718,12 @@ private struct PillGrid: View {
             }
             .frame(width: geo.size.width, alignment: .top)
             .contentShape(Rectangle())
-            .overlay(ScrubSurface { location in selected = index(at: location, width: geo.size.width) })
+            .overlay(ScrubSurface { location in
+                // Written only when the day changes, so a drag within one
+                // pill doesn't redraw the screen (Weber D).
+                let d = index(at: location, width: geo.size.width)
+                if d != selected { selected = d }
+            })
         }
         .scrubFeedback(selected)
         .frame(height: CGFloat(rows) * rowHeight + CGFloat(rows - 1) * spacing)
@@ -956,12 +830,7 @@ private struct SuppressedSection: View {
                 .font(.bodyText)
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
-            Text(CycleCare.methodBleedCantShowFuel)
-                .font(.secondary)
-                .secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
         }
-        if method == .miniPill { MissedDoseCard(method: .miniPill) }
         Card {
             SectionLabel(text: "Still tracked")
             Text(mayOvulate
@@ -970,7 +839,7 @@ private struct SuppressedSection: View {
                 .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        BleedingCheckCard(extra: "Bleeding that lasts more than 2 weeks or comes with a lot of pain, or you think you could be pregnant: check in with a doctor too.")
+        MethodSafetyRows(method: method)
     }
 
     private var historyCard: some View {
@@ -991,32 +860,6 @@ private struct SuppressedSection: View {
             }
             Text("Started on these days. A history like this is what a doctor will ask about.")
                 .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-/// When bleeding needs checking on a method that changes bleeding: the red
-/// flags for an STI or pregnancy test, heavy bleeding in one ACOG wording,
-/// and the urgent tier (Okafor F, H).
-private struct BleedingCheckCard: View {
-    var extra: String?
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        Card(accent: .coral) {
-            Text("When to get bleeding checked").font(.bodyEmphasis)
-                .accessibilityAddTraits(.isHeader)
-            Text(CycleCare.bleedingRedFlags)
-                .font(.bodyText).fixedSize(horizontal: false, vertical: true)
-            Text(CycleCare.heavyBleeding)
-                .font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
-            if let extra {
-                Text(extra).font(.bodyText).secondaryText().fixedSize(horizontal: false, vertical: true)
-            }
-            Text(CycleCare.heavyBleedingUrgent)
-                .font(.bodyEmphasis)
-                .foregroundStyle(Accent.coral.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -1043,7 +886,6 @@ private struct PackUnknownSection: View {
         Card {
             PackSetupControl()
         }
-        MissedDoseCard(method: method)
         Card(accent: .indigo) {
             SectionLabel(text: "On your \(method.inSentence)", accent: .indigo)
             Text("It stops your body from releasing an egg, so there are no ovulation or luteal phases and no period countdown. The bleed in your break week is a withdrawal bleed.")
@@ -1053,6 +895,7 @@ private struct PackUnknownSection: View {
                 BirthControlLearnView()
             }
         }
+        MethodSafetyRows(method: method)
     }
 }
 

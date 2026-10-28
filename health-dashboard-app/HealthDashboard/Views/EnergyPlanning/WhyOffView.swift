@@ -1,8 +1,8 @@
 import SwiftUI
 import HealthCore
 
-/// "Why do I feel off?": the likeliest reasons today feels harder than usual,
-/// ranked, each with a plain explanation and one concrete thing to try.
+/// "Why do I feel off?": the likeliest reason today feels harder than
+/// usual, the one thing to do about it, and the other reasons as rows.
 struct WhyOffView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
@@ -11,7 +11,7 @@ struct WhyOffView: View {
         let reasons = model.whyOffReasons
         Screen(title: "Why do I feel off?", accent: .coral) {
             SampleDataBanner()
-            headerCard(reasons)
+            header(reasons)
             if reasons.isEmpty {
                 allClearCard
             } else {
@@ -20,66 +20,51 @@ struct WhyOffView: View {
                 if let top = reasons.first {
                     oneThingCard(top, second: reasons.dropFirst().first)
                 }
-                VStack(spacing: Space.m) {
+                RowCard {
                     ForEach(Array(reasons.enumerated()), id: \.element.id) { i, r in
+                        if i > 0 { RowDivider() }
                         WhyOffReasonRow(number: i + 1, reason: r, tryThis: i == 0 ? nil : model.tryThis(for: r))
                     }
                 }
             }
-            matchCard
-            HowWeGotThisLink(title: "Why you might feel off",
-                             method: "We check your sleep debt, recent late nights, where you are in your cycle, signs you might be getting sick, stress, caffeine timing and daylight, each against your own normal. The ones furthest from your normal rank highest. These are best guesses, not a diagnosis.")
-                .padding(.horizontal, 4)
         }
     }
 
     // MARK: Header
 
-    private func headerCard(_ reasons: [AppModel.OffReason]) -> some View {
+    /// How the reasons are picked, behind the header's ⓘ.
+    private var info: Explanation {
+        Explanation(id: "whyOff", title: "Why you might feel off",
+                    meaning: "We check your sleep debt, recent late nights, where you are in your cycle, signs you might be getting sick, stress, caffeine timing and daylight, each against your own normal. The ones furthest from your normal rank highest.",
+                    forYou: (model.usingSampleData
+                             ? "Worked out from example data until your own nights come in. Not a diagnosis."
+                             : "Best guesses from your own data, not a diagnosis.")
+                        + " Telling the app how awake you feel each morning makes the next guess better.")
+    }
+
+    private func header(_ reasons: [AppModel.OffReason]) -> some View {
         let recovery = model.recoveryShown
-        let usual = model.recoveryUsual
-        let below = recovery.map { $0 < usual - 5 } ?? false
-        let usualWord = model.recoveryUsualIsPersonal ? "your usual" : "starting point"
-        let pill = recovery.map { "Recovery \($0) · \(usualWord) \(usual)" } ?? "No recovery yet today"
-        return Card(accent: .coral) {
-            HStack(spacing: 0) {
-                Text(pill)
-                    .font(.secondary).fontWeight(.bold)
-                    .foregroundStyle((below ? Accent.coral : Accent.mint).onTint(scheme))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background((below ? Accent.coral : Accent.mint).tint(scheme), in: Capsule())
-                InfoButton(topic: .recovery)
-            }
-            Text(reasons.isEmpty ? "Nothing stands out today" : "Why you might feel off today")
-                .font(.detailTitle)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(reasons.isEmpty
-                 ? "Your sleep, heart and other signals are close to your normal."
-                 : model.usingSampleData
-                    ? "Example reasons, ranked by how far each one is from the example normal. Your own replace them as your nights come in. Tap ⓘ to learn what each means."
-                    : "Your top reasons, ranked by how far each one is from your normal. Tap ⓘ to learn what each means.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        let below = recovery.map { $0 < model.recoveryUsual - 5 } ?? false
+        let usualWord = model.recoveryUsualIsPersonal ? "usual" : "start"
+        return SummaryHeader(eyebrow: reasons.isEmpty ? "Why you might feel off" : "Most likely",
+                             value: reasons.first?.title ?? "Nothing stands out",
+                             status: recovery.map { SummaryStatus(text: "Recovery \($0)", accent: below ? .coral : .mint) },
+                             line: reasons.isEmpty
+                                ? "Your sleep, heart and other signals are close to your normal."
+                                : model.usingSampleData
+                                    ? "Example reasons, ranked by how far each one is from the example normal."
+                                    : "Your top reasons, ranked by how far each one is from your normal.",
+                             pairs: recovery == nil ? [] : [StatPair(label: "Recovery \(usualWord)", value: "\(model.recoveryUsual)")],
+                             accent: .coral, info: info)
     }
 
     private var allClearCard: some View {
         Card(accent: .mint) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.detailTitle)
-                .foregroundStyle(Accent.mint.ink(scheme))
-                .accessibilityHidden(true)
-            Text("All clear").font(.section)
             Text("No sleep debt to speak of, no recent late nights, and no signs your body is fighting something. If you still feel off, it may be something a watch can't measure: a hard day, skipped meals, not enough water, or just a slow morning.")
                 .font(.bodyText).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             Text("Try a glass of water, something to eat and 10 minutes outside.")
                 .font(.bodyEmphasis)
-                .fixedSize(horizontal: false, vertical: true)
-            // Low mood is something a watch can't see (Laurent F6).
-            Text("Feeling low or down most days for two weeks or more? That\u{2019}s worth talking about. Your campus counseling center can help, or call or text 988 any time (US).")
-                .font(.secondary).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -98,67 +83,41 @@ struct WhyOffView: View {
             }
         }
     }
-
-    private var matchCard: some View {
-        Card {
-            Text("Does this match how you feel?").font(.cardTitle)
-            Text("Telling the app how awake you feel each morning makes the next guess better.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            LinkRow(title: "Do your morning check-in", systemImage: "checkmark.circle.fill", accent: .indigo) { CheckInView() }
-            LinkRow(title: "The cost of a late night", systemImage: "moon.haze.fill", accent: .purple) { LateNightView() }
-            Text(model.usingSampleData
-                 ? "Worked out from example data until your own nights come in. Not a diagnosis. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse."
-                 : "Best guesses from your own data, not a diagnosis. See a doctor if you have a fever, trouble breathing, or you\u{2019}re getting worse.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
 }
 
 // MARK: - Subviews
 
+/// One reason as a row that opens in place: its detail, its tip and what
+/// the term means.
 private struct WhyOffReasonRow: View {
     var number: Int
     var reason: AppModel.OffReason
     var tryThis: String?
     @Environment(\.colorScheme) private var scheme
+    @State private var explaining: Explanation? = nil
 
     var body: some View {
-        let accent: Accent = number == 1 ? .coral : (number == 2 ? .orange : .indigo)
-        Card {
-            HStack(alignment: .top, spacing: 12) {
-                Text("\(number)")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(accent.ink(scheme))
-                    .frame(width: 30, height: 30)
-                    .background(accent.tint(scheme), in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 0) {
-                        Text(reason.title).font(.bodyEmphasis)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let topic = reason.topic {
-                            InfoButton(topic: topic).padding(.vertical, -12)
-                        }
-                    }
-                    Text(reason.detail).font(.bodyText).secondaryText()
+        ExpandRow(title: reason.title, summary: reason.detail,
+                  systemImage: "\(number).circle.fill", accent: number == 1 ? .coral : (number == 2 ? .orange : .indigo)) {
+            Text(reason.detail).fixedSize(horizontal: false, vertical: true)
+            if let tryThis {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.secondary).fontWeight(.semibold)
+                        .foregroundStyle(Accent.yellow.ink(scheme))
+                        .accessibilityHidden(true)
+                    (Text("Try this: ").font(.role(.bodyEmphasis)) + Text(tryThis).font(.role(.bodyText)))
+                        .foregroundStyle(Palette(scheme: scheme).primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if let tryThis {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.secondary).fontWeight(.semibold)
-                    .foregroundStyle(Accent.yellow.ink(scheme))
-                    .accessibilityHidden(true)
-                (Text("Try this: ").font(.role(.bodyEmphasis)) + Text(tryThis).font(.role(.bodyText)))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+            if let topic = reason.topic {
+                Button("What \(reason.title.lowercased()) means") { explaining = topic.explanation }
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(Accent.indigo.ink(scheme))
+                    .frame(minHeight: Sizes.minTap, alignment: .leading)
             }
         }
+        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }

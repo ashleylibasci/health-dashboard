@@ -360,7 +360,10 @@ final class TestRound: XCTestCase {
         launch(appearance: appearance, textSize: textSize)
         sleep(2)
         // The Body tab's rows (stress and sleep stages live on Today and Sleep).
-        for tile in ["Cycle", "Body clock", "HRV", "Resting HR", "Breathing", "Your week", "Streaks", "Fitness"] {
+        // The cycle tile is named for a pack on the pill ("Pill pack").
+        goTab("Body")
+        let pillPack = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Pill pack'")).firstMatch.exists
+        for tile in [pillPack ? "Pill pack" : "Cycle", "Sick check", "HRV", "Resting heart rate", "Fitness", "Body clock"] {
             goTab("Body")
             guard tap(tile) else { continue }
             sleep(1)

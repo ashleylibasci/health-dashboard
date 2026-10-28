@@ -328,7 +328,6 @@ struct SettingsView: View {
             }
             // Your pack sits with the method it belongs to.
             if model.packMethod != nil {
-                PackCheckCard()
                 Card {
                     PackSetupControl()
                 }
