@@ -2,8 +2,9 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Your week: last week's energy by day, what the best days shared, what the
-/// worst day had, and one goal for this week.
+/// Your week: the week's average energy first, the 7 days as bars, then the
+/// details one tap down: a day up close, what the best days shared, what
+/// the lowest day had, one goal for this week, and streaks.
 struct WeekRecapView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -33,81 +34,64 @@ struct WeekRecapView: View {
             if let recap = model.weekRecap, !model.lastWeek.isEmpty {
                 let days = model.lastWeek.sorted { $0.date < $1.date }
                 let need = model.sleepNeed.minutes
-                weekHeader(days)
-                averageCard(recap)
-                daysCard(recap, days: days, need: need)
-                bestCard(recap, days: days, need: need)
-                worstCard(recap)
-                glance(recap, days: days, need: need)
-                goalCard(recap, need: need)
-                linksCard
+                let bestIndex = days.firstIndex(of: recap.best) ?? 0
+                let selected = min(max(selectedIndex ?? bestIndex, 0), days.count - 1)
+                summary(recap, days: days)
+                daysCard(recap, days: days, need: need, selected: selected)
+                RowCard {
+                    if days.indices.contains(selected) {
+                        dayRow(days[selected], recap: recap, need: need)
+                        RowDivider()
+                    }
+                    bestRow(recap, days: days)
+                    RowDivider()
+                    worstRow(recap)
+                    RowDivider()
+                    goalRow(recap, need: need)
+                    RowDivider()
+                    streaksRow
+                }
+                Card(density: .compact) {
+                    LearnMoreRow("Learn more about energy", article: .energyThroughTheDay, accent: .indigo)
+                }
             } else {
                 emptyCard
-                linksCard
             }
         }
     }
 
-    // MARK: Header + average
+    // MARK: Summary
 
-    private func weekHeader(_ days: [DaySummary]) -> some View {
+    private func summary(_ recap: WeekRecap, days: [DaySummary]) -> some View {
+        let avg = recap.averageEnergy
+        let diff = avg - usualScore
+        let usual = model.energyUsualIsPersonal ? "your \(usualScore)" : "\(usualScore)"
+        let status: SummaryStatus
+        // A lower week is information, not a warning: blue, not coral.
+        if diff <= -2 { status = SummaryStatus(text: "\(-diff) below \(usual)", accent: .blue) }
+        else if diff >= 2 { status = SummaryStatus(text: "\(diff) above \(usual)", accent: .mint) }
+        else { status = SummaryStatus(text: "Around \(usual)", accent: .indigo) }
+        let avgBed = Clock.circularMean(days.map(\.bedtime)).map { Clock.format($0) } ?? "\u{2013}"
+        let nights = model.usingSampleData ? "example week" : "\(model.weekRecapDays) of 7 nights"
+        return SummaryHeader(eyebrow: "\(weekRange(days)) \u{00B7} \(nights)", value: "\(avg)", unit: "week average", status: status,
+                             line: "\(weekday(recap.best.date, .wide)) was your best day, \(weekday(recap.worst.date, .wide)) your lowest.",
+                             pairs: [StatPair(label: "Avg sleep", value: Clock.duration(recap.averageAsleep)),
+                                     StatPair(label: "Avg bedtime", value: avgBed)],
+                             accent: .indigo, info: Topic.energyScore.explanation)
+    }
+
+    /// "Oct 21–27"
+    private func weekRange(_ days: [DaySummary]) -> String {
         let first = days.first?.date ?? .now
         let last = days.last?.date ?? .now
         let sameMonth = Calendar.current.isDate(first, equalTo: last, toGranularity: .month)
         let end = sameMonth ? last.formatted(.dateTime.day()) : last.formatted(.dateTime.month(.abbreviated).day())
-        let range = "\(first.formatted(.dateTime.month(.abbreviated).day()))–\(end)"
-        return Card {
-            VStack(spacing: 2) {
-                Text(range).font(.cardTitle)
-                Text(model.usingSampleData
-                     ? "Example week \u{00B7} \(model.weekRecapDays) of 7 nights are yours"
-                     : "The last 7 days \u{00B7} \(model.weekRecapDays) of 7 with a recorded night")
-                    .font(.secondary).secondaryText()
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
-        }
-    }
-
-    private func averageCard(_ recap: WeekRecap) -> some View {
-        let avg = recap.averageEnergy
-        let diff = avg - usualScore
-        let headline: String
-        let usual = model.energyUsualPhrase
-        if diff <= -2 { headline = "\(-diff) below \(usual)" }
-        else if diff >= 2 { headline = "\(diff) above \(usual)" }
-        else { headline = "Right around \(usual)" }
-        var sub = "\(weekday(recap.best.date, .wide)) was your best day, \(weekday(recap.worst.date, .wide)) your lowest."
-        if recap.worst.bedtime >= lateBedtime || recap.worst.asleep < model.sleepNeed.minutes - 30 {
-            // One night can explain one day; it isn't a pattern (round 3, N6).
-            let late = recap.worst.bedtime >= lateBedtime
-            sub += " \(weekday(dayBefore(recap.worst.date), .wide)) night was " + (late ? "a late one" : "short") + ", which likely played a part."
-        }
-        return Card(accent: .indigo) {
-            // Stacks at the accessibility sizes, so "9 below the starting
-            // point" never breaks a word per line beside the ring (Ortiz F4).
-            AdaptiveStack(spacing: 18) {
-                Ring(value: Double(avg) / 100, accent: .indigo, label: "\(avg)", caption: "Week average", size: 134,
-                     accessibilityText: "Week energy average \(avg) out of 100, estimated from your sleep")
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 0) {
-                        SectionLabel(text: "Energy score", accent: .indigo)
-                        InfoButton(topic: .energyScore).padding(.vertical, -12)
-                    }
-                    Text(headline).font(.section)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(sub).font(.bodyText).secondaryText()
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
+        return "\(first.formatted(.dateTime.month(.abbreviated).day()))–\(end)"
     }
 
     // MARK: Energy by day
 
-    private func daysCard(_ recap: WeekRecap, days: [DaySummary], need: Int) -> some View {
-        let bestIndex = days.firstIndex(of: recap.best) ?? 0
-        let selected = min(max(selectedIndex ?? bestIndex, 0), days.count - 1)
+    private func daysCard(_ recap: WeekRecap, days: [DaySummary], need: Int, selected: Int) -> some View {
         let bars: [RecapDayBar] = days.indices.map { i in
             let d = days[i]
             return RecapDayBar(id: i, label: weekday(d.date, .abbreviated), energy: d.energy,
@@ -115,21 +99,20 @@ struct WeekRecapView: View {
         }
         let labels = bars.map(\.label)
         return Card {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
                 Text("Energy by day").font(.cardTitle)
-                InfoButton(topic: .energyScore).padding(.vertical, -12)
-                Spacer()
+                Text("Estimated from your sleep each night, not measured.")
+                    .font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Estimated from your sleep each night, not measured.")
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
             if days.indices.contains(selected) {
-                dayReadout(days[selected], recap: recap, need: need)
+                dayReadout(days[selected], recap: recap, need: need,
+                           slots: days.map { dayDetail($0, recap: recap, need: need) })
             }
             VStack(spacing: 0) {
                 WeekEnergyChart(bars: bars, selection: $chartSelection,
                                 summary: "Energy score by day, estimated from sleep: " + bars.map { "\($0.label) \($0.energy)" }.joined(separator: ", "))
-                    .frame(height: 150)
+                    .frame(height: 130)
                     .accessibilityChartDescriptor(DateChartDescriptor(
                         title: "Energy score by day, estimated from sleep", seriesName: "Energy score", yTitle: "Energy score",
                         points: days.map { ($0.date, Double($0.energy)) }, yLabel: { "\(Int($0.rounded())) of 100" },
@@ -160,23 +143,26 @@ struct WeekRecapView: View {
                 legend(Accent.coral.fill(scheme), "Lowest day")
                 legend(otherDay, "Other days")
             }
-            if days.indices.contains(selected) {
-                dayPanel(days[selected], recap: recap, need: need)
-            }
         }
     }
 
-    private func dayReadout(_ d: DaySummary, recap: WeekRecap, need: Int) -> ChartReadout {
-        let tag: String = d == recap.best ? "Best day · " : (d == recap.worst ? "Lowest day · " : "")
+    /// The readout's note for a day: against the week's average, then the
+    /// night before.
+    private func dayDetail(_ d: DaySummary, recap: WeekRecap, need: Int) -> String {
         let diff = d.energy - recap.averageEnergy
         let vsAvg = diff == 0 ? "right on your week's average" : "\(abs(diff)) \(diff > 0 ? "above" : "below") your week's average"
         let sleep = met(d.asleep, need) ? "a full night (\(Clock.duration(d.asleep)))" : "\(Clock.duration(d.asleep)) of sleep, \(Clock.duration(need - d.asleep)) short of your need"
         let wake = d.wokeFromLightSleep ? "woke in light sleep" : "woke from deep sleep, which feels groggier"
+        return "\(vsAvg.prefix(1).uppercased() + vsAvg.dropFirst()). After \(sleep); \(wake)."
+    }
+
+    private func dayReadout(_ d: DaySummary, recap: WeekRecap, need: Int, slots: [String]) -> ChartReadout {
+        let tag: String = d == recap.best ? "Best day · " : (d == recap.worst ? "Lowest day · " : "")
         let accent: Accent = d == recap.best ? .mint : (d == recap.worst ? .coral : .indigo)
         return ChartReadout(title: tag + d.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()) + " \u{00B7} energy score",
                             value: "\(d.energy)",
-                            detail: "\(vsAvg.prefix(1).uppercased() + vsAvg.dropFirst()). After \(sleep); \(wake).",
-                            accent: accent)
+                            detail: dayDetail(d, recap: recap, need: need),
+                            accent: accent, detailSlots: slots)
     }
 
     private func barColor(_ d: DaySummary, recap: WeekRecap, selected: Bool) -> Color {
@@ -196,38 +182,23 @@ struct WeekRecapView: View {
         }
     }
 
-    private func dayPanel(_ d: DaySummary, recap: WeekRecap, need: Int) -> some View {
+    // MARK: Rows
+
+    /// The day picked on the chart, up close: six facts and a sentence.
+    private func dayRow(_ d: DaySummary, recap: WeekRecap, need: Int) -> some View {
         let isBest = d == recap.best
         let isWorst = d == recap.worst
         let accent: Accent = isBest ? .mint : (isWorst ? .coral : .indigo)
-        let tag: String? = isBest ? "Best day of the week" : (isWorst ? "Lowest day of the week" : nil)
-        let title = d.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-        let facts = facts(for: d, need: need)
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.cardTitle)
-                    if let tag {
-                        Text(tag).font(.secondary).fontWeight(.bold).foregroundStyle(accent.ink(scheme))
-                    }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text("Energy").font(.secondary).secondaryText()
-                    Text("\(d.energy)").font(.numberL)
-                        .foregroundStyle(isBest || isWorst ? accent.ink(scheme) : Palette(scheme: scheme).primary)
-                }
-                .accessibilityElement(children: .combine)
-            }
+        let tag = isBest ? "Best day of the week" : (isWorst ? "Lowest day of the week" : "Energy \(d.energy)")
+        return ExpandRow(title: "\(d.date.formatted(.dateTime.weekday(.wide))) up close", summary: tag,
+                         systemImage: "calendar", accent: accent) {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(facts) { f in RecapFactTile(fact: f) }
+                ForEach(facts(for: d, need: need)) { f in RecapFactTile(fact: f) }
             }
             Text(note(for: d, recap: recap, need: need)).font(.bodyText)
+                .foregroundStyle(Palette(scheme: scheme).primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).strokeBorder(accent.fill(scheme).opacity(0.3)))
     }
 
     private func facts(for d: DaySummary, need: Int) -> [RecapDayFact] {
@@ -272,35 +243,26 @@ struct WeekRecapView: View {
         return capitalizedFirst(listJoin(good)) + ", but held back by " + listJoin(bad) + "."
     }
 
-    // MARK: Best / worst
-
-    private func bestCard(_ recap: WeekRecap, days: [DaySummary], need: Int) -> some View {
+    private func bestRow(_ recap: WeekRecap, days: [DaySummary]) -> some View {
         let top = Array(days.sorted { $0.energy > $1.energy }.prefix(max(days.count / 2, 1)))
         let topSorted = top.sorted { $0.date < $1.date }
         let names = listJoin(topSorted.map { weekday($0.date, .abbreviated) })
         let lo = top.map(\.energy).min() ?? 0
         let hi = top.map(\.energy).max() ?? 0
-        return Card(accent: .mint) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("What your best days had in common").font(.cardTitle)
-                Text("\(names) · energy \(lo) to \(hi)").font(.secondary).secondaryText()
-                Text(recap.habitsFromCheckIns
-                     ? "Best days picked by how you said you felt at your check-ins."
-                     : "Based on your sleep only. Check in each morning and this also uses how you felt.")
-                    .font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        return ExpandRow(title: "What your best days had in common", summary: "\(names) · energy \(lo) to \(hi)",
+                         systemImage: "checkmark.circle.fill", accent: .mint) {
+            Text(recap.habitsFromCheckIns
+                 ? "Best days picked by how you said you felt at your check-ins."
+                 : "Based on your sleep only. Check in each morning and this also uses how you felt.")
+                .font(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text("\(recap.betterDays) better days vs \(recap.lowerDays) lower days" + (recap.enoughForPattern ? "." : ": too few to call it a pattern (that takes \(HabitEffect.minimumNights)+ of each), so treat these as hints."))
-                .font(.secondary).secondaryText()
+                .font(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if recap.bestDayHabits.isEmpty {
                 Text("No single habit set your better days apart this week.")
-                    .font(.bodyText).secondaryText()
             } else {
                 ForEach(recap.bestDayHabits, id: \.self) { h in RecapHabitRow(ok: true, text: h) }
-            }
-            LinkRow(title: "Why \(Clock.duration(need)) is your number", systemImage: "moon.zzz.fill", accent: .mint) {
-                SleepNeedView()
             }
             HowWeGotThisLink(title: "Your best days",
                              method: recap.habitsFromCheckIns
@@ -309,55 +271,31 @@ struct WeekRecapView: View {
         }
     }
 
-    private func worstCard(_ recap: WeekRecap) -> some View {
+    private func worstRow(_ recap: WeekRecap) -> some View {
         let w = recap.worst
         let date = w.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-        return Card(accent: .coral) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("What your lowest day had").font(.cardTitle)
-                Text("\(date) · energy \(w.energy)").font(.secondary).secondaryText()
+        return ExpandRow(title: "What your lowest day had", summary: "\(date) · energy \(w.energy)",
+                         systemImage: "exclamationmark.circle.fill", accent: .coral) {
+            if w.bedtime >= lateBedtime || w.asleep < model.sleepNeed.minutes - 30 {
+                // One night can explain one day; it isn't a pattern (round 3, N6).
+                let late = w.bedtime >= lateBedtime
+                Text("\(weekday(dayBefore(w.date), .wide)) night was " + (late ? "a late one" : "short") + ", which likely played a part.")
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if recap.worstDayIssues.isEmpty {
                 Text("Nothing obvious stood out. Sometimes a day is just a day.")
-                    .font(.bodyText).secondaryText()
             } else {
                 ForEach(recap.worstDayIssues, id: \.self) { issue in RecapHabitRow(ok: false, text: issue) }
             }
         }
     }
 
-    // MARK: Week at a glance
-
-    private func glance(_ recap: WeekRecap, days: [DaySummary], need: Int) -> some View {
-        let short = need - recap.averageAsleep
-        let sleepNote = met(recap.averageAsleep, need) ? "Need \(Clock.duration(need)) · covered" : "Need \(Clock.duration(need)) · \(Clock.duration(short)) short"
-        let deepDays = days.filter { !$0.wokeFromLightSleep }.map { weekday($0.date, .abbreviated) }
-        let wakeNote = deepDays.isEmpty ? "Every wake at a cycle end" : "\(listJoin(deepDays)) hit deep sleep"
-        let bedtimes = days.map(\.bedtime)
-        let avgBed = Clock.circularMean(bedtimes).map { Clock.format($0) } ?? "–"
-        let latest = bedtimes.max().map { Clock.format($0) } ?? "–"
-        let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Week at a glance").font(.section)
-                .padding(.top, 6)
-            LazyVGrid(columns: columns, spacing: 12) {
-                NavigationLink { SleepNeedView() } label: {
-                    RecapTile(title: "Avg sleep", topic: .sleepNeed, value: Clock.duration(recap.averageAsleep), note: sleepNote, accent: .purple, systemImage: "moon.fill")
-                }
-                .buttonStyle(.plain)
-                RecapTile(title: "Avg bedtime", topic: .regularity, value: avgBed, note: "Latest \(latest)", accent: .indigo, systemImage: "bed.double.fill")
-                NavigationLink { WakePlanView() } label: {
-                    RecapTile(title: "Light-sleep wakes", topic: .sleepCycle, value: "\(recap.lightSleepWakes) of \(days.count)", note: wakeNote, accent: .orange, systemImage: "sunrise.fill")
-                }
-                .buttonStyle(.plain)
-                RecapTile(title: "Daylight", topic: .daylight, value: "\(recap.averageDaylight) min", note: "Daily avg · aim for 20+", accent: .yellow, systemImage: "sun.max.fill")
-                NavigationLink { CaffeineView() } label: {
-                    RecapTile(title: "Caffeine", topic: .caffeineCutoff, value: "\(recap.averageCaffeine) mg", note: "Daily avg · limit 400 mg", accent: .coral, systemImage: "cup.and.saucer.fill")
-                }
-                .buttonStyle(.plain)
-                RecapTile(title: "Best day", topic: nil, value: weekday(recap.best.date, .wide), note: "Energy score \(recap.best.energy)", accent: .mint, systemImage: "star.fill")
-            }
-        }
+    private var streaksRow: some View {
+        let going = model.streaks.filter { $0.current > 0 }.count
+        let earned = model.badges.filter(\.earned).count
+        return MetricRow(title: "Streaks and badges",
+                         note: "\(going) of \(model.streaks.count) streaks going \u{00B7} \(earned) \(earned == 1 ? "badge" : "badges")",
+                         systemImage: "flame.fill", accent: .yellow) { AchievementsView() }
     }
 
     // MARK: Goal
@@ -397,51 +335,34 @@ struct WeekRecapView: View {
                     detail: "Your days averaged \(recap.averageDaylight) min. Morning light is the strongest signal your body clock gets.")
     }
 
-    private func goalCard(_ recap: WeekRecap, need: Int) -> some View {
+    private func goalRow(_ recap: WeekRecap, need: Int) -> some View {
         let g = goal(recap, need: need)
         let current = store.data.weeklyGoal
         let isOn = current == g.title
         let worstLabel = "Last \(weekday(recap.worst.date, .abbreviated))"
-        return Card(accent: .indigo) {
-            SectionLabel(text: "One thing for this week", accent: .indigo)
-            Text(g.title).font(.section)
+        return ExpandRow(title: "One thing for this week", summary: g.title, systemImage: "target", accent: .indigo) {
+            Text(g.title).font(.cardTitle).foregroundStyle(Palette(scheme: scheme).primary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(g.detail).font(.bodyText).secondaryText()
+            Text(g.detail)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 8) {
                 BarRow(label: worstLabel, fraction: Double(recap.worst.energy) / 100, valueText: "\(recap.worst.energy)", accent: .coral)
                 BarRow(label: "Week average", fraction: Double(recap.averageEnergy) / 100, valueText: "\(recap.averageEnergy)", accent: .indigo)
             }
             if let current, !isOn {
-                Text("Replaces your current goal: \(current)").font(.secondary).secondaryText()
+                Text("Replaces your current goal: \(current)").font(.secondary)
             }
             PrimaryButton(title: isOn ? "Your goal this week" : "Make it my goal", accent: .indigo, done: isOn) {
                 store.data.weeklyGoal = isOn ? nil : g.title
             }
             .accessibilityAddTraits(isOn ? .isSelected : [])
             if isOn {
-                Text("Saved as your goal. It stays here until you change it.")
-                    .font(.secondary).secondaryText()
+                Text("Saved as your goal. It stays here until you change it.").font(.secondary)
             }
         }
     }
 
-    // MARK: Links + empty
-
-    private var linksCard: some View {
-        let plan = model.wakePlan()
-        let wakeSubtitle = plan.map {
-            "\(model.nextWakeDayLabel) \(Clock.format($0.wake)), " + ($0.endsCycle ? "near the end of your \(ordinal($0.cycles)) cycle" : "your up-by time")
-        } ?? "See your wake plan"
-        return Card {
-            LinkRow(title: "Today's energy", subtitle: "\(model.energyToday.score) so far, with your peaks and dips",
-                    systemImage: "bolt.fill", accent: .mint) { EnergyView() }
-            LinkRow(title: "Your sleep need",
-                    subtitle: "\(Clock.duration(model.sleepNeed.minutes)) base, \(Clock.duration(model.tonightNeed.total)) tonight",
-                    systemImage: "moon.zzz.fill", accent: .purple) { SleepNeedView() }
-            LinkRow(title: "Best time to wake", subtitle: wakeSubtitle, systemImage: "alarm.fill", accent: .orange) { WakePlanView() }
-        }
-    }
+    // MARK: Empty
 
     private var emptyCard: some View {
         Card(accent: .indigo) {
@@ -478,15 +399,6 @@ struct WeekRecapView: View {
     private func capitalizedFirst(_ s: String) -> String {
         guard let first = s.first else { return s }
         return first.uppercased() + s.dropFirst()
-    }
-
-    private func ordinal(_ n: Int) -> String {
-        switch n {
-        case 1: return "1st"
-        case 2: return "2nd"
-        case 3: return "3rd"
-        default: return "\(n)th"
-        }
     }
 }
 
@@ -578,37 +490,5 @@ private struct RecapHabitRow: View {
                 .padding(.top, 3)
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// A week-at-a-glance tile whose title carries an ⓘ.
-private struct RecapTile: View {
-    var title: String
-    var topic: Topic?
-    var value: String
-    var note: String
-    var accent: Accent
-    var systemImage: String
-    @Environment(\.colorScheme) private var scheme
-    @State private var explaining: Explanation? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 0) {
-                Text(title).font(.bodyEmphasis)
-                if let topic { InfoButton(topic: topic).padding(.vertical, -12).accessibilityHidden(true) }
-                Spacer(minLength: 0)
-                Image(systemName: systemImage).foregroundStyle(accent.ink(scheme)).accessibilityHidden(true)
-            }
-            Text(value).font(.numberM).minimumScaleFactor(0.6).lineLimit(1)
-            Text(note).font(.secondary).fontWeight(.semibold).secondaryText()
-        }
-        .padding(Space.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title), \(value), \(note)")
-        .accessibilityAction(named: "Explain") { explaining = topic?.explanation }
-        .sheet(item: $explaining) { ExplanationSheet(explanation: $0) }
     }
 }

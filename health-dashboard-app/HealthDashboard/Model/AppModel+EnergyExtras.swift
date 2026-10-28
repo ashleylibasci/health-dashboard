@@ -15,8 +15,11 @@ extension AppModel {
         var kind: EnergyDay.Zone.Kind?
         /// "Afternoon dip", "Climbing out of the dip"
         var title: String
-        var meaning: String
-        var action: String
+        /// The readout's note, one or two lines: the zone's one-liner, or
+        /// what to do between zones (the title already says where she is).
+        /// Each zone's full meaning opens from its row on Energy, and all of
+        /// it is in the Health guide ("Your energy through the day").
+        var note: String
     }
 
     /// The curve point nearest to `t`.
@@ -39,56 +42,40 @@ extension AppModel {
         let time = point?.time ?? t
         let level = Int((point?.level ?? 0).rounded())
         if let z = Self.zone(at: time, in: e) {
+            let line = zoneOneLinerShown(z.kind)
             return EnergyMoment(time: time, level: level, kind: z.kind, title: Self.zoneTitle(z),
-                                meaning: Self.zoneMeaning(z.kind), action: Self.zoneAction(z.kind))
+                                note: line.prefix(1).uppercased() + line.dropFirst())
         }
         let peak = e.zone(.morningPeak)?.range
         let dip = e.zone(.afternoonDip)?.range
         let wind = e.zone(.secondWind)?.range
         let down = e.zone(.windDown)?.range
         let mel = e.zone(.melatonin)?.range
-        func moment(_ title: String, _ meaning: String, _ action: String) -> EnergyMoment {
-            EnergyMoment(time: time, level: level, kind: nil, title: title, meaning: meaning, action: action)
+        func moment(_ title: String, _ note: String) -> EnergyMoment {
+            EnergyMoment(time: time, level: level, kind: nil, title: title, note: note)
         }
         if let mel, time > mel.end {
-            return moment("Past your sleep window",
-                          "Your body expected to be asleep by now. Bright light and screens this late push your body clock later, so tomorrow morning feels harder.",
-                          "Keep the lights low and head to bed as soon as you can.")
+            return moment("Past your sleep window", "Keep the lights low and head to bed as soon as you can.")
         }
         if let down, time < down.start, let wind, time > wind.end {
-            return moment("Evening",
-                          "Energy slowly fades as the day's tiredness catches up with you.",
-                          "Good for lighter work, friends or dinner. Start wrapping up anything intense.")
+            return moment("Evening", "Good for lighter work, friends or dinner. Start wrapping up anything intense.")
         }
         if let dip, let wind, time > dip.end, time < wind.start {
-            return moment("Climbing out of the dip",
-                          "Your energy is coming back up toward your second wind.",
-                          "Ease back into work that needs some focus.")
+            return moment("Climbing out of the dip", "Ease back into work that needs some focus.")
         }
         if let peak, let dip, time > peak.end, time < dip.start {
-            return moment("Coming off your peak",
-                          "Still fairly sharp, but drifting down toward the afternoon dip.",
-                          "Finish your focused work now and save easy tasks for the dip.")
+            return moment("Coming off your peak", "Finish your focused work now and save easy tasks for the dip.")
         }
         if let peak, time < peak.start {
-            let peakName = e.zone(.morningPeak).map { Self.zoneTitle($0).lowercased() } ?? "first peak"
-            return moment("Warming up",
-                          "The just-woke-up fog has cleared and your focus is building toward your \(peakName).",
-                          "Start on something that needs focus. It only gets easier from here.")
+            return moment("Warming up", "Start on something that needs focus. It only gets easier from here.")
         }
-        return moment("Steady stretch", "Your energy is fairly level here.", "Use it for whatever's next on your list.")
-    }
-
-    /// The curve readout's note for a moment: what it is, then what to do
-    /// (the zone's action without workout advice where that's hidden).
-    func energyMomentDetail(_ m: EnergyMoment) -> String {
-        "\(m.meaning) \(m.kind.map { zoneActionShown($0) } ?? m.action)"
+        return moment("Steady stretch", "Use it for whatever's next on your list.")
     }
 
     /// Every note the curve readout can show on this day, one per moment
     /// kind, so the readout keeps the height of the longest (Weber A1).
-    func energyMomentDetails(in e: EnergyDay) -> [String] {
-        Array(Set(e.curve.map { energyMomentDetail(energyMoment(at: $0.time, in: e)) }))
+    func energyMomentNotes(in e: EnergyDay) -> [String] {
+        Array(Set(e.curve.map { energyMoment(at: $0.time, in: e).note }))
     }
 
     /// "Sleep window", "Morning peak", or "First peak" when that peak
@@ -97,31 +84,7 @@ extension AppModel {
         zone.title
     }
 
-    /// What the zone is, in one plain sentence or two.
-    static func zoneMeaning(_ kind: EnergyDay.Zone.Kind) -> String {
-        switch kind {
-        case .grogginess: return "The foggy, just-woke-up feeling while your brain switches on."
-        case .morningPeak: return "Your sharpest focus of the day."
-        case .afternoonDip: return "A natural energy drop, mostly from your body clock. It happens even without lunch, though a big meal can add to it."
-        case .secondWind: return "Your body clock pushes back against the day's tiredness, so your energy lifts again."
-        case .windDown: return "About 2 hours before you usually fall asleep, your body starts making its own sleep hormone (melatonin, not pills)."
-        case .melatonin: return "The hour before you usually fall asleep. Your body's own sleep hormone has been rising for a while (not about melatonin pills), so falling asleep tends to come easiest now."
-        }
-    }
-
-    /// What to do in the zone.
-    static func zoneAction(_ kind: EnergyDay.Zone.Kind) -> String {
-        switch kind {
-        case .grogginess: return "Skip big decisions. Daylight, water and moving around clear it faster."
-        case .morningPeak: return "Save it for your hardest studying: problem sets, writing, anything that needs focus."
-        case .afternoonDip: return "Good time for easy tasks or a walk. A 20-minute nap early in the dip is fine."
-        case .secondWind: return "Good for a workout or group study. Wrap up anything intense a couple of hours before bed."
-        case .windDown: return "Dim the lights, put screens down and do something calm."
-        case .melatonin: return "Aim to be in bed in this window. Falling asleep is usually easiest now; much later and you may lie awake. It's an estimate from your usual sleep times."
-        }
-    }
-
-    /// The one-liner shown next to each zone in the list.
+    /// The zone's one-liner, the curve readout's note inside the zone.
     static func zoneOneLiner(_ kind: EnergyDay.Zone.Kind) -> String {
         switch kind {
         case .grogginess: return "the foggy just-woke-up feeling. Skip big decisions; get daylight and water."

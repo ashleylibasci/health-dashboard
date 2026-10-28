@@ -3,7 +3,8 @@ import Charts
 import HealthCore
 
 /// Exam-week mode: protects sleep before an exam, plans study into her peaks
-/// and plans the exam morning.
+/// and plans the exam morning. The switch and the countdown come first,
+/// then the day-by-day plan; exam morning and the why are one tap down.
 struct ExamModeView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -11,8 +12,7 @@ struct ExamModeView: View {
 
     @State private var examID: String? = nil
     @State private var dayIndex = 0
-    @State private var alarmSetFor: Set<String> = []
-    @State private var morningSelection: Int? = nil
+    @State private var showSick = false
 
     /// Her own sleep cycle length, the one the plan uses.
     private var cycle: Int { model.sleepCycleLength }
@@ -31,35 +31,49 @@ struct ExamModeView: View {
                                             energyTemplate: model.energyToday, caffeineCutoff: model.caffeineCutoff,
                                             windowLength: AppModel.alarmWindowLead)
                 let index = min(max(dayIndex, 0), max(plan.count - 1, 0))
+                if store.data.examModeOn && model.unwellTonight {
+                    CalloutBar(text: "Sick before an exam? Rest comes first", systemImage: "cross.case.fill", accent: .coral) {
+                        showSick = true
+                    }
+                }
                 modeCard(exam)
                 if store.data.examModeOn {
-                    examPicker(all, selected: exam)
-                    if model.unwellTonight { sickCard }
                     countdownCard(exam, plan: plan)
+                    if all.count > 1 { examPicker(all, selected: exam) }
                     planSection(exam, plan: plan, index: index)
-                    if let examDay = plan.last {
-                        morningCard(exam, day: examDay)
-                    }
                 } else {
                     offCard(all)
                 }
+                RowCard {
+                    if store.data.examModeOn, let examDay = plan.last {
+                        MetricRow(title: "Exam morning",
+                                  note: "Up \(Clock.format(examDay.wake)), clear-headed by \(Clock.format(examDay.wake + grogginess))",
+                                  systemImage: "sunrise.fill", accent: .orange) { ExamMorningView(exam: exam, day: examDay) }
+                        RowDivider()
+                    }
+                    ExpandRow(title: "Why sleep comes first", summary: "Sleep debt: \(Clock.duration(model.sleepDebt))",
+                              systemImage: "brain.head.profile", accent: .purple) { whyRows }
+                    if store.data.examModeOn && clocksChangeBefore(exam) {
+                        RowDivider()
+                        MetricRow(title: "Clocks fall back \(shortDate(model.nextFallBack))",
+                                  note: "Your body runs an hour ahead of the clock for a few days",
+                                  systemImage: "clock.arrow.circlepath", accent: .indigo) { TimeChangeView() }
+                    }
+                    RowDivider()
+                    ExamsLinkRow()
+                }
             } else {
                 noExamsCard
+                RowCard {
+                    ExpandRow(title: "Why sleep comes first", summary: "Sleep debt: \(Clock.duration(model.sleepDebt))",
+                              systemImage: "brain.head.profile", accent: .purple) { whyRows }
+                }
             }
-            whyCard
-            if store.data.examModeOn { supportCard }
-            linksCard
+            Card(density: .compact) {
+                LearnMoreRow("Learn more about sleep and exams", article: .examWeek, accent: .yellow)
+            }
         }
-    }
-
-    // MARK: Sick, and overwhelmed
-
-    /// The sick check thinks she may be fighting something off (Moreno F8).
-    private var sickCard: some View {
-        Card(accent: .coral) {
-            Label("Sick before an exam?", systemImage: "cross.case.fill")
-                .font(.cardTitle)
-                .foregroundStyle(Accent.coral.ink(scheme))
+        .bottomSheet(isPresented: $showSick, title: "Sick before an exam?") {
             Text("Your body signals look like you may be fighting something off. Rest comes before study blocks, so the plan below drops them. Campus health can document that you're sick; ask your instructor or dean about a make-up.")
                 .font(.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -67,14 +81,10 @@ struct ExamModeView: View {
         }
     }
 
-    /// Where to turn when exam week is too much (Laurent F13).
-    private var supportCard: some View {
-        Card {
-            Text("Feeling overwhelmed?").font(.cardTitle)
-            Text("Exam weeks are hard, and you don't have to get through them alone. Your campus counseling center can help. If you're sick, dealing with something at home or just can't keep up, your dean of students or accessibility office can talk to you about extensions or a make-up. In a crisis, call or text 988 (US) any time.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    /// The clocks go back before this exam.
+    private func clocksChangeBefore(_ exam: UpcomingExam) -> Bool {
+        let fallBack = model.nextFallBack
+        return fallBack > Calendar.current.startOfDay(for: .now) && fallBack <= exam.date
     }
 
     private var noExamsCard: some View {
@@ -110,9 +120,11 @@ struct ExamModeView: View {
             }
             .tint(Accent.yellow.fill(scheme))
             .frame(minHeight: 44)
-            Text("Plans your sleep and study blocks around your exam, and can send a one-off smart alarm window for exam morning to your Watch.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
+            if !on {
+                Text("Plans your sleep and study blocks around your exam, and can send a one-off smart alarm window for exam morning to your Watch.")
+                    .font(.bodyText).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if exam.isExample {
                 HStack(spacing: 8) {
                     ExamExampleTag()
@@ -150,79 +162,37 @@ struct ExamModeView: View {
                     }
                 }
             }
-            NavigationLink { ExamListView() } label: {
-                Text(selected.isExample ? "Add your exams" : "Add or change exams")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(Accent.yellow.ink(scheme))
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
     }
 
+    /// The countdown as the screen's summary: nights (or days) to the exam,
+    /// and the two things to know next.
     private func countdownCard(_ exam: UpcomingExam, plan: [ExamDayPlan]) -> some View {
         let days = exam.daysUntil
-        let big: String = days == 0 ? "Today" : "\(days)"
         let unit: String
         if days == 0 { unit = "exam day" } else if days <= 7 { unit = days == 1 ? "night of sleep" : "nights of sleep" } else { unit = "days" }
         let tonight = plan.first { $0.dayOffset == -days + 1 }
         let bedTonight = tonight?.bedtimeBefore ?? store.data.bedtime
-        let fallBack = model.nextFallBack
-        let changeBeforeExam = fallBack > Calendar.current.startOfDay(for: .now) && fallBack <= exam.date
-        let t1Value: String
-        let t1Label: String
-        let t2Value: String
-        let t2Label: String
+        var pairs: [StatPair] = []
         if days <= 2 {
             let studyDays = plan.filter { $0.dayOffset < 0 && $0.dayOffset > -days }
             if studyDays.isEmpty {
-                t1Value = "Today"
-                t1Label = "your last study day"
+                pairs.append(StatPair(label: "Last study day", value: "Today"))
             } else {
                 let names = studyDays.map { weekdayName(dayDate(exam, $0.dayOffset)) }.joined(separator: " and ")
                 let blocks = studyDays.map(\.studyBlocks.count).reduce(0, +)
-                t1Value = studyDays.count == 1 ? "1 study day" : "\(studyDays.count) study days"
-                t1Label = "\(names), \(blocks) peak \(blocks == 1 ? "block" : "blocks")"
+                pairs.append(StatPair(label: "Study", value: "\(names) \u{00B7} \(blocks) \(blocks == 1 ? "block" : "blocks")"))
             }
-            t2Value = Clock.format(bedTonight)
-            t2Label = "bed tonight"
+            pairs.append(StatPair(label: "Bed tonight", value: Clock.format(bedTonight)))
         } else {
-            t1Value = plan.first.map { shortDate(dayDate(exam, $0.dayOffset)) } ?? "–"
-            t1Label = "\(plan.count)-day lead-up starts"
-            if changeBeforeExam {
-                t2Value = shortDate(fallBack)
-                t2Label = "clocks fall back 1 hour"
-            } else {
-                t2Value = Clock.format(store.data.bedtime)
-                t2Label = "bed tonight"
-            }
+            pairs.append(StatPair(label: "\(plan.count)-day lead-up", value: plan.first.map { shortDate(dayDate(exam, $0.dayOffset)) } ?? "\u{2013}"))
+            pairs.append(clocksChangeBefore(exam)
+                         ? StatPair(label: "Clocks fall back", value: shortDate(model.nextFallBack))
+                         : StatPair(label: "Bed tonight", value: Clock.format(store.data.bedtime)))
         }
-        return Card(accent: .yellow) {
-            SectionLabel(text: "Countdown", accent: .yellow)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(big).font(.display)
-                Text(unit).font(.cardTitle).foregroundStyle(Accent.yellow.ink(scheme))
-            }
-            .accessibilityElement(children: .combine)
-            Text("Until your \(exam.title), \(shortDate(exam.date)) at \(Clock.format(exam.start)).")
-                .font(.bodyText).secondaryText()
-            HStack(spacing: 10) {
-                ExamCountTile(value: t1Value, label: t1Label)
-                ExamCountTile(value: t2Value, label: t2Label)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            if changeBeforeExam {
-                LinkRow(title: "Clocks fall back \(shortDate(fallBack))",
-                        subtitle: "Your body runs an hour ahead of the clock for a few days. Plan around it.",
-                        systemImage: "clock.arrow.circlepath", accent: .indigo) { TimeChangeView() }
-            } else {
-                let upNext = tonight?.wake ?? model.wakePlan()?.wake ?? 502
-                LinkRow(title: "Tonight: wind down from \(Clock.format(bedTonight - 90))",
-                        subtitle: "Bed by \(Clock.format(bedTonight)), up at \(Clock.format(upNext)).",
-                        systemImage: "moon.fill", accent: .orange) { WakePlanView() }
-            }
-        }
+        return SummaryHeader(eyebrow: "Countdown", value: days == 0 ? "Today" : "\(days)", unit: unit,
+                             line: "Until your \(exam.title), \(shortDate(exam.date)) at \(Clock.format(exam.start)).",
+                             pairs: pairs, accent: .yellow)
     }
 
     // MARK: Day plan
@@ -433,132 +403,29 @@ struct ExamModeView: View {
         return rows
     }
 
-    // MARK: Exam morning
+    // MARK: Why
 
-    private func morningCard(_ exam: UpcomingExam, day d: ExamDayPlan) -> some View {
-        let window = d.alarmWindow
-        let sentEarlier: Bool = model.activeAlarmOverride.map {
-            Calendar.current.isDate($0.wakeDay, inSameDayAs: exam.date) && $0.start == window.start && $0.end == window.end
-        } ?? false
-        let isSet = alarmSetFor.contains(exam.id) || sentEarlier
-        let date = dayDate(exam, 0).formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-        return Card(accent: .orange) {
-            SectionLabel(text: "Exam morning · \(date)", accent: .orange)
-            Text("Up \(Clock.format(d.wake)), clear-headed by \(Clock.format(d.wake + grogginess))")
-                .font(.section)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Your smart alarm wakes you when you start stirring between \(Clock.format(window.start)) and \(Clock.format(window.end)). Grogginess usually fades within about \(grogginess) minutes (up to an hour after deep sleep), well before \(Clock.format(exam.start)).")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            morningReadout(exam, day: d)
-            ExamMorningChart(window: window, wake: d.wake, groggyEnd: d.wake + grogginess, examStart: exam.start,
-                             selected: morningSelection, selection: $morningSelection,
-                             summary: "Exam morning: smart alarm window \(window.label), wake at \(Clock.format(d.wake)), grogginess for about \(grogginess) minutes, \(exam.title) at \(Clock.format(exam.start))")
-                .frame(height: 90)
-            ScrubHint(each: "moment")
-            HStack(spacing: 0) {
-                swatch(Accent.orange.fill(scheme).opacity(0.55), "Smart alarm window")
-                InfoButton(topic: .smartAlarm)
-                swatch(Accent.indigo.fill(scheme).opacity(0.45), "Grogginess")
-                InfoButton(topic: .grogginess)
-                swatch(Accent.yellow.fill(scheme), exam.kind)
-            }
-            if exam.isExample {
-                Text("This is an example exam. Add your own to send its window to your Watch.")
-                    .font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if Calendar.current.isDate(exam.date, inSameDayAs: model.nextWakeDay) {
-                PrimaryButton(title: isSet ? "Sent to your Watch: \(window.label)" : "Use this window on my Watch tonight",
-                              accent: .orange, done: isSet) {
-                    guard !isSet else { return }
-                    alarmSetFor.insert(exam.id)
-                    store.data.smartAlarmEnabled = true
-                    model.pushToWatch(alarm: window, wakeDay: exam.date)
-                }
-            } else {
-                Text("You can send this window to your Watch's smart alarm the night before.")
-                    .font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            LinkRow(title: "How your wake window works", systemImage: "alarm.fill", accent: .orange) { WakePlanView() }
-        }
-    }
-
-    private func morningReadout(_ exam: UpcomingExam, day d: ExamDayPlan) -> ChartReadout {
-        let window = d.alarmWindow
-        let groggyEnd = d.wake + grogginess
-        let t = morningSelection.map { Int((Double($0) / 5).rounded()) * 5 } ?? d.wake
-        let value: String
-        let detail: String
-        let accent: Accent
-        if t < window.start {
-            value = "Still asleep"
-            detail = "Your smart alarm can start waking you from \(Clock.format(window.start)), as soon as you start stirring."
-            accent = .purple
-        } else if t < d.wake {
-            value = "Smart alarm window"
-            detail = "If you start stirring now, the alarm wakes you here instead of later. Stirring often means lighter sleep, which can feel a bit easier to wake from."
-            accent = .orange
-        } else if t < groggyEnd {
-            value = t == d.wake ? "Up" : "Grogginess"
-            detail = "Your brain usually takes about \(grogginess) minutes to fully switch on (up to an hour after deep sleep). Get daylight and water; skip last-minute cramming."
-            accent = .indigo
-        } else if t < exam.start {
-            value = "Clear-headed"
-            detail = "Grogginess has passed. Coffee around \(Clock.format(d.caffeineBy)) so it's working by the \(exam.kind.lowercased())."
-            accent = .mint
-        } else {
-            value = "\(exam.kind) starts"
-            detail = "\(exam.start - d.wake) minutes after waking: well past grogginess."
-            accent = .yellow
-        }
-        return ChartReadout(title: Clock.format(t), value: value, detail: detail, accent: accent,
-                            onClear: morningSelection == nil ? nil : { morningSelection = nil })
-    }
-
-    private func swatch(_ color: Color, _ text: String) -> some View {
-        HStack(spacing: 5) {
-            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
-            Text(text).font(.secondary).secondaryText().lineLimit(1)
-        }
-    }
-
-    // MARK: Why + links
-
-    private var whyCard: some View {
+    @ViewBuilder
+    private var whyRows: some View {
         let need = model.tonightNeed.total
         let lastNight = model.lastNight.asleep
         let scale = Double(max(need, lastNight, 1))
-        return Card(accent: .purple) {
-            Text("Why it matters").font(.cardTitle)
-            ExamWhyRow(systemImage: "brain.head.profile", accent: .purple, title: "Short nights cost recall",
-                   detail: "After a short night, memory and focus drop. Sleep is when what you studied gets stored, so an all-nighter takes back more than it gives.",
-                   topic: .rem)
-            ExamWhyRow(systemImage: "car.fill", accent: .orange, title: "Up all night? Don't drive",
-                   detail: "After an all-nighter or a very short night, driving is about as risky as driving drunk. Get a ride or take the bus.",
-                   topic: .lateNight)
-            ExamWhyRow(systemImage: "moon.zzz.fill", accent: .coral, title: "Sleep debt: \(Clock.duration(model.sleepDebt))",
-                   detail: "Sleep you've missed over the last two weeks. Paying some back before the exam is worth more than one more hour of review. Exam mode protects your bedtime first.",
-                   topic: .sleepDebt)
-            VStack(spacing: 8) {
-                HStack(spacing: 0) {
-                    SectionLabel(text: "Tonight's need vs. last night")
-                    InfoButton(topic: .tonightNeed).padding(.vertical, -12)
-                }
-                BarRow(label: "Tonight's need", fraction: Double(need) / scale, valueText: Clock.duration(need), accent: .purple)
-                BarRow(label: "Last night", fraction: Double(lastNight) / scale, valueText: Clock.duration(lastNight), accent: .coral)
+        ExamWhyRow(systemImage: "brain.head.profile", accent: .purple, title: "Short nights cost recall",
+               detail: "After a short night, memory and focus drop. Sleep is when what you studied gets stored, so an all-nighter takes back more than it gives.",
+               topic: .rem)
+        ExamWhyRow(systemImage: "car.fill", accent: .orange, title: "Up all night? Don't drive",
+               detail: "After an all-nighter or a very short night, driving is about as risky as driving drunk. Get a ride or take the bus.",
+               topic: .lateNight)
+        ExamWhyRow(systemImage: "moon.zzz.fill", accent: .coral, title: "Sleep debt: \(Clock.duration(model.sleepDebt))",
+               detail: "Sleep you've missed over the last two weeks. Paying some back before the exam is worth more than one more hour of review. Exam mode protects your bedtime first.",
+               topic: .sleepDebt)
+        VStack(spacing: 8) {
+            HStack(spacing: 0) {
+                SectionLabel(text: "Tonight's need vs. last night")
+                InfoButton(topic: .tonightNeed).padding(.vertical, -12)
             }
-        }
-    }
-
-    private var linksCard: some View {
-        Card {
-            LinkRow(title: "Where your peaks fall", subtitle: "Study blocks follow your morning peak and second wind.",
-                    systemImage: "chart.xyaxis.line", accent: .mint) { EnergyView() }
-            LinkRow(title: "Your wake plan", subtitle: "Tonight's best wake time and alarm window.",
-                    systemImage: "alarm.fill", accent: .orange) { WakePlanView() }
-            LinkRow(title: "Clock change", subtitle: "Clocks go back \(shortDate(model.nextFallBack)).",
-                    systemImage: "clock.arrow.circlepath", accent: .indigo) { TimeChangeView() }
+            BarRow(label: "Tonight's need", fraction: Double(need) / scale, valueText: Clock.duration(need), accent: .purple)
+            BarRow(label: "Last night", fraction: Double(lastNight) / scale, valueText: Clock.duration(lastNight), accent: .coral)
         }
     }
 
@@ -590,6 +457,111 @@ struct ExamModeView: View {
 
     private func weekdayName(_ d: Date) -> String {
         d.formatted(.dateTime.weekday(.abbreviated))
+    }
+}
+
+// MARK: - Exam morning
+
+/// Exam morning: when she's up and clear-headed, the smart alarm window to
+/// drag along, and the button that sends it to her Watch. Pushed from
+/// exam-week mode.
+private struct ExamMorningView: View {
+    var exam: UpcomingExam
+    var day: ExamDayPlan
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @State private var alarmSet = false
+    /// The selected time, snapped to 5 minutes.
+    @State private var selection: Int? = nil
+
+    private let grogginess = ExamPlanner.grogginessMinutes
+
+    var body: some View {
+        let d = day
+        let window = d.alarmWindow
+        let sentEarlier: Bool = model.activeAlarmOverride.map {
+            Calendar.current.isDate($0.wakeDay, inSameDayAs: exam.date) && $0.start == window.start && $0.end == window.end
+        } ?? false
+        let isSet = alarmSet || sentEarlier
+        let date = exam.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        Screen(title: "Exam morning", accent: .orange) {
+            SummaryHeader(eyebrow: "Exam morning \u{00B7} \(date)", value: Clock.format(d.wake), unit: "up",
+                          line: "Clear-headed by \(Clock.format(d.wake + grogginess)), well before \(Clock.format(exam.start)).",
+                          pairs: [StatPair(label: "Smart alarm", value: window.label),
+                                  StatPair(label: exam.kind, value: Clock.format(exam.start))],
+                          accent: .orange, info: Topic.smartAlarm.explanation)
+            Card {
+                Text("Your smart alarm wakes you when you start stirring between \(Clock.format(window.start)) and \(Clock.format(window.end)). Grogginess usually fades within about \(grogginess) minutes (up to an hour after deep sleep), well before \(Clock.format(exam.start)).")
+                    .font(.bodyText).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                readout
+                ExamMorningChart(window: window, wake: d.wake, groggyEnd: d.wake + grogginess, examStart: exam.start,
+                                 selected: selection,
+                                 selection: $selection.snapping { Int((Double($0) / 5).rounded()) * 5 },
+                                 summary: "Exam morning: smart alarm window \(window.label), wake at \(Clock.format(d.wake)), grogginess for about \(grogginess) minutes, \(exam.title) at \(Clock.format(exam.start))")
+                    .frame(height: 90)
+                ScrubHint(each: "moment")
+                FlowLayout(spacing: 14, lineSpacing: 6) {
+                    swatch(Accent.orange.fill(scheme).opacity(0.55), "Smart alarm window")
+                    swatch(Accent.indigo.fill(scheme).opacity(0.45), "Grogginess")
+                    swatch(Accent.yellow.fill(scheme), exam.kind)
+                }
+            }
+            if exam.isExample {
+                Text("This is an example exam. Add your own to send its window to your Watch.")
+                    .font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if Calendar.current.isDate(exam.date, inSameDayAs: model.nextWakeDay) {
+                PrimaryButton(title: isSet ? "Sent to your Watch: \(window.label)" : "Use this window on my Watch tonight",
+                              accent: .orange, done: isSet) {
+                    guard !isSet else { return }
+                    alarmSet = true
+                    store.data.smartAlarmEnabled = true
+                    model.pushToWatch(alarm: window, wakeDay: exam.date)
+                }
+            } else {
+                Text("You can send this window to your Watch's smart alarm the night before.")
+                    .font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// What each part of the morning means, as (value, note, accent).
+    private func moment(at t: Int) -> (value: String, detail: String, accent: Accent) {
+        let d = day
+        let window = d.alarmWindow
+        if t < window.start {
+            return ("Still asleep", "Your smart alarm can start waking you from \(Clock.format(window.start)), as soon as you start stirring.", .purple)
+        }
+        if t < d.wake {
+            return ("Smart alarm window", "If you start stirring now, the alarm wakes you here instead of later. Stirring often means lighter sleep, which can feel a bit easier to wake from.", .orange)
+        }
+        if t < d.wake + grogginess {
+            return (t == d.wake ? "Up" : "Grogginess", "Your brain usually takes about \(grogginess) minutes to fully switch on (up to an hour after deep sleep). Get daylight and water; skip last-minute cramming.", .indigo)
+        }
+        if t < exam.start {
+            return ("Clear-headed", "Grogginess has passed. Coffee around \(Clock.format(d.caffeineBy)) so it's working by the \(exam.kind.lowercased()).", .mint)
+        }
+        return ("\(exam.kind) starts", "\(exam.start - d.wake) minutes after waking: well past grogginess.", .yellow)
+    }
+
+    private var readout: ChartReadout {
+        let d = day
+        let t = selection ?? d.wake
+        let m = moment(at: t)
+        // One note per part of the morning, so the readout keeps one height.
+        let slots = [d.alarmWindow.start - 5, d.alarmWindow.start, d.wake, d.wake + grogginess, exam.start].map { moment(at: $0).detail }
+        return ChartReadout(title: Clock.format(t), value: m.value, detail: m.detail, accent: m.accent,
+                            onClear: selection == nil ? nil : { selection = nil }, detailSlots: slots)
+    }
+
+    private func swatch(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
+            Text(text).font(.secondary).secondaryText().lineLimit(1)
+        }
     }
 }
 
@@ -702,7 +674,8 @@ private struct ExamMorningChart: View {
                     .foregroundStyle(p.primary)
             }
         }
-        .chartScrub($selection)
+        .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 15 })
+        .transaction(value: selected) { $0.animation = nil }
         .chartXScale(domain: lo...hi)
         .chartYScale(domain: 0.0...1.0)
         .chartYAxis(.hidden)
@@ -785,24 +758,6 @@ private struct ExamDayTab: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-private struct ExamCountTile: View {
-    var value: String
-    var label: String
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.bodyEmphasis).lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Palette(scheme: scheme).chip, in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-        .accessibilityElement(children: .combine)
     }
 }
 
