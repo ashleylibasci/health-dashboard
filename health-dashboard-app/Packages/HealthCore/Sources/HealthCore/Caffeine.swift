@@ -31,6 +31,52 @@ public struct Drink: Hashable, Codable, Sendable, Identifiable {
     ]
 }
 
+/// A drink's size compared with the drink as listed (its regular size), so
+/// a venti isn't logged as a tall. Caffeine scales with volume: a 16 oz
+/// grande has about 1⅓ times a 12 oz tall's caffeine, and an iced venti
+/// (24 oz) about twice (Starbucks: brewed coffee 235 / 310 / 410 mg, cold
+/// brew 150 / 205 / 310 mg). Rounded up where shops differ, so a big
+/// drink isn't undercounted.
+public enum DrinkSize: String, CaseIterable, Codable, Sendable {
+    case small, regular, large, extraLarge
+
+    /// How much caffeine compared with the drink as listed.
+    public var factor: Double {
+        switch self {
+        case .small: return 2.0 / 3
+        case .regular: return 1
+        case .large: return 4.0 / 3
+        case .extraLarge: return 2
+        }
+    }
+
+    /// "Small", "Regular", "Large", "Extra large".
+    public var label: String {
+        switch self {
+        case .small: return "Small"
+        case .regular: return "Regular"
+        case .large: return "Large"
+        case .extraLarge: return "Extra large"
+        }
+    }
+
+    /// The coffee-shop size it matches, against a 12 oz tall.
+    public var shopName: String {
+        switch self {
+        case .small: return "short"
+        case .regular: return "tall"
+        case .large: return "grande"
+        case .extraLarge: return "venti"
+        }
+    }
+
+    /// The caffeine in this size of a drink listed at `mg`, to the 5 mg.
+    public func mg(_ mg: Int) -> Int {
+        guard self != .regular else { return mg }
+        return Int((Double(mg) * factor / 5).rounded()) * 5
+    }
+}
+
 public struct CaffeineDose: Hashable, Codable, Sendable {
     public var time: Minutes
     public var mg: Int

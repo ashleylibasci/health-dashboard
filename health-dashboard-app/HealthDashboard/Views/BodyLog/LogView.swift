@@ -388,10 +388,13 @@ struct CaffeineQuickLog: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var time: LogTime = .now
+    /// Small to extra large; back to regular after each log, like the time.
+    @State private var size: DrinkSize = .regular
     @State private var showsMore = false
     @State private var addCount = 0
     /// Bounces a drink's "+" when it's logged.
     @State private var bounces: [UUID: Int] = [:]
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private static let shownSaved = 3
 
@@ -430,22 +433,49 @@ struct CaffeineQuickLog: View {
         }
     }
 
+    /// The title, then the size and time pills; the pills move under the
+    /// title when they don't fit beside it (large text sizes).
+    @ViewBuilder
     private func titleRow(_ p: Palette) -> some View {
-        HStack(spacing: Space.s) {
-            if compact {
-                Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                    Text("\(model.caffeineMgToday)")
-                        .font(.numberM)
-                        .contentTransition(reduceMotion ? .opacity : .numericText())
-                        .motion(.log, value: model.caffeineMgToday)
-                    Text("mg today").font(.secondary).foregroundStyle(p.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            Spacer(minLength: Space.s)
+        let pills = HStack(spacing: Space.s) {
+            DrinkSizeMenu(size: $size)
             LogTimeMenu(time: $time, accent: .yellow)
+        }
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Space.s) {
+                title(p)
+                pills
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) {
+                    title(p)
+                    Spacer(minLength: Space.s)
+                    pills
+                }
+                VStack(alignment: .leading, spacing: Space.s) {
+                    title(p)
+                    pills
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func title(_ p: Palette) -> some View {
+        if compact {
+            Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                .fixedSize()
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                Text("\(model.caffeineMgToday)")
+                    .font(.numberM)
+                    .contentTransition(reduceMotion ? .opacity : .numericText())
+                    .motion(.log, value: model.caffeineMgToday)
+                Text("mg today").font(.secondary).foregroundStyle(p.secondary)
+            }
+            .fixedSize()
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -476,7 +506,8 @@ struct CaffeineQuickLog: View {
         let p = Palette(scheme: scheme)
         let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
         return VStack(alignment: .leading, spacing: Space.m) {
-            Text("Logs \(time.phrase)").font(.secondary).foregroundStyle(p.secondary)
+            Text(size == .regular ? "Logs \(time.phrase)" : "Logs \(size.label.lowercased()) \(time.phrase)")
+                .font(.secondary).foregroundStyle(p.secondary)
             VStack(spacing: 0) {
                 ForEach(moreDrinks) { drink in
                     drinkButton(drink) { showsMore = false }
@@ -510,7 +541,9 @@ struct CaffeineQuickLog: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
-                        Text("\(drink.caffeineMg) mg").font(.secondary).secondaryText()
+                        Text("\(size.mg(drink.caffeineMg)) mg").font(.secondary).secondaryText()
+                            .contentTransition(reduceMotion ? .opacity : .numericText())
+                            .motion(.dataSwap, value: size)
                         if drink.isCustom { CustomDrinkBadge(accent: .purple) }
                     }
                 }
@@ -529,7 +562,7 @@ struct CaffeineQuickLog: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable)
-        .accessibilityLabel("Add \(drink.name), \(drink.caffeineMg) mg, \(time.phrase)")
+        .accessibilityLabel("Add \(Self.name(drink, size: size)), \(size.mg(drink.caffeineMg)) mg, \(time.phrase)")
         .contextMenu {
             if store.data.savedDrinks.contains(where: { $0.id == drink.id }) {
                 Button(role: .destructive) {
@@ -542,14 +575,23 @@ struct CaffeineQuickLog: View {
         }
     }
 
+    /// "Latte", or "Latte (large)" in another size.
+    static func name(_ drink: Drink, size: DrinkSize) -> String {
+        size == .regular ? drink.name : "\(drink.name) (\(size.label.lowercased()))"
+    }
+
     private func log(_ drink: Drink) {
         let chosen = time
+        let chosenSize = size
         let id = UUID()
         withMotion(.log) {
-            model.logDrink(id: id, drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: chosen.date, saveToHealth: true)
+            model.logDrink(id: id, drinkID: drink.id, name: Self.name(drink, size: chosenSize),
+                           mg: chosenSize.mg(drink.caffeineMg), at: chosen.date, saveToHealth: true)
         }
         let when = store.data.drinkLog.first { $0.id == id }?.date ?? .now
-        var message = LogFormat.loggedLine(LogFormat.midSentence(drink), time: chosen, at: when)
+        let what = chosenSize == .regular ? LogFormat.midSentence(drink)
+            : "\(chosenSize.label.lowercased()) \(LogFormat.midSentence(drink)) (\(chosenSize.mg(drink.caffeineMg)) mg)"
+        var message = LogFormat.loggedLine(what, time: chosen, at: when)
         // Past today's cutoff: say so here, as the Watch does. The advice
         // itself is on the Caffeine screen.
         if AppDay.contains(when) {
@@ -562,8 +604,55 @@ struct CaffeineQuickLog: View {
         }
         toast = UndoToast(message) { withMotion(.undo) { model.deleteDrink(id) } }
         time = .now
+        size = .regular
         addCount += 1
         bounces[drink.id, default: 0] += 1
+    }
+}
+
+/// The drink size as one pill ("Regular ▾"), next to the time: small,
+/// regular, large or extra large, compared with the drink as listed, with
+/// the coffee-shop names that match (design review D4).
+struct DrinkSizeMenu: View {
+    @Binding var size: DrinkSize
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Menu {
+            Section("Coffee shop: tall is regular, grande large, venti extra large") {
+                ForEach(DrinkSize.allCases, id: \.self) { s in
+                    Button { size = s } label: {
+                        if s == size { Label(Self.menuLabel(s), systemImage: "checkmark") } else { Text(Self.menuLabel(s)) }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: Space.xs) {
+                Text(size.label).lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.scaled(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+            .font(.bodyEmphasis)
+            .foregroundStyle(Accent.yellow.onTint(scheme))
+            .padding(.horizontal, Space.m)
+            .frame(minHeight: Sizes.minTap)
+            .background(Accent.yellow.fill(scheme).opacity(size == .regular ? 0.12 : 0.24), in: Capsule())
+            .fixedSize()
+        }
+        .accessibilityLabel("Size")
+        .accessibilityValue(size.label)
+        .sensoryFeedback(.selection, trigger: size)
+    }
+
+    /// "Large · 1⅓× the caffeine".
+    static func menuLabel(_ s: DrinkSize) -> String {
+        switch s {
+        case .small: return "Small \u{00B7} \u{2154} the caffeine"
+        case .regular: return "Regular \u{00B7} as listed"
+        case .large: return "Large \u{00B7} 1\u{2153}\u{00D7} the caffeine"
+        case .extraLarge: return "Extra large \u{00B7} 2\u{00D7} the caffeine"
+        }
     }
 }
 
