@@ -112,7 +112,7 @@ struct SleepHistoryView: View {
                         selection: $selectedDay.snapping { raw in
                             nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
                         },
-                        barWidth: range == .week ? 22 : 6)
+                        barWidth: range == .week ? 22 : 6, days: range.days)
                 .frame(height: 200)
                 .motion(.dataSwap, value: rangeRaw)
             ScrubHint(each: "night")
@@ -183,7 +183,17 @@ struct HistoryBars: View {
     let selected: Date?
     @Binding var selection: Date?
     let barWidth: CGFloat
+    /// The days the x axis spans, ending today: exactly 7 bars' worth of
+    /// labels on a week, never an extra empty day (design flaw 5).
+    var days: Int = 7
     @Environment(\.colorScheme) private var scheme
+
+    private var domain: ClosedRange<Date> {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
+        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        return start...end
+    }
 
     private func day(_ night: NightRecord) -> Date { Calendar.current.startOfDay(for: night.wakeDay) }
 
@@ -233,7 +243,7 @@ struct HistoryBars: View {
         }
         .chartScrub($selection, snapped: selected, steps: nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
-        .chartXScale(range: .plotDimension(startPadding: 4, endPadding: 8))
+        .chartXScale(domain: domain, range: .plotDimension(startPadding: 4, endPadding: 8))
         .chartYAxis {
             AxisMarks(position: .leading, values: [0.0, 4.0, 6.0, 8.0, 10.0]) { value in
                 AxisGridLine()
@@ -243,8 +253,14 @@ struct HistoryBars: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 7)) { _ in
-                AxisValueLabel(format: .dateTime.weekday(.narrow))
+            if days <= 7 {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: 7)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+                }
             }
         }
         .accessibilityLabel(summary)
