@@ -634,7 +634,7 @@ private struct WakeHistoryChart: View {
                 .foregroundStyle(Accent.mint.fill(scheme).opacity(0.16))
                 .annotation(position: .top, alignment: .center) {
                     Text("best for you")
-                        .font(.scaled(size: 11, weight: .bold))
+                        .font(.chartLabel(size: 11, weight: .bold))
                         .foregroundStyle(Accent.mint.ink(scheme))
                 }
         }

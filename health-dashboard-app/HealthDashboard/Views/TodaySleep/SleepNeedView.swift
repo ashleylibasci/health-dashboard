@@ -604,7 +604,7 @@ private struct DoseResponseChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 .annotation(position: .top, alignment: .center) {
                     Text(Clock.duration(Int(fit.knee)))
-                        .font(.scaled(size: 11, weight: .bold))
+                        .font(.chartLabel(size: 11, weight: .bold))
                         .foregroundStyle(metric.accent.ink(scheme))
                 }
         }

@@ -102,12 +102,9 @@ struct PackSetupControl: View {
                 Spacer(minLength: 0)
             }
             // Segments shrink their text instead of clipping at large sizes.
-            Picker("Pack type", selection: typeBinding) {
-                ForEach(PackType.options(for: method), id: \.self) { t in
-                    Text(t.title(for: method)).tag(t)
-                }
+            AdaptiveSegmentedPicker("Pack type", selection: typeBinding, options: PackType.options(for: method)) { t in
+                t.title(for: method)
             }
-            .pickerStyle(.segmented)
             .frame(maxWidth: .infinity)
             .minimumScaleFactor(0.6)
             Text(typeNote).font(.scaled(size: 13)).secondaryText()
@@ -419,17 +416,17 @@ struct SleepScheduleControl: View {
     }
 
     private func row(title: String, detail: String, selection: Binding<Date>) -> some View {
-        HStack(spacing: 12) {
+        LabeledControlRow {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.scaled(size: 15, weight: .bold))
                 Text(detail).font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 8)
+        } control: {
             DatePicker(title, selection: selection, displayedComponents: .hourAndMinute)
                 .labelsHidden()
                 .tint(Accent.purple.ink(scheme))
-                .accessibilityLabel(title)
+                .timePickerAccessibility(title, time: selection.wrappedValue)
         }
         .frame(minHeight: 44)
     }

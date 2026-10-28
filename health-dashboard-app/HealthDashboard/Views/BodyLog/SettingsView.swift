@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     /// "dark" (default), "light" or "system". Read by the app root.
     @AppStorage("appearance") private var appearance = "dark"
 
@@ -106,11 +107,11 @@ struct SettingsView: View {
 
     private var profileCard: some View {
         Card(padding: 14) {
-            HStack(spacing: 12) {
+            AdaptiveStack(spacing: 4) {
                 Text("Name").font(.scaled(size: 15, weight: .bold))
                 TextField("Your first name", text: nameBinding)
                     .font(.scaled(size: 15))
-                    .multilineTextAlignment(.trailing)
+                    .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
                     .textInputAutocapitalization(.words)
                     .submitLabel(.done)
                     .focused($nameFocused)
@@ -118,19 +119,20 @@ struct SettingsView: View {
                     .accessibilityLabel("Your name")
             }
             Divider().overlay(Palette(scheme: scheme).cardBorder)
-            HStack(spacing: 12) {
+            LabeledControlRow {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Age").font(.scaled(size: 15, weight: .bold))
                     Text("Optional. Compares your fitness with your own age group.").font(.scaled(size: 13)).secondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
+            } control: {
                 Picker("Age", selection: ageBinding) {
                     Text("Not set").tag(0)
                     ForEach(13...90, id: \.self) { age in Text("\(age)").tag(age) }
                 }
                 .pickerStyle(.menu)
                 .tint(Accent.indigo.ink(scheme))
+                .fixedSize()
             }
             .frame(minHeight: 44)
             Divider().overlay(Palette(scheme: scheme).cardBorder)
@@ -219,19 +221,26 @@ struct SettingsView: View {
         return VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Cycle & birth control")
             Card(padding: 12) {
-                HStack(spacing: 12) {
-                    settingIcon("drop.fill", accent: .pink)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Cycle").font(.scaled(size: 15, weight: .bold))
-                        Text("What the cycle screens show").font(.scaled(size: 13)).secondaryText()
+                // Stacked at large text sizes: beside the label, the menu's
+                // value was squeezed to one letter per line (round 3, A2).
+                LabeledControlRow {
+                    HStack(spacing: 12) {
+                        settingIcon("drop.fill", accent: .pink)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Cycle").font(.scaled(size: 15, weight: .bold))
+                            Text("What the cycle screens show").font(.scaled(size: 13)).secondaryText()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    Spacer(minLength: 8)
+                } control: {
                     Picker("Cycle", selection: $store.data.cycleSetup) {
                         ForEach(AppData.CycleSetup.allCases, id: \.self) { setup in
                             Text(Self.setupName(setup)).tag(setup)
                         }
                     }
+                    .pickerStyle(.menu)
                     .tint(Accent.pink.ink(scheme))
+                    .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)
                     .accessibilityLabel("Cycle setup")
                 }
                 .frame(minHeight: 44)
@@ -243,17 +252,21 @@ struct SettingsView: View {
                 }
                 if store.data.cycleSetup == .hormonal {
                     Divider().overlay(p.cardBorder)
-                    HStack(spacing: 12) {
-                        settingIcon("pills.fill", accent: .purple)
-                        Text("Method").font(.scaled(size: 15, weight: .bold))
-                        Spacer(minLength: 8)
+                    LabeledControlRow {
+                        HStack(spacing: 12) {
+                            settingIcon("pills.fill", accent: .purple)
+                            Text("Method").font(.scaled(size: 15, weight: .bold))
+                        }
+                    } control: {
                         Picker("Birth control", selection: birthControlBinding) {
                             Text("Choose\u{2026}").tag("")
                             ForEach(BirthControl.allCases, id: \.self) { bc in
                                 Text(bc.rawValue).tag(bc.rawValue)
                             }
                         }
+                        .pickerStyle(.menu)
                         .tint(Accent.purple.ink(scheme))
+                        .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)
                         .accessibilityLabel("Birth control method")
                     }
                     .frame(minHeight: 44)
@@ -600,17 +613,27 @@ struct SettingsView: View {
 /// the label when it fits and under it at large text sizes.
 struct SexPickerRow: View {
     @EnvironmentObject var store: DataStore
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                label
-                Spacer(minLength: 8)
-                picker.fixedSize()
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                label
-                picker
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    label
+                    picker
+                }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        label
+                        Spacer(minLength: 8)
+                        picker.fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        label
+                        picker
+                    }
+                }
             }
         }
         .frame(minHeight: 44)
@@ -628,11 +651,9 @@ struct SexPickerRow: View {
     }
 
     private var picker: some View {
-        Picker("Sex", selection: $store.data.sex) {
-            Text("Female").tag(FitnessAge.Sex.female)
-            Text("Male").tag(FitnessAge.Sex.male)
+        AdaptiveSegmentedPicker("Sex", selection: $store.data.sex, options: [.female, .male]) { sex in
+            sex == .female ? "Female" : "Male"
         }
-        .pickerStyle(.segmented)
     }
 }
 

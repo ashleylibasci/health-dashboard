@@ -292,7 +292,7 @@ private struct BedtimeChart: View {
                 AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
-                        Text(Clock.format(m)).font(.scaled(size: 10)).foregroundStyle(Palette(scheme: scheme).tertiary)
+                        Text(Clock.format(m)).font(.chartLabel(size: 10)).foregroundStyle(Palette(scheme: scheme).tertiary)
                     }
                 }
             }
@@ -311,7 +311,7 @@ private struct BedtimeChart: View {
             .foregroundStyle(Accent.coral.fill(scheme).opacity(0.7))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             .annotation(position: .top, alignment: .trailing, spacing: 2) {
-                Text("Late: \(Clock.format(threshold))").font(.scaled(size: 10, weight: .bold)).foregroundStyle(Accent.coral.ink(scheme))
+                Text("Late: \(Clock.format(threshold))").font(.chartLabel(size: 10, weight: .bold)).foregroundStyle(Accent.coral.ink(scheme))
             }
     }
 

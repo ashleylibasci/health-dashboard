@@ -82,7 +82,7 @@ struct CaffeineView: View {
 
     private var hero: some View {
         Card(padding: 18) {
-            HStack(spacing: 16) {
+            AdaptiveStack(spacing: 16) {
                 Ring(value: Double(model.caffeineMgToday) / Double(dailyLimit), accent: .yellow,
                      label: "\(model.caffeineMgToday)", caption: "mg today", size: 132)
                 VStack(alignment: .leading, spacing: 8) {
@@ -325,9 +325,12 @@ struct CaffeineView: View {
             CaffeineFalloffChart(points: curve, start: chartStart, end: chartEnd, cutoff: model.caffeineCutoffShown,
                                  bedtime: bedtime, now: model.now, goal: bedtimeGoal,
                                  selected: selectedPoint, selection: $selectedTime)
-                .frame(height: 180)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(chartSummary)
+                .accessibilityChartDescriptor(ClockChartDescriptor(
+                    title: "Caffeine in your body", seriesName: "Caffeine", yTitle: "Milligrams",
+                    points: curve.map { ($0.time, $0.mg) },
+                    yLabel: { "\(Int($0.rounded())) mg" }))
             ScrubHint()
             HStack(spacing: 0) {
                 Image(systemName: "moon.zzz.fill")
@@ -481,12 +484,7 @@ struct CaffeineView: View {
                 }
                 InfoButton(topic: .coffeeNap).padding(.vertical, -12)
             }
-            Picker("Day", selection: $timingDay) {
-                ForEach(TimingDay.allCases) { day in
-                    Text(label(day)).tag(day)
-                }
-            }
-            .pickerStyle(.segmented)
+            AdaptiveSegmentedPicker("Day", selection: $timingDay, options: Array(TimingDay.allCases), accent: .mint) { day in label(day) }
             let r = timingReadout
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .mint)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -556,11 +554,18 @@ private struct CaffeineFalloffChart: View {
     let selected: CaffeinePoint?
     @Binding var selection: Int?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// Every 4 hours, or every 8 (about three labels) at accessibility sizes.
     private var ticks: [Int] {
-        let first = ((start + 239) / 240) * 240
-        return Array(stride(from: first, through: end, by: 240))
+        let step = typeSize.isAccessibilitySize ? 480 : 240
+        let first = ((start + step - 1) / step) * step
+        return Array(stride(from: first, through: end, by: step))
     }
+
+    /// At accessibility sizes the goal, cutoff and bedtime labels collided
+    /// on the chart ("2pmbed12:30"), so they move to a legend under it.
+    private var labelsInLegend: Bool { typeSize.isAccessibilitySize }
 
     private var nowLevel: Double? {
         guard now >= start, now <= end else { return nil }
@@ -575,6 +580,35 @@ private struct CaffeineFalloffChart: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            chart.frame(height: 180)
+            if labelsInLegend { legend }
+        }
+    }
+
+    private var legend: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            legendRow(color: Accent.mint, dashed: true, text: "Goal at bedtime: \(goal) mg")
+            if let cutoff, cutoff >= start {
+                legendRow(color: Accent.orange, dashed: false, text: "Cutoff: \(BodyLogStyle.shortTime(cutoff))")
+            }
+            legendRow(color: Accent.purple, dashed: true, text: "Bedtime: \(Clock.format(bedtime))")
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func legendRow(color: Accent, dashed: Bool, text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Capsule()
+                .fill(color.fill(scheme))
+                .frame(width: dashed ? 10 : 18, height: 3)
+                .accessibilityHidden(true)
+            Text(text).font(.scaled(size: 13, weight: .semibold)).foregroundStyle(color.ink(scheme))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var chart: some View {
         Chart {
             ForEach(points) { p in
                 AreaMark(x: .value("Time", p.time), y: .value("Caffeine", p.mg))
@@ -617,21 +651,27 @@ private struct CaffeineFalloffChart: View {
             .foregroundStyle(Accent.mint.fill(scheme))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             .annotation(position: .top, alignment: .leading) {
-                Text("\(goal) mg").font(.scaled(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
+                if !labelsInLegend {
+                    Text("\(goal) mg").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
+                }
             }
         if let cutoff, cutoff >= start {
             RuleMark(x: .value("Cutoff", cutoff))
                 .foregroundStyle(Accent.orange.fill(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
                 .annotation(position: .top, alignment: .leading) {
-                    Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.scaled(size: 11, weight: .semibold)).foregroundStyle(Accent.orange.ink(scheme))
+                    if !labelsInLegend {
+                        Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.orange.ink(scheme))
+                    }
                 }
         }
         RuleMark(x: .value("Bedtime", bedtime))
             .foregroundStyle(Accent.purple.fill(scheme))
             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
             .annotation(position: .top, alignment: .trailing) {
-                Text("bed \(Clock.format(bedtime, suffix: false))").font(.scaled(size: 11, weight: .semibold)).foregroundStyle(Accent.purple.ink(scheme))
+                if !labelsInLegend {
+                    Text("bed \(Clock.format(bedtime, suffix: false))").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.purple.ink(scheme))
+                }
             }
     }
 
@@ -684,8 +724,13 @@ private struct EnergyTimingChart: View {
 
     private func clamp(_ m: Minutes) -> Minutes { min(max(m, span.lowerBound), span.upperBound) }
 
-    /// A tick every 5 hours from the start of the span.
-    private var ticks: [Int] { Array(stride(from: span.lowerBound, through: span.upperBound, by: 300)) }
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// A tick every 5 hours from the start of the span (every 8 at
+    /// accessibility text sizes, so the labels don't run together).
+    private var ticks: [Int] {
+        Array(stride(from: span.lowerBound, through: span.upperBound, by: typeSize.isAccessibilitySize ? 480 : 300))
+    }
 
     var body: some View {
         Chart {
@@ -720,7 +765,7 @@ private struct EnergyTimingChart: View {
                 .foregroundStyle(Accent.yellow.fill(scheme))
                 .lineStyle(StrokeStyle(lineWidth: 2))
                 .annotation(position: .top, alignment: .center) {
-                    Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.scaled(size: 11, weight: .semibold)).foregroundStyle(Accent.yellow.ink(scheme))
+                    Text("\(BodyLogStyle.shortTime(cutoff)) cutoff").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.yellow.ink(scheme))
                 }
         }
     }

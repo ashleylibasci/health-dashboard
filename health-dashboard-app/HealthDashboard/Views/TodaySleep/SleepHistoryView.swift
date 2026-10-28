@@ -29,12 +29,9 @@ struct SleepHistoryView: View {
     var body: some View {
         Screen(title: "Sleep history", accent: .purple) {
             SampleDataBanner()
-            Picker("Range", selection: $rangeRaw) {
-                ForEach(HistoryRange.allCases) { r in
-                    Text(r.title).tag(r.rawValue)
-                }
+            AdaptiveSegmentedPicker("Range", selection: $rangeRaw, options: HistoryRange.allCases.map(\.rawValue), accent: .purple) { raw in
+                HistoryRange.allCases.first { $0.rawValue == raw }?.title ?? raw
             }
-            .pickerStyle(.segmented)
             .padding(.top, 4)
             .onChange(of: rangeRaw) { selectedDay = nil }
             if nights.isEmpty {

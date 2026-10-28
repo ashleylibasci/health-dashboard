@@ -71,7 +71,7 @@ struct WaterView: View {
 
     private var hero: some View {
         Card(padding: 18) {
-            HStack(spacing: 16) {
+            AdaptiveStack(spacing: 16) {
                 Ring(value: goalML > 0 ? model.waterTodayML / goalML : 0, accent: .blue,
                      label: LogFormat.bottles(model.waterBottlesToday),
                      caption: "of \(LogFormat.bottlesPhrase(model.waterGoalBottles))", size: 132)
@@ -111,9 +111,11 @@ struct WaterView: View {
                 addButton(title: "1 bottle", detail: LogFormat.oz(bottleML)) { add(ml: bottleML, label: "1 bottle") }
                 addButton(title: "\u{00BD} bottle", detail: LogFormat.oz(bottleML / 2)) { add(ml: bottleML / 2, label: "half a bottle") }
             }
-            HStack(spacing: 10) {
+            LabeledControlRow(spacing: 10) {
                 Text("Other amount").font(.scaled(size: 14, weight: .semibold))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+            } control: {
+              HStack(spacing: 10) {
                 TextField("8", text: $customOz)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
@@ -147,6 +149,7 @@ struct WaterView: View {
                 .buttonStyle(.plain)
                 .disabled((Self.parse(customOz) ?? 0) <= 0)
                 .accessibilityLabel("Add \(customOz.isEmpty ? "the amount you typed" : customOz + " ounces"), \(time.phrase)")
+              }
             }
             if let amountNote { rangeNote(amountNote) }
             if let lastLogged {
@@ -236,6 +239,10 @@ struct WaterView: View {
                 .frame(height: 180)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Water today: \(LogFormat.oz(model.waterTodayML)) so far of a \(LogFormat.oz(goalML)) goal. \(status)")
+                .accessibilityChartDescriptor(ClockChartDescriptor(
+                    title: "Water today", seriesName: "Water so far", yTitle: "Ounces",
+                    points: run.map { ($0.time, $0.ml / LogFormat.mlPerOunce) },
+                    yLabel: { "\(Int($0.rounded())) oz" }))
             ScrubHint()
             HStack(spacing: 14) {
                 legend("You", color: Accent.blue.fill(scheme), dashed: false)
@@ -318,6 +325,7 @@ struct WaterView: View {
                 Spacer()
                 Text(LogFormat.oz(bottleML))
                     .font(.scaled(size: 14, weight: .bold)).foregroundStyle(Accent.blue.ink(scheme))
+                    .fixedSize()
             }
             HStack(spacing: 8) {
                 ForEach(Self.bottlePresetsOz, id: \.self) { oz in
@@ -328,9 +336,11 @@ struct WaterView: View {
                 Text("Adjust by 1 oz").font(.scaled(size: 14, weight: .semibold))
             }
             .frame(minHeight: 44)
-            HStack(spacing: 10) {
+            LabeledControlRow(spacing: 10) {
                 Text("Exact size").font(.scaled(size: 14, weight: .semibold))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+            } control: {
+              HStack(spacing: 10) {
                 TextField("\(LogFormat.ozNumber(bottleML))", text: $customBottle)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
@@ -362,6 +372,7 @@ struct WaterView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled((Self.parse(customBottle) ?? 0) < 4)
+              }
             }
             if let bottleNote { rangeNote(bottleNote) }
             Text("Between 4 and 68 oz.").font(.scaled(size: 12)).secondaryText()
@@ -373,7 +384,7 @@ struct WaterView: View {
         let on = abs(bottleML - ml) < 1
         return Button { store.data.bottleSizeML = ml } label: {
             VStack(spacing: 2) {
-                Text(LogFormat.ozNumber(ml)).font(.scaled(size: 15, weight: .bold))
+                Text(LogFormat.ozNumber(ml)).font(.scaled(size: 15, weight: .bold)).keepsOnOneLine()
                 Text("oz").font(.scaled(size: 11, weight: .semibold))
                     .foregroundStyle(on ? Color(hex: 0x00111F).opacity(0.75) : p.secondary)
             }
@@ -415,13 +426,16 @@ private struct WaterDayChart: View {
     let end: Minutes
     let now: Minutes
     let selected: Int?
+    @Environment(\.dynamicTypeSize) private var typeSize
     let selectedML: Double?
     @Binding var selection: Int?
     @Environment(\.colorScheme) private var scheme
 
+    /// Every 3 hours, or every 6 (about three labels) at accessibility sizes.
     private var ticks: [Int] {
-        let first = ((start + 179) / 180) * 180
-        return Array(stride(from: first, through: end, by: 180))
+        let step = typeSize.isAccessibilitySize ? 360 : 180
+        let first = ((start + step - 1) / step) * step
+        return Array(stride(from: first, through: end, by: step))
     }
 
     private var yMax: Double { max(goal, run.map(\.ml).max() ?? 0) * 1.15 }
@@ -477,7 +491,7 @@ private struct WaterDayChart: View {
             .foregroundStyle(Accent.mint.fill(scheme))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             .annotation(position: .top, alignment: .leading) {
-                Text("goal").font(.scaled(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
+                Text("goal").font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(Accent.mint.ink(scheme))
             }
     }
 

@@ -6,11 +6,12 @@ struct TodayView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Screen(accent: .indigo) {
             header
-            SampleDataBanner()
+            SampleDataBanner(prominent: true)
             PackCheckCard()
             chips
             if model.canCheckInNow && !model.checkInDoneToday {
@@ -211,11 +212,14 @@ struct TodayView: View {
                 NavigationLink {
                     RecoveryView()
                 } label: {
-                    HStack(spacing: 16) {
+                    // Ring above the words at large text sizes, so "Take it
+                    // steady" isn't squeezed into a few letters per line.
+                    AdaptiveStack(spacing: 16) {
                         Ring(value: Double(value) / 100, accent: .indigo, label: "\(value)", caption: "Recovery")
                         VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            AdaptiveStack(spacing: 8, alignment: .firstTextBaseline) {
                                 Text(model.recoveryLabel(for: value)).font(.scaled(size: 22, weight: .bold))
+                                    .fixedSize(horizontal: false, vertical: true)
                                 if model.recoveryIsExample {
                                     ExampleTag()
                                 }
@@ -243,7 +247,7 @@ struct TodayView: View {
                     .foregroundStyle(p.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(alignment: .top, spacing: 6) {
+            AdaptiveStack(spacing: 6, alignment: .top) {
                 MiniGauge(fraction: heart ? model.hrv / 80 : 0, accent: model.hrvDeltaPct < 0 ? .coral : .mint,
                           value: heart ? "\(Int(model.hrv.rounded()))" : "\u{2014}", title: "HRV",
                           note: heart ? SleepText.signed(model.hrvDeltaPct) + "%" : "no reading",
@@ -412,7 +416,7 @@ struct TodayView: View {
             alarmText = "Plan your wake time"
         }
         return Card(accent: .purple, padding: 14) {
-            HStack(spacing: 14) {
+            AdaptiveStack(spacing: 14) {
                 SleepArcDial(start: bed, end: wake, size: 88, lineWidth: 10,
                              colors: [Accent.purple.fill(scheme), Accent.orange.fill(scheme)],
                              label: SleepText.hours(wake - bed), labelSize: 20)
@@ -506,9 +510,32 @@ struct TodayView: View {
         return model.sleepRegularityScore.map { "Regularity \($0)" } ?? "Last night"
     }
 
+    /// Two columns, or one at accessibility text sizes so titles and
+    /// values aren't cut off.
+    @ViewBuilder
     private var tiles: some View {
-        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-            GridRow {
+        if typeSize.isAccessibilitySize {
+            VStack(spacing: 10) {
+                sleepTile
+                caffeineTile
+                waterTile
+                stressTile
+            }
+        } else {
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    sleepTile
+                    caffeineTile
+                }
+                GridRow {
+                    waterTile
+                    stressTile
+                }
+            }
+        }
+    }
+
+    private var sleepTile: some View {
                 ZStack(alignment: .bottomTrailing) {
                     NavigationLink {
                         SleepView()
@@ -521,6 +548,9 @@ struct TodayView: View {
                         InfoButton(topic: .regularity)
                     }
                 }
+    }
+
+    private var caffeineTile: some View {
                 NavigationLink {
                     CaffeineView()
                 } label: {
@@ -529,12 +559,16 @@ struct TodayView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Opens caffeine, where you can log drinks and change their times")
-            }
-            GridRow {
+    }
+
+    private var waterTile: some View {
                 WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
                           bottleML: store.data.bottleSizeML) {
                     model.addWater()
                 }
+    }
+
+    private var stressTile: some View {
                 ZStack(alignment: .topTrailing) {
                     NavigationLink {
                         StressView()
@@ -544,8 +578,6 @@ struct TodayView: View {
                     .buttonStyle(.plain)
                     InfoButton(topic: .stress)
                 }
-            }
-        }
     }
 
     // MARK: More

@@ -8,6 +8,7 @@ struct OnboardingFlow: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @AppStorage("appearance") private var appearance = "dark"
 
     @State private var step: Step = .welcome
@@ -55,14 +56,15 @@ struct OnboardingFlow: View {
         return out
     }
 
-    /// The counter treats "your pack" as part of the birth control step, so
-    /// picking a pill instead of an implant never changes the total.
-    private var counted: [Step] { flow.filter { $0 != .pack } }
+    /// The counter treats "which birth control" and "your pack" as part of
+    /// the cycle step, so picking birth control (or a pill instead of an
+    /// implant) never changes the total mid-flow ("Step 2 of 5" stays "of 5").
+    private var counted: [Step] { flow.filter { $0 != .birthControl && $0 != .pack } }
 
     private var totalSteps: Int { counted.count }
 
     private func number(of step: Step) -> Int {
-        let s = step == .pack ? .birthControl : step
+        let s = (step == .pack || step == .birthControl) ? .cycle : step
         return (counted.firstIndex(of: s) ?? 0) + 1
     }
 
@@ -104,9 +106,10 @@ struct OnboardingFlow: View {
             .accessibilityLabel("Back")
             Spacer()
             VStack(spacing: 6) {
-                Text("Step \(current) of \(totalSteps)")
+                Text("Step\u{00A0}\(current)\u{00A0}of\u{00A0}\(totalSteps)")
                     .font(.scaled(size: 13, weight: .semibold))
                     .secondaryText()
+                    .keepsOnOneLine()
                 HStack(spacing: 4) {
                     ForEach(1...totalSteps, id: \.self) { i in
                         Capsule()
@@ -117,11 +120,13 @@ struct OnboardingFlow: View {
                 .accessibilityHidden(true)
             }
             .accessibilityElement(children: .combine)
+            .layoutPriority(1)
             Spacer()
             if let trailing {
                 Button(trailing.title, action: trailing.action)
                     .font(.scaled(size: 15, weight: .semibold))
                     .foregroundStyle(Accent.indigo.ink(scheme))
+                    .keepsOnOneLine()
                     .frame(minWidth: 44, minHeight: 44)
             } else {
                 Color.clear.frame(width: 44, height: 44)
@@ -135,8 +140,9 @@ struct OnboardingFlow: View {
             Text(first)
             Text(second).foregroundStyle(Accent.purple.ink(scheme))
         }
-        .font(.scaled(size: 32, weight: .bold))
-        .accessibilityElement(children: .combine)
+        .font(.headingScaled(size: 32))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(first) \(second)")
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -199,8 +205,9 @@ struct OnboardingFlow: View {
                 Text("Your body, explained.")
                 Text("Cycle included.").foregroundStyle(Accent.purple.ink(scheme))
             }
-            .font(.scaled(size: 34, weight: .bold))
-            .accessibilityElement(children: .combine)
+            .font(.headingScaled(size: 34))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Your body, explained. Cycle included.")
             .accessibilityAddTraits(.isHeader)
 
             intro("Sleep, recovery, caffeine and your cycle, read from your Apple Watch. Your data stays on your phone.")
@@ -210,7 +217,7 @@ struct OnboardingFlow: View {
                 go(.about)
             }
             .padding(.top, 8)
-            Text("Apple Health asks about each kind of data. The app reads sleep, heart rate and HRV, steps and activity, daylight, wrist temperature, breathing rate, VO\u{2082} max, caffeine, water and cycle tracking. It only saves the caffeine and water you log here.")
+            Text("Apple Health asks about each kind of data. The app reads sleep, heart rate and HRV (how much the gap between heartbeats varies, a sign of how rested you are), steps and activity, daylight, wrist temperature, breathing rate, VO\u{2082} max (how fit your heart and lungs are), caffeine, water and cycle tracking. It only saves the caffeine and water you log here.")
                 .font(.scaled(size: 13))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
@@ -261,11 +268,11 @@ struct OnboardingFlow: View {
             heading("First,", "about you")
             intro("All optional, and it stays on your phone. Age and sex are used only for your fitness age.")
             Card(padding: 14) {
-                HStack(spacing: 12) {
+                AdaptiveStack(spacing: 4) {
                     Text("Name").font(.scaled(size: 15, weight: .bold))
                     TextField("Your first name", text: nameBinding)
                         .font(.scaled(size: 15))
-                        .multilineTextAlignment(.trailing)
+                        .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
                         .textInputAutocapitalization(.words)
                         .submitLabel(.done)
                         .focused($nameFocused)
@@ -273,19 +280,20 @@ struct OnboardingFlow: View {
                         .accessibilityLabel("Your first name")
                 }
                 Divider().overlay(p.cardBorder)
-                HStack(spacing: 12) {
+                LabeledControlRow {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Age").font(.scaled(size: 15, weight: .bold))
                         Text("Compares your fitness with your own age group.").font(.scaled(size: 13)).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer(minLength: 8)
+                } control: {
                     Picker("Age", selection: ageBinding) {
                         Text("Skip").tag(0)
                         ForEach(13...90, id: \.self) { age in Text("\(age)").tag(age) }
                     }
                     .pickerStyle(.menu)
                     .tint(Accent.indigo.ink(scheme))
+                    .fixedSize()
                 }
                 .frame(minHeight: 44)
                 Divider().overlay(p.cardBorder)
@@ -502,7 +510,7 @@ struct OnboardingFlow: View {
                 }
             }
             SectionLabel(text: "Hormonal")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 10) {
                 ForEach(hormonalMethods, id: \.self) { bc in
                     methodCard(bc)
                 }
@@ -630,7 +638,7 @@ struct OnboardingFlow: View {
                 PackSetupControl(showsSkip: false)
             }
             HStack(spacing: 0) {
-                Text("What\u{2019}s a withdrawal bleed?").font(.scaled(size: 14, weight: .semibold)).secondaryText()
+                Text("What\u{2019}s a withdrawal\u{00A0}bleed?").font(.scaled(size: 14, weight: .semibold)).secondaryText()
                 InfoButton(topic: .withdrawalBleed).padding(.vertical, -12)
             }
             PrimaryButton(title: "Continue") { next() }

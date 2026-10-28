@@ -217,8 +217,7 @@ struct LogView: View {
                 Text("Tap to log one drink now. Change the time or number on the Drinks screen.")
                     .font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                FlowLayout(spacing: 8) {
                         ForEach(Self.quickKinds, id: \.self) { kind in
                             Button {
                                 store.data.alcoholLog.append(AppData.AlcoholEntry(date: .now, kind: kind, count: 1))
@@ -236,7 +235,6 @@ struct LogView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Log one \(kind), now")
                         }
-                    }
                 }
                 if let lastAlcohol { confirmation(lastAlcohol) }
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
@@ -420,20 +418,26 @@ struct LogTimeSelector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            // Title above "Other [time]" at large text sizes, so neither is
+            // squeezed into a few letters per line.
+            LabeledControlRow(spacing: 8) {
                 Text(title).font(.scaled(size: 13, weight: .bold)).secondaryText()
-                Spacer(minLength: 4)
-                Text("Other").font(.scaled(size: 13)).secondaryText().accessibilityHidden(true)
-                DatePicker("Pick another time", selection: exactTime, displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .tint(accent.ink(scheme))
-                    .accessibilityLabel("Pick another time")
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
+                    .fixedSize(horizontal: false, vertical: true)
+            } control: {
                 HStack(spacing: 8) {
-                    ForEach(LogTime.presets, id: \.self) { minutes in
-                        chip(minutes)
-                    }
+                    Text("Other").font(.scaled(size: 13)).secondaryText().accessibilityHidden(true)
+                        .keepsOnOneLine()
+                    DatePicker("Pick another time", selection: exactTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .tint(accent.ink(scheme))
+                        .timePickerAccessibility("Pick another time", time: time.date)
+                }
+            }
+            // Wraps instead of scrolling sideways, so "1 hr ago" and
+            // "2 hr ago" are never hidden off the edge.
+            FlowLayout(spacing: 8) {
+                ForEach(LogTime.presets, id: \.self) { minutes in
+                    chip(minutes)
                 }
             }
         }
@@ -449,6 +453,7 @@ struct LogTimeSelector: View {
         return Button { time = .ago(minutes) } label: {
             Text(LogTime.presetLabel(minutes))
                 .font(.scaled(size: 14, weight: .bold))
+                .keepsOnOneLine(minimumScale: 0.7)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .foregroundStyle(on ? Color(hex: 0x1A0E00) : p.primary)
@@ -682,12 +687,13 @@ struct LogEditSheet<Extra: View>: View {
                 VStack(alignment: .leading, spacing: 14) {
                     extra
                     Card {
-                        HStack {
+                        LabeledControlRow {
                             Text(showsDate ? "When" : "Time").font(.scaled(size: 15, weight: .bold))
-                            Spacer()
+                        } control: {
                             DatePicker("Time", selection: dateBinding, displayedComponents: components)
                                 .labelsHidden()
                                 .tint(accent.ink(scheme))
+                                .accessibilityLabel(showsDate ? "When" : "Time")
                         }
                         .frame(minHeight: 44)
                         Text(showsDate
@@ -701,8 +707,8 @@ struct LogEditSheet<Extra: View>: View {
                         HStack(spacing: 12) {
                             stepButton("minus", label: "Less") { amount = max(range.lowerBound, amount - step) }
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(amountText).font(.scaledNumber(30))
-                                Text(unitText).font(.scaled(size: 15, weight: .semibold)).secondaryText()
+                                Text(amountText).font(.scaledNumber(30)).keepsOnOneLine()
+                                Text(unitText).font(.scaled(size: 15, weight: .semibold)).secondaryText().keepsOnOneLine()
                             }
                             .frame(maxWidth: .infinity)
                             .accessibilityElement(children: .combine)

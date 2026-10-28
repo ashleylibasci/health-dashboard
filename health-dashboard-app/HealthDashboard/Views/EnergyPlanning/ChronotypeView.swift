@@ -6,6 +6,7 @@ import HealthCore
 /// it means for the day and what can shift it. The method lives behind
 /// "Learn how we got this number", not on the page.
 struct ChronotypeView: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
 
@@ -45,15 +46,21 @@ struct ChronotypeView: View {
             Text(c.category.rawValue).font(.scaled(size: 28, weight: .bold))
             Text(Self.plain(c.category)).font(.scaled(size: 15, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("Middle of your sleep on free days").font(.scaled(size: 14, weight: .semibold)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
                 InfoButton(title: "Middle of your sleep",
                            meaning: "The halfway point between falling asleep and waking up on days with no alarm. It's the simplest way to tell how early or late your body naturally runs.",
                            forYou: "The later it is, the more of an evening type you are, and the harder early classes feel. Morning daylight and a steady wake time pull it earlier.")
                     .padding(.vertical, -12)
-                Spacer()
-                Text(Clock.format(msfsc, suffix: false)).font(.scaledNumber(34))
-                Text(suffix).font(.scaled(size: 15, weight: .bold)).foregroundStyle(Accent.orange.ink(scheme))
+                }
+                if !typeSize.isAccessibilitySize { Spacer() }
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(Clock.format(msfsc, suffix: false)).font(.scaledNumber(34)).keepsOnOneLine()
+                    Text(suffix).font(.scaled(size: 15, weight: .bold)).foregroundStyle(Accent.orange.ink(scheme)).keepsOnOneLine()
+                }
+                .fixedSize()
             }
             ChronotypeSpectrum(msfsc: msfsc, category: c.category)
             Text(why(c)).font(.scaled(size: 14)).secondaryText()
@@ -115,7 +122,7 @@ struct ChronotypeView: View {
                 .font(.scaled(size: 13)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .center, spacing: 10) {
-                Text(Clock.duration(sjl)).font(.scaledNumber(34))
+                Text(Clock.duration(sjl)).font(.scaledNumber(34)).keepsOnOneLine()
                 Text(over ? "Above goal" : "Under goal")
                     .font(.scaled(size: 13, weight: .bold))
                     .foregroundStyle(badgeAccent.ink(scheme))
@@ -425,7 +432,7 @@ private struct SleepWindowsChart: View {
                 AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
-                        Text(Clock.format(m)).font(.scaled(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
+                        Text(Clock.format(m)).font(.chartLabel(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
                     }
                 }
             }

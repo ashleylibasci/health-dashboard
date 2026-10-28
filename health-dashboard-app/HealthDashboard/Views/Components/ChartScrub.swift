@@ -21,6 +21,15 @@ extension View {
                 }
             }
         }
+        .chartAxisTextCapped()
+    }
+
+    /// Axis labels grow with the text size up to xxLarge, then stop: at the
+    /// accessibility sizes they overprinted each other ("9a12p3p6p9pm").
+    /// The readout above each chart and its VoiceOver summary carry the
+    /// full-size values.
+    func chartAxisTextCapped() -> some View {
+        dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     /// Donut charts: tap or drag around the ring to pick a slice. `selection`

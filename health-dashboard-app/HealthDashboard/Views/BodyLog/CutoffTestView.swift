@@ -190,7 +190,7 @@ private struct CutoffBarChart: View {
                     .foregroundStyle(color(g))
                     .cornerRadius(8)
                     .annotation(position: .top) {
-                        Text(Clock.duration(g.averageAsleep)).font(.scaled(size: 12, weight: .bold)).secondaryText()
+                        Text(Clock.duration(g.averageAsleep)).font(.chartLabel(size: 12, weight: .bold)).secondaryText()
                     }
             }
         }

@@ -15,8 +15,15 @@ struct InfoButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("What is \(explanation.title)?")
+        .accessibilityLabel(spokenLabel)
         .sheet(isPresented: $showing) { ExplanationSheet(explanation: explanation) }
+    }
+
+    /// "What is HRV?", but a title that's already a question reads
+    /// "Explain: How stressed do you feel?" (not "What is How…??").
+    private var spokenLabel: String {
+        let title = explanation.title.trimmingCharacters(in: .whitespaces)
+        return title.hasSuffix("?") ? "Explain: \(title)" : "What is \(title)?"
     }
 }
 

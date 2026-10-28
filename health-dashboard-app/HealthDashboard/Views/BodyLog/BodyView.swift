@@ -8,6 +8,7 @@ struct BodyView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private enum Tile: Hashable {
         case cycle, energy, stress, hrv, restingHR, breathing, wristTemp, fitness, calories, sleepStages, chronotype, weekRecap, wins
@@ -44,11 +45,11 @@ struct BodyView: View {
         let p = Palette(scheme: scheme)
         return ZStack(alignment: .topTrailing) {
             NavigationLink { RecoveryView() } label: {
-                HStack(spacing: 16) {
+                AdaptiveStack(spacing: 16) {
                     Ring(value: Double(model.recoveryShown ?? 0) / 100, accent: .indigo, lineWidth: 12,
                          label: model.recoveryShown.map { "\($0)" } ?? "\u{2013}", caption: "Recovery", size: 100)
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
+                        FlowLayout(spacing: 6) {
                             Text(model.recoveryShown == nil ? "No reading yet" : model.recoveryLabel)
                                 .font(.scaled(size: 20, weight: .bold))
                             if model.recoveryIsExample { ExampleTag() }
@@ -56,7 +57,7 @@ struct BodyView: View {
                         Text(model.recoveryUsualIsPersonal ? "Your usual is \(model.recoveryUsual)" : "Typical is \(model.recoveryUsual)")
                             .font(.scaled(size: 14)).secondaryText()
                         if model.hasHeartData {
-                            HStack(spacing: 6) {
+                            FlowLayout(spacing: 6) {
                                 deltaPill(label: "HRV \(Int(model.hrv.rounded()))", delta: percentText(model.hrvDeltaPct), accent: .coral)
                                 deltaPill(label: "RHR \(Int(model.restingHR.rounded()))", delta: signedText(model.restingHRDelta), accent: .pink)
                             }
@@ -104,6 +105,7 @@ struct BodyView: View {
             Text(label)
             Text(delta).foregroundStyle(accent.ink(scheme))
         }
+        .keepsOnOneLine(minimumScale: 0.7)
         .font(.scaled(size: 12, weight: .semibold))
         .padding(.horizontal, 9)
         .frame(minHeight: Font.scaledSize(24))
@@ -191,9 +193,12 @@ struct BodyView: View {
         return true
     }
 
+    /// Two tiles a row, or one at accessibility text sizes so titles
+    /// aren't cut to "Rest…".
     private var tileRows: [[Tile]] {
         let list = tiles
-        return stride(from: 0, to: list.count, by: 2).map { Array(list[$0..<min($0 + 2, list.count)]) }
+        let perRow = typeSize.isAccessibilitySize ? 1 : 2
+        return stride(from: 0, to: list.count, by: perRow).map { Array(list[$0..<min($0 + perRow, list.count)]) }
     }
 
     private var tileGrid: some View {
@@ -204,7 +209,7 @@ struct BodyView: View {
                         tileLink(row[0])
                         tileLink(row[1])
                     } else if let only = row.first {
-                        tileLink(only).gridCellColumns(2)
+                        tileLink(only).gridCellColumns(typeSize.isAccessibilitySize ? 1 : 2)
                     }
                 }
             }
@@ -544,10 +549,7 @@ private struct BodyTrendCard: View {
                 ExplainedTitle(text: "Last 14 nights", topic: topic, size: 17)
                 Spacer()
             }
-            Picker("Measure", selection: $metric) {
-                ForEach(Metric.allCases, id: \.self) { m in Text(m.rawValue).tag(m) }
-            }
-            .pickerStyle(.segmented)
+            AdaptiveSegmentedPicker("Measure", selection: $metric, options: Array(Metric.allCases)) { m in m.rawValue }
             if let p = shown {
                 ChartReadout(title: selected == nil ? "Last night \u{00B7} \(p.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))"
                                                     : p.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
@@ -575,7 +577,7 @@ private struct BodyTrendCard: View {
                 .foregroundStyle(Palette(scheme: scheme).tertiary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 .annotation(position: .top, alignment: .leading) {
-                    Text(metric == .sleep ? "Your need" : "Your usual").font(.scaled(size: 10, weight: .semibold)).secondaryText()
+                    Text(metric == .sleep ? "Your need" : "Your usual").font(.chartLabel(size: 10, weight: .semibold)).secondaryText()
                 }
             ForEach(points) { p in
                 LineMark(x: .value("Night", p.date), y: .value(metric.rawValue, p.value))
@@ -682,7 +684,9 @@ private struct BodyTile: View {
                     .font(.scaled(size: 13, weight: .semibold))
                     .foregroundStyle(accent.ink(scheme))
                     .accessibilityHidden(true)
-                Text(title).font(.scaled(size: 14, weight: .bold)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(title).font(.scaled(size: 14, weight: .bold))
+                    .lineLimit(2).minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 30)
             }
             .frame(minHeight: 20)

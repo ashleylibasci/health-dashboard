@@ -509,7 +509,7 @@ private struct WakeByClockChart: View {
                     .symbolSize(d.label == selectedLabel ? 140 : 60)
                     .annotation(position: .bottom, spacing: 4) {
                         Text(Clock.format(d.wake, suffix: false))
-                            .font(.scaled(size: 11, weight: .semibold))
+                            .font(.chartLabel(size: 11, weight: .semibold))
                             .foregroundStyle(Palette(scheme: scheme).secondary)
                     }
             }
@@ -524,7 +524,7 @@ private struct WakeByClockChart: View {
         .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks { _ in
-                AxisValueLabel().font(.scaled(size: 11))
+                AxisValueLabel().font(.chartLabel(size: 11))
             }
         }
         .chartScrub($selection)

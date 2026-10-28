@@ -108,7 +108,9 @@ struct ConditionsView: View {
                     .background(Accent.indigo.fill(scheme).opacity(0.24), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
+                    // Wraps the tag under the name instead of breaking
+                    // "Endometriosis" into letters at large sizes.
+                    FlowLayout(spacing: 8, lineSpacing: 4) {
                         Text(item.name).font(.scaled(size: 16, weight: .bold))
                         Text("Added")
                             .font(.scaled(size: 11, weight: .bold))
