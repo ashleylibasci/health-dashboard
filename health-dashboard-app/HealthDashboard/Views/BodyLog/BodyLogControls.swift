@@ -427,24 +427,30 @@ struct SleepScheduleControl: View {
 
     private var note: String {
         if bedAfterWake {
-            return "Your bedtime comes after your up-by time. A bedtime from noon on counts as the evening before, and before noon as after midnight, so check both times."
+            return "Your bedtime comes after your latest wake-up. A bedtime from noon on counts as the evening before, and before noon as after midnight, so check both times."
         }
         let need = model.sleepNeed.minutes
-        let base = "That\u{2019}s \(Clock.duration(inBed)) in bed, from bedtime to up-by."
         if inBed > 14 * 60 {
-            return base + " That\u{2019}s a lot. Check that bedtime and up-by are both right."
+            return "That\u{2019}s \(Clock.duration(inBed)) in bed. That\u{2019}s a lot. Check that both times are right."
         }
-        // Time asleep, not time in bed, against the need, as Today counts it
-        // (round 3: Settings said "enough" while Today said 45 min short).
+        // Time asleep (in bed minus the time it takes to drift off), against
+        // the need, as Today counts it. Exact, with no slack: "enough" next
+        // to a need 7 min higher read as a contradiction (Dubois 2).
         let asleep = max(inBed - AppModel.planLatency, 0)
-        let tonight = model.tonightPlan.need
-        let debtNote = tonight > need + 10
-            ? " Tonight you need \(Clock.duration(tonight)), to pay back some sleep debt; Today shows when to go to bed for it."
-            : ""
-        if asleep + 10 < need {
-            return base + " About \(Clock.duration(asleep)) of sleep once you drift off, less than your usual need of about \(Clock.duration(need)), so you\u{2019}d build sleep debt." + debtNote
+        let gap = need - asleep
+        let compared: String
+        if gap > 0 {
+            compared = "\(Clock.duration(gap)) under your usual need of \(Clock.duration(need))."
+        } else if gap < 0 {
+            compared = "\(Clock.duration(-gap)) over your usual need of \(Clock.duration(need))."
+        } else {
+            compared = "right at your usual need of \(Clock.duration(need))."
         }
-        return base + " About \(Clock.duration(asleep)) of sleep once you drift off, enough for your usual need of about \(Clock.duration(need))." + debtNote
+        let tonight = model.tonightPlan.need
+        let tonightNote = tonight > need + 5
+            ? " Tonight you need \(Clock.duration(tonight)); Today shows when to go to bed."
+            : ""
+        return "That\u{2019}s \(Clock.duration(inBed)) in bed, about \(Clock.duration(asleep)) asleep: " + compared + tonightNote
     }
 
     var body: some View {
@@ -452,7 +458,7 @@ struct SleepScheduleControl: View {
         VStack(alignment: .leading, spacing: 8) {
             row(title: "Bedtime", detail: "When you plan to be in bed", selection: bedtimeBinding)
             Divider().overlay(p.cardBorder)
-            row(title: "Up by", detail: "The latest you can get up. The smart alarm never goes later.", selection: upByBinding)
+            row(title: "Latest wake-up", detail: "The latest you can get up. The smart alarm never goes later.", selection: upByBinding)
             if bedAfterWake {
                 Label(note, systemImage: "exclamationmark.triangle.fill")
                     .font(.scaled(size: 13, weight: .semibold))

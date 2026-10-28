@@ -85,9 +85,9 @@ extension AppModel {
         caffeineCutoffShown.map { Clock.format($0) } ?? "one small drink early"
     }
 
-    /// The short version for tight spots ("4:30pm", "None today").
+    /// The short version for tight spots ("4:30pm", "before you're up").
     var caffeineCutoffShort: String {
-        caffeineCutoffShown.map { BodyLogStyle.shortTime($0) } ?? "none today"
+        caffeineCutoffShown.map { BodyLogStyle.shortTime($0) } ?? "before you\u{2019}re up"
     }
 
     /// The one coffee every caffeine line compares with: the 12 oz drip
@@ -118,8 +118,8 @@ extension AppModel {
         let coffee = Self.referenceCoffee
         let left = caffeineLeftAtBedtime(mg: coffee.caffeineMg, at: caffeineWakeTime)
         let advice = largest >= 5
-            ? "So there\u{2019}s no cutoff time today. Best: one small drink soon after you wake, up to about \(largest) mg."
-            : "So there\u{2019}s no cutoff time today. Best: skip caffeine, or keep it very small and early."
+            ? "So no time today works for a full coffee. Best: one small drink soon after you wake, up to about \(largest) mg."
+            : "So no time today works for a full coffee. Best: skip caffeine, or keep it very small and early."
         return "\(cause) Even \(Self.referenceCoffeePhrase) right when you wake would still be about \(left) mg at bedtime. \(advice)"
     }
 

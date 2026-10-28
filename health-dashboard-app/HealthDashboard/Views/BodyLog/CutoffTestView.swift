@@ -13,13 +13,13 @@ struct CutoffTestView: View {
     private var test: CaffeineCutoffTest { model.cutoffTest }
 
     var body: some View {
-        Screen(title: "Cutoff test", accent: .mint) {
+        Screen(title: "Caffeine limit", accent: .yellow) {
             SampleDataBanner()
             header
             progressCard
             resultCard
             howCard
-            HowWeGotThisLink(title: "Caffeine cutoff test",
+            HowWeGotThisLink(title: "Find your caffeine limit",
                              method: "From the day you first logged caffeine, we take each night's last caffeinated drink (from 4am the day before until you fell asleep) and how long you slept (from your Apple Watch). Nights go into groups: no caffeine, last caffeine before 12pm, 12 to 3pm, and after 3pm (drinks after midnight count as late). Each bar is the average sleep in that group. We compare the earliest and latest caffeine groups once each has at least \(HabitEffect.minimumNights) nights, and a difference has to be big enough to stand out from ordinary night-to-night swings: about 45 minutes with 5 nights in each group, shrinking to about 20 minutes with 30 or more.")
         }
     }
@@ -29,7 +29,7 @@ struct CutoffTestView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 0) {
-                Text("Caffeine cutoff test").font(.scaled(size: 28, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Find your caffeine limit").font(.detailTitle).accessibilityAddTraits(.isHeader)
                 InfoButton(topic: .cutoffTest)
             }
             Text("Does a later coffee cost you sleep? Your own nights answer it.")

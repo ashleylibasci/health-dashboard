@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Drinks and your body: log alcohol, see what your own nights show the
+/// Alcohol and your sleep: log alcohol, see what your own nights show the
 /// morning after, and edit what you've logged. No judgment.
 struct DrinksView: View {
     @EnvironmentObject var model: AppModel
@@ -14,7 +14,7 @@ struct DrinksView: View {
     @State private var time: LogTime = .now
     @State private var editing: AppData.AlcoholEntry?
     @State private var selected: Int?
-    @State private var lastLogged: String?
+    @State private var toast: UndoToast?
     @State private var logCount = 0
     /// When the Log button last fired, so a double tap doesn't log twice.
     @State private var lastLogTap: Date?
@@ -45,7 +45,7 @@ struct DrinksView: View {
     }
 
     var body: some View {
-        Screen(title: "Drinks", accent: .purple) {
+        Screen(title: "Alcohol", accent: .purple) {
             SampleDataBanner()
             header
             logCard
@@ -53,7 +53,7 @@ struct DrinksView: View {
             nightsCard
             recentCard
             tipsCard
-            HowWeGotThisLink(title: "Drinks and your body",
+            HowWeGotThisLink(title: "Alcohol and your sleep",
                              method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. It doesn\u{2019}t separate amounts: a night after one glass counts the same as a night after several. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
         }
         .sheet(item: $editing) { entry in
@@ -61,7 +61,8 @@ struct DrinksView: View {
                 .environmentObject(model)
                 .environmentObject(store)
         }
-        .sensoryFeedback(.success, trigger: logCount)
+        .undoToast($toast)
+        .sensoryFeedback(.increase, trigger: logCount)
     }
 
     // MARK: Header
@@ -69,7 +70,7 @@ struct DrinksView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 0) {
-                Text("Drinks and your body").font(.scaled(size: 28, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Alcohol and your sleep").font(.detailTitle).accessibilityAddTraits(.isHeader)
                 InfoButton(topic: .alcohol)
             }
             Text("No judgment, just what your own data shows the morning after.")
@@ -84,9 +85,13 @@ struct DrinksView: View {
     private func logDrinks() {
         if let last = lastLogTap, Date.now.timeIntervalSince(last) < 1.5 { return }
         lastLogTap = .now
+        let chosen = time
         let date = min(time.date, .now)
-        store.data.alcoholLog.append(AppData.AlcoholEntry(date: date, kind: kind, count: count))
-        lastLogged = LogFormat.loggedLine(Self.phrase(count: count, kind: kind), at: date)
+        let entry = AppData.AlcoholEntry(date: date, kind: kind, count: count)
+        withMotion(.log) { store.data.alcoholLog.append(entry) }
+        toast = UndoToast(LogFormat.loggedLine(Self.phrase(count: count, kind: kind), time: chosen, at: date)) {
+            withMotion(.undo) { store.data.alcoholLog.removeAll { $0.id == entry.id } }
+        }
         time = .now
         count = 1
         logCount += 1
@@ -94,7 +99,7 @@ struct DrinksView: View {
 
     private var logCard: some View {
         Card(accent: .purple) {
-            Text("Log drinks").font(.scaled(size: 17, weight: .bold))
+            Text("Log alcohol").font(.cardTitle)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Self.kinds, id: \.self) { k in
@@ -115,11 +120,6 @@ struct DrinksView: View {
                 .fixedSize(horizontal: false, vertical: true)
             LogTimeSelector(time: $time, accent: .purple, title: "When?")
             PrimaryButton(title: "Log \(Self.phrase(count: count, kind: kind))", accent: .purple, action: logDrinks)
-            if let lastLogged {
-                Label(lastLogged, systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.mint.ink(scheme))
-            }
             AlcoholSafetyNote()
         }
     }
@@ -130,7 +130,7 @@ struct DrinksView: View {
     private func kindChip(_ k: String) -> some View {
         let p = Palette(scheme: scheme)
         let on = kind == k
-        return Button { kind = k } label: {
+        return Button { withMotion(.select) { kind = k } } label: {
             Label(k, systemImage: Self.symbol(for: k))
                 .font(.scaled(size: 14, weight: .bold))
                 .padding(.horizontal, 14)
@@ -139,7 +139,8 @@ struct DrinksView: View {
                 .background(on ? Accent.purple.fill(scheme) : p.chip, in: Capsule())
                 .overlay(Capsule().strokeBorder(on ? Accent.purple.fill(scheme) : p.cardBorder))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
+        .sensoryFeedback(.selection, trigger: on) { _, isOn in isOn }
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
@@ -159,7 +160,7 @@ struct DrinksView: View {
 
     private var effect: HabitEffect { model.alcoholEffect }
 
-    /// "After drinks you sleep 25 min less, your HRV is 12% lower and you feel worse the next morning."
+    /// "After alcohol you sleep 25 min less, your HRV is 12% lower and you feel worse the next morning."
     private var effectSentence: String {
         let e = effect
         var parts: [String] = []
@@ -182,13 +183,13 @@ struct DrinksView: View {
         } else {
             joined = parts.first ?? ""
         }
-        return "After drinks \(joined)."
+        return "After alcohol \(joined)."
     }
 
     private var effectCard: some View {
         Card {
             HStack {
-                Text("After drinks").font(.scaled(size: 17, weight: .bold))
+                Text("After alcohol").font(.cardTitle)
                 if model.usingSampleData { ExampleTag() }
                 Spacer()
                 Text("\(effect.withCount) night\(effect.withCount == 1 ? "" : "s")")
@@ -203,7 +204,7 @@ struct DrinksView: View {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     EffectTile(title: "Sleep", value: signed(effect.asleepDelta, unit: " min"),
                                good: abs(effect.asleepDelta) < 10 ? nil : effect.asleepDelta > 0,
-                               explanation: Explanation(id: "drinkSleep", title: "Sleep after drinks",
+                               explanation: Explanation(id: "drinkSleep", title: "Sleep after alcohol",
                                                         meaning: "How much longer or shorter you slept after drinks than on your other nights.",
                                                         forYou: "Alcohol often helps you fall asleep, then wakes you more in the second half of the night."))
                     if let h = effect.hrvDeltaPct {
@@ -289,7 +290,7 @@ struct DrinksView: View {
                 .accessibilityLabel("Hours asleep over the last \(points.count) nights. \(points.filter(\.afterDrinks).count) followed drinks.")
             ScrubHint()
             HStack(spacing: 14) {
-                legend("After drinks", color: Self.drinkBar(scheme))
+                legend("After alcohol", color: Self.drinkBar(scheme))
                 legend("Other nights", color: Palette(scheme: scheme).tertiary)
             }
             .accessibilityHidden(true)
@@ -316,7 +317,7 @@ struct DrinksView: View {
     private var recentCard: some View {
         Card {
             HStack {
-                Text("Logged drinks").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Logged alcohol").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("Last 2 weeks").font(.scaled(size: 13, weight: .semibold)).secondaryText()
             }
@@ -508,7 +509,7 @@ private struct AlcoholEntryEditor: View {
     }
 
     var body: some View {
-        LogEditSheet(title: "Edit drinks", accent: .purple, date: entry.date, amount: Double(entry.count),
+        LogEditSheet(title: "Edit alcohol", accent: .purple, date: entry.date, amount: Double(entry.count),
                      unit: "drink", pluralUnit: "drinks", step: 1, range: 1...15, showsDate: true,
                      onSave: { date, n in save(date: date, count: Int(n.rounded())) },
                      onDelete: { store.data.alcoholLog.removeAll { $0.id == entry.id } }) {

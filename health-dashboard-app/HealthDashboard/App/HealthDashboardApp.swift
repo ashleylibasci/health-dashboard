@@ -36,8 +36,10 @@ struct HealthDashboardApp: App {
             Group {
                 if store.data.onboarded {
                     RootTabView()
+                        .motionTransition(.commit)
                 } else {
                     OnboardingFlow()
+                        .motionTransition(.commit)
                 }
             }
             .environmentObject(store)

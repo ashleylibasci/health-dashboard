@@ -16,7 +16,8 @@ struct WaterView: View {
     @State private var customBottle = ""
     @State private var editing: AppData.WaterEntry?
     @State private var selected: Int?
-    @State private var lastLogged: String?
+    @State private var toast: UndoToast?
+    @State private var goalCount = 0
     /// Why a typed amount wasn't used (out of range), instead of a silent change.
     @State private var amountNote: String?
     @State private var bottleNote: String?
@@ -40,7 +41,9 @@ struct WaterView: View {
         .sheet(item: $editing) { entry in
             editor(entry)
         }
-        .sensoryFeedback(.success, trigger: logCount)
+        .undoToast($toast)
+        .sensoryFeedback(.increase, trigger: logCount)
+        .sensoryFeedback(.success, trigger: goalCount)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -126,11 +129,20 @@ struct WaterView: View {
     // MARK: Add
 
     private func add(ml: Double, label: String) {
-        model.addWater(ml: ml, at: time.date)
-        let when = store.data.waterLog.last?.date ?? .now
-        lastLogged = LogFormat.loggedLine(label, at: when).replacingOccurrences(of: "Logged ", with: "Added ")
+        let chosen = time
+        let id = UUID()
+        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        withMotion(.log) { model.addWater(ml: ml, at: chosen.date, id: id) }
+        let when = store.data.waterLog.first { $0.id == id }?.date ?? .now
+        var message = LogFormat.loggedLine(label, time: chosen, at: when).replacingOccurrences(of: "Logged ", with: "Added ")
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+            message += " That\u{2019}s today\u{2019}s goal."
+            goalCount += 1
+        } else {
+            logCount += 1
+        }
+        toast = UndoToast(message) { withMotion(.undo) { model.deleteWater(id) } }
         time = .now
-        logCount += 1
     }
 
     private var addCard: some View {
@@ -183,12 +195,6 @@ struct WaterView: View {
               }
             }
             if let amountNote { rangeNote(amountNote) }
-            if let lastLogged {
-                Label(lastLogged, systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.mint.ink(scheme))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 
@@ -210,7 +216,7 @@ struct WaterView: View {
             .background(Accent.blue.fill(scheme).opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Accent.blue.fill(scheme).opacity(0.35)))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
         .accessibilityLabel("Add \(title), \(detail), \(time.phrase)")
     }
 

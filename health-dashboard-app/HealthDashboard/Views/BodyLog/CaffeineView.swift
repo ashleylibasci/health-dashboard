@@ -12,7 +12,7 @@ struct CaffeineView: View {
 
     @State private var timingDay: TimingDay = .today
     @State private var logTime: LogTime = .now
-    @State private var lastLogged: String?
+    @State private var toast: UndoToast?
     @State private var editing: AppData.LoggedDrink?
     @State private var selectedTime: Int?
     @State private var selectedTiming: Int?
@@ -45,7 +45,7 @@ struct CaffeineView: View {
             falloffCard
             timingCard
             Card {
-                LinkRow(title: "Caffeine cutoff test", subtitle: cutoffSubtitle,
+                LinkRow(title: "Find your caffeine limit", subtitle: cutoffSubtitle,
                         systemImage: "flask.fill", accent: .mint) {
                     CutoffTestView()
                 }
@@ -59,18 +59,25 @@ struct CaffeineView: View {
         .sheet(item: $editing) { entry in
             editor(entry)
         }
-        .sensoryFeedback(.success, trigger: logCount)
+        .undoToast($toast)
+        .sensoryFeedback(.increase, trigger: logCount)
     }
 
     private var cutoffSubtitle: String {
         let test = model.cutoffTest
-        return "Find your own cutoff \u{00B7} \(min(test.nightsLogged, test.target)) of \(test.target) nights"
+        return "How late caffeine works for your sleep \u{00B7} \(min(test.nightsLogged, test.target)) of \(test.target) nights"
     }
 
     private func log(_ drink: Drink) {
-        model.log(drink, at: logTime.date)
-        let when = store.data.drinkLog.last?.date ?? .now
-        lastLogged = LogFormat.loggedLine(drink.name, at: when) + (AppDay.contains(when) ? " Tap it below to change." : "")
+        let chosen = logTime
+        let id = UUID()
+        withMotion(.log) {
+            model.logDrink(id: id, drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: chosen.date, saveToHealth: true)
+        }
+        let when = store.data.drinkLog.first { $0.id == id }?.date ?? .now
+        toast = UndoToast(LogFormat.loggedLine(LogFormat.midSentence(drink), time: chosen, at: when)) {
+            withMotion(.undo) { model.deleteDrink(id) }
+        }
         logTime = .now
         logCount += 1
     }
@@ -93,7 +100,7 @@ struct CaffeineView: View {
                         heroStat(label: "No caffeine yet", value: "\u{2014}", accent: .yellow)
                     }
                     HStack(alignment: .bottom, spacing: 0) {
-                        heroStat(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "None today", accent: .orange)
+                        heroStat(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "Before you\u{2019}re up", accent: .orange)
                         InfoButton(topic: .caffeineCutoff).padding(.bottom, -10)
                     }
                     HStack(spacing: 0) {
@@ -160,7 +167,7 @@ struct CaffeineView: View {
                 Button { log(drink) } label: {
                     SavedDrinkRow(drink: drink, featured: index == 0)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressable)
                 .accessibilityLabel(logLabel(for: drink))
                 .contextMenu {
                     Button(role: .destructive) {
@@ -185,13 +192,7 @@ struct CaffeineView: View {
                     .strokeBorder(Accent.yellow.fill(scheme).opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            if let lastLogged {
-                Label(lastLogged, systemImage: "checkmark.circle.fill")
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(Accent.mint.ink(scheme))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .buttonStyle(.pressable)
         }
     }
 
@@ -204,18 +205,21 @@ struct CaffeineView: View {
         let when = logTime == .now ? "now" : logTime.phrase
         let bed = Clock.format(model.bedtimeTonight)
         let left = model.caffeineAtBedtime(adding: drink.caffeineMg, at: t)
-        // The total at bedtime, with today's other drinks: say so, or "your
-        // 130 mg latte would be 140 mg at bedtime" reads as wrong (round 3).
-        let withOthers = model.caffeineDoses.isEmpty ? "" : ", with what you\u{2019}ve already had"
+        // "A latte now", lower case mid-sentence; her own drinks as she named them.
+        let name = LogFormat.midSentence(drink)
+        let a = drink.isCustom ? "Your" : ("aeiou".contains(name.prefix(1)) ? "An" : "A")
+        // The total at bedtime, with today's other drinks: say so, or "a
+        // 130 mg latte would leave 140 mg" reads as wrong (round 3).
+        let withOthers = model.caffeineDoses.isEmpty ? "" : ", counting what you\u{2019}ve had"
         if !tooMuch {
-            text = "Your \(drink.name) (\(drink.caffeineMg) mg) \(when) is fine: under 25 mg would be left by your \(bed) bedtime."
+            text = "\(a) \(name) (\(drink.caffeineMg) mg) \(when) is fine: under 25 mg left by your \(bed) bedtime."
         } else if let latest = model.latestTimeForCaffeine(mg: drink.caffeineMg), latest > t {
-            text = "Your \(drink.name) \(when) would leave about \(left) mg in you at bedtime\(withOthers). Have it by \(Clock.format(latest)) instead."
+            text = "\(a) \(name) \(when) would leave about \(left) mg at bedtime\(withOthers). Have it by \(Clock.format(latest)) instead."
         } else {
             let room = CaffeineModel.largestDose(at: max(t, model.now), bedtime: model.bedtimeTonight, existing: model.caffeineDoses,
                                                  halfLifeHours: model.caffeineHalfLifeHours)
             let smaller = room >= 5 ? " A smaller drink still fits: up to about \(room) mg now." : ""
-            text = "Your \(drink.name) \(when) would leave about \(left) mg in you at bedtime\(withOthers), so skip more caffeine today." + smaller
+            text = "\(a) \(name) \(when) would leave about \(left) mg at bedtime\(withOthers). Skip more caffeine today." + smaller
                 + (model.caffeineLastsLonger ? " On your birth control caffeine stays \(model.caffeineLongerPhrase)." : "")
         }
         return Label(text, systemImage: tooMuch ? "exclamationmark.triangle.fill" : "checkmark.circle")
@@ -397,7 +401,7 @@ struct CaffeineView: View {
                             .font(.scaled(size: 13)).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("Cutoff \u{00B7} one small drink early").font(.scaled(size: 15, weight: .bold))
+                        Text("Cutoff \u{00B7} before you\u{2019}re up").font(.scaled(size: 15, weight: .bold))
                         Text(model.caffeineEarlyOnlyText)
                             .font(.scaled(size: 13)).secondaryText()
                             .fixedSize(horizontal: false, vertical: true)
@@ -423,7 +427,7 @@ struct CaffeineView: View {
     private var chartSummary: String {
         let peak = curve.max { $0.mg < $1.mg }
         let peakText = peak.map { "peaks near \(Int($0.mg.rounded())) mg at \(Clock.format($0.time))" } ?? "stays at zero"
-        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "No cutoff time: one small drink early."
+        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "Cutoff before you\u{2019}re up: no time today works for a full coffee."
         return "Caffeine in your body today \(peakText) and falls to about \(model.caffeineAtBedtime) mg by your \(Clock.format(bedtime)) bedtime. \(cutoffText) Goal under \(bedtimeGoal) mg."
     }
 
@@ -482,7 +486,7 @@ struct CaffeineView: View {
     private var timingReadout: (title: String, value: String, detail: String) {
         guard let raw = selectedTiming else {
             if noWindow {
-                return (label(timingDay), "No cutoff time today", "At no time today would a 12 oz drip coffee (140 mg) be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
+                return (label(timingDay), "No time works for a full coffee", "At no time today would a 12 oz drip coffee (140 mg) be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
             }
             return (label(timingDay), "Best window \(timing.bestWindow.label)",
                     "Caffeine works best once grogginess clears and before your \(Clock.format(timing.cutoff)) cutoff.")
@@ -525,11 +529,13 @@ struct CaffeineView: View {
             let r = timingReadout
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .mint)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .motion(.dataSwap, value: timingDay)
             EnergyTimingChart(span: span, groggy: timingEnergy.zone(.grogginess)?.range, window: noWindow ? nil : timing.bestWindow,
                               dip: timingEnergy.zone(.afternoonDip)?.range, cutoff: noWindow ? nil : timing.cutoff, marker: timingMarker,
                               selected: selectedTiming.map { min(max($0, span.lowerBound), span.upperBound) },
                               selection: $selectedTiming)
                 .frame(height: 74)
+                .motion(.dataSwap, value: timingDay)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timingSummary)
             ScrubHint()

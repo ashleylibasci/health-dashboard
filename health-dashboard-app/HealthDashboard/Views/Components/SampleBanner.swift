@@ -66,19 +66,23 @@ struct SampleDataBanner: View {
     }
 
     var body: some View {
-        if model.usingSampleData {
-            Group {
-                if showsFullBanner {
-                    fullBanner
-                        .onAppear { if firstSeen == 0 { firstSeen = Date.now.timeIntervalSince1970 } }
-                } else if prominent {
-                    compactBanner
-                } else {
-                    capsule
+        // Fades out (and the page closes up) when her own numbers take over.
+        Group {
+            if model.usingSampleData {
+                Group {
+                    if showsFullBanner {
+                        fullBanner
+                            .onAppear { if firstSeen == 0 { firstSeen = Date.now.timeIntervalSince1970 } }
+                    } else if prominent {
+                        compactBanner
+                    } else {
+                        capsule
+                    }
                 }
+                .motionTransition(.commit, edge: .top)
             }
-            .motionTransition(.commit, edge: .top)
         }
+        .motion(.commit, value: model.usingSampleData)
     }
 
     /// The full banner: icon, title, why, and the access note.

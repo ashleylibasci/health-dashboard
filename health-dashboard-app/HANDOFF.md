@@ -25,7 +25,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
   - `Services/` has the clock-change bedtime reminders, the peak/dip and sick notifications, and the features ported from the old app:
     - `BackgroundHealth.swift`: Apple Health wakes the app when sleep, caffeine, water, periods, resting HR, HRV or wrist temperature change; the app refreshes and updates the Watch. Off on example data and in demo mode.
     - `PhoneBackupAlarm.swift`: an AlarmKit iPhone alarm at the smart alarm's latest time, cancelled when she stops the Watch alarm (iOS 26.1+; the setting says so on older iOS).
-    - `CalendarImport.swift`: exams from Apple Calendar (EventKit), Google Calendar (OAuth with PKCE, refresh token in the Keychain) or a secret iCal link (`ICSFeed`, address in the Keychain). Imported exams are keyed by `AppData.Exam.source`, so re-imports never duplicate and never touch exams she added or edited. The card is in the exam list, Settings → Exams and onboarding's last step.
+    - `CalendarImport.swift`: exams from Apple Calendar (EventKit), Google Calendar (OAuth with PKCE, refresh token in the Keychain) or a secret iCal link (`ICSFeed`, address in the Keychain). Imported exams are keyed by `AppData.Exam.source`, so re-imports never duplicate and never touch exams she added or edited. The card is in the exam list and Settings → Exams.
     - `Shortcuts.swift`: Siri / Shortcuts / Spotlight "Log a latte" (`Shared/LogLatteIntent.swift`).
 - `HealthDashboardWidgets/`: Home Screen and Lock Screen widgets (Recovery, Cycle, Caffeine & water with a "log a latte" button, Bedtime streak). They read `WidgetSnapshot` from the App Group.
 - `HealthDashboardWatchWidgets/`: Watch-face complications (Recovery, Cycle, Caffeine, Bedtime).

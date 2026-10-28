@@ -12,9 +12,16 @@ struct CheckInView: View {
     @State private var tags: Set<String> = []
     @State private var loaded = false
     @State private var selectedDay: Date? = nil
+    @State private var selectCount = 0
+    @State private var savedCount = 0
+
+    /// The question, in the past tense after noon (Dubois 24).
+    static var prompt: String {
+        Calendar.current.component(.hour, from: .now) >= 12 ? "How awake were you this morning?" : "How awake do you feel?"
+    }
 
     private let names = ["Like a zombie", "Groggy", "Okay", "Good", "Wide awake"]
-    private let tagOptions = ["Woke up in the night", "Vivid dreams", "Too warm", "Late screen time", "Drinks", "Cramps"]
+    private let tagOptions = ["Woke up in the night", "Vivid dreams", "Too warm", "Late screen time", "Alcohol", "Cramps"]
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -43,6 +50,8 @@ struct CheckInView: View {
             }
         }
         .onAppear(perform: loadExisting)
+        .sensoryFeedback(.selection, trigger: selectCount)
+        .sensoryFeedback(.success, trigger: savedCount)
     }
 
     @ViewBuilder
@@ -55,8 +64,8 @@ struct CheckInView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         HStack(spacing: 0) {
-            Text("How awake do you feel?")
-                .font(.scaled(size: 22, weight: .bold))
+            Text(Self.prompt)
+                .font(.heading)
                 .accessibilityAddTraits(.isHeader)
             InfoButton(title: "Morning check-in",
                        meaning: "A quick rating of how awake you feel, from 1 (like a zombie) to 5 (wide awake), plus anything unusual about last night.",
@@ -76,6 +85,13 @@ struct CheckInView: View {
         .font(.scaled(size: 12, weight: .semibold))
         .foregroundStyle(p.secondary)
         .accessibilityHidden(true)
+        if level > 0 {
+            Label("Saved for today. Tap another number to change it.", systemImage: "checkmark.circle.fill")
+                .font(.scaled(size: 13, weight: .semibold))
+                .foregroundStyle(Accent.mint.ink(scheme))
+                .fixedSize(horizontal: false, vertical: true)
+                .motionTransition(.reveal, edge: .top)
+        }
         Text("Anything last night?")
             .font(.scaled(size: 17, weight: .bold))
             .padding(.top, 4)
@@ -195,12 +211,14 @@ struct CheckInView: View {
         loaded = true
         if let existing = store.checkIn(on: .now) {
             level = existing.awake
-            tags = Set(existing.tags)
+            // "Drinks" was the alcohol tag's old name.
+            tags = Set(existing.tags.map { $0 == "Drinks" ? "Alcohol" : $0 })
         }
     }
 
     private func save() {
         guard level > 0 else { return }
+        if store.checkIn(on: .now) == nil { savedCount += 1 } else { selectCount += 1 }
         model.saveCheckIn(awake: level, tags: tagOptions.filter { tags.contains($0) })
     }
 
@@ -210,7 +228,7 @@ struct CheckInView: View {
         let p = Palette(scheme: scheme)
         let on = n == level
         return Button {
-            level = n
+            withMotion(.select) { level = n }
             save()
         } label: {
             Text("\(n)")
@@ -224,7 +242,7 @@ struct CheckInView: View {
                     .strokeBorder(on ? Accent.orange.fill(scheme) : p.cardBorder))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
         .accessibilityLabel("\(n), \(names[n - 1])")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
@@ -234,7 +252,7 @@ struct CheckInView: View {
         let on = tags.contains(tag)
         return Button {
             if on { tags.remove(tag) } else { tags.insert(tag) }
-            save()
+            if level > 0 { save() } else { selectCount += 1 }
         } label: {
             Text(tag)
                 .font(.scaled(size: 14, weight: .semibold))
@@ -250,7 +268,7 @@ struct CheckInView: View {
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(on ? Accent.orange.fill(scheme) : p.cardBorder))
                 .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
