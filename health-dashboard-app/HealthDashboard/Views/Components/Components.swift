@@ -287,6 +287,9 @@ struct LinkRow<Destination: View>: View {
                     .foregroundStyle(accent.ink(scheme))
                     .frame(width: Sizes.icon, height: Sizes.icon)
                     .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                    // Decorative: VoiceOver read "Question Mark In A Filled
+                    // Speech Bubble" before the title (F12).
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(title).font(.bodyEmphasis)
                     if let subtitle { Text(subtitle).font(.secondary).foregroundStyle(Palette(scheme: scheme).secondary) }
@@ -295,6 +298,7 @@ struct LinkRow<Destination: View>: View {
                 Image(systemName: "chevron.right")
                     .font(.scaled(size: 13, weight: .semibold))
                     .foregroundStyle(Palette(scheme: scheme).tertiary)
+                    .accessibilityHidden(true)
             }
             .frame(minHeight: Sizes.minTap)
             .contentShape(Rectangle())
