@@ -59,6 +59,10 @@ struct AppData: Codable {
         var date: Date
         /// Start time, minutes after midnight on `date`.
         var start: Minutes
+        /// Imported from a calendar: "apple:<event id>" or "google:<event id>".
+        /// "edited:" in front once she changed it here, so imports leave it be.
+        /// nil for exams she added.
+        var source: String? = nil
     }
     /// A wake window she chose for one particular morning (exam mode), kept
     /// until that morning has passed so later pushes don't overwrite it.

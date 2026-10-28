@@ -100,6 +100,7 @@ struct ExamListView: View {
                 }
             }
             PrimaryButton(title: "Add an exam", accent: .yellow) { editing = ExamDraft(nil) }
+            CalendarImportCard()
             if !past.isEmpty {
                 Button {
                     let today = AppDay.day()
@@ -220,6 +221,12 @@ private struct ExamEditorSheet: View {
                                 kind: draft.kind, date: cal.startOfDay(for: draft.date),
                                 start: Clock.minutesOfDay(draft.time))
         if let i = store.data.exams.firstIndex(where: { $0.id == draft.id }) {
+            var exam = exam
+            // An imported exam she changed is hers now: calendar imports
+            // won't overwrite it or add it again.
+            if let s = store.data.exams[i].source {
+                exam.source = s.hasPrefix("edited:") ? s : "edited:" + s
+            }
             store.data.exams[i] = exam
         } else {
             store.data.exams.append(exam)
@@ -279,5 +286,82 @@ struct ExamExampleTag: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(Accent.yellow.tint(scheme), in: Capsule())
+    }
+}
+
+/// "Find exams on your calendar": connect Apple or Google Calendar once, and
+/// exams on it (events with exam, midterm, final, quiz or test in the title)
+/// join the list and stay up to date.
+private struct CalendarImportCard: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject private var importer = CalendarImport.shared
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Card {
+            HStack(spacing: 0) {
+                Text("From your calendar").font(.scaled(size: 17, weight: .bold))
+                InfoButton(title: "Exams from your calendar",
+                           meaning: "The app looks for events with exam, midterm, final, quiz or test in the title, from today to four months ahead. Repeating events like classes are skipped, and so are events like \u{201C}midterm review\u{201D}.",
+                           forYou: "It only reads your calendar, never changes it, and your events stay on your phone. Exams you add or edit here are never overwritten.")
+                    .padding(.vertical, -12)
+            }
+            if let source = importer.source {
+                Text(status(source)).font(.scaled(size: 14)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 16) {
+                    Button(importer.working ? "Checking\u{2026}" : "Check now") {
+                        Task { await importer.check(model: model, force: true) }
+                    }
+                    .disabled(importer.working)
+                    Button("Stop", role: .destructive) { importer.disconnect() }
+                }
+                .font(.scaled(size: 15, weight: .semibold))
+                .tint(Accent.indigo.ink(scheme))
+                .frame(minHeight: 44)
+            } else {
+                Text("Connect a calendar and your exams show up here on their own.")
+                    .font(.scaled(size: 14)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { buttons }
+                    VStack(alignment: .leading, spacing: 10) { buttons }
+                }
+            }
+            if let error = importer.error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.scaled(size: 13))
+                    .foregroundStyle(Accent.coral.ink(scheme))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
+        connectButton(.apple, systemImage: "calendar")
+        connectButton(.google, systemImage: "globe")
+    }
+
+    private func connectButton(_ source: CalendarSource, systemImage: String) -> some View {
+        Button {
+            Task { await importer.connect(source, model: model) }
+        } label: {
+            Label(source.name, systemImage: systemImage)
+                .font(.scaled(size: 15, weight: .semibold))
+                .frame(minHeight: 44)
+                .padding(.horizontal, 12)
+                .background(Accent.indigo.tint(scheme), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Accent.indigo.ink(scheme))
+        .disabled(importer.working)
+    }
+
+    private func status(_ source: CalendarSource) -> String {
+        let imported = model.store.data.exams.filter { $0.source?.contains(source.rawValue + ":") == true }.count
+        let checked = importer.lastChecked.map { " Last checked \($0.formatted(date: .omitted, time: .shortened).lowercased())." } ?? ""
+        let found = imported == 1 ? "1 exam" : "\(imported) exams"
+        return "Reading \(source.name): \(found) from it.\(checked)"
     }
 }

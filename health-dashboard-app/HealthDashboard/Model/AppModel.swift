@@ -519,6 +519,7 @@ final class AppModel: ObservableObject {
     func becameActive() async {
         AppDay.rolloverMinutes = AppDay.rollover(forBedtime: store.data.bedtime)
         importPendingDrinks()
+        Task { await CalendarImport.shared.check(model: self) }
         guard store.data.onboarded else {
             pushToWatch()
             return
