@@ -213,6 +213,12 @@ struct EnergyView: View {
         ExpandRow(title: "Your day, zone by zone", summary: zonesSummary(e),
                   systemImage: "clock.fill", accent: .mint) { zoneRows(e, zone: zone) }
         if isToday {
+            // Does the score match how she felt? (H-E3)
+            RowDivider()
+            ExpandRow(title: "Does it match how you feel?", summary: model.scoreMatchSummary(model.energyMatch),
+                      systemImage: "person.fill.questionmark", accent: .mint) {
+                Text(model.scoreMatchDetail("energy score")).fixedSize(horizontal: false, vertical: true)
+            }
             RowDivider()
             MetricRow(title: "Make the most of today",
                       note: model.hidesEffortTargets ? "Daylight, best nap and sleep debt" : "Daylight, best nap, sleep debt and effort",

@@ -20,6 +20,12 @@ struct RecoveryView: View {
                 RowDivider()
                 HeartMetricRows()
                 RowDivider()
+                // Does the score match how she felt? (H-E3)
+                ExpandRow(title: "Does it match how you feel?", summary: model.scoreMatchSummary(model.recoveryMatch),
+                          systemImage: "person.fill.questionmark", accent: .indigo) {
+                    Text(model.scoreMatchDetail("recovery")).fixedSize(horizontal: false, vertical: true)
+                }
+                RowDivider()
                 MetricRow(title: "Getting accurate numbers", note: "A checklist of ways to help your Watch",
                           systemImage: "checklist", accent: .indigo) {
                     AccuracyTipsView()
