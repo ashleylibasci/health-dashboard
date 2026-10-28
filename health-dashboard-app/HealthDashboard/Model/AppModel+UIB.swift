@@ -85,9 +85,28 @@ extension AppModel {
         caffeineCutoffShown.map { Clock.format($0) } ?? "one small drink early"
     }
 
-    /// The short version for tight spots ("4:30pm", "Early only").
+    /// The short version for tight spots ("4:30pm", "None today").
     var caffeineCutoffShort: String {
-        caffeineCutoffShown.map { BodyLogStyle.shortTime($0) } ?? "early only"
+        caffeineCutoffShown.map { BodyLogStyle.shortTime($0) } ?? "none today"
+    }
+
+    /// The one coffee every caffeine line compares with: the 12 oz drip
+    /// coffee from the drink chips (140 mg), so the copy and the chip agree.
+    static var referenceCoffee: Drink {
+        Drink.common.first { $0.name == "Drip coffee" } ?? Drink(name: "Drip coffee", sizeLabel: "12 oz", caffeineMg: 140)
+    }
+
+    /// "a 12 oz drip coffee (140 mg)".
+    static var referenceCoffeePhrase: String {
+        let c = referenceCoffee
+        return "a \(c.sizeLabel.map { "\($0) " } ?? "")\(c.name.lowercased()) (\(c.caffeineMg) mg)"
+    }
+
+    /// Caffeine left at tonight's bedtime if she had `mg` at `t`, on top of
+    /// what she's already had today.
+    func caffeineAtBedtime(adding mg: Int, at t: Minutes) -> Int {
+        let doses = caffeineDoses + [CaffeineDose(time: t, mg: mg)]
+        return Int(CaffeineModel.amount(at: bedtimeTonight, doses: doses, halfLifeHours: caffeineHalfLifeHours).rounded())
     }
 
     /// The copy for when there's no safe clock time for a typical drink.
@@ -96,11 +115,12 @@ extension AppModel {
             ? "On your birth control, caffeine stays in your body about twice as long."
             : "With your bedtime, caffeine has little time to clear."
         let largest = caffeineLargestDoseAtWake
-        let left = caffeineLeftAtBedtime(mg: 95, at: caffeineWakeTime)
+        let coffee = Self.referenceCoffee
+        let left = caffeineLeftAtBedtime(mg: coffee.caffeineMg, at: caffeineWakeTime)
         let advice = largest >= 5
-            ? "Best: one small drink soon after you wake, up to about \(largest) mg."
-            : "Best: skip caffeine today, or keep it very small and early."
-        return "\(cause) Even a regular coffee (95 mg) right when you wake leaves about \(left) mg at bedtime. \(advice)"
+            ? "So there\u{2019}s no cutoff time today. Best: one small drink soon after you wake, up to about \(largest) mg."
+            : "So there\u{2019}s no cutoff time today. Best: skip caffeine, or keep it very small and early."
+        return "\(cause) Even \(Self.referenceCoffeePhrase) right when you wake would still be about \(left) mg at bedtime. \(advice)"
     }
 
     // MARK: Cycle copy

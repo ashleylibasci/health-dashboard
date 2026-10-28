@@ -235,7 +235,7 @@ struct ChronotypeView: View {
                               note: "Your energy lifts again here: a good time for a workout or group study.", topic: .secondWind)
             }
             ChronoInfoRow(systemImage: "moon.fill", accent: .purple, label: "Melatonin window", value: melatonin,
-                          note: "Your brain starts releasing its own sleep hormone. It's not about taking melatonin pills; it's the best time to be in bed.",
+                          note: "Your body's own sleep hormone has been rising for a while (it usually starts about 2 hours before you normally fall asleep). Not about melatonin pills. Falling asleep tends to come easiest now.",
                           topic: .melatonin)
             LinkRow(title: "See your energy peaks", systemImage: "chart.xyaxis.line", accent: .mint) { EnergyView() }
         }
@@ -289,8 +289,8 @@ struct ChronotypeView: View {
     private var timeChangeCard: some View {
         let date = model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         let subtitle = model.isEveningLeaning
-            ? "For an evening type, falling back is a free hour earlier. See the plan."
-            : "Falling back makes your early mornings come even earlier. See the plan."
+            ? "Good news for an evening type: for a few days after the clocks go back, an 8am start feels like 9am to your body. See the plan."
+            : "For a few days after the clocks go back, you'll wake an hour earlier by the clock (6am feels like 7am). See the plan."
         return Card(accent: .orange) {
             LinkRow(title: "Clocks go back \(date)", subtitle: subtitle,
                     systemImage: "clock.arrow.circlepath", accent: .orange) { TimeChangeView() }

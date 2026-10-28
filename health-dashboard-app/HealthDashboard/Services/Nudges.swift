@@ -91,7 +91,7 @@ enum Nudges {
             ? "Several of your overnight signals are off at once. Rest if you can, and see how you feel."
             : "A couple of your overnight signals are off. Worth an easier day."
         if cyclePhaseUnknown {
-            body += " Your cycle can raise these too, and the app can't tell which phase you're in."
+            body += " The app can't tell which phase of your cycle you're in, so part of this could be your cycle."
         }
         let content = UNMutableNotificationContent()
         content.title = confidence == .high ? "You might be getting sick" : "Your body may be fighting something"

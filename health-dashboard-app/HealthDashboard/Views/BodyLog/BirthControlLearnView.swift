@@ -58,7 +58,7 @@ struct BirthControlLearnView: View {
     private func yourMethod(_ bc: BirthControl) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("How the")
-            Text(bc.rawValue.lowercased()).foregroundStyle(Accent.indigo.ink(scheme))
+            Text(bc.inSentence).foregroundStyle(Accent.indigo.ink(scheme))
             Text("works in your body")
         }
         .font(.scaled(size: 30, weight: .bold))

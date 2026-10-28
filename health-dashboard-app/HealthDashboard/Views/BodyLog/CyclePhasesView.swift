@@ -10,10 +10,11 @@ struct CyclePhasesView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Screen(title: "Phases", accent: .purple) {
+        Screen(title: model.usesPackWording ? "Your pack" : "Phases", accent: .purple) {
             SampleDataBanner()
             VStack(alignment: .leading, spacing: 0) {
-                Text("How your cycle")
+                // Pill, ring and patch: her month is a pack, not a cycle.
+                Text(model.usesPackWording ? "How your pack" : "How your cycle")
                 Text("affects you").foregroundStyle(Accent.purple.ink(scheme))
             }
             .font(.scaled(size: 32, weight: .bold))
@@ -118,8 +119,8 @@ struct CyclePhasesView: View {
     @ViewBuilder
     private func methodContent(_ bc: BirthControl) -> some View {
         intro(bc.hasBreakWeek
-              ? "Your \(bc.rawValue.lowercased()) stops your body from releasing an egg, so you don't have natural phases. Your month is active days and, unless you use it continuously, a break week instead."
-              : "Your \(bc.rawValue.lowercased()) stops your body from releasing an egg, so you don't have natural phases. Your hormones stay fairly level all month.")
+              ? "Your \(bc.inSentence) stops your body from releasing an egg, so you don't have natural phases. Your month is active days and, unless you use it continuously, a break week instead."
+              : "Your \(bc.inSentence) stops your body from releasing an egg, so you don't have natural phases. Your hormones stay fairly level all month.")
         if let pack = model.packState {
             Card {
                 CycleStrip(length: pack.packLength, today: pack.day,
@@ -147,7 +148,7 @@ struct CyclePhasesView: View {
                                                    exercise: "Train as normal. There's no best or worst week."),
                         topic: nil)
         }
-        LinkRow(title: "How your \(bc.rawValue.lowercased()) works", systemImage: "book.fill", accent: .indigo) {
+        LinkRow(title: "How your \(bc.inSentence) works", systemImage: "book.fill", accent: .indigo) {
             BirthControlLearnView()
         }
     }

@@ -69,7 +69,9 @@ struct PackSetupControl: View {
         switch (method, p.hasBreak && d > p.activeDays) {
         case (.ring, true): kind = "ring-free"
         case (.patch, true): kind = "patch-free"
-        case (_, true): kind = p.packLength - p.activeDays >= 7 ? "break" : "placebo"
+        // One label for every pack: "break" (21 + 7 and 24 + 4 alike). The
+        // type note says break days may be placebo pills or no pills.
+        case (_, true): kind = "break"
         default: kind = "active"
         }
         return "\(unit) \(d) \u{00B7} \(kind)"
@@ -81,9 +83,9 @@ struct PackSetupControl: View {
             switch method {
             case .ring: return "3 weeks with the ring in, then a ring-free week."
             case .patch: return "A new patch each week for 3 weeks, then a patch-free week."
-            default: return "21 active pills, then 7 days of placebo pills or no pills."
+            default: return "21 active pills, then 7 break days (placebo pills or no pills)."
             }
-        case .extended: return "24 active pills, then 4 placebo pills (break days)."
+        case .extended: return "24 active pills, then 4 break days (placebo pills)."
         case .continuous:
             switch method {
             case .ring: return "A new ring straight away each time, with no ring-free week, so no withdrawal bleed is expected."
@@ -152,10 +154,40 @@ struct PackSetupControl: View {
         .tint(Accent.indigo.ink(scheme))
     }
 
+    private var packWord: String { method == .combinedPill ? "pack" : model.packThing }
+
+    private var missedThing: String {
+        switch method {
+        case .ring: return "your ring"
+        case .patch: return "a patch"
+        default: return "a pill"
+        }
+    }
+
+    /// What "Skip this break" does today: from the break's first day, or,
+    /// when she's already in the break, from today (the rest is left out).
+    private var skipWhatItDoes: String {
+        if model.packState?.isBreak == true {
+            return "You\u{2019}re in your break now. Skipping it means you start your next \(packWord) today and leave out the rest of the break. A bleed that has already started may carry on for a few days."
+        }
+        let when = model.nextBreakStart.map { PackPosition.shortDate($0) } ?? "the first break day"
+        return "Skipping means you start your next \(packWord) on \(when) instead of taking the break, so no withdrawal bleed is due this time. Some spotting is common."
+    }
+
+    /// Who skipping is for, shown next to the button and in the confirmation.
+    private var skipOnePhaseNote: String {
+        method == .combinedPill
+            ? "Only for one-phase packs (all active pills the same color). Ask a pharmacist if yours has several colors."
+            : "Fine for most rings and patches. If you\u{2019}re not sure, ask a pharmacist first."
+    }
+
+    /// The same pregnancy caveat as the Cycle screen.
+    private var skipPregnancyNote: String {
+        "Missed or late with \(missedThing) this \(method == .combinedPill ? "pack" : "cycle") and no bleed comes in the break? Take a pregnancy test or ask a pharmacist before starting the next one."
+    }
+
     private var skipMessage: String {
-        let start = model.packState.flatMap { $0.isBreak ? Date.now : model.nextBreakStart }
-        let when = start.map { PackPosition.shortDate($0) } ?? "the first break day"
-        return "Your next \(method == .combinedPill ? "pack" : model.packThing) starts on \(when) instead of taking the break, so no withdrawal bleed is due this time. This changes only this pack. Skipping the break is fine for most combined pills, rings and patches; if your pack has pills in more than one color, ask a pharmacist which to take."
+        "\(skipWhatItDoes) This changes only this \(packWord). \(skipOnePhaseNote)"
     }
 
     @ViewBuilder
@@ -179,7 +211,16 @@ struct PackSetupControl: View {
                     .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Starts your next pack where the break would begin")
+            .accessibilityHint(model.packState?.isBreak == true
+                               ? "Starts your next pack today and leaves out the rest of the break"
+                               : "Starts your next pack where the break would begin")
+            VStack(alignment: .leading, spacing: 6) {
+                Text(skipWhatItDoes)
+                Text(skipOnePhaseNote)
+                Text(skipPregnancyNote)
+            }
+            .font(.scaled(size: 13)).secondaryText()
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -434,6 +475,51 @@ struct SleepScheduleControl: View {
 
 // MARK: - 988
 
+/// One line under the stress scale when PMDD is on and she picks 4 or 5:
+/// the 988 Lifeline, with call and text. Shows nothing otherwise.
+struct StressCrisisRow: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.colorScheme) private var scheme
+    /// Today's stress rating (1 calm – 5 very stressed), if logged.
+    let level: Int?
+
+    var body: some View {
+        if model.showsCrisisLine, let level, level >= 4 {
+            HStack(spacing: 10) {
+                Image(systemName: "phone.fill")
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .foregroundStyle(Accent.pink.ink(scheme))
+                    .accessibilityHidden(true)
+                Text("Rough day? Call or text 988, any time (US).")
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Link(destination: URL(string: "tel:988")!) {
+                    Image(systemName: "phone.fill").font(.scaled(size: 14, weight: .bold))
+                        .frame(width: 44, height: 44)
+                        .foregroundStyle(onFill)
+                        .background(fill, in: Circle())
+                }
+                .accessibilityLabel("Call 988")
+                Link(destination: URL(string: "sms:988")!) {
+                    Image(systemName: "message.fill").font(.scaled(size: 14, weight: .bold))
+                        .frame(width: 44, height: 44)
+                        .foregroundStyle(onFill)
+                        .background(fill, in: Circle())
+                }
+                .accessibilityLabel("Text 988")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(Accent.pink.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var fill: Color { scheme == .dark ? Accent.pink.fill(.dark) : Accent.pink.ink(.light) }
+    private var onFill: Color { scheme == .dark ? Color(hex: 0x1A0E00) : .white }
+}
+
 /// The 988 Suicide & Crisis Lifeline (US), shown on the Body and Cycle
 /// screens when PMDD is added. Calls and texts go straight from the phone.
 /// She can shrink it to one line; the choice is remembered on this phone.
@@ -471,11 +557,19 @@ struct CrisisLineCard: View {
                 link("Call 988", systemImage: "phone.fill", url: Self.call)
                 link("Text 988", systemImage: "message.fill", url: Self.text)
             }
-            Button("Show as one line") { compact = true }
-                .font(.scaled(size: 13, weight: .semibold))
-                .foregroundStyle(Palette(scheme: scheme).secondary)
-                .frame(minHeight: 44)
-                .accessibilityHint("Keeps the 988 line here in a smaller form")
+            // A real control (outlined, with an icon), not plain grey text.
+            // Collapsing keeps 988 on screen as one line with call and text.
+            Button { compact = true } label: {
+                Label("Show as one line", systemImage: "rectangle.compress.vertical")
+                    .font(.scaled(size: 14, weight: .semibold))
+                    .foregroundStyle(Accent.pink.ink(scheme))
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 44)
+                    .overlay(Capsule().strokeBorder(Accent.pink.ink(scheme).opacity(0.6), lineWidth: 1.5))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Keeps 988 here as one line, with call and text buttons")
         }
     }
 

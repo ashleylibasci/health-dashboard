@@ -207,14 +207,8 @@ struct SettingsView: View {
 
     private var method: BirthControl? { store.data.birthControl.flatMap(BirthControl.init(rawValue:)) }
 
-    private func ovulationLine(_ bc: BirthControl) -> String {
-        switch bc.ovulation {
-        case .stopped: return "This method stops ovulation, so the app doesn't show ovulation or luteal phases for you."
-        case .sometimes: return "Ovulation may or may not happen on this method, so cycle phases are shown as rough estimates."
-        case .mostStill: return "Most people still ovulate on this method, so the app still shows your cycle phases."
-        case .natural: return "You ovulate as normal on this method, so the app shows your cycle phases."
-        }
-    }
+    /// Shared with Accuracy tips, so the two screens always agree.
+    private func ovulationLine(_ bc: BirthControl) -> String { bc.ovulationLine }
 
     private var bodySection: some View {
         let p = Palette(scheme: scheme)

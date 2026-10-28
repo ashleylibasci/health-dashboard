@@ -1209,7 +1209,8 @@ final class AppModel: ObservableObject {
             plannedWake: tonight.wake.map { AppDay.date($0, relativeTo: nextWakeDay) },
             upBy: AppDay.date(tonight.upBy, relativeTo: nextWakeDay),
             tonightNeedMinutes: tonight.need,
-            plannedAsleepMinutes: tonight.plan == nil ? nil : tonight.expectedAsleep))
+            plannedAsleepMinutes: tonight.plan == nil ? nil : tonight.expectedAsleep,
+            caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime))
     }
 
     func handle(_ message: WatchMessage) {

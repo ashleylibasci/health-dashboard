@@ -29,10 +29,12 @@ struct TonightPage: View {
 
     @ViewBuilder
     private var plan: some View {
-        if let bed = snapshot.bedtime, let wake = snapshot.alarmWindowEnd {
+        // The phone's plan: best wake time and the sleep it expects (older
+        // phone builds only send the alarm window, so fall back to its end).
+        if let bed = snapshot.bedtime, let wake = snapshot.plannedWake ?? snapshot.upBy ?? snapshot.alarmWindowEnd {
             let bedMinutes = Clock.minutesOfDay(bed)
             let wakeMinutes = Clock.minutesOfDay(wake)
-            SleepDial(bedMinutes: bedMinutes, wakeMinutes: wakeMinutes)
+            SleepDial(bedMinutes: bedMinutes, wakeMinutes: wakeMinutes, asleepMinutes: snapshot.plannedAsleepMinutes)
                 .frame(width: 118, height: 118)
                 .frame(maxWidth: .infinity)
             HStack(alignment: .top) {
@@ -46,7 +48,7 @@ struct TonightPage: View {
                 .accessibilityElement(children: .combine)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("UP AT")
+                    Text(snapshot.plannedWake == nil ? "UP BY" : "WAKE")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Accent.orange.ink(.dark))
                     Text(Clock.format(wakeMinutes))
@@ -76,6 +78,9 @@ struct TonightPage: View {
 private struct SleepDial: View {
     let bedMinutes: Int
     let wakeMinutes: Int
+    /// Sleep the phone's plan expects (time in bed minus falling asleep);
+    /// nil from older phone builds, which show time in bed.
+    var asleepMinutes: Int? = nil
 
     private let lineWidth: CGFloat = 12
     private let size: CGFloat = 118
@@ -87,7 +92,8 @@ private struct SleepDial: View {
 
     /// "8h", or "7h 40m".
     private var durationText: String {
-        duration % 60 == 0 ? "\(duration / 60)h" : Clock.duration(duration)
+        let shown = asleepMinutes ?? duration
+        return shown % 60 == 0 ? "\(shown / 60)h" : Clock.duration(shown)
     }
 
     var body: some View {
@@ -112,14 +118,14 @@ private struct SleepDial: View {
                 Text(durationText)
                     .font(.number(durationText.count > 3 ? 18 : 26))
                     .minimumScaleFactor(0.7)
-                Text("of sleep")
+                Text(asleepMinutes == nil ? "in bed" : "asleep")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(WatchStyle.secondaryText)
             }
         }
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Sleep plan from \(Clock.format(bedMinutes)) to \(Clock.format(wakeMinutes)), \(Clock.duration(duration)) of sleep")
+        .accessibilityLabel("Sleep plan from \(Clock.format(bedMinutes)) to \(Clock.format(wakeMinutes)), \(Clock.duration(asleepMinutes ?? duration)) \(asleepMinutes == nil ? "in bed" : "asleep")")
     }
 
     private func endpoint(symbol: String, color: Color, fraction: Double) -> some View {

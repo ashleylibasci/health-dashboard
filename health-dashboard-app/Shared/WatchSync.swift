@@ -61,6 +61,9 @@ struct WatchSnapshot: Codable, Equatable {
     var upBy: Date? = nil
     var tonightNeedMinutes: Int? = nil
     var plannedAsleepMinutes: Int? = nil
+    /// Today's caffeine leaves 25 mg or more at bedtime: the only time the
+    /// Watch shows a warning (nil from older phone builds).
+    var caffeineTooMuchAtBedtime: Bool? = nil
 
     struct Zone: Codable, Equatable {
         var title: String

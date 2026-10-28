@@ -27,9 +27,9 @@ enum Topic: String, CaseIterable, Identifiable {
     var explanation: Explanation {
         switch self {
         case .melatonin: Explanation(id: id, title: "Melatonin window",
-            meaning: "Melatonin is a hormone your own body makes in the evening to get you ready for sleep. This window is when your body is releasing the most of it. It has nothing to do with taking melatonin pills.",
-            forYou: "This is usually the easiest time for you to fall asleep. Getting into bed inside this window makes it more likely you drift off quickly instead of lying awake. Bright screens and overhead lights hold melatonin back, so dim them in the half hour before.",
-            howWeGotIt: "Melatonin rises in the evening and is well under way in the hour before you usually fall asleep. The window is that hour, ending around the time you usually fall asleep on school nights, from your Apple Watch sleep data (or your planned bedtime until there are nights to learn from). The 15 minutes before it are your wind-down.")
+            meaning: "Melatonin is a hormone your own body makes at night to get you ready for sleep. It usually starts rising about 2 hours before you normally fall asleep and stays up through the night. It has nothing to do with taking melatonin pills.",
+            forYou: "This window is the hour before you usually fall asleep. By then melatonin has been rising for a while, so it's usually the easiest time to drift off instead of lying awake. Bright screens and overhead lights can hold melatonin back, so dim them in the couple of hours before if you can.",
+            howWeGotIt: "In studies, melatonin starts rising (in dim light) about 2 hours before people's usual time of falling asleep, though this varies from person to person. Your Watch can't measure melatonin, so this is an estimate: the window is the hour ending around the time you usually fall asleep on school nights, from your Apple Watch sleep data (or your planned bedtime until there are nights to learn from). The 15 minutes before it are your wind-down.")
         case .grogginess: Explanation(id: id, title: "Grogginess",
             meaning: "The foggy, slow feeling right after you wake up. Scientists call it sleep inertia. Your brain takes a while to fully switch on, especially if you woke from deep sleep.",
             forYou: "Avoid big decisions, tests or driving if you can during this time. Daylight, water and moving around clear it faster. Waking at the end of a sleep cycle, which the smart alarm aims for, makes it shorter.",
@@ -39,13 +39,13 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Save your hardest thinking for this window: studying, problem sets, writing. Try not to spend it on email or scrolling.",
             howWeGotIt: "Your energy curve combines how long you've been awake (sleep pressure builds through the day) with your body clock's daily rhythm, timed from when you usually sleep.")
         case .afternoonDip: Explanation(id: id, title: "Afternoon dip",
-            meaning: "A natural drop in energy in the early afternoon. Almost everyone has one; it's built into your body clock, not caused by lunch.",
+            meaning: "A natural drop in energy in the early afternoon. Almost everyone has one. It comes mostly from your body clock, so it happens even if you skip lunch, though a big meal can make it feel stronger.",
             forYou: "Plan easy tasks here. Daylight or a short break helps. A short nap (20 minutes max) early in the dip is fine, but caffeine after your cutoff will cost you sleep tonight.")
         case .secondWind: Explanation(id: id, title: "Second wind",
             meaning: "A late-afternoon or evening rise in energy, when your body clock pushes back against the tiredness that has built up all day.",
             forYou: "A good time to be active or study with friends. Wrap up anything intense a couple of hours before bed so you can wind down.")
         case .windDown: Explanation(id: id, title: "Wind-down",
-            meaning: "The stretch just before your melatonin window starts.",
+            meaning: "The stretch just before your melatonin window, when it helps to start slowing down.",
             forYou: "Dim the lights, put screens down or on night mode, and do something calm. It makes falling asleep much easier.")
         case .energyScore: Explanation(id: id, title: "Energy score",
             meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It's a different number from energy left, which is a battery for right now. Your usual is shown next to it (a typical value until there's a week of your own nights).",
@@ -119,9 +119,9 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "A rise of one breath a minute or more is one of the earliest signs of getting sick.")
         case .wristTemp: Explanation(id: id, title: "Wrist temperature",
             meaning: "How your skin temperature during sleep compares with your usual.",
-            forYou: "Small ups and downs night to night are normal. If you have a natural cycle, it also rises about 0.3 \u{00B0}C after ovulation and falls before your period; on birth control that stops ovulation, it stays flatter. A rise well above your usual can mean you're fighting something off.")
+            forYou: "Small ups and downs night to night are normal. If you have a natural cycle, it also rises about \(TempFormat.delta(0.3, signed: false)) after ovulation and falls before your period; on birth control that stops ovulation, it stays flatter. A rise well above your usual can mean you're fighting something off.")
         case .illness: Explanation(id: id, title: "Might be getting sick",
-            meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it. A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of them too, so the app allows for those. When it can't tell which part of your cycle you're in, it allows for that too, and says so.",
+            meaning: "When several signals move together (resting heart rate up, HRV down, breathing rate and wrist temperature up), your body is often fighting something, sometimes a day before you feel it. A hard workout the day before (well above your own usual) or the second half of a natural cycle can move some of them too, so the app allows for those. When it can't tell which part of your cycle you're in, it doesn't assume one: no cycle allowance is made, and it tells you your cycle could be part of it.",
             forYou: "It's a guess, not a diagnosis. Extra sleep, fluids and an easy day help. See a doctor if you feel unwell.")
         case .fitnessAge: Explanation(id: id, title: "Fitness age",
             meaning: "The age of an average person with your cardio fitness (VO2 max, measured by your Apple Watch during walks and runs).",
@@ -139,10 +139,11 @@ enum Topic: String, CaseIterable, Identifiable {
         case .caffeineCutoff: Explanation(id: id, title: "Caffeine cutoff",
             meaning: "The latest time to have caffeine so that very little is left in your body at bedtime.",
             forYou: "Caffeine takes about 5 hours for half of it to leave your body, and about twice that on the combined pill, ring or patch (the app uses the longer time if you use one). So an afternoon coffee is still partly there at midnight, even if you can fall asleep. It makes sleep lighter.",
-            howWeGotIt: "The latest time a typical 100 mg drink would drop below 25 mg by your planned bedtime, rounded down to the half hour. A bigger drink needs to be earlier; the Caffeine screen warns you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then there's no cutoff to show, and the app tells you the biggest single drink you could have soon after waking instead.")
+            howWeGotIt: "The latest time a 100 mg drink (a small coffee; a 12 oz drip coffee is about 140 mg) would be down to under 25 mg by your planned bedtime, rounded down to the half hour. A bigger drink needs to be earlier; the Caffeine screen tells you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then the cutoff shows as \u{201C}None today\u{201D}, and the app tells you the biggest single drink you could have soon after waking instead.")
         case .caffeineLeft: Explanation(id: id, title: "Caffeine left at bedtime",
             meaning: "How much of today's caffeine is predicted to still be in your body when you go to bed.",
-            forYou: "Under 25 mg is the goal.")
+            forYou: "Under 25 mg is the goal. That's about a fifth of a 12 oz drip coffee.",
+            howWeGotIt: "Why 25 mg: in sleep-lab studies, caffeine still in the body at bedtime made sleep lighter and shorter even when people fell asleep fine, and bigger amounts did more. There's no exact safe line, and some people are more sensitive than others. 25 mg is a cautious rule of thumb the app uses, a small amount where the effect is usually minor, not a medical cutoff. The caffeine cutoff test can show what works for you.")
         case .coffeeNap: Explanation(id: id, title: "Coffee nap",
             meaning: "Drinking a small coffee and then napping for 20 minutes. The caffeine kicks in just as you wake up.",
             forYou: "Only worth it when your afternoon dip starts before your caffeine cutoff.")

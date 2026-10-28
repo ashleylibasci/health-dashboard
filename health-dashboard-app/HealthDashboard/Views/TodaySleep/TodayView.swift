@@ -298,14 +298,17 @@ struct TodayView: View {
 
     // MARK: Might be getting sick
 
-    /// Only on real heart data: example numbers never say she's getting sick.
-    private var showSickCard: Bool {
-        !model.usingSampleData && model.hasHeartData
-            && (model.illness.confidence == .medium || model.illness.confidence == .high)
-    }
+    /// Whenever the sick check reads Possible or Likely, so Today agrees with
+    /// Body and "Why do I feel off?". On example data it says so.
+    private var showSickCard: Bool { model.sickCheckFlagged }
 
     private var sickTitle: String {
-        model.illness.confidence == .high
+        if model.usingSampleData {
+            return model.illness.confidence == .high
+                ? "Example: your body is likely fighting something"
+                : "Example: your body may be fighting something"
+        }
+        return model.illness.confidence == .high
             ? "Your body is likely fighting something"
             : "Your body may be fighting something"
     }
@@ -321,9 +324,9 @@ struct TodayView: View {
                 : " Yesterday's hard training is already allowed for."
         }
         if model.illness.cyclePhaseUnknown {
-            detail += " Your cycle can raise these too, and the app can't tell which phase you're in."
+            detail += " The app can't tell which phase of your cycle you're in, so it didn't allow for one. Part of this could be your cycle."
         } else if model.inLutealPhase {
-            detail += " So is the late part of your cycle."
+            detail += " The late part of your cycle is already allowed for."
         }
         return detail + " Take it easy, drink water and get extra sleep tonight."
     }
