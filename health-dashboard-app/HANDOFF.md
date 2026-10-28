@@ -22,6 +22,8 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
   - The `AppModel+*.swift` extensions hold derived values.
   - `Model/Explanations.swift` has the plain-language text behind every ⓘ.
   - `Views/` holds the screens. `Views/Components/` has the shared pieces: `Screen`, `Card`, `InfoButton`, `HowWeGotThisLink`, `ChartReadout`, `chartScrub` + `ScrubSurface` (UIKit touch layer for charts), `SampleDataBanner`, and `Font.scaled` (Dynamic Type).
+  - Design system (from the Oct 28 design review): colours, type and tokens in `Shared/Theme.swift` and `Views/Components/ScaledFont.swift` (one hue per feature; `TypeRole` roles via `.font(.screenTitle)` etc.; `Space`, `Radius`, `Sizes`); motion in `Shared/Motion.swift` (`withMotion`, `.motion`, `.buttonStyle(.pressable)`, Reduce Motion fallbacks); `TabHeader.swift` (the header on all four tabs), `LogFeedback.swift` (Undo toast after any log), chart descriptors in `ChartAudioGraph.swift`. Use these instead of literal sizes, colours and animations.
+  - Safety content: `Views/BodyLog/CycleSafety.swift` (missed-pill rules, medicines and the pill, heavy bleeding, red flags, 90-day and RED-S notes). Heart and cycle-aware recovery/stress/sick logic: HealthCore `HeartSignals.swift` and `Model/AppModel+Heart.swift`.
   - `Services/` has the clock-change bedtime reminders, the peak/dip and sick notifications, and the features ported from the old app:
     - `BackgroundHealth.swift`: Apple Health wakes the app when sleep, caffeine, water, periods, resting HR, HRV or wrist temperature change; the app refreshes and updates the Watch. Off on example data and in demo mode.
     - `PhoneBackupAlarm.swift`: an AlarmKit iPhone alarm at the smart alarm's latest time, cancelled when she stops the Watch alarm (iOS 26.1+; the setting says so on older iOS).
@@ -57,6 +59,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 5. Ashley asked for: water in oz, choosing where she is in her pack in Settings (Settings → Cycle & birth control, also on the Cycle screen and in onboarding), bedtime and wake time at any hour.
 
 6. Round 3 on the Mac (Oct 27, 2026): real builds, the simulator test round, and the six student testers (the "student-testers" BMad party) on real screens. Findings and their status are in TEST-FINDINGS.md. The old app's features were ported in the same session (see Layout).
+7. Expert review (Oct 28, 2026): a women's health expert party and a design party (both in `_bmad/custom/bmad-party-mode.toml`) reviewed every calculation, message and screen. What changed and what's still recommended: EXPERT-REVIEW.md. The app is for women only (no male norms or options), and it replaced the old app on her phone under the old bundle IDs.
 
 ## Simulator test round
 `HealthDashboardUITests/TestRound.swift`, one tester setup at a time, e.g.

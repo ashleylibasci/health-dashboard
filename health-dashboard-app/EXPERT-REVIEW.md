@@ -60,9 +60,26 @@ Features (biggest value first):
 - Iron: 18 mg a day for women 19–50; low iron is common and causes tiredness.
 
 ## Design: fixed
-- Watch: titles in the clock row; logging without scrolling with Undo on the tile; Tonight leads with "Bed by"; a "now" point on the Energy curve; a water tile; Dynamic Type; honest "no data for today yet" after the rollover; time-of-day start page.
-- Widgets and complications: tinted and accented rendering, per-family empty states, stale numbers greyed, latte button shows the cutoff, Smart Stack relevance for bedtime.
-- (The design-system and screen changes are listed in the next update of this file.)
+**System** (used by every screen)
+- One palette with one hue per feature, end to end (tile → screen → Watch): HRV and recovery indigo, sleep purple (moved away from indigo), energy mint, caffeine yellow, water blue, stress orange, cycle and period pink. Coral only means "worse" (and Awake). Light-mode chart colours reach 3:1 on white; text on tints 4.5:1.
+- A type scale of 14 roles (was 27 sizes), numbers in rounded bold with fixed-width digits so they don't jiggle, titles capped so the largest text size keeps its hierarchy.
+- Spacing and corner-radius tokens (cards 16pt padding, 24pt corners; 12pt between cards); rings draw inside their frames.
+- A motion system (press, log, fill, select, reveal, data swap, page, commit, undo) that falls back to fades with Reduce Motion; numbers animate; logging gives haptics and a 5-second Undo toast.
+- Charts: readouts keep a steady height while you drag, show a summary at rest, clear with a tap, tick a haptic per point, and VoiceOver can step through them; every chart has an audio-graph description.
+
+**Screens**
+- The same header on all four tabs (date, title, Settings avatar). Today has one hero (recovery), one bedtime ("Bed by … · Up at …" and one plain sentence) and an alarm chip that really switches the alarm. Body is grouped into Rhythms, Vitals and Progress with nothing repeated from Today. Settings is regrouped, with a Widgets & Watch how-to.
+- Log only logs: one-tap period flow chips, four equal time chips (Now / 30m / 1h / 2h), History links, Undo after every log. Onboarding is three steps; notification permission is asked when it's needed.
+- Detail screens: one title each; honest HRV and resting-heart-rate charts (her usual range as a band, a y-range that doesn't turn a 3 ms wobble into spikes); sleep stages compared with her own usual; explanations restructured as "What it is / What to do / How it's worked out" and shortened.
+- Words: one name per thing (Alcohol, Weekend shift, Streaks, Your week, Sick check, Example data, focus peak, "your usual"), times as "8:15am", ranges "8:00–8:25am", the logged confirmation echoes the time she picked.
+- Accessibility: no sideways scrolling or mid-word breaks at the largest text size; section headings are headings; 44pt targets on text links; VoiceOver labels say "About …" and read symbols as words.
+- Watch: titles in the clock row; logging without scrolling, with Undo on the tile; Tonight leads with "Bed by"; a "now" point on the Energy curve; a water tile; text follows her text size; "no numbers for today yet" after the 4am rollover instead of yesterday's; opens on the page that fits the time of day.
+- Widgets and complications: tinted and accented rendering, empty states sized for each family, stale numbers greyed with the day shown, the latte button shows when it's past the cutoff, and the bedtime complication rises in the Smart Stack before bed and says whether the alarm is armed.
 
 ## Design: recommendations not built yet
-See the end of this file after the design pass.
+- Show the Energy curve inline on Body (today it's a tile that opens it) and an Energy complication / Smart Stack widget with a "now" dot.
+- A "Staying up late?" row and the clock-change line on the Tonight card in the week before a change.
+- Bedtime reminders as a general setting (today they live in the clock-change plan).
+- A one-time Today card on day 3 that introduces widgets, the Watch and health conditions.
+- Alcohol has no colour of its own (it shares purple with sleep); a ninth hue would need care to stay distinct.
+- A snooze on the Watch alarm was left out on purpose: the smart-alarm session can't outlast its window, and the iPhone backup alarm covers that case.
