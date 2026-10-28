@@ -131,8 +131,9 @@ struct SleepView: View {
                     .tint(Accent.orange.fill(scheme))
             }
             if let plan {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(Clock.format(plan.alarmWindow.end, suffix: false)).font(.scaledNumber(40))
+                // Stacks at large sizes so the time never splits ("8:2 / 5").
+                AdaptiveStack(spacing: 6, alignment: .firstTextBaseline) {
+                    Text(Clock.format(plan.alarmWindow.end, suffix: false)).font(.scaledNumber(40)).keepsOnOneLine()
                     Text("\(SleepText.meridiem(plan.alarmWindow.end)) latest \u{00B7} listens from \(Clock.format(plan.alarmWindow.start)) \u{00B7} up by \(Clock.format(store.data.upBy))")
                         .font(.scaled(size: 14, weight: .semibold))
                         .foregroundStyle(p.secondary)
@@ -300,7 +301,8 @@ private struct ShiftBar: View {
             HStack {
                 Text(title)
                 Spacer()
-                Text("\(Clock.format(range.start, suffix: false)) \u{2013} \(Clock.format(range.end, suffix: false))")
+                // With am/pm: "1:22" alone is ambiguous for a night owl (round 3).
+                Text("\(Clock.format(range.start)) \u{2013} \(Clock.format(range.end))")
             }
             .font(.scaled(size: 12, weight: .semibold))
             .foregroundStyle(p.secondary)

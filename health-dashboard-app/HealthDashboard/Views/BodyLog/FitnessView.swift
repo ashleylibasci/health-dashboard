@@ -32,9 +32,13 @@ struct FitnessView: View {
             SampleDataBanner()
             if let vo2 = model.vo2Max {
                 hero(vo2: vo2)
-                if points.count >= 2 { historyCard }
-                if !hidesTargets { tipsCard }
-                ageCard
+                // Under eating-disorder history: the number only. No fitness
+                // age, history line or age comparison (round 3, H6).
+                if points.count >= 2 && !hidesTargets { historyCard }
+                if !hidesTargets {
+                    tipsCard
+                    ageCard
+                }
             } else {
                 Card(accent: .mint) {
                     Text("No VO\u{2082} max yet").font(.scaled(size: 18, weight: .bold))
@@ -43,7 +47,23 @@ struct FitnessView: View {
                 }
             }
             HowWeGotThisLink(title: "Fitness age",
-                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average \(store.data.sex == .female ? "woman" : "man") has your VO\u{2082} max, from population averages that drop about \(store.data.sex == .female ? "0.32" : "0.35") points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
+                             method: "Your Apple Watch estimates VO\u{2082} max from your heart rate and pace on outdoor walks and runs. Fitness age is the age at which an average \(averagePerson) has your VO\u{2082} max, from population averages that drop about \(dropPerYear) points a year from age 20. The line doesn't go below 20, so anything fitter than an average 20-year-old shows as \u{201C}Under 20\u{201D}. The level compares you with the average for your age, on the same line, so the two always agree; without your age there's no level, only the fitness age.")
+        }
+    }
+
+    private var averagePerson: String {
+        switch store.data.sex {
+        case .female?: "woman"
+        case .male?: "man"
+        case nil: "woman or man (you choose which, under Compared with)"
+        }
+    }
+
+    private var dropPerYear: String {
+        switch store.data.sex {
+        case .female?: "0.32"
+        case .male?: "0.35"
+        case nil: "0.32 (women) or 0.35 (men)"
         }
     }
 
@@ -76,7 +96,7 @@ struct FitnessView: View {
                     }
                 }
                 if !typeSize.isAccessibilitySize { Spacer() }
-                if let fa = model.fitnessAgeText {
+                if let fa = model.fitnessAgeText, !hidesTargets {
                     VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                         HStack(spacing: 0) {
                             Text("FITNESS AGE").font(.scaled(size: 12, weight: .bold)).secondaryText()
@@ -89,8 +109,8 @@ struct FitnessView: View {
                     }
                 }
             }
-            if let fa = model.fitnessAge, age > 0, !hidesTargets {
-                Text(ageComparison(fitnessAge: fa, vo2: vo2))
+            if let fa = model.fitnessAge, let sex = store.data.sex, age > 0, !hidesTargets {
+                Text(ageComparison(fitnessAge: fa, vo2: vo2, sex: sex))
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
             }
             if hidesTargets {
@@ -107,11 +127,11 @@ struct FitnessView: View {
     /// why calories are hidden.
     static let noComparisonsExplanation = Explanation(
         id: "fitnessNoComparisons", title: "Why there are no comparisons",
-        meaning: "You added eating-disorder history to your health conditions, so the app leaves out rankings like \u{201C}below average\u{201D}, your past peak, and ups and downs over time. It also keeps calories, step counts and exercise targets out of sight.",
+        meaning: "You added eating-disorder history to your health conditions, so the app leaves out rankings like \u{201C}below average\u{201D} and fitness age, your past peak, and ups and downs over time. It also keeps calories, step counts and exercise targets out of sight.",
         forYou: "VO\u{2082} max is shown as a plain number from your Watch. You can change this in Health conditions.")
 
-    private func ageComparison(fitnessAge fa: Int, vo2: Double) -> String {
-        if FitnessAge.isTopOfChart(vo2Max: vo2, sex: store.data.sex) {
+    private func ageComparison(fitnessAge fa: Int, vo2: Double, sex: FitnessAge.Sex) -> String {
+        if FitnessAge.isTopOfChart(vo2Max: vo2, sex: sex) {
             return age <= 20 ? "Your heart and lungs are at least as fit as an average 20-year-old's." : "Your heart and lungs are fitter than an average 20-year-old's, younger than your \(age) years."
         }
         let d = fa - age
@@ -129,16 +149,20 @@ struct FitnessView: View {
 
     private var readoutDetail: String {
         guard let p = shown else { return "" }
-        let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: store.data.sex) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: store.data.sex))"
-        var text = "Fitness age then: \(fa)."
-        // No "up/down since" or "your peak" with an eating-disorder history.
-        if hidesTargets { return text }
-        if let first = points.first, p.date != first.date {
-            let diff = p.value - first.value
-            text += " " + (diff >= 0 ? String(format: "Up %.1f", diff) : String(format: "Down %.1f", -diff)) + " since \(first.date.formatted(.dateTime.month(.abbreviated).year()))."
+        var parts: [String] = []
+        if let sex = store.data.sex {
+            let fa = FitnessAge.isTopOfChart(vo2Max: p.value, sex: sex) ? "under 20" : "\(FitnessAge.estimate(vo2Max: p.value, sex: sex))"
+            parts.append("Fitness age then: \(fa).")
         }
-        if p.date == model.vo2MaxPeak?.date { text += " Your peak." }
-        return text
+        // No "up/down since" or "your peak" with an eating-disorder history.
+        if !hidesTargets {
+            if let first = points.first, p.date != first.date {
+                let diff = p.value - first.value
+                parts.append((diff >= 0 ? String(format: "Up %.1f", diff) : String(format: "Down %.1f", -diff)) + " since \(first.date.formatted(.dateTime.month(.abbreviated).year())).")
+            }
+            if p.date == model.vo2MaxPeak?.date { parts.append("Your peak.") }
+        }
+        return parts.joined(separator: " ")
     }
 
     private var historyCard: some View {

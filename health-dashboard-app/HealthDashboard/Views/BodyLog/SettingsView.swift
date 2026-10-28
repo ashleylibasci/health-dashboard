@@ -37,6 +37,7 @@ struct SettingsView: View {
             profileCard
             appearanceSection
             sleepSection
+            calendarSection
             bodySection
             if model.packMethod != nil { packSection }
             waterSection
@@ -306,6 +307,15 @@ struct SettingsView: View {
             Card(padding: 12) {
                 SleepScheduleControl()
             }
+        }
+    }
+
+    // MARK: Exams calendar
+
+    private var calendarSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Exams")
+            CalendarImportCard()
         }
     }
 
@@ -603,7 +613,8 @@ struct SettingsView: View {
     }
 }
 
-/// "Sex", used only for fitness age. The segmented control sits next to
+/// "Compared with" (women or men), used only for fitness age, in the same
+/// words as the Fitness screen. The segmented control sits next to
 /// the label when it fits and under it at large text sizes.
 struct SexPickerRow: View {
     @EnvironmentObject var store: DataStore
@@ -636,8 +647,8 @@ struct SexPickerRow: View {
     private var label: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sex").font(.scaled(size: 15, weight: .bold))
-                Text("Used only to work out your fitness age.").font(.scaled(size: 13)).secondaryText()
+                Text("Compared with").font(.scaled(size: 15, weight: .bold))
+                Text("Optional. Used only to work out your fitness age.").font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             }
             InfoButton(topic: .fitnessAge)
@@ -645,8 +656,8 @@ struct SexPickerRow: View {
     }
 
     private var picker: some View {
-        AdaptiveSegmentedPicker("Sex", selection: $store.data.sex, options: [.female, .male]) { sex in
-            sex == .female ? "Female" : "Male"
+        AdaptiveSegmentedPicker("Compared with", selection: $store.data.sex, options: [.female, .male]) { sex in
+            sex == .female ? "Women" : "Men"
         }
     }
 }

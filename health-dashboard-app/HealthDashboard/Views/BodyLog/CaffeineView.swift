@@ -176,15 +176,18 @@ struct CaffeineView: View {
         let when = logTime == .now ? "now" : logTime.phrase
         let bed = Clock.format(model.bedtimeTonight)
         let left = model.caffeineAtBedtime(adding: drink.caffeineMg, at: t)
+        // The total at bedtime, with today's other drinks: say so, or "your
+        // 130 mg latte would be 140 mg at bedtime" reads as wrong (round 3).
+        let withOthers = model.caffeineDoses.isEmpty ? "" : ", with what you\u{2019}ve already had"
         if !tooMuch {
             text = "Your \(drink.name) (\(drink.caffeineMg) mg) \(when) is fine: under 25 mg would be left by your \(bed) bedtime."
         } else if let latest = model.latestTimeForCaffeine(mg: drink.caffeineMg), latest > t {
-            text = "Your \(drink.name) \(when) would still be about \(left) mg at bedtime. Have it by \(Clock.format(latest)) instead."
+            text = "Your \(drink.name) \(when) would leave about \(left) mg in you at bedtime\(withOthers). Have it by \(Clock.format(latest)) instead."
         } else {
             let room = CaffeineModel.largestDose(at: max(t, model.now), bedtime: model.bedtimeTonight, existing: model.caffeineDoses,
                                                  halfLifeHours: model.caffeineHalfLifeHours)
             let smaller = room >= 5 ? " A smaller drink still fits: up to about \(room) mg now." : ""
-            text = "Your \(drink.name) \(when) would still be about \(left) mg at bedtime, so skip more caffeine today." + smaller
+            text = "Your \(drink.name) \(when) would leave about \(left) mg in you at bedtime\(withOthers), so skip more caffeine today." + smaller
                 + (model.caffeineLastsLonger ? " On your birth control caffeine stays about twice as long." : "")
         }
         return Label(text, systemImage: tooMuch ? "exclamationmark.triangle.fill" : "checkmark.circle")
@@ -213,8 +216,9 @@ struct CaffeineView: View {
         if !unsavedCommon.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 SectionLabel(text: "Common drinks")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                // Wraps instead of scrolling sideways, so none is cut off
+                // at large text sizes (round 3, A8).
+                FlowLayout(spacing: 8, lineSpacing: 8) {
                         ForEach(unsavedCommon) { drink in
                             Button { log(drink) } label: {
                                 Text("\(drink.name) \u{00B7} \(drink.caffeineMg) mg")
@@ -227,7 +231,6 @@ struct CaffeineView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Log \(drink.name), \(drink.caffeineMg) mg, \(logTime.phrase)")
                         }
-                    }
                 }
             }
         }
@@ -374,7 +377,7 @@ struct CaffeineView: View {
                 InfoButton(topic: .caffeineCutoff)
             }
             HowWeGotThisLink(title: "Caffeine in your body",
-                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 9 on the combined pill, ring or patch, which slow how fast the liver clears it; the app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a typical 100 mg drink would drop below 25 mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
+                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 9 on the combined pill, ring or patch, which slow how fast the liver clears it; the app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below 25 mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
         }
     }
 
@@ -448,7 +451,7 @@ struct CaffeineView: View {
     private var timingReadout: (title: String, value: String, detail: String) {
         guard let raw = selectedTiming else {
             if noWindow {
-                return (label(timingDay), "No cutoff time today", "At no time today would a typical 100 mg drink be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
+                return (label(timingDay), "No cutoff time today", "At no time today would a 12 oz drip coffee (140 mg) be down to under 25 mg by bedtime. If you have one, keep it small, soon after you wake.")
             }
             return (label(timingDay), "Best window \(timing.bestWindow.label)",
                     "Caffeine works best once grogginess clears and before your \(Clock.format(timing.cutoff)) cutoff.")
@@ -623,8 +626,9 @@ private struct CaffeineFalloffChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .interpolationMethod(.monotone)
             }
-            guides
-            markers
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
+            guides.accessibilityHidden(true)
+            markers.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartXScale(domain: start...end)
@@ -748,6 +752,7 @@ private struct EnergyTimingChart: View {
             RectangleMark(xStart: .value("Start", span.lowerBound), xEnd: .value("End", span.upperBound),
                           yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
                 .foregroundStyle(Palette(scheme: scheme).chip)
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             ForEach(zones) { zone in
                 RectangleMark(xStart: .value("Start", clamp(zone.range.start)), xEnd: .value("End", clamp(zone.range.end)),
                               yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
@@ -763,8 +768,9 @@ private struct EnergyTimingChart: View {
                         }
                     }
             }
-            cutoffRule
-            dots
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
+            cutoffRule.accessibilityHidden(true)
+            dots.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartXScale(domain: span.lowerBound...span.upperBound)

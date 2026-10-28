@@ -49,7 +49,7 @@ struct BirthControlLearnView: View {
         switch bc.ovulation {
         case .stopped: return "Stops ovulation. You don't release an egg each month, so you don't have the natural phases (follicular, ovulation, luteal)."
         case .sometimes: return "Ovulation stops for some people and not for others, so you may or may not release an egg each cycle."
-        case .mostStill: return "Most people still ovulate, so the natural phases still apply to you."
+        case .mostStill: return "Most people still ovulate, so the natural phases usually still apply, even when periods get lighter or stop."
         case .natural: return "No hormones, so you ovulate normally and have a natural cycle."
         }
     }

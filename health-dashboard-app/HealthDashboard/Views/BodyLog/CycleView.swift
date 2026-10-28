@@ -240,7 +240,7 @@ private struct PhasesSection: View {
         case .sometimes:
             return "On the mini pill, some people still release an egg each cycle and some don't, and bleeding can come at unexpected times. So the phases here are a rough guide, and there's no period countdown."
         case .mostStill:
-            return "With a hormonal IUD, most people still ovulate, so your phases still apply. Periods are often lighter or stop, so there's no period countdown."
+            return "With a hormonal IUD, most people still ovulate, so your phases apply while your periods come. Periods are often lighter or stop, so there's no period countdown."
         case .natural:
             return "The copper IUD has no hormones. You ovulate normally, so your phases work like a natural cycle. Periods can be heavier."
         case .stopped:
@@ -324,7 +324,9 @@ private struct PhasesSection: View {
 
     private var nextPeriodRange: String? {
         let cal = Calendar.current
-        guard let start = model.periodEstimateStart, let end = cal.date(byAdding: .day, value: 4, to: start) else { return nil }
+        // As long as her own periods run (round 3, N10), not a fixed 5 days.
+        guard let start = model.periodEstimateStart,
+              let end = cal.date(byAdding: .day, value: max(model.periodLength, 1) - 1, to: start) else { return nil }
         let style: Date.FormatStyle = .dateTime.month(.abbreviated).day()
         return "\(start.formatted(style)) \u{2013} \(end.formatted(style))"
     }
@@ -1118,7 +1120,9 @@ private struct IrregularSection: View {
     /// The cycle she's in now, so far (an outlined bar, not a prediction).
     private var currentBar: CycleBar? {
         guard !bars.isEmpty, let days = model.daysSinceLastPeriodStart, days > 0 else { return nil }
-        return CycleBar(id: bars.count + 1, start: model.allPeriodStarts.last, days: days + 1, isCurrent: true)
+        // Days since it started, the same number as the hero above and the
+        // Body tile (round 3, N11: "53 d so far" under "52 days since").
+        return CycleBar(id: bars.count + 1, start: model.allPeriodStarts.last, days: days, isCurrent: true)
     }
 
     private var chartBars: [CycleBar] { bars + (currentBar.map { [$0] } ?? []) }

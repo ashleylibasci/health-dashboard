@@ -37,7 +37,7 @@ struct WhyOffView: View {
         let recovery = model.recoveryShown
         let usual = model.recoveryUsual
         let below = recovery.map { $0 < usual - 5 } ?? false
-        let usualWord = model.recoveryUsualIsPersonal ? "your usual" : "typical"
+        let usualWord = model.recoveryUsualIsPersonal ? "your usual" : "starting point"
         let pill = recovery.map { "Recovery \($0) · \(usualWord) \(usual)" } ?? "No recovery yet today"
         return Card(accent: .coral) {
             HStack(spacing: 0) {
@@ -54,7 +54,9 @@ struct WhyOffView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(reasons.isEmpty
                  ? "Your sleep, heart and other signals are close to your normal."
-                 : "Your top reasons, ranked by how far each one is from your normal. Tap ⓘ to learn what each means.")
+                 : model.usingSampleData
+                    ? "Example reasons, ranked by how far each one is from the example normal. Your own replace them as your nights come in. Tap ⓘ to learn what each means."
+                    : "Your top reasons, ranked by how far each one is from your normal. Tap ⓘ to learn what each means.")
                 .font(.scaled(size: 14)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -99,7 +101,9 @@ struct WhyOffView: View {
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Do your morning check-in", systemImage: "checkmark.circle.fill", accent: .indigo) { CheckInView() }
             LinkRow(title: "The cost of a late night", systemImage: "moon.haze.fill", accent: .purple) { LateNightView() }
-            Text("Best guesses from your own data, not a diagnosis. See a doctor if you feel unwell.")
+            Text(model.usingSampleData
+                 ? "Worked out from example data until your own nights come in. Not a diagnosis. See a doctor if you feel unwell."
+                 : "Best guesses from your own data, not a diagnosis. See a doctor if you feel unwell.")
                 .font(.scaled(size: 12)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
         }

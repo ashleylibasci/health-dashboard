@@ -177,7 +177,10 @@ struct SickView: View {
             parts.append("Yesterday\u{2019}s active energy was well above your usual, which raises resting heart rate and lowers HRV the next morning, so the check allows 3 bpm and 10% more today.")
         }
         if signal.cyclePhaseUnknown {
-            parts.append("The app can\u{2019}t tell which phase of your cycle you\u{2019}re in, so it doesn\u{2019}t allow for one today. The second half of a cycle can raise resting heart rate and temperature and lower HRV on its own, so part of this could be your cycle.")
+            // Only point at "this" when something moved (round 3: "All clear"
+            // followed by "part of this could be your cycle").
+            parts.append("The app can\u{2019}t tell which phase of your cycle you\u{2019}re in, so it doesn\u{2019}t allow for one today. The second half of a cycle can raise resting heart rate and temperature and lower HRV on its own"
+                         + (signal.confidence == .none ? "." : ", so part of this could be your cycle."))
         }
         if case let .phases(_, _, phase) = model.cycleDisplay {
             if phase == .luteal {
@@ -241,7 +244,7 @@ struct SickView: View {
 
     private var helpCard: some View {
         Card(accent: .mint) {
-            SectionLabel(text: "Things that may help", accent: .mint)
+            SectionLabel(text: signal.confidence == .none ? "If you start to feel unwell" : "Things that may help", accent: .mint)
             // The same plan Today and Sleep show. Tonight's need already adds
             // 30 minutes when the check says Possible or Likely.
             tip("moon.fill", "Sleep early tonight. \(model.tonightAimSentence)" + (model.unwellTonight ? "" : " Add about 30 minutes if you feel unwell."))

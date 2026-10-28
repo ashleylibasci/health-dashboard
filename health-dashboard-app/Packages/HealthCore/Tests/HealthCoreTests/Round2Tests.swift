@@ -261,4 +261,24 @@ final class Round2WakePlanTests: XCTestCase {
         XCTAssertEqual(fallBack.asleep, fallBack.cycles * 92)
         XCTAssertTrue(fallBack.reasons.first!.detail.contains(Clock.format(fallBack.wake)))
     }
+
+    /// Round 3 H10: the cutoff for the 140 mg reference coffee comes earlier
+    /// than for 100 mg, and still leaves under 25 mg at bedtime.
+    func testCutoffForReferenceCoffee() {
+        let c140 = CaffeineModel.cutoff(bedtime: 1470, mg: 140)
+        XCTAssertLessThan(c140, CaffeineModel.cutoff(bedtime: 1470))
+        XCTAssertEqual(Clock.format(c140), "11:30am")
+        XCTAssertLessThan(CaffeineModel.amount(at: 1470, doses: [CaffeineDose(time: c140, mg: 140)]), 25)
+    }
+
+    /// Round 3 J1: a hormonal IUD or mini pill with no period logged gets its
+    /// method's view, not the irregular "log your next period" one.
+    func testNoPeriodHormonalIUDIsSuppressed() {
+        XCTAssertEqual(CycleDisplay.make(tracking: true, irregular: false, birthControl: .hormonalIUD, cycleDay: nil, cycleLength: 29),
+                       .suppressed(.hormonalIUD))
+        XCTAssertEqual(CycleDisplay.make(tracking: true, irregular: true, birthControl: .miniPill, cycleDay: nil, cycleLength: 29),
+                       .suppressed(.miniPill))
+        XCTAssertEqual(CycleDisplay.make(tracking: true, irregular: false, birthControl: nil, cycleDay: nil, cycleLength: 29),
+                       .irregular(daysSinceLastPeriod: nil))
+    }
 }

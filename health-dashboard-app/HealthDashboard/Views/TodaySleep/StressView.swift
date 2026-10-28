@@ -173,11 +173,11 @@ struct StressView: View {
             FlowLayout(spacing: 12, lineSpacing: 6) {
                 swatch(StressLevelColor.fill(0, scheme), "Low")
                 swatch(StressLevelColor.fill(1, scheme), StressDay.Label.usual.rawValue)
-                swatch(StressLevelColor.fill(2, scheme), "Raised")
+                swatch(StressLevelColor.fill(2, scheme), "Raised \u{25CF}")
                 swatch(StressLevelColor.fill(3, scheme), "High \u{25B2}")
                 swatch(p.primary.opacity(0.18), "Active")
             }
-            Text("Each hour is colored by level, darkest for High. High hours also get a \u{25B2}, and the highest hour shows its number. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
+            Text("Each hour is colored by level, darkest for High. High hours also get a \u{25B2} and Raised hours a \u{25CF}, and the highest hour shows its number. Grey hours were active (including workouts without many steps, like swimming or lifting). Exercise raises heart rate too, so those hours, and hours asleep, aren't counted as stress.")
                 .font(.scaled(size: 13))
                 .foregroundStyle(p.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -216,7 +216,11 @@ struct StressView: View {
 
     // MARK: How do you feel
 
-    private let feelNames = ["Calm", "Mostly calm", "Some stress", "Stressed", "Very stressed"]
+    /// The Log tab's words for the same 1–5 scale, so the two never disagree.
+    private let feelNames = (1...5).map { n -> String in
+        let w = LogView.stressWord(n)
+        return w.prefix(1).uppercased() + w.dropFirst()
+    }
     private func feelName(_ n: Int) -> String { feelNames[min(max(n, 1), 5) - 1] }
 
     private var feelCard: some View {
@@ -390,17 +394,23 @@ private struct StressHoursChart: View {
                     .cornerRadius(3)
                     .annotation(position: .top, spacing: 2) {
                         // Not color alone: the highest hour shows its number,
-                        // and every other High hour gets a ▲.
+                        // every other High hour gets a ▲ and Raised a ●.
                         if !bar.active, bar.hour == peakHour {
                             Text("\(bar.level)").font(.scaled(size: 11, weight: .heavy))
                                 .foregroundStyle(Palette(scheme: scheme).primary)
                         } else if !bar.active, StressView.bandIndex(bar.level) == 3 {
                             Text("\u{25B2}").font(.scaled(size: 8, weight: .heavy))
                                 .foregroundStyle(StressLevelColor.fill(3, scheme))
+                        } else if !bar.active, StressView.bandIndex(bar.level) == 2 {
+                            // Raised gets its own mark too: green Low and amber
+                            // Raised are a colour-blind pair (round 3).
+                            Text("\u{25CF}").font(.scaled(size: 6, weight: .heavy))
+                                .foregroundStyle(StressLevelColor.fill(2, scheme))
                         }
                     }
             }
-            selectionMarks
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
+            selectionMarks.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartXScale(domain: domain)

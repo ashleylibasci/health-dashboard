@@ -19,8 +19,23 @@ extension AppModel {
     /// label ("no data"), never a made-up "High". HRV is compared with her
     /// daytime HRV baseline (not the overnight one recovery uses).
     var stressToday: StressDay {
-        let hrvBase = usingSampleData && !heartIsReal ? SampleData.baselineHRV : (stressHRVBaseline ?? 0)
-        return StressModel.day(stressSamples, restingHR: restingHRBaselineKnown ? baselineRestingHR : 0, baselineHRV: hrvBase)
+        let example = usingSampleData && !heartIsReal
+        let hrvBase = example ? SampleData.baselineHRV : (stressHRVBaseline ?? 0)
+        var samples = stressSamples
+        if example {
+            // The example day runs 7am–10pm. Like real data, show only hours
+            // that have happened, with hours before the example night's wake
+            // counted as asleep (round 3: a 10pm bar at 9pm, a 7am bar while
+            // she slept until 8:17).
+            let nowHour = Calendar.current.component(.hour, from: .now)
+            let wake = lastNight.wake % 1440
+            samples = samples.filter { $0.hour <= nowHour }.map { s in
+                var s = s
+                s.asleep = s.asleep || s.hour * 60 + 30 <= wake
+                return s
+            }
+        }
+        return StressModel.day(samples, restingHR: restingHRBaselineKnown ? baselineRestingHR : 0, baselineHRV: hrvBase)
     }
 
     /// No stress level can be given today: no resting heart rate baseline
@@ -62,23 +77,28 @@ extension AppModel {
     }
 
     /// Fitness age, 20 at the youngest. Show `fitnessAgeText` on screen.
-    var fitnessAge: Int? { vo2Max.map { FitnessAge.estimate(vo2Max: $0, sex: store.data.sex) } }
+    /// Nil until she says whether to compare with women or men.
+    var fitnessAge: Int? {
+        guard let v = vo2Max, let sex = store.data.sex else { return nil }
+        return FitnessAge.estimate(vo2Max: v, sex: sex)
+    }
     /// "Under 20" when fitter than an average 20-year-old, else the age.
     var fitnessAgeText: String? {
-        guard let v = vo2Max else { return nil }
-        return FitnessAge.isTopOfChart(vo2Max: v, sex: store.data.sex) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: store.data.sex))"
+        guard let v = vo2Max, let sex = store.data.sex else { return nil }
+        return FitnessAge.isTopOfChart(vo2Max: v, sex: sex) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: sex))"
     }
     /// "Above average for your age", on the same scale as the fitness age so
     /// the two never disagree. Nil until she adds her age: without it there
     /// is no age group to compare with (round 3, N8). Show
     /// `fitnessLevelShown` on screen.
     var fitnessLevel: String? {
-        guard let age = store.data.ageYears else { return nil }
-        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: store.data.sex, age: age) }
+        guard let age = store.data.ageYears, let sex = store.data.sex else { return nil }
+        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: sex, age: age) }
     }
-    /// The level, or a prompt to add her age.
+    /// The level, or a prompt for what's missing to work it out.
     var fitnessLevelShown: String? {
         guard vo2Max != nil else { return nil }
+        if store.data.sex == nil { return "Choose women or men to compare" }
         return fitnessLevel ?? "Add your age to compare"
     }
 

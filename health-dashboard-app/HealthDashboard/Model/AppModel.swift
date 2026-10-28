@@ -443,7 +443,12 @@ final class AppModel: ObservableObject {
     var todaysWater: [AppData.WaterEntry] { AppData.today(store.data.waterLog, date: \.date).sorted { $0.date < $1.date } }
     var waterTodayML: Double { todaysWater.map(\.ml).reduce(0, +) }
 
-    var caffeineCutoff: Minutes { CaffeineModel.cutoff(bedtime: 1440 + store.data.bedtime, halfLifeHours: caffeineHalfLifeHours) }
+    /// For the reference coffee every caffeine line names (12 oz drip, 140 mg),
+    /// so the cutoff and the copy describe the same drink (round 3, H10).
+    var caffeineCutoff: Minutes {
+        CaffeineModel.cutoff(bedtime: 1440 + store.data.bedtime, halfLifeHours: caffeineHalfLifeHours,
+                             mg: Double(Self.referenceCoffee.caffeineMg))
+    }
     var caffeineMgToday: Int { caffeineDoses.map(\.mg).reduce(0, +) }
     var caffeineAtBedtime: Int {
         Int(CaffeineModel.amount(at: 1440 + store.data.bedtime, doses: caffeineDoses, halfLifeHours: caffeineHalfLifeHours).rounded())

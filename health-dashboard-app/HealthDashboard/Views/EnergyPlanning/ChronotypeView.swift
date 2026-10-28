@@ -260,7 +260,7 @@ struct ChronotypeView: View {
             let onset = roundUp15(work.start)
             let newGap = abs((onset + target) / 2 - (work.start + work.end) / 2)
             if c.socialJetlag > newGap + 10 {
-                shiftDetail = "Asleep by \(Clock.format(onset)) and up by \(Clock.format(target)) on Fri and Sat cuts your social jetlag from \(Clock.duration(c.socialJetlag)) to about \(Clock.duration(newGap))."
+                shiftDetail = "Asleep by \(Clock.format(onset)) and up by \(Clock.format(target)) on Fri and Sat cuts your social jet lag from \(Clock.duration(c.socialJetlag)) to about \(Clock.duration(newGap))."
             } else {
                 shiftDetail = "Your weekend shift is already small. Keeping it under an hour protects Monday mornings."
             }

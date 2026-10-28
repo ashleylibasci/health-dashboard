@@ -99,63 +99,85 @@ Duplicates are merged; the IDs in brackets are the testers' own.
 ## Wrong numbers and contradictions
 | ID | Problem | Seen by | Status |
 |---|---|---|---|
-| N1 | One night shows three sleep totals. "7h 35m asleep" includes 14 min awake, the stage tiles add up to 7h 21m, and fell asleep 12:42am → woke 7:21am is 6h 39m. The chart's VoiceOver summary is from a different night. | Sam S1, Maya M4 | |
-| N2 | HRV and resting HR each show two values with opposite verdicts for the same night. The hero says "43 ms, 6% below usual"; the chart card says "46 ms, right around your usual 46 ms". Resting HR is 70 vs 68. | Sam S2, Maya M5, Jordan J10, Priya P2, Riley R4 | |
-| N3 | Five different "tonight" plans: Today "bed 12:30, up 8:22, 7.9h"; Sleep "tonight 8h 24m"; sick check "aim for 8h 54m"; Why off "bed by 12:00am"; Watch "7h 55m". Wake times 8:22, 8:25 and 8:30 aren't explained. Today's plan is shorter than the need and doesn't say so. | Sam S3, Jordan J9, Priya P3, Maya M15 | |
-| N4 | The same recovery of 69 is "Take it steady" on Today and the Watch but "Go easy" on Energy. | Priya P4 | |
-| N5 | Body clock shows the free-day sleep midpoint as both 5:21am and 5:50am, unlabelled. | Sam S8, Maya M7, Jordan J11 | |
-| N6 | Example data feeds claims about her: "7 of 7 with a recorded night" under "no nights yet", "best days had in common" from 3 days, badges "3 of 9 earned", "Caffeine scientist 14/21", "cutoff test 14 of 21 nights", "In bed on time 2 nights in a row". | Sam S5, S6, Tessa T5 | |
-| N7 | The "7 nights on time" badge shows 5/7 ("in a row") while the current streak is 2. | Sam S6, Maya M12 | |
-| N8 | "VO₂ max 38.2 · Below average for a 20-year-old" with age not set. | Sam S7, Maya M6, Priya P12, Riley R3 | |
+| N1 | One night shows three sleep totals. "7h 35m asleep" includes 14 min awake, the stage tiles add up to 7h 21m, and fell asleep 12:42am → woke 7:21am is 6h 39m. The chart's VoiceOver summary is from a different night. | Sam S1, Maya M4 | Fixed |
+| N2 | HRV and resting HR each show two values with opposite verdicts for the same night. The hero says "43 ms, 6% below usual"; the chart card says "46 ms, right around your usual 46 ms". Resting HR is 70 vs 68. | Sam S2, Maya M5, Jordan J10, Priya P2, Riley R4 | Fixed (the -demoSick example still shows a chart from ordinary nights) |
+| N3 | Five different "tonight" plans: Today "bed 12:30, up 8:22, 7.9h"; Sleep "tonight 8h 24m"; sick check "aim for 8h 54m"; Why off "bed by 12:00am"; Watch "7h 55m". Wake times 8:22, 8:25 and 8:30 aren't explained. Today's plan is shorter than the need and doesn't say so. | Sam S3, Jordan J9, Priya P3, Maya M15 | Fixed: each wake time named; 11:05pm explained as whole sleep cycles; Settings counts time asleep like Today |
+| N4 | The same recovery of 69 is "Take it steady" on Today and the Watch but "Go easy" on Energy. | Priya P4 | Fixed |
+| N5 | Body clock shows the free-day sleep midpoint as both 5:21am and 5:50am, unlabelled. | Sam S8, Maya M7, Jordan J11 | Fixed |
+| N6 | Example data feeds claims about her: "7 of 7 with a recorded night" under "no nights yet", "best days had in common" from 3 days, badges "3 of 9 earned", "Caffeine scientist 14/21", "cutoff test 14 of 21 nights", "In bed on time 2 nights in a row". | Sam S5, S6, Tessa T5 | Fixed: example reasons and recap say so; no pattern from one night |
+| N7 | The "7 nights on time" badge shows 5/7 ("in a row") while the current streak is 2. | Sam S6, Maya M12 | Fixed |
+| N8 | "VO₂ max 38.2 · Below average for a 20-year-old" with age not set. | Sam S7, Maya M6, Priya P12, Riley R3 | Fixed |
 | N9 | The cycle view invents a period: with no period logged it fell back to the example cycle ("day 22 of ~29", P days on Oct 6–10, "Late luteal… before your period", a luteal allowance in the sick check, "Day 22 · Luteal" on Log). This affected a hormonal-IUD user with spotting only and a first-time natural user. It's a regression of round-1 B3. | Jordan J1, J2, J7, J8, Tessa T4 | Fixed: no cycle day without a logged period |
-| N10 | Period length is fixed at 5 days: a logged day 6 shows as Follicular, and the prediction is a day short. | Sam S4 | |
-| N11 | Body tile "Day 53" vs Cycle and Log "52 days since". | Riley R5 | |
-| N12 | Watch Energy page: "22% Second wind" puts energy left next to an energy-score zone name. | Priya P5 | |
-| N13 | Watch Log: "0 mg today" plus a red "Past your cutoff. It may cost you sleep." | Priya P9, Sam S9 | |
-| N14 | "Typical 74" / "a typical 78" with no source. The stress band is called "Usual" with no personal baseline. | Sam S11, S12, Tessa T16 | |
-| N15 | "Paying back 15–30 minutes a night for a week clears most of it" (it clears 35–70% of 5h). | Maya M8 | |
-| N16 | Too much precision: deep sleep "+2m vs usual", "aim for 8h 54m". | Sam S10 | |
+| N10 | Period length is fixed at 5 days: a logged day 6 shows as Follicular, and the prediction is a day short. | Sam S4 | Fixed: the predicted period is as long as hers |
+| N11 | Body tile "Day 53" vs Cycle and Log "52 days since". | Riley R5 | Fixed: the chart's "so far" matches the hero |
+| N12 | Watch Energy page: "22% Second wind" puts energy left next to an energy-score zone name. | Priya P5 | Fixed |
+| N13 | Watch Log: "0 mg today" plus a red "Past your cutoff. It may cost you sleep." | Priya P9, Sam S9 | Fixed |
+| N14 | "Typical 74" / "a typical 78" with no source. The stress band is called "Usual" with no personal baseline. | Sam S11, S12, Tessa T16 | Fixed: "starting point" everywhere, and the ⓘ says where 78 and 74 come from |
+| N15 | "Paying back 15–30 minutes a night for a week clears most of it" (it clears 35–70% of 5h). | Maya M8 | Fixed |
+| N16 | Too much precision: deep sleep "+2m vs usual", "aim for 8h 54m". | Sam S10 | Partly: one-night stage differences still to the minute |
 
 ## Women's health and tone
 | ID | Problem | Seen by | Status |
 |---|---|---|---|
-| H1 | Settings → Your pack shows "Skip this break" with no pregnancy caveat (the Cycle screen has one) and no "one-phase packs only" note. | Maya M1 | |
-| H2 | No-period methods still get period wording and nags: "This eases once your period starts", "period on 0 days in 2 months", a "Full cycle tracked 0/2" badge, a "NEXT PERIOD" header, "hormonal iud". | Jordan J3, J4, J5, J14, J15, Maya M14 | |
-| H3 | Settings ("most still ovulate, so the app shows phases") and Accuracy tips ("most hormonal methods stop ovulation") disagree for the hormonal IUD. | Jordan J6 | |
-| H4 | The sick check fired ("Sick check: likely · 4 signals"), but Today has no sick card and "Why do I feel off?" says "Most likely: sleep debt". | Priya P1 | |
-| H5 | The irregular view's "Your last 2 cycles" chart draws no bars (the data is in the element tree: 58 and 47 days). | Riley R1 | |
-| H6 | With eating-disorder history on, Fitness still shows "below average", "your peak was 41.0", "Down 2.8", and Water says "1.9 bottles behind a steady pace". | Riley R3, R9 | |
-| H7 | PMDD is on, but the stress check-in (where she picks 5, "very stressed") has no 988 row. | Riley R8 | |
-| H8 | Pill 25 is "break" on 21+7 but "placebo" on 24+4. | Maya M3 | |
-| H9 | Melatonin window 11:37pm–12:37am sits at sleep onset (melatonin starts ~2h before). "Afternoon dip… not lunch" overstates. | Maya M11 | |
-| H10 | The caffeine cutoff copy is hard to parse ("No time left today when your Latte clears enough…", "Cutoff: Early only"). "Regular coffee 95 mg" vs a "Drip coffee 140 mg" chip. The 25 mg bedtime goal has no source. | Maya M9, M10 | |
-| H11 | Clock-change copy: "For an evening type, falling back is a free hour earlier" reads backwards. | Jordan J13 | |
+| H1 | Settings → Your pack shows "Skip this break" with no pregnancy caveat (the Cycle screen has one) and no "one-phase packs only" note. | Maya M1 | Fixed |
+| H2 | No-period methods still get period wording and nags: "This eases once your period starts", "period on 0 days in 2 months", a "Full cycle tracked 0/2" badge, a "NEXT PERIOD" header, "hormonal iud". | Jordan J3, J4, J5, J14, J15, Maya M14 | Fixed; a hormonal IUD or mini pill with no period logged now gets its method's view, not "log your next period" |
+| H3 | Settings ("most still ovulate, so the app shows phases") and Accuracy tips ("most hormonal methods stop ovulation") disagree for the hormonal IUD. | Jordan J6 | Fixed |
+| H4 | The sick check fired ("Sick check: likely · 4 signals"), but Today has no sick card and "Why do I feel off?" says "Most likely: sleep debt". | Priya P1 | Fixed |
+| H5 | The irregular view's "Your last 2 cycles" chart draws no bars (the data is in the element tree: 58 and 47 days). | Riley R1 | Fixed |
+| H6 | With eating-disorder history on, Fitness still shows "below average", "your peak was 41.0", "Down 2.8", and Water says "1.9 bottles behind a steady pace". | Riley R3, R9 | Fixed: fitness age, the history line, the age prompt and the water pace line are hidden too |
+| H7 | PMDD is on, but the stress check-in (where she picks 5, "very stressed") has no 988 row. | Riley R8 | Not seen on screen (the 988 row shows at level 4 or 5 with PMDD on) |
+| H8 | Pill 25 is "break" on 21+7 but "placebo" on 24+4. | Maya M3 | Fixed |
+| H9 | Melatonin window 11:37pm–12:37am sits at sleep onset (melatonin starts ~2h before). "Afternoon dip… not lunch" overstates. | Maya M11 | Partly: the Energy copy is right; Body clock still shows an 11:37pm–12:37am melatonin window |
+| H10 | The caffeine cutoff copy is hard to parse ("No time left today when your Latte clears enough…", "Cutoff: Early only"). "Regular coffee 95 mg" vs a "Drip coffee 140 mg" chip. The 25 mg bedtime goal has no source. | Maya M9, M10 | Fixed: the cutoff is for the 12 oz drip coffee (140 mg) the copy names |
+| H11 | Clock-change copy: "For an evening type, falling back is a free hour earlier" reads backwards. | Jordan J13 | Fixed |
 
 ## Large text (AX5) and VoiceOver
 | ID | Problem | Seen by | Status |
 |---|---|---|---|
-| A1 | Label-beside-value rows don't stack, so words break into letters: "Be / dti / me" (bedtime, onboarding and Settings), "Tak / e it / ste / ad / y" (Recovery card), "Wh / en / did / yo / u…" (Log), "Sk / ip" / "N / ot / se / t" (Age), "Ex / ac / t / si / ze". | Tessa T1, T3, T7, T8, T22 | |
-| A2 | Settings › Cycle: the picker value is drawn one letter per line and overlaps Health conditions, Redo setup and Water. | Tessa T2 | |
-| A3 | Two-column Body tiles truncate every title ("Rest…", "Bre…") and the HRV pill reads "H / R / V / 6 / 4 / % / 3". | Tessa T10, Priya P11 | |
-| A4 | Times and numbers break across lines ("8:2 / 5", "5: / 21 / am", "38 / .2"), as do phase names and "Endometriosi / s". | Tessa T11 | |
-| A5 | Chart axis labels overprint ("2pmbed12:30", "9a12p3p6p9pm"); the stress legend breaks into letters. | Tessa T12, T13 | |
-| A6 | Segmented controls stay ~11 pt and 32 pt tall. "Female" is preselected on an "all optional" step. | Tessa T9 | |
-| A7 | At AX5 the example-data banner fills the first screen of every tab and sub-screen. | Tessa T6 | |
-| A8 | The log-time chips scroll sideways and hide "1 hr ago" and "2 hr ago". | Tessa T7 | |
-| A9 | VoiceOver: the banner icon reads "Search Document"; "First,, about you"; "What is How stressed do you feel??"; chart audio graphs read minutes-of-day and ml; the inner time pickers are just "Time Picker". | Tessa T18–T21 | |
-| A10 | "Streaks and wins" title has no left gutter; "Step 3 / of 5" and a lone "?" wrap. | Tessa T14, T23 | |
+| A1 | Label-beside-value rows don't stack, so words break into letters: "Be / dti / me" (bedtime, onboarding and Settings), "Tak / e it / ste / ad / y" (Recovery card), "Wh / en / did / yo / u…" (Log), "Sk / ip" / "N / ot / se / t" (Age), "Ex / ac / t / si / ze". | Tessa T1, T3, T7, T8, T22 | Fixed (the quick-log drink card stacks too; not re-shot at AX5) |
+| A2 | Settings › Cycle: the picker value is drawn one letter per line and overlaps Health conditions, Redo setup and Water. | Tessa T2 | Partly: no overlap, but "Natural cycle" is clipped |
+| A3 | Two-column Body tiles truncate every title ("Rest…", "Bre…") and the HRV pill reads "H / R / V / 6 / 4 / % / 3". | Tessa T10, Priya P11 | Fixed |
+| A4 | Times and numbers break across lines ("8:2 / 5", "5: / 21 / am", "38 / .2"), as do phase names and "Endometriosi / s". | Tessa T11 | Partly: the alarm time keeps together; the sleep-stage axis and long phase names still wrap |
+| A5 | Chart axis labels overprint ("2pmbed12:30", "9a12p3p6p9pm"); the stress legend breaks into letters. | Tessa T12, T13 | Partly: the sleep-stage axis |
+| A6 | Segmented controls stay ~11 pt and 32 pt tall. "Female" is preselected on an "all optional" step. | Tessa T9 | Partly: nothing preselected; the water steppers are still small |
+| A7 | At AX5 the example-data banner fills the first screen of every tab and sub-screen. | Tessa T6 | Fixed |
+| A8 | The log-time chips scroll sideways and hide "1 hr ago" and "2 hr ago". | Tessa T7 | Fixed (the common-drink chips wrap too) |
+| A9 | VoiceOver: the banner icon reads "Search Document"; "First,, about you"; "What is How stressed do you feel??"; chart audio graphs read minutes-of-day and ml; the inner time pickers are just "Time Picker". | Tessa T18–T21 | Fixed: charts read as one element with a summary |
+| A10 | "Streaks and wins" title has no left gutter; "Step 3 / of 5" and a lone "?" wrap. | Tessa T14, T23 | Fixed |
 
 ## Units, colour and polish
 | ID | Problem | Seen by | Status |
 |---|---|---|---|
-| U1 | The default bottle is 16.9 oz (500 ml) and the goal is "3.8 bottles". The 64 oz goal never rises on training days. | Priya P6, P7, Tessa T17 | |
-| U2 | Wrist temperature is in °C only. | Priya P8 | |
-| U3 | Stress "Raised" and "High" have the same brightness (hue-only), and the bars are under 3:1 on white. Locked badges are about 3:1. | Riley R2, R6 | |
-| U4 | The caffeine timing strip relies on colour alone (green next to salmon); "Show as one line" on the 988 card isn't styled as a control. | Riley R10, R7 | |
-| U5 | Onboarding step total changes mid-flow ("Step 2 of 5" → "Step 3 of 6"). | Maya M13 | |
-| U6 | No am/pm on "Bed by 12:30, up 8:22". | Jordan J12 | |
-| U7 | The energy curve's range is tiny (53–59), so scrubbing reads flat. | Priya P13 | |
-| U8 | Welcome screen jargon (HRV, VO₂ max) has no plain gloss. | Tessa T15 | |
+| U1 | The default bottle is 16.9 oz (500 ml) and the goal is "3.8 bottles". The 64 oz goal never rises on training days. | Priya P6, P7, Tessa T17 | Partly: 24 oz bottle and quarter bottles; the goal doesn't rise on training days |
+| U2 | Wrist temperature is in °C only. | Priya P8 | Fixed |
+| U3 | Stress "Raised" and "High" have the same brightness (hue-only), and the bars are under 3:1 on white. Locked badges are about 3:1. | Riley R2, R6 | Fixed; Raised hours also get a ● |
+| U4 | The caffeine timing strip relies on colour alone (green next to salmon); "Show as one line" on the 988 card isn't styled as a control. | Riley R10, R7 | Fixed |
+| U5 | Onboarding step total changes mid-flow ("Step 2 of 5" → "Step 3 of 6"). | Maya M13 | Fixed |
+| U6 | No am/pm on "Bed by 12:30, up 8:22". | Jordan J12 | Fixed (the weekend shift too) |
+| U7 | The energy curve's range is tiny (53–59), so scrubbing reads flat. | Priya P13 | Partly: the readout helps, but the curve is still flat |
+| U8 | Welcome screen jargon (HRV, VO₂ max) has no plain gloss. | Tessa T15 | Fixed |
+
+## Round 3 re-check (same evening, after the fixes)
+The same six testers re-checked their items on fresh simulator screens (each setup re-shot from the merged round 3 build, then again after the fixes below). The Status column above is the result. New problems they found, all fixed unless marked open:
+
+- Hormonal IUD with no period logged got the irregular/PCOS view ("your cycles vary a lot", "log the first day of your next period"). Now it gets the method's own view (`CycleDisplay.make`, tested).
+- The example stress day drew hours that hadn't happened yet and hours she was asleep for. Now it shows only past, awake hours.
+- Energy listed two sleep debts (5h 37m and 5h 06m). The score's row is now "Debt from earlier nights", since last night has its own row.
+- "Your latte now would still be about 140 mg at bedtime" for a 130 mg drink. It now says that's the total, "with what you've already had".
+- The sick check said "All clear" and then "part of this could be your cycle". The cycle note and the tips heading now follow the result.
+- Under eating-disorder history, Fitness still showed fitness age and a falling history line, and Water drew a "steady pace" line. All hidden now. The Body tile shows VO₂ max as a number.
+- The Fitness tile said "Age 26" with no age set. It now says "Fitness age 26". Settings and Fitness both say "Compared with: Women / Men", with nothing preselected.
+- "This week" sat over last night's sleep and today's drinks, so it's now "At a glance". Today's ring says "7h 21m", not "7.3h".
+- The stress scale used two vocabularies. The Stress screen now uses the Log's words.
+- Water: "about 2½ bottles" for 2.67 is now "about 2¾" (quarters). The "Add" and "Set" buttons were squeezed into letters.
+- Large text: the quick-log drink card broke "Latte" into letters (it stacks now), the common-drink chips scrolled sideways (they wrap now), and Today's ⓘ covered its labels.
+- Polish: "1 points", "worst day" (now "lowest day"), "social jetlag", the weekend shift without am/pm, "hrv" in lowercase, and "· Off" wrapping alone on the alarm chip.
+
+Still open:
+- Large text: the sleep-stage axis, long phase names ("Follicu / lar"), "Natural cycle" clipped in Settings, ring captions touching their rings, a few "…" truncations in Settings and Wins, the floating gear over card text.
+- Contrast in light mode: REM bars and Awake ticks under 3:1 on the grey track, grey axis labels at 3.2–3.5:1, and an almost invisible empty progress track on Wins.
+- U1: the water goal doesn't rise on training days. U7: the energy curve is flat over a small range. N16: stage differences to the minute.
+- Not built yet: friend streaks, a doctor-ready export, pill-taken logging and reminders.
 
 ## Works on real screens
 Pack dates (pill 18 → break Sat Oct 31; 24+4 switch), withdrawal-bleed wording, no ovulation predictions on the pill, caffeine on the pill (~9h half-life matches the copy), the 12:30am bedtime used everywhere and "Tue night" labelling, smart alarm off by default, water in oz with no ml on screen, chart scrubbing (a sideways drag scrubs, a vertical drag scrolls the page), energy left agrees from phone to Watch, irregular cycle copy (no countdown, no "late", an honest note), 988 buttons in light mode, the calories toggle explains why it's off, exercise tips swapped out under ED history, example data labelled on every phone and Watch screen, no cycle preselected, conditions say what they change, ⓘ on Today's jargon, spoken chart summaries, no unlabelled buttons.

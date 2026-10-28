@@ -257,7 +257,8 @@ struct TodayView: View {
                           note: heart ? SleepText.signed(model.restingHRDelta) : "no reading",
                           topic: .restingHR)
                 MiniGauge(fraction: fresh ? Double(model.lastNight.asleep) / 540 : 0, accent: .mint,
-                          value: fresh ? SleepText.hours(model.lastNight.asleep) : "\u{2014}", title: "Sleep",
+                          // "7h 21m", as the Sleep tile and screen say it (round 3).
+                          value: fresh ? Clock.duration(model.lastNight.asleep) : "\u{2014}", title: "Sleep",
                           note: sleepVsNeedWord, topic: .sleepNeed)
             }
             if !heart {
@@ -314,7 +315,8 @@ struct TodayView: View {
     }
 
     private var sickDetail: String {
-        let flagged = model.illness.factors.filter(\.flagged).map { $0.name.lowercased() }
+        // Lowercase mid-sentence, but keep acronyms ("HRV", not "hrv").
+        let flagged = model.illness.factors.filter(\.flagged).map { $0.name == $0.name.uppercased() ? $0.name : $0.name.lowercased() }
         var detail = flagged.isEmpty
             ? "Several of your signals moved at once."
             : "Your " + joined(flagged) + (flagged.count == 1 ? " is" : " are") + " off your usual."
@@ -415,7 +417,8 @@ struct TodayView: View {
             } else {
                 state = "On"
             }
-            alarmText = "Smart alarm by \(Clock.format(plan.alarmWindow.end)) \u{00B7} " + state
+            // Non-breaking around the dot, so "· Off" never wraps on its own.
+            alarmText = "Smart alarm by \(Clock.format(plan.alarmWindow.end))\u{00A0}\u{00B7}\u{00A0}" + state
         } else {
             alarmText = "Plan your wake time"
         }
@@ -468,7 +471,9 @@ struct TodayView: View {
 
     private var weekHeader: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("This week").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+            // Last night's sleep and today's drinks, water and stress: not a
+            // week (round 3). The week is behind "Weekly recap".
+            Text("At a glance").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
             Spacer()
             NavigationLink {
                 WeekRecapView()
@@ -719,6 +724,7 @@ private struct MiniGauge: View {
     var note: String
     var topic: Topic
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -736,7 +742,7 @@ private struct MiniGauge: View {
                     .rotationEffect(.degrees(135))
                     .opacity(fraction > 0 ? 1 : 0)
                 Text(value)
-                    .font(.scaledNumber(value.count > 3 ? 15 : 17))
+                    .font(.scaledNumber(value.count > 5 ? 13 : value.count > 3 ? 15 : 17))
                     .lineLimit(1)
                     .minimumScaleFactor(0.4)
                     .padding(.horizontal, 8)
@@ -748,7 +754,9 @@ private struct MiniGauge: View {
                 Text(title).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
                     .lineLimit(2).minimumScaleFactor(0.6)
                     .multilineTextAlignment(.center)
-                InfoButton(topic: topic).padding(.vertical, -12).padding(.horizontal, -10)
+                // The tight fit only at regular sizes: at accessibility sizes
+                // the bigger ⓘ sat on the label's letters (round 3).
+                InfoButton(topic: topic).padding(.vertical, -12).padding(.horizontal, typeSize.isAccessibilitySize ? 0 : -10)
             }
             Text(note).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(accent.ink(scheme))
                 .lineLimit(2).minimumScaleFactor(0.6)

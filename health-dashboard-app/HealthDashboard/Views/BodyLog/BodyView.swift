@@ -327,11 +327,15 @@ struct BodyView: View {
                      note: model.wristTempDelta == nil ? "Wear your Watch to bed" : wristNote)
         case .fitness:
             BodyTile(title: "Fitness", accent: .mint, systemImage: "figure.run",
-                     value: model.fitnessAgeText.map { "Age \($0.lowercased())" } ?? "\u{2013}",
+                     // "Fitness age", so it never reads as her own age (round 3).
+                     // Under eating-disorder history: VO₂ max as a plain number,
+                     // with no fitness age or ranking (round 3, H6).
+                     value: model.hidesActivityNumbers
+                        ? (model.vo2Max.map { String(format: "%.1f", $0) } ?? "\u{2013}")
+                        : (model.fitnessAgeText.map { "Fitness age \($0.lowercased())" } ?? "\u{2013}"),
                      note: model.vo2Max.map { v in
                          let value = "VO\u{2082} max \(String(format: "%.1f", v))"
-                         // No "below average" ranking with an eating-disorder history.
-                         return model.hidesActivityNumbers ? value : "\(value) \u{00B7} \(model.fitnessLevelShown ?? "")"
+                         return model.hidesActivityNumbers ? "VO\u{2082} max" : "\(value) \u{00B7} \(model.fitnessLevelShown ?? "")"
                      } ?? "Needs a few outdoor walks")
         case .calories:
             BodyTile(title: "Calories", accent: .orange, systemImage: "flame.fill",

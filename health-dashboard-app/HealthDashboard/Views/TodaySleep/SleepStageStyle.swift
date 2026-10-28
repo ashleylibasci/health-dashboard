@@ -90,11 +90,6 @@ enum SleepText {
         return (minutes < 0 ? "\u{2212}" : "+") + compact(minutes)
     }
 
-    /// "7.6h".
-    static func hours(_ minutes: Int) -> String {
-        String(format: "%.1fh", Double(minutes) / 60)
-    }
-
     /// Where the sleep need comes from: "learned from 42 nights", or while the
     /// numbers are still examples, "example until 14 nights (3 of 14 so far)".
     @MainActor

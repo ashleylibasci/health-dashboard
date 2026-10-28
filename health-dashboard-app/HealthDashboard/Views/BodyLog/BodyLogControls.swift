@@ -432,10 +432,17 @@ struct SleepScheduleControl: View {
         if inBed > 14 * 60 {
             return base + " That\u{2019}s a lot. Check that bedtime and up-by are both right."
         }
-        if inBed + 15 < need {
-            return base + " Shorter than your sleep need of about \(Clock.duration(need)), so you\u{2019}d build sleep debt."
+        // Time asleep, not time in bed, against the need, as Today counts it
+        // (round 3: Settings said "enough" while Today said 45 min short).
+        let asleep = max(inBed - AppModel.planLatency, 0)
+        let tonight = model.tonightPlan.need
+        let debtNote = tonight > need + 10
+            ? " Tonight you need \(Clock.duration(tonight)), to pay back some sleep debt; Today shows when to go to bed for it."
+            : ""
+        if asleep + 10 < need {
+            return base + " About \(Clock.duration(asleep)) of sleep once you drift off, less than your usual need of about \(Clock.duration(need)), so you\u{2019}d build sleep debt." + debtNote
         }
-        return base + " Enough for your sleep need of about \(Clock.duration(need))."
+        return base + " About \(Clock.duration(asleep)) of sleep once you drift off, enough for your usual need of about \(Clock.duration(need))." + debtNote
     }
 
     var body: some View {

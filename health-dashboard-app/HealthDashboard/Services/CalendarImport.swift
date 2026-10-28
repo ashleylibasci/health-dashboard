@@ -20,18 +20,28 @@ struct CalendarEvent: Equatable {
 /// Where exams are read from. Read-only: the app never changes a calendar.
 enum CalendarSource: String {
     case apple, google
+    /// A calendar's secret iCal address (Google: "Secret address in iCal
+    /// format"), kept in the Keychain. Works without Google sign-in.
+    case link
 
-    var name: String { self == .apple ? "Apple Calendar" : "Google Calendar" }
+    var name: String {
+        switch self {
+        case .apple: "Apple Calendar"
+        case .google: "Google Calendar"
+        case .link: "your calendar link"
+        }
+    }
 }
 
 enum CalendarImportError: LocalizedError {
-    case denied, notConfigured, cancelled, signedOut, failed(String)
+    case denied, notConfigured, cancelled, signedOut, badLink, failed(String)
     var errorDescription: String? {
         switch self {
         case .denied: "Calendar access is off for Health Next. Turn it on in Settings \u{2192} Health Next \u{2192} Calendars."
         case .notConfigured: "Google sign-in isn\u{2019}t set up in this build."
         case .cancelled: "Sign-in was cancelled."
         case .signedOut: "Google signed you out. Connect again to keep finding exams."
+        case .badLink: "That doesn\u{2019}t look like a calendar link. It should start with https:// or webcal:// and end in .ics."
         case let .failed(message): message
         }
     }
@@ -64,6 +74,9 @@ final class CalendarImport: ObservableObject {
                 guard granted else { throw CalendarImportError.denied }
             case .google:
                 try await GoogleAuth.shared.signIn()
+            case .link:
+                // Needs the address: `connectLink` handles it.
+                return
             }
             setSource(new)
             await check(model: model, force: true)
@@ -72,9 +85,33 @@ final class CalendarImport: ObservableObject {
         }
     }
 
+    /// Reads the link once before keeping it, so a wrong address says so
+    /// right away instead of failing later in the background.
+    func connectLink(_ text: String, model: AppModel) async {
+        error = nil
+        guard let url = ICSFeed.url(from: text) else {
+            error = CalendarImportError.badLink.localizedDescription
+            return
+        }
+        working = true
+        defer { working = false }
+        do {
+            let events = try await ICSFeed.events(from: url)
+            if source == .google { GoogleAuth.shared.signOut() }
+            Keychain.set(url.absoluteString, for: ICSFeed.account)
+            setSource(.link)
+            model.mergeCalendarExams(events, source: CalendarSource.link.rawValue)
+            lastChecked = .now
+            UserDefaults.standard.set(lastChecked, forKey: Self.checkedKey)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     /// Stops reading the calendar. Exams already imported stay in the list.
     func disconnect() {
         if source == .google { GoogleAuth.shared.signOut() }
+        Keychain.set(nil, for: ICSFeed.account)
         setSource(nil)
         error = nil
     }
@@ -94,7 +131,14 @@ final class CalendarImport: ObservableObject {
         working = true
         defer { working = false }
         do {
-            let events = source == .apple ? try appleEvents() : try await GoogleCalendarAPI.events()
+            let events: [CalendarEvent]
+            switch source {
+            case .apple: events = try appleEvents()
+            case .google: events = try await GoogleCalendarAPI.events()
+            case .link:
+                guard let url = Keychain.get(ICSFeed.account).flatMap(URL.init(string:)) else { throw CalendarImportError.badLink }
+                events = try await ICSFeed.events(from: url)
+            }
             model.mergeCalendarExams(events, source: source.rawValue)
             lastChecked = .now
             UserDefaults.standard.set(lastChecked, forKey: Self.checkedKey)
@@ -362,7 +406,41 @@ enum GoogleCalendarAPI {
     }
 }
 
-/// The Google refresh token, in the phone's Keychain rather than in settings.
+// MARK: - Calendar link
+
+/// A calendar's secret iCal address: fetched and read with HealthCore's
+/// `ICSCalendar`. The address works like a password, so it's kept in the
+/// Keychain and never shown in full.
+enum ICSFeed {
+    static let account = "calendarICSURL"
+
+    /// Accepts https:// and webcal:// addresses (webcal is https underneath).
+    static func url(from text: String) -> URL? {
+        var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.lowercased().hasPrefix("webcal://") { s = "https://" + s.dropFirst(9) }
+        guard let url = URL(string: s), url.scheme?.lowercased() == "https", url.host != nil else { return nil }
+        return url
+    }
+
+    static func events(from url: URL) async throws -> [CalendarEvent] {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200, let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+            throw CalendarImportError.failed(code == 404
+                ? "That calendar link doesn\u{2019}t work any more. If you reset the secret address, paste the new one."
+                : "Couldn\u{2019}t read the calendar link (error \(code)).")
+        }
+        guard text.contains("BEGIN:VCALENDAR") else { throw CalendarImportError.badLink }
+        let cal = Calendar.current
+        return ICSCalendar.parse(text, timeZone: cal.timeZone).compactMap { e in
+            guard let day = cal.date(from: DateComponents(year: e.year, month: e.month, day: e.day)) else { return nil }
+            return CalendarEvent(id: e.id, title: e.title, day: cal.startOfDay(for: day), start: e.start)
+        }
+    }
+}
+
+/// The Google refresh token and the calendar link, in the phone's Keychain
+/// rather than in settings.
 enum Keychain {
     private static let service = "com.ashleylibasci.healthdashboard.next"
 

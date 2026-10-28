@@ -22,9 +22,16 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
   - The `AppModel+*.swift` extensions hold derived values.
   - `Model/Explanations.swift` has the plain-language text behind every ⓘ.
   - `Views/` holds the screens. `Views/Components/` has the shared pieces: `Screen`, `Card`, `InfoButton`, `HowWeGotThisLink`, `ChartReadout`, `chartScrub` + `ScrubSurface` (UIKit touch layer for charts), `SampleDataBanner`, and `Font.scaled` (Dynamic Type).
-  - `Services/` has the clock-change bedtime reminders and the peak/dip and sick notifications.
+  - `Services/` has the clock-change bedtime reminders, the peak/dip and sick notifications, and the features ported from the old app:
+    - `BackgroundHealth.swift`: Apple Health wakes the app when sleep, caffeine, water, periods, resting HR, HRV or wrist temperature change; the app refreshes and updates the Watch. Off on example data and in demo mode.
+    - `PhoneBackupAlarm.swift`: an AlarmKit iPhone alarm at the smart alarm's latest time, cancelled when she stops the Watch alarm (iOS 26.1+; the setting says so on older iOS).
+    - `CalendarImport.swift`: exams from Apple Calendar (EventKit), Google Calendar (OAuth with PKCE, refresh token in the Keychain) or a secret iCal link (`ICSFeed`, address in the Keychain). Imported exams are keyed by `AppData.Exam.source`, so re-imports never duplicate and never touch exams she added or edited. The card is in the exam list, Settings → Exams and onboarding's last step.
+    - `Shortcuts.swift`: Siri / Shortcuts / Spotlight "Log a latte" (`Shared/LogLatteIntent.swift`).
+- `HealthDashboardWidgets/`: Home Screen and Lock Screen widgets (Recovery, Cycle, Caffeine & water with a "log a latte" button, Bedtime streak). They read `WidgetSnapshot` from the App Group.
+- `HealthDashboardWatchWidgets/`: Watch-face complications (Recovery, Cycle, Caffeine, Bedtime).
 - `HealthDashboardWatch/`: Watch pages and `SmartAlarm.swift` (WKExtendedRuntimeSession smart alarm).
-- `Shared/`: HealthKit access (`HealthKitService`), phone↔Watch sync (`WatchSync`), and the theme.
+- `Shared/`: HealthKit access (`HealthKitService`), phone↔Watch sync (`WatchSync`), `WidgetSnapshot`, the latte intent and the theme.
+- App Group: the old app's `group.com.ashleylibasci.healthdashboard` (a free team can't register a new one), with Health Next's own keys (`next.widgetSnapshot.v1`, `next.pendingDrinks.v1`) so the two apps' widgets never mix.
 
 ## Conventions
 - Plain language for a college student; every number and term gets an ⓘ. Method details go behind "Learn how we got this number", never on the main page.
@@ -49,6 +56,18 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 4. Test round 2: same testers re-checked and found ~60 smaller issues/regressions; all fixed. See TEST-FINDINGS.md (bottom section lists what's still open).
 5. Ashley asked for: water in oz, choosing where she is in her pack in Settings (Settings → Your pack, also on the Cycle screen and in onboarding), bedtime and wake time at any hour.
 
+6. Round 3 on the Mac (Oct 27, 2026): real builds, the simulator test round, and the six student testers (the "student-testers" BMad party) on real screens. Findings and their status are in TEST-FINDINGS.md. The old app's features were ported in the same session (see Layout).
+
+## Simulator test round
+`HealthDashboardUITests/TestRound.swift`, one tester setup at a time, e.g.
+```
+TEST_RUNNER_SHOT_DIR=/folder TEST_RUNNER_DEMO_ARGS="-resetData -demoCycle pill" \
+  xcodebuild test -project HealthDashboard.xcodeproj -scheme HealthDashboard \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -parallel-testing-enabled NO \
+  -only-testing:HealthDashboardUITests/TestRound/test8ScreensDark
+```
+Xcode 27.1 can hang after the suite reports on this simulator; stop `xcodebuild` once the log says the suite passed or failed. Use a separate `-derivedDataPath` so it doesn't fight the device build.
+
 ## What a Mac session can do that the cloud couldn't
 - Build and run in the Simulator:
   ```
@@ -66,6 +85,10 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 ## Verify first on the Mac
 - Build both targets with the real SDK (Xcode 27.1 / iOS 27 SDK on her Mac; targets are iOS 17 / watchOS 10). The cloud only type-checked the iPhone app against stand-ins and syntax-checked the Watch app.
 - Highest-risk files: `HealthDashboardWatch/SmartAlarm.swift`, `HealthDashboardWatch/Pages/EnergyPage.swift` (crown + tap), `Views/Components/ScrubSurface.swift` (UIKit gestures), `Views/Components/ScaledFont.swift`, `Services/Nudges.swift` (notification delegate).
+
+## Not checked on a device yet
+- The widgets and complications on a real Home Screen and Watch face, Siri "Log a latte", the AlarmKit backup ringing, and calendar import with real events.
+- Google sign-in: the OAuth client is the old app's (made for `com.ashleylibasci.healthdashboard`). If Google refuses it for Health Next, add an iOS OAuth client for `com.ashleylibasci.healthdashboard.next` in Google Cloud and put its id in `GoogleConfig`; until then the calendar link works for Google Calendar.
 
 ## Not built yet
 - Friend streaks.

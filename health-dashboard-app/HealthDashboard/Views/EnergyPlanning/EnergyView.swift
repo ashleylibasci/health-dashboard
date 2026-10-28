@@ -641,11 +641,11 @@ private struct EnergyCurveChart: View {
 
     var body: some View {
         Chart {
-            bandMark
-            curveMarks
-            extremeMarks
-            nowMarks
-            selectionMarks
+            bandMark.accessibilityHidden(true)
+            curveMarks.accessibilityHidden(true)
+            extremeMarks.accessibilityHidden(true)
+            nowMarks.accessibilityHidden(true)
+            selectionMarks.accessibilityHidden(true)
         }
         .chartXScale(domain: start...end)
         .chartYScale(domain: -8.0...112.0)
@@ -775,8 +775,8 @@ private struct EnergyBankChart: View {
 
     var body: some View {
         Chart {
-            lineMarks
-            markers
+            lineMarks.accessibilityHidden(true)
+            markers.accessibilityHidden(true)
         }
         .chartXScale(domain: wake...max(bedtime, wake + 60))
         .chartYScale(domain: 0.0...100.0)

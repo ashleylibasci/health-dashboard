@@ -11,7 +11,7 @@ extension AppModel {
     /// One thing pushing today's energy score up or down, in points.
     struct EnergyDriver: Identifiable, Hashable {
         var id: String { name }
-        /// "Sleep debt 2h 40m"
+        /// "Debt from earlier nights 2h 40m"
         var name: String
         /// Short phrase for sentences: "sleep debt".
         var cause: String
@@ -38,7 +38,9 @@ extension AppModel {
                 return EnergyDriver(name: "Slept \(Clock.duration(d.amount)) (need \(Clock.duration(need)))",
                                     cause: short ? "a short night" : "a long night", points: d.points)
             case .sleepDebt:
-                return EnergyDriver(name: "Sleep debt \(Clock.duration(d.amount))", cause: "sleep debt", points: d.points)
+                // Not the Sleep debt tile's number: last night is its own row
+                // above, so this is the debt from the nights before it (round 3).
+                return EnergyDriver(name: "Debt from earlier nights \(Clock.duration(d.amount))", cause: "sleep debt", points: d.points)
             case .wokeFromDeepSleep:
                 return EnergyDriver(name: "Woke from deep sleep", cause: "waking mid-cycle", points: d.points)
             case .wakeTime:

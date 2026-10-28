@@ -52,10 +52,10 @@ public enum CaffeineModel {
         }
     }
 
-    /// Latest time for a typical 100 mg drink so under 25 mg is left at
-    /// bedtime, rounded down to the half hour.
-    public static func cutoff(bedtime: Minutes, halfLifeHours: Double = 5) -> Minutes {
-        let hours = halfLifeHours * log2(100.0 / 25.0) + 0.5
+    /// Latest time for one drink of `mg` (100 by default) so under 25 mg is
+    /// left at bedtime, rounded down to the half hour.
+    public static func cutoff(bedtime: Minutes, halfLifeHours: Double = 5, mg: Double = 100) -> Minutes {
+        let hours = halfLifeHours * log2(max(mg, 25) / 25.0) + 0.5
         let raw = bedtime - Int(hours * 60)
         return raw - ((raw % 30) + 30) % 30
     }

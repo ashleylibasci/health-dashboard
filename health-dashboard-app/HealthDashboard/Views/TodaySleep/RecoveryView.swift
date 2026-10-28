@@ -408,8 +408,9 @@ private struct MovedRow: View {
     private var fraction: CGFloat { CGFloat(min(Double(abs(points)) / 10, 1)) }
 
     private var effectDescription: String {
-        if points < 0 { return "pulled recovery down \(abs(points)) points" }
-        if points > 0 { return "lifted recovery \(points) points" }
+        let n = abs(points) == 1 ? "1 point" : "\(abs(points)) points"
+        if points < 0 { return "pulled recovery down \(n)" }
+        if points > 0 { return "lifted recovery \(n)" }
         return "no change"
     }
 

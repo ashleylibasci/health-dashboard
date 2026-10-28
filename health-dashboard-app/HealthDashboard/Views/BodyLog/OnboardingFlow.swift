@@ -810,6 +810,8 @@ struct OnboardingFlow: View {
                 SettingToggleRow(title: "Light mode", detail: "Dark is the default. Change it anytime in Settings.",
                                  systemImage: "sun.max.fill", accent: .yellow, isOn: lightMode)
             }
+            // Optional: exams from her calendar, so exam weeks are planned for.
+            CalendarImportCard()
             PrimaryButton(title: "Start learning my normal", action: finish)
             Text("Notifications ask for permission when you finish. Your own numbers replace the example ones after 14 nights.")
                 .font(.scaled(size: 13))

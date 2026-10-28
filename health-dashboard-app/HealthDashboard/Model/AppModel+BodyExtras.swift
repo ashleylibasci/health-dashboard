@@ -281,7 +281,7 @@ extension BirthControl {
         switch ovulation {
         case .stopped: return "The \(inSentence) stops ovulation, so the app doesn\u{2019}t show ovulation or luteal phases for you."
         case .sometimes: return "On the \(inSentence), ovulation may or may not happen, so cycle phases are shown as rough estimates."
-        case .mostStill: return "Most people still ovulate on the \(inSentence), so the app still shows your cycle phases."
+        case .mostStill: return "Most people still ovulate on the \(inSentence), so the app shows your cycle phases once you log a period. If your periods have stopped, it keeps a history of any bleeding you log instead."
         case .natural: return "You ovulate as normal on the \(inSentence), so the app shows your cycle phases."
         }
     }

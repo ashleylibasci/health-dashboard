@@ -88,8 +88,9 @@ struct AppData: Codable {
     var sickAlerts = true
     var drinksTracking = true
     var peakDipNudges = true
-    /// For fitness age.
-    var sex: FitnessAge.Sex = .female
+    /// For fitness age. Nil until she picks one: nothing is preselected on an
+    /// optional step, and there's no fitness age until then (round 3, A6).
+    var sex: FitnessAge.Sex?
     var ageYears: Int?
 
     /// Pill, ring or patch: the day she took pill 1 (or put in the ring /

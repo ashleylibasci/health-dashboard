@@ -22,6 +22,10 @@ extension View {
             }
         }
         .chartAxisTextCapped()
+        // One VoiceOver element per chart: its summary and audio graph (set
+        // after this), never Swift Charts' own per-mark elements, which read
+        // raw values like "400 to 500" (minutes) or ml (round 3, A9).
+        .accessibilityElement(children: .ignore)
     }
 
     /// Axis labels grow with the text size up to xxLarge, then stop: at the

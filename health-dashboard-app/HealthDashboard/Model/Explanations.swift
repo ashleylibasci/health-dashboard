@@ -48,7 +48,7 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "The stretch just before your melatonin window, when it helps to start slowing down.",
             forYou: "Dim the lights, put screens down or on night mode, and do something calm. It makes falling asleep much easier.")
         case .energyScore: Explanation(id: id, title: "Energy score",
-            meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It's a different number from energy left, which is a battery for right now. Your usual is shown next to it (a typical value until there's a week of your own nights).",
+            meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It's a different number from energy left, which is a battery for right now. Your usual is shown next to it. Until there are 7 days of your own, that's a starting point of 74: a fixed middle-of-the-range value the app begins from, not anyone's measured average.",
             forYou: "Below usual means today will feel harder than normal. It's mostly driven by sleep debt and how rested your body is.",
             howWeGotIt: "We use the two-process model of sleep, the standard model sleep researchers use: sleep pressure that builds while you're awake and clears while you sleep, plus your body clock's daily rhythm. Sleep debt flattens your peaks.")
         case .energyBank: Explanation(id: id, title: "Energy left",
@@ -104,7 +104,7 @@ enum Topic: String, CaseIterable, Identifiable {
         case .recovery: Explanation(id: id, title: "Recovery",
             meaning: "How ready your body is today, from 0 to 100, compared with your own usual.",
             forYou: "Lower than usual means your body is still catching up (from short sleep, stress, illness, alcohol or a hard workout). Take it easier; higher means it's a good day to push.",
-            howWeGotIt: "Mostly from your HRV (from readings taken while you slept, once there are enough) and resting heart rate compared with your last 30 days, plus last night's sleep compared with your need. Whether a score counts as below or above usual depends on how much yours normally moves.")
+            howWeGotIt: "Mostly from your HRV (from readings taken while you slept, once there are enough) and resting heart rate compared with your last 30 days, plus last night's sleep compared with your need. Whether a score counts as below or above usual depends on how much yours normally moves. Your usual is your own average once there are 7 days; before that the app compares with a starting point of 78, a fixed middle-of-the-range value, not anyone's measured average. (Sleep need takes longer, 14 nights, because it learns from how your body responds to different amounts of sleep.)")
         case .hrv: Explanation(id: id, title: "HRV (heart rate variability)",
             meaning: "The tiny variation in time between heartbeats. Higher than your usual generally means your body is relaxed and recovered; lower means it's under strain.",
             forYou: "Only compare HRV with your own usual, never with other people's. It naturally dips late in your cycle, after drinking and when you're getting sick.")
@@ -139,7 +139,7 @@ enum Topic: String, CaseIterable, Identifiable {
         case .caffeineCutoff: Explanation(id: id, title: "Caffeine cutoff",
             meaning: "The latest time to have caffeine so that very little is left in your body at bedtime.",
             forYou: "Caffeine takes about 5 hours for half of it to leave your body, and about twice that on the combined pill, ring or patch (the app uses the longer time if you use one). So an afternoon coffee is still partly there at midnight, even if you can fall asleep. It makes sleep lighter.",
-            howWeGotIt: "The latest time a 100 mg drink (a small coffee; a 12 oz drip coffee is about 140 mg) would be down to under 25 mg by your planned bedtime, rounded down to the half hour. A bigger drink needs to be earlier; the Caffeine screen tells you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then the cutoff shows as \u{201C}None today\u{201D}, and the app tells you the biggest single drink you could have soon after waking instead.")
+            howWeGotIt: "The latest time a 12 oz drip coffee (140 mg) would be down to under 25 mg by your planned bedtime, rounded down to the half hour. A smaller drink, like a single espresso, can be a little later and a bigger one needs to be earlier; the Caffeine screen tells you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then the cutoff shows as \u{201C}None today\u{201D}, and the app tells you the biggest single drink you could have soon after waking instead.")
         case .caffeineLeft: Explanation(id: id, title: "Caffeine left at bedtime",
             meaning: "How much of today's caffeine is predicted to still be in your body when you go to bed.",
             forYou: "Under 25 mg is the goal. That's about a fifth of a 12 oz drip coffee.",

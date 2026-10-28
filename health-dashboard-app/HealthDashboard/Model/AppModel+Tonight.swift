@@ -32,12 +32,17 @@ extension AppModel {
         guard !p.coversNeed else { return nil }
         var text: String
         if p.bedtimeTooLateForNeed {
-            text = "Bed at \(Clock.format(p.bedtime)) and up by \(Clock.format(p.upBy)) leaves \(Clock.duration(p.timeInBedAllowed)) in bed, less than the \(Clock.duration(p.need)) you need tonight."
-            text += " About \(Clock.duration(p.expectedAsleep)) asleep, \(Clock.duration(p.shortfall)) short."
+            // One wake time per sentence, named, so it doesn't read as a
+            // second plan next to the headline's best wake (round 3, N3).
+            text = "Even staying in bed until \(Clock.format(p.upBy)), the latest you can get up, that\u{2019}s \(Clock.duration(p.timeInBedAllowed)) in bed: at most about \(Clock.duration(p.mostSleepAllowed)) asleep, \(Clock.duration(max(p.need - p.mostSleepAllowed, 0))) short of the \(Clock.duration(p.need)) you need tonight."
         } else {
             text = "About \(Clock.duration(p.expectedAsleep)) asleep, \(Clock.duration(p.shortfall)) short of tonight\u{2019}s \(Clock.duration(p.need))."
         }
-        if let bed = p.bedtimeToCoverNeed { text += " Bed by \(Clock.format(bed)) covers it." }
+        // Whole sleep cycles, so the wake still lands at the end of one; say
+        // so, or it looks like more than the shortfall (round 3, N3).
+        if let bed = p.bedtimeToCoverNeed {
+            text += " Bed by \(Clock.format(bed)) covers it with whole sleep cycles, so you still wake at the end of one."
+        }
         return text
     }
 

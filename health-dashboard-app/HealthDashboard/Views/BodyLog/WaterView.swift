@@ -144,6 +144,7 @@ struct WaterView: View {
                 } label: {
                     Text("Add")
                         .font(.scaled(size: 15, weight: .bold))
+                        .fixedSize()   // never squeezed into letters (round 3)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 44)
                         .foregroundStyle(Color(hex: 0x00111F))
@@ -198,6 +199,9 @@ struct WaterView: View {
     private var run: [WaterRunPoint] { model.waterRun(from: chartStart, to: min(model.now, chartEnd)) }
 
     private var paceLine: [WaterRunPoint] {
+        // No pace to keep up with under eating-disorder history: the line
+        // was the "behind a steady pace" nag as a picture (round 3, H6).
+        guard !model.hidesActivityNumbers else { return [] }
         let start = model.lastNight.wake
         let end = 1440 + store.data.bedtime - 60
         return [WaterRunPoint(time: start, ml: 0), WaterRunPoint(time: end, ml: goalML)]
@@ -222,7 +226,9 @@ struct WaterView: View {
         let atThatTime = model.todaysWater.filter { model.appDayMinutes($0.date) == t }.map(\.ml).reduce(0, +)
         var detail = "\(pct)% of your goal."
         if atThatTime > 0 { detail = "You drank \(LogFormat.oz(atThatTime)) here. " + detail }
-        if t > model.now {
+        if model.hidesActivityNumbers {
+            if t > model.now { detail = "Later today." }
+        } else if t > model.now {
             detail = "Later today. A steady pace reaches \(LogFormat.oz(model.waterPace(at: t))) by then."
         } else {
             detail += " A steady pace would be about \(LogFormat.oz(model.waterPace(at: t))) by then."
@@ -368,6 +374,7 @@ struct WaterView: View {
                 } label: {
                     Text("Set")
                         .font(.scaled(size: 15, weight: .bold))
+                        .fixedSize()   // never squeezed into letters (round 3)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 44)
                         .foregroundStyle(Accent.blue.ink(scheme))
@@ -460,13 +467,15 @@ private struct WaterDayChart: View {
                     .foregroundStyle(Accent.blue.fill(scheme))
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
             }
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             ForEach(pace) { p in
                 LineMark(x: .value("Time", p.time), y: .value("Water", p.ml), series: .value("Line", "Pace"))
                     .foregroundStyle(Palette(scheme: scheme).tertiary)
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
             }
+            .accessibilityHidden(true)   // VoiceOver reads the chart's summary instead (round 3, A9)
             goalRule
-            selectionMarks
+            selectionMarks.accessibilityHidden(true)
         }
         .chartScrub($selection)
         .chartXScale(domain: start...end)

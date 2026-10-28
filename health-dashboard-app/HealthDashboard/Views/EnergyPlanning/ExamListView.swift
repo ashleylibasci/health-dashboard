@@ -291,11 +291,13 @@ struct ExamExampleTag: View {
 
 /// "Find exams on your calendar": connect Apple or Google Calendar once, and
 /// exams on it (events with exam, midterm, final, quiz or test in the title)
-/// join the list and stay up to date.
-private struct CalendarImportCard: View {
+/// join the list and stay up to date. Also in Settings and onboarding.
+struct CalendarImportCard: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject private var importer = CalendarImport.shared
     @Environment(\.colorScheme) private var scheme
+    @State private var showLink = false
+    @State private var link = ""
 
     var body: some View {
         Card {
@@ -320,13 +322,14 @@ private struct CalendarImportCard: View {
                 .tint(Accent.indigo.ink(scheme))
                 .frame(minHeight: 44)
             } else {
-                Text("Connect a calendar and your exams show up here on their own.")
+                Text("Connect a calendar and your exams join your exam list on their own.")
                     .font(.scaled(size: 14)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 10) { buttons }
                     VStack(alignment: .leading, spacing: 10) { buttons }
                 }
+                linkEntry
             }
             if let error = importer.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -341,6 +344,46 @@ private struct CalendarImportCard: View {
     private var buttons: some View {
         connectButton(.apple, systemImage: "calendar")
         connectButton(.google, systemImage: "globe")
+    }
+
+    /// The secret iCal address: for a Google Calendar when Google sign-in
+    /// doesn't work, or a school calendar.
+    @ViewBuilder
+    private var linkEntry: some View {
+        // Plain buttons in the accent ink: inside onboarding's card a tint
+        // alone left them white, like body text (round 3).
+        Button(showLink ? "Hide calendar link" : "Or paste a calendar link") {
+            withAnimation { showLink.toggle() }
+        }
+        .buttonStyle(.plain)
+        .font(.scaled(size: 15, weight: .semibold))
+        .foregroundStyle(Accent.indigo.ink(scheme))
+        .multilineTextAlignment(.leading)
+        .frame(minHeight: 44)
+        if showLink {
+            SecureField("Secret address (https:// or webcal://)", text: $link)
+                .textContentType(.URL)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.scaled(size: 15))
+                .padding(12)
+                .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Button(importer.working ? "Checking\u{2026}" : "Use this link") {
+                Task {
+                    await importer.connectLink(link, model: model)
+                    if importer.source == .link { link = ""; showLink = false }
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.scaled(size: 15, weight: .bold))
+            .foregroundStyle(Accent.indigo.ink(scheme))
+            .frame(minHeight: 44)
+            .disabled(importer.working || link.trimmingCharacters(in: .whitespaces).isEmpty)
+            Text("In Google Calendar on a computer: Settings \u{2192} your calendar \u{2192} \u{201C}Secret address in iCal format.\u{201D} Treat it like a password: it\u{2019}s kept in your phone\u{2019}s Keychain.")
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func connectButton(_ source: CalendarSource, systemImage: String) -> some View {

@@ -91,6 +91,9 @@ public enum CycleDisplay: Hashable, Sendable {
             }
             if bc.ovulation == .stopped { return .suppressed(bc) }
         }
+        // Hormonal IUD or mini pill with no period logged: periods often stop,
+        // so her method's own view, never "log your next period" (round 3, J1).
+        if cycleDay == nil, let bc = birthControl, bc == .hormonalIUD || bc == .miniPill { return .suppressed(bc) }
         if irregular { return .irregular(daysSinceLastPeriod: cycleDay.map { $0 - 1 }) }
         guard let d = cycleDay else { return .irregular(daysSinceLastPeriod: nil) }
         if d > cycleLength + overdueGraceDays {
@@ -110,8 +113,8 @@ public enum CycleDisplay: Hashable, Sendable {
     /// A natural cycle is (or may be) running but the app can't tell which
     /// phase she's in: irregular/PCOS, overdue, the grace days past her usual
     /// length, or a method that may keep ovulation once phases aren't shown.
-    /// Signals that also move with the cycle (resting heart rate, HRV,
-    /// temperature) then get the luteal allowance, with a caveat.
+    /// The app gives no luteal allowance then (it doesn't assume a phase it
+    /// can't see) but says the cycle might be part of a change.
     public var cyclePhaseUnknown: Bool {
         switch self {
         case .irregular, .overdue: return true
@@ -260,13 +263,16 @@ public struct IllnessSignal: Hashable, Sendable {
     public var confidence: Confidence
     public var factors: [Factor]
     /// Her cycle phase isn't known (irregular, PCOS, overdue…), so a rise
-    /// from the second half of her cycle can't be ruled out. The luteal
-    /// allowance was applied; screens and alerts should say so.
+    /// from the second half of her cycle can't be ruled out. Screens and
+    /// alerts should say so. Whether an allowance was applied depends on the
+    /// `cyclePhaseUnknown` argument to `evaluate` (the app passes false and
+    /// sets this flag afterwards, for the wording only).
     public var cyclePhaseUnknown: Bool = false
 
     /// `cyclePhaseUnknown`: a natural cycle whose phase the app can't tell.
-    /// It gets the same allowances as the luteal phase (the safer side: no
-    /// false alarm from a normal cycle change), and the result says so.
+    /// When true it gets the same allowances as the luteal phase and the
+    /// result says so. The app passes false (round 3, H4): no allowance for a
+    /// phase it can't see, so the sick check matches Today and "Why off".
     public static func evaluate(restingHRDelta: Double, hrvDeltaPct: Double, respiratoryRateDelta: Double?, wristTempDelta: Double?,
                                 lutealPhase: Bool, hardTrainingYesterday: Bool = false, cyclePhaseUnknown: Bool = false) -> IllnessSignal {
         var score = 0.0

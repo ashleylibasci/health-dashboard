@@ -574,25 +574,26 @@ enum LogFormat {
         return String(format: "%.1f", tenth)
     }
 
-    /// Bottle counts to the nearest half: "1½", "2", "½" (Priya U1: no
-    /// "3.8 bottles"). Under a quarter of a bottle reads "0".
+    /// Bottle counts to the nearest quarter: "1½", "2¾", "¼" (Priya U1: no
+    /// "3.8 bottles"; round 3: 2.67 isn't "2½", which falls 4 oz short).
+    /// Under an eighth of a bottle reads "0".
     static func bottles(_ value: Double) -> String {
-        let halves = max((value * 2).rounded() / 2, 0)
-        let whole = Int(halves)
-        let half = halves - Double(whole) >= 0.5
-        if whole == 0 && half { return "\u{00BD}" }
-        return half ? "\(whole)\u{00BD}" : "\(whole)"
+        let quarters = Int(max((value * 4).rounded(), 0))
+        let whole = quarters / 4
+        let part = ["", "\u{00BC}", "\u{00BD}", "\u{00BE}"][quarters % 4]
+        if whole == 0 && !part.isEmpty { return part }
+        return "\(whole)\(part)"
     }
 
-    /// True when `bottles` had to round (more than a sliver off a half).
+    /// True when `bottles` had to round (more than a sliver off a quarter).
     static func bottlesRounded(_ value: Double) -> Bool {
-        abs((value * 2).rounded() / 2 - value) >= 0.05
+        abs((value * 4).rounded() / 4 - value) >= 0.05
     }
 
-    /// "½ bottle", "1 bottle", "about 2½ bottles", "2 bottles".
+    /// "½ bottle", "1 bottle", "about 2¾ bottles", "2 bottles".
     static func bottlesPhrase(_ value: Double) -> String {
         let text = bottles(value)
-        let plural = (value * 2).rounded() / 2 > 1 || text == "0"
+        let plural = (value * 4).rounded() / 4 > 1 || text == "0"
         return (bottlesRounded(value) ? "about " : "") + "\(text) bottle" + (plural ? "s" : "")
     }
 

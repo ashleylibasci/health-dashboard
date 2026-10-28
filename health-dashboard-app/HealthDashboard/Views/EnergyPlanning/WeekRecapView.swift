@@ -79,7 +79,9 @@ struct WeekRecapView: View {
         else { headline = "Right around \(usual)" }
         var sub = "\(weekday(recap.best.date, .wide)) was your best day, \(weekday(recap.worst.date, .wide)) your lowest."
         if recap.worst.bedtime >= lateBedtime || recap.worst.asleep < model.sleepNeed.minutes - 30 {
-            sub += " Most of the drop traces back to \(weekday(dayBefore(recap.worst.date), .wide)) night."
+            // One night can explain one day; it isn't a pattern (round 3, N6).
+            let late = recap.worst.bedtime >= lateBedtime
+            sub += " \(weekday(dayBefore(recap.worst.date), .wide)) night was " + (late ? "a late one" : "short") + ", which likely played a part."
         }
         return Card(accent: .indigo) {
             HStack(spacing: 18) {
@@ -303,7 +305,7 @@ struct WeekRecapView: View {
         let date = w.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
         return Card(accent: .coral) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("What your worst day had").font(.scaled(size: 17, weight: .bold))
+                Text("What your lowest day had").font(.scaled(size: 17, weight: .bold))
                 Text("\(date) · energy \(w.energy)").font(.scaled(size: 13)).secondaryText()
             }
             if recap.worstDayIssues.isEmpty {

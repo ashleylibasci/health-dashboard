@@ -194,6 +194,7 @@ struct SavedDrinkRow: View {
     var featured: Bool
     var trailingSystemImage: String?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(drink: Drink, featured: Bool = false, trailingSystemImage: String? = "plus") {
         self.drink = drink
@@ -208,13 +209,20 @@ struct SavedDrinkRow: View {
         let sub: Color = featured ? Color(hex: 0x1A1400, alpha: 0.78) : p.secondary
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
-        HStack(spacing: 12) {
-            Image(systemName: BodyLogStyle.symbol(for: drink.icon))
-                .font(.scaled(size: 17, weight: .semibold))
-                .foregroundStyle(featured ? ink : accent.ink(scheme))
-                .frame(width: 40, height: 40)
-                .background(featured ? Color.black.opacity(0.12) : accent.fill(scheme).opacity(0.24), in: Circle())
-                .accessibilityHidden(true)
+        // At accessibility sizes the row stacks (no icon, mg under the name),
+        // so "Latte" never breaks into letters (round 3, A1).
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 12))
+        layout {
+            if !typeSize.isAccessibilitySize {
+                Image(systemName: BodyLogStyle.symbol(for: drink.icon))
+                    .font(.scaled(size: 17, weight: .semibold))
+                    .foregroundStyle(featured ? ink : accent.ink(scheme))
+                    .frame(width: 40, height: 40)
+                    .background(featured ? Color.black.opacity(0.12) : accent.fill(scheme).opacity(0.24), in: Circle())
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(drink.name)
                     .font(.scaled(size: 15, weight: .bold))
@@ -227,12 +235,15 @@ struct SavedDrinkRow: View {
                     if drink.isCustom { CustomDrinkBadge() }
                 }
             }
-            Spacer(minLength: 8)
-            Text("\(drink.caffeineMg) mg").font(.scaledNumber(17)).lineLimit(1).fixedSize()
-            if let trailingSystemImage {
-                Image(systemName: trailingSystemImage)
-                    .font(.scaled(size: 15, weight: .bold))
-                    .accessibilityHidden(true)
+            if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
+            HStack(spacing: 12) {
+                Text("\(drink.caffeineMg) mg").font(.scaledNumber(17)).lineLimit(1).fixedSize()
+                if typeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                if let trailingSystemImage {
+                    Image(systemName: trailingSystemImage)
+                        .font(.scaled(size: 15, weight: .bold))
+                        .accessibilityHidden(true)
+                }
             }
         }
         .foregroundStyle(ink)

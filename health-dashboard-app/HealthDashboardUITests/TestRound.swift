@@ -257,29 +257,33 @@ final class TestRound: XCTestCase {
         launch(appearance: appearance, textSize: textSize)
         sleep(2)
 
-        // Pack setting: Settings → Your pack.
-        goTab("Body")
-        tap("Settings")
-        tap("Pack type")
-        shot("pack-1-settings")
-        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Today is'")).firstMatch
-        if picker.waitForExistence(timeout: 3) {
-            picker.tap(); sleep(1)
-            shot("pack-2-menu")
-            pickMenuItem("Pill 25"); sleep(1)
-            shot("pack-3-set-placebo")
+        // Pack setting: Settings → Your pack. Only pack methods have one
+        // (the default setup, and -demoCycle pill).
+        let demoArgs = ProcessInfo.processInfo.environment["DEMO_ARGS"] ?? ""
+        if !demoArgs.contains("-demoCycle") || demoArgs.contains("-demoCycle pill") {
+            goTab("Body")
+            tap("Settings")
+            tap("Pack type")
+            shot("pack-1-settings")
+            let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Today is'")).firstMatch
+            if picker.waitForExistence(timeout: 3) {
+                picker.tap(); sleep(1)
+                shot("pack-2-menu")
+                pickMenuItem("Pill 25"); sleep(1)
+                shot("pack-3-set-placebo")
+            }
+            let p24 = app.buttons["24 + 4"]
+            if p24.exists { p24.tap(); sleep(1); shot("pack-4-type-24-4") }
+            let p21 = app.buttons["21 + 7"]
+            if p21.exists { p21.tap(); sleep(1) }
+            if picker.exists { picker.tap(); sleep(1); pickMenuItem("Pill 18"); sleep(1) }
+            back()
+            // The Cycle screen after the change.
+            tap("Cycle")
+            sleep(1)
+            shotPage("cycle", maxPages: 4)
+            back()
         }
-        let p24 = app.buttons["24 + 4"]
-        if p24.exists { p24.tap(); sleep(1); shot("pack-4-type-24-4") }
-        let p21 = app.buttons["21 + 7"]
-        if p21.exists { p21.tap(); sleep(1) }
-        if picker.exists { picker.tap(); sleep(1); pickMenuItem("Pill 18"); sleep(1) }
-        back()
-        // The Cycle screen after the change.
-        tap("Cycle")
-        sleep(1)
-        shotPage("cycle", maxPages: 4)
-        back()
 
         // Coffee at a custom time: Log → "Pick another time" → 8:15 → a drink.
         goTab("Log")
