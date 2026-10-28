@@ -181,6 +181,7 @@ struct BodyView: View {
                 MetricRow(title: "Fitness",
                           note: fitnessNote,
                           value: model.vo2Max.map { String(format: "%.1f", $0) },
+                          verdict: fitnessVerdict,
                           systemImage: "figure.run", accent: .mint) { FitnessView() }
                 RowDivider()
                 MetricRow(title: "Body clock", note: chronotypeNote,
@@ -197,7 +198,20 @@ struct BodyView: View {
     private var fitnessNote: String {
         guard model.vo2Max != nil else { return "Needs a few outdoor walks" }
         if model.hidesActivityNumbers { return "VO\u{2082} max" }
+        // With the verdict beside it there's room for the unit only; the
+        // fitness age is one tap down (F29).
+        if fitnessVerdict != nil { return "VO\u{2082} max \u{00B7} ml/kg/min" }
         return model.fitnessAgeText.map { "VO\u{2082} max \u{00B7} fitness age \($0.lowercased())" } ?? "VO\u{2082} max"
+    }
+
+    /// "Above average" / "About average" / "Below average" for women her
+    /// age, the health team's bands (`fitnessLevel`), under the number (F29).
+    /// None without her age, or with an eating-disorder history.
+    private var fitnessVerdict: RowVerdict? {
+        guard !model.hidesActivityNumbers, let level = model.fitnessLevel else { return nil }
+        let band = level.components(separatedBy: " for ").first?.components(separatedBy: " compared").first ?? level
+        let accent: Accent = band.hasPrefix("Above") ? .mint : band.hasPrefix("Below") ? .blue : .indigo
+        return RowVerdict(text: band, accent: accent)
     }
 
     private var chronotypeNote: String {
