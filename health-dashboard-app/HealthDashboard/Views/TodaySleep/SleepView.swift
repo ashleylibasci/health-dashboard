@@ -133,7 +133,7 @@ struct SleepView: View {
             if let plan {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(Clock.format(plan.alarmWindow.end, suffix: false)).font(.scaledNumber(40))
-                    Text("\(SleepText.meridiem(plan.alarmWindow.end)) latest \u{00B7} window opens \(Clock.format(plan.alarmWindow.start))")
+                    Text("\(SleepText.meridiem(plan.alarmWindow.end)) latest \u{00B7} listens from \(Clock.format(plan.alarmWindow.start)) \u{00B7} up by \(Clock.format(store.data.upBy))")
                         .font(.scaled(size: 14, weight: .semibold))
                         .foregroundStyle(p.secondary)
                 }
@@ -166,7 +166,7 @@ struct SleepView: View {
                     WakePlanView()
                 } label: {
                     HStack(spacing: 6) {
-                        Text("Best time to wake \(model.nextWakeDayLabel.lowercased()): \(Clock.format(plan.wake, suffix: false))")
+                        Text("Best time to wake \(model.nextWakeDayLabel.lowercased()): \(Clock.format(plan.wake))")
                             .font(.scaled(size: 15, weight: .bold))
                         Image(systemName: "chevron.right").font(.scaled(size: 12, weight: .bold)).accessibilityHidden(true)
                     }
@@ -196,7 +196,7 @@ struct SleepView: View {
             .padding(.horizontal, 4)
             Divider()
             LinkRow(title: "Your sleep need: \(Clock.duration(need.minutes))",
-                    subtitle: "Tonight \(Clock.duration(model.tonightNeed.total)), " + SleepText.needSource(model),
+                    subtitle: "Tonight \(model.tonightNeedText), " + SleepText.needSource(model),
                     systemImage: "bed.double.fill", accent: .purple) {
                 SleepNeedView()
             }

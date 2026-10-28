@@ -70,7 +70,7 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "This is the amount to aim for tonight.")
         case .sleepDebt: Explanation(id: id, title: "Sleep debt",
             meaning: "How much sleep you've missed compared with your need, over the last two weeks. Recent nights count most.",
-            forYou: "Sleep debt flattens your energy peaks and deepens your dips. You don't have to pay it all back at once; 15 to 30 extra minutes a night for a week works.")
+            forYou: "Sleep debt flattens your energy peaks and deepens your dips. You don't have to pay it all back at once: tonight's need adds about a tenth of your debt (up to 45 minutes a night), so a big debt comes down over a week or two.")
         case .sleepStages: Explanation(id: id, title: "Sleep stages",
             meaning: "Through the night you cycle through light (core) sleep, deep sleep and REM sleep, about every 90 minutes, with brief wake-ups that are normal.",
             forYou: "Deep sleep comes mostly early in the night and REM mostly near morning, so going to bed late cuts deep sleep, and waking early cuts REM.")

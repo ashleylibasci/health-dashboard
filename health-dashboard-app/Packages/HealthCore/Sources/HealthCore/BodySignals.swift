@@ -78,7 +78,8 @@ public enum CycleDisplay: Hashable, Sendable {
     /// her usual length, but a long gap is expected on them (bleeding often
     /// gets lighter or stops), so they never show `.overdue`.
     public static func make(tracking: Bool, irregular: Bool, birthControl: BirthControl?, cycleDay: Int?, cycleLength: Int,
-                            packDay: Int? = nil, activeDays: Int? = nil, packLength: Int? = nil) -> CycleDisplay {
+                            packDay: Int? = nil, activeDays: Int? = nil, packLength: Int? = nil,
+                            periodLength: Int = CycleEstimator.typicalPeriodLength) -> CycleDisplay {
         guard tracking else { return .notTracking }
         if let bc = birthControl {
             if bc.hasBreakWeek {
@@ -96,7 +97,7 @@ public enum CycleDisplay: Hashable, Sendable {
             if let bc = birthControl, bc == .hormonalIUD || bc == .miniPill { return .suppressed(bc) }
             return .overdue(day: d, typicalLength: cycleLength)
         }
-        return .phases(day: d, length: cycleLength, phase: CycleEstimator.phase(day: d, length: cycleLength))
+        return .phases(day: d, length: cycleLength, phase: CycleEstimator.phase(day: d, length: cycleLength, periodLength: periodLength))
     }
 
     /// Phases, but past her usual length (the 3 grace days before overdue):
@@ -161,8 +162,10 @@ public struct StressDay: Hashable, Sendable {
         /// down from the workout, so it isn't counted as stress.
         public var coolingDown: Bool = false
     }
-    /// The one label set used everywhere stress is named.
-    public enum Label: String, Sendable, CaseIterable { case low = "Low", usual = "Usual", raised = "Raised", high = "High" }
+    /// The one label set used everywhere stress is named. The bands are
+    /// fixed points on the 0–100 level, so the middle one is "Moderate", not
+    /// "Usual": it isn't a personal baseline (Sam N14).
+    public enum Label: String, Sendable, CaseIterable { case low = "Low", usual = "Moderate", raised = "Raised", high = "High" }
 
     public var hours: [Hour]
     /// Average over awake, still hours only.

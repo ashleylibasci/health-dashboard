@@ -225,7 +225,7 @@ extension AppModel {
     func tryThis(for reason: OffReason) -> String {
         switch reason.topic {
         case .sleepDebt?:
-            return "Be in bed by \(Clock.format(store.data.bedtime - 30)) tonight. Paying back 15 to 30 minutes a night for a week clears most of it."
+            return "Be in bed by \(Clock.format(tonightAimBedtime)) tonight for your \(tonightNeedText). \(debtPaybackSentence)"
         case .lateNight?:
             return "Be in bed by \(Clock.format(store.data.bedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
         case .luteal?:
@@ -271,21 +271,27 @@ extension AppModel {
     var badges: [Badge] {
         let cal = Calendar.current
         let streakList = streaks
-        let onTimeLongest = streakList.first { $0.title == "In bed on time" }?.longest ?? 0
-        let needLongest = streakList.first { $0.title == "Met your sleep need" }?.longest ?? 0
+        let onTime = streakList.first { $0.title == "In bed on time" }
+        let need = streakList.first { $0.title == "Met your sleep need" }
+        /// "N in a row" badges: earned once the longest run reached N; until
+        /// then progress is the current streak (round 3, N7).
+        func inARow(_ s: StreakInfo?, _ goal: Int) -> Int {
+            guard let s else { return 0 }
+            return s.longest >= goal ? goal : min(s.current, goal)
+        }
         let waterByDay = Dictionary(grouping: store.data.waterLog) { cal.startOfDay(for: $0.date) }
         let waterDays = waterByDay.values.filter { $0.map(\.ml).reduce(0, +) >= store.data.waterGoalML }.count
         let bed = Clock.format(store.data.bedtime)
         let test = cutoffTest
         var out: [Badge] = [
             Badge(title: "First week tracked", systemImage: "moon.stars.fill", accent: .purple,
-                  progress: min(nights.count, 7), goal: 7, howTo: "Wear your Watch to bed for 7 nights."),
+                  progress: min(realNights.count, 7), goal: 7, howTo: "Wear your Watch to bed for 7 nights."),
             Badge(title: "7 nights on time", systemImage: "bed.double.fill", accent: .indigo,
-                  progress: min(onTimeLongest, 7), goal: 7, howTo: "Fall asleep within 20 minutes of your \(bed) bedtime 7 nights in a row."),
+                  progress: inARow(onTime, 7), goal: 7, howTo: "Fall asleep within 20 minutes of your \(bed) bedtime 7 nights in a row."),
             Badge(title: "14 check-ins", systemImage: "checkmark.circle.fill", accent: .mint,
                   progress: min(store.data.checkIns.count, 14), goal: 14, howTo: "Do your morning check-in 14 times."),
             Badge(title: "Slept your need 5 nights running", systemImage: "zzz", accent: .blue,
-                  progress: min(needLongest, 5), goal: 5, howTo: "Get at least your sleep need 5 nights in a row."),
+                  progress: inARow(need, 5), goal: 5, howTo: "Get at least your sleep need 5 nights in a row."),
             Badge(title: "First drink logged", systemImage: "cup.and.saucer.fill", accent: .yellow,
                   progress: min(store.data.drinkLog.count, 1), goal: 1, howTo: "Log a coffee, tea or energy drink."),
             Badge(title: "Hydrated week", systemImage: "drop.fill", accent: .blue,
@@ -294,7 +300,7 @@ extension AppModel {
                   progress: min(test.nightsLogged, test.target), goal: test.target,
                   howTo: "Log your caffeine for \(test.target) days to find your own cutoff time."),
             Badge(title: "30-night streak", systemImage: "flame.fill", accent: .orange,
-                  progress: min(onTimeLongest, 30), goal: 30, howTo: "Fall asleep on time 30 nights in a row."),
+                  progress: inARow(onTime, 30), goal: 30, howTo: "Fall asleep on time 30 nights in a row."),
         ]
         if store.data.cycleSetup != .notTracking {
             let starts = Self.mergedPeriodStarts(health: [], logged: store.data.flowLog).count

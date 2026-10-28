@@ -92,7 +92,7 @@ struct RecoveryView: View {
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 HowWeGotThisLink(title: "Recovery",
-                                 method: "Recovery starts from a typical score of \(AppModel.recoveryAnchor). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. " + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average."))
+                                 method: "Recovery starts from a fixed starting score of \(AppModel.recoveryAnchor), chosen by the app (not a population average). Your HRV this morning compared with your last 30 days moves it most, then your resting heart rate, then how last night's sleep compared with your need. Each input is scored on its own, which is how we show how many points each one moved today. " + (model.recoveryUsualIsPersonal ? "Your usual, \(model.recoveryUsual), is your own average over recent days." : "Once you have 7 days of readings, your usual becomes your own average."))
             }
             .frame(maxWidth: .infinity)
         }
@@ -115,7 +115,7 @@ struct RecoveryView: View {
     private func nightDetail(_ night: AppModel.RecoveryNight) -> String {
         let usual = model.recoveryUsual
         let gap = night.score - usual
-        let word = model.recoveryUsualIsPersonal ? "your usual" : "typical"
+        let word = model.recoveryUsualIsPersonal ? "your usual" : "the starting point"
         let vs = abs(gap) < 3 ? "About \(word)." : gap < 0 ? "\(-gap) below \(word)." : "\(gap) above \(word)."
         let why = night.bedtime >= lateBedtime
             ? " Followed a \(Clock.format(night.bedtime)) bedtime."
@@ -164,7 +164,7 @@ struct RecoveryView: View {
     private func historyCaption(_ history: [AppModel.RecoveryNight]) -> String {
         let usualText = model.recoveryUsualIsPersonal
             ? "The dashed line is your usual, \(model.recoveryUsual)."
-            : "The dashed line is a typical score, \(model.recoveryUsual), until your own usual is known."
+            : "The dashed line is the starting point, \(model.recoveryUsual), until 7 days give your own usual."
         if history.contains(where: { $0.bedtime >= lateBedtime }) {
             return "Peach days followed a bedtime at \(Clock.format(lateBedtime)) or later. " + usualText
         }
@@ -179,7 +179,7 @@ struct RecoveryView: View {
             guard let v = heartMetric == .hrv ? n.hrv : n.restingHR else { return nil }
             return HeartPoint(day: n.day, value: v)
         }
-        let usual = heartMetric == .hrv ? (model.usingSampleData ? SampleData.baselineHRV : model.baselineHRV) : model.baselineRestingHR
+        let usual = heartMetric == .hrv ? model.baselineHRV : model.baselineRestingHR
         let selected = selectedHeartDay.flatMap { d in points.min { abs($0.day.timeIntervalSince(d)) < abs($1.day.timeIntervalSince(d)) } }
         return Card {
             HStack(spacing: 0) {

@@ -35,12 +35,20 @@ extension AppModel {
 
     // MARK: Usual values
 
-    /// "your usual 78" when it's her own average, "a typical 78" otherwise.
+    /// "your usual 78" when it's her own average, otherwise "the starting
+    /// point of 78": a fixed value the app begins from, not a measured norm
+    /// (Sam N14), until 7 days give her own.
     var recoveryUsualPhrase: String {
-        recoveryUsualIsPersonal ? "your usual \(recoveryUsual)" : "a typical \(recoveryUsual)"
+        recoveryUsualIsPersonal ? "your usual \(recoveryUsual)" : "the starting point of \(recoveryUsual)"
     }
     var energyUsualPhrase: String {
-        energyUsualIsPersonal ? "your usual \(energyUsual)" : "a typical \(energyUsual)"
+        energyUsualIsPersonal ? "your usual \(energyUsual)" : "the starting point of \(energyUsual)"
+    }
+    /// For a short note: "Your usual is 78." or "Starting point 78 until
+    /// your own usual (7 days)."
+    var recoveryUsualNote: String {
+        recoveryUsualIsPersonal ? "Your usual is \(recoveryUsual)."
+            : "Starting point \(recoveryUsual) until your own usual (7 days)."
     }
 
     // MARK: Exams
@@ -70,8 +78,12 @@ extension AppModel {
 
     // MARK: Week recap
 
-    /// Real days in last week's recap (example data shows the designs' week).
-    var weekRecapDays: Int { lastWeek.count }
+    /// Days in last week's recap that are her own recorded nights (0 while
+    /// the recap shows the example week).
+    var weekRecapDays: Int {
+        let cal = Calendar.current
+        return lastWeek.filter { realNightDays.contains(cal.startOfDay(for: $0.date)) }.count
+    }
 }
 
 extension AppModel {

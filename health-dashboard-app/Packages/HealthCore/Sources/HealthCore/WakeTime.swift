@@ -139,7 +139,8 @@ public enum WakePlanner {
 
         // Fewest whole cycles that cover the need, ending by the deadline.
         let cyclesForNeed = Int((Double(input.tonightNeed) / Double(input.cycleLength)).rounded(.up))
-        let bedForNeed = input.deadline - cyclesForNeed * input.cycleLength - input.latency
+        // Rounded down to 5 minutes: "bed by 11:05pm", not 11:06pm.
+        let bedForNeed = Int((Double(input.deadline - cyclesForNeed * input.cycleLength - input.latency) / 5).rounded(.down)) * 5
         let into = input.currentAlarmLatest.map { (($0 - onset) % input.cycleLength + input.cycleLength) % input.cycleLength }
 
         return WakePlan(wake: wake, alarmWindow: window, cycles: n, asleep: asleep, shortfall: shortfall,

@@ -53,12 +53,41 @@ public enum Recovery {
     /// "Ready to push" or "Take it steady" for an ordinary day. Without it
     /// the bands are ±5 and −15.
     public static func label(_ score: Int, usual: Int, spread: Double? = nil) -> String {
+        level(score, usual: usual, spread: spread).label
+    }
+
+    /// The four recovery bands. Every screen that names a recovery (the
+    /// label, the Watch, the effort target on Energy) goes through this, so
+    /// one score never gets two different names (Priya N4).
+    public enum Level: Int, Sendable, CaseIterable {
+        case push, onTrack, steady, easy
+        /// "Ready to push", "On track", "Take it steady", "Go easy today".
+        public var label: String {
+            switch self {
+            case .push: return "Ready to push"
+            case .onTrack: return "On track"
+            case .steady: return "Take it steady"
+            case .easy: return "Go easy today"
+            }
+        }
+        /// The effort target for training: "Push", "As planned", "Steady", "Go easy".
+        public var effort: String {
+            switch self {
+            case .push: return "Push"
+            case .onTrack: return "As planned"
+            case .steady: return "Steady"
+            case .easy: return "Go easy"
+            }
+        }
+    }
+
+    public static func level(_ score: Int, usual: Int, spread: Double? = nil) -> Level {
         let k = band(spread: spread)
         let d = Double(score - usual)
-        if d >= k { return "Ready to push" }
-        if d > -k { return "On track" }
-        if d > -3 * k { return "Take it steady" }
-        return "Go easy today"
+        if d >= k { return .push }
+        if d > -k { return .onTrack }
+        if d > -3 * k { return .steady }
+        return .easy
     }
 
     /// Half her day-to-day spread, kept between 5 and 12 points.
@@ -74,11 +103,14 @@ public enum CyclePhase: String, Sendable { case period, follicular, ovulation, l
 
 public enum CycleEstimator {
     /// Phase on `day` (1 = first day of the period) for a cycle of `length`.
-    public static func phase(day: Int, length: Int = 29, periodLength: Int = 5) -> CyclePhase {
+    /// The period length used until her own logs give one.
+    public static let typicalPeriodLength = 5
+
+    public static func phase(day: Int, length: Int = 29, periodLength: Int = typicalPeriodLength) -> CyclePhase {
         guard day >= 1 else { return .unknown }
         let ovulation = length - 14
         switch day {
-        case 1...periodLength: return .period
+        case 1...max(periodLength, 1): return .period
         case ..<(ovulation - 1): return .follicular
         case (ovulation - 1)...(ovulation + 1): return .ovulation
         default: return .luteal
@@ -91,6 +123,32 @@ public enum CycleEstimator {
     /// make one up. See `lengths` for cycles that run longer.
     public static func averageLength(periodStarts: [Date], calendar: Calendar = .current) -> Int? {
         lengths(periodStarts: periodStarts, calendar: calendar).usual
+    }
+
+    /// Her usual period length: the median length of her most recent
+    /// periods (up to 6), from the days she logged bleeding. Bleeding days
+    /// with at most one unlogged day between them count as one period.
+    /// Kept to 2–10 days. Nil until at least one period of 2+ days is logged
+    /// (callers then use `typicalPeriodLength`). Sam N10: a fixed 5 showed a
+    /// logged day 6 as follicular and predicted periods a day short.
+    public static func periodLength(bleedDays: [Date], calendar: Calendar = .current) -> Int? {
+        let days = Set(bleedDays.map { calendar.startOfDay(for: $0) }).sorted()
+        guard let first = days.first else { return nil }
+        var runs: [Int] = []
+        var start = first, last = first
+        for d in days.dropFirst() {
+            let gap = calendar.dateComponents([.day], from: last, to: d).day ?? 99
+            if gap <= 2 {
+                last = d
+            } else {
+                runs.append((calendar.dateComponents([.day], from: start, to: last).day ?? 0) + 1)
+                start = d; last = d
+            }
+        }
+        runs.append((calendar.dateComponents([.day], from: start, to: last).day ?? 0) + 1)
+        let periods = runs.filter { $0 >= 2 }.suffix(6).map(Double.init)
+        guard let m = periods.median else { return nil }
+        return min(max(Int(m.rounded()), 2), 10)
     }
 
     public struct Lengths: Hashable, Sendable {
@@ -152,6 +210,13 @@ public struct WeekRecap: Hashable, Sendable {
     /// modelled energy score, which only knows about sleep, so only sleep
     /// habits are tested (caffeine and daylight would be circular).
     public var habitsFromCheckIns: Bool = false
+    /// How many days were in the better and the lower half.
+    public var betterDays: Int = 0
+    public var lowerDays: Int = 0
+    /// Both halves have at least `HabitEffect.minimumNights` days, the same
+    /// minimum every other comparison uses. A single week (3 vs 3) never
+    /// does, so its habits are hints, not a pattern (round 3, N6).
+    public var enoughForPattern: Bool { betterDays >= HabitEffect.minimumNights && lowerDays >= HabitEffect.minimumNights }
 
     /// `lateThreshold`: her late-bedtime threshold (the app-wide one); without
     /// it, 90 minutes past this week's median.
@@ -192,7 +257,8 @@ public struct WeekRecap: Hashable, Sendable {
         return WeekRecap(averageEnergy: avg(days.map(\.energy)), best: sorted.first!, worst: w,
                          averageAsleep: avg(days.map(\.asleep)), lightSleepWakes: days.filter(\.wokeFromLightSleep).count,
                          averageDaylight: avg(days.map(\.daylightMinutes)), averageCaffeine: avg(days.map(\.caffeineMg)),
-                         bestDayHabits: habits, worstDayIssues: issues, habitsFromCheckIns: byCheckIn)
+                         bestDayHabits: habits, worstDayIssues: issues, habitsFromCheckIns: byCheckIn,
+                         betterDays: top.count, lowerDays: bottom.count)
     }
 }
 

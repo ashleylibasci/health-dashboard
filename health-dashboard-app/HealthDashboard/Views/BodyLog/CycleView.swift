@@ -158,7 +158,7 @@ private struct PhasesSection: View {
         CycleCalendarCard()
         nextPeriodCard
         HowWeGotThisLink(title: "Your cycle day and phases",
-                         method: "Your cycle day counts from the first day of your last period, from Apple Health and the bleeding days you log here. Your average length is the middle value of the gaps between your recent periods. Phases are placed from that: period about 5 days, then the follicular phase, a 3-day mid-cycle window about 14 days before your next period, then the luteal phase. Real cycles vary, so treat every day as an estimate.")
+                         method: "Your cycle day counts from the first day of your last period, from Apple Health and the bleeding days you log here. Your average length is the middle value of the gaps between your recent periods. Phases are placed from that: your period (\(model.periodLength) days, \(store.data.flowLog.isEmpty ? "a typical length until you log one" : "from the bleeding you logged")), then the follicular phase, a 3-day mid-cycle window about 14 days before your next period, then the luteal phase. Real cycles vary, so treat every day as an estimate.")
     }
 
     private var bc: BirthControl? { store.birthControl }
@@ -276,9 +276,9 @@ private struct PhasesSection: View {
                                                     meaning: "Each bar is one day of your cycle, colored by phase. The dot marks today.",
                                                     forYou: "Drag along the bars to see what each day usually means for your energy, sleep and mood."), size: 17)
             CycleStrip(length: length, today: min(day, length),
-                       color: { d in BodyLogStyle.phaseFill(CycleEstimator.phase(day: d, length: length), scheme) },
-                       readout: { d in CycleCopy.dayReadout(day: d, length: length, birthControl: bc, isToday: d == day) },
-                       letter: { d in BodyLogStyle.phaseLetter(CycleEstimator.phase(day: d, length: length), birthControl: bc) })
+                       color: { d in BodyLogStyle.phaseFill(model.cyclePhase(day: d, length: length), scheme) },
+                       readout: { d in CycleCopy.dayReadout(day: d, length: length, birthControl: bc, isToday: d == day, periodLength: model.periodLength) },
+                       letter: { d in BodyLogStyle.phaseLetter(model.cyclePhase(day: d, length: length), birthControl: bc) })
             legend
         }
     }
@@ -293,7 +293,7 @@ private struct PhasesSection: View {
     }
 
     private func legendRow(_ p: CyclePhase) -> some View {
-        let r = CycleCopy.range(p, length: length)
+        let r = CycleCopy.range(p, length: length, periodLength: model.periodLength)
         let t: Topic = p == .period ? .period : p == .follicular ? .follicular : p == .ovulation ? .ovulation : .luteal
         return HStack(spacing: 6) {
             Circle().fill(BodyLogStyle.phaseFill(p, scheme)).frame(width: 18, height: 18)
@@ -393,7 +393,7 @@ private struct CycleCalendarCard: View {
             // No guessing into the next cycle when bleeding is unpredictable
             // (mini pill, hormonal IUD): those days stay blank.
             let cd = offset > 0 && nextCycle && hidden ? nil : model.predictedCycleDay(offset: offset)
-            let isPeriod = cd.map { CycleEstimator.phase(day: $0, length: model.cycleLength) == .period } ?? false
+            let isPeriod = cd.map { model.cyclePhase(day: $0, length: model.cycleLength) == .period } ?? false
             out.append(DayCell(id: d, date: d, cycleDay: cd, isToday: offset == 0,
                                isPredicted: !hidden && offset > 0 && nextCycle && isPeriod))
         }
@@ -414,7 +414,7 @@ private struct CycleCalendarCard: View {
             r = CycleReadout(title: date == todayNumber ? "Today \u{00B7} day \(cd)" : "Day \(cd)", value: "Past \(model.cycleLengthIsPersonal ? "your usual" : "a typical") length",
                              detail: "That\u{2019}s \(model.usualLengthPhrase(model.cycleLength)). Log your period when it starts.", accent: .indigo)
         } else {
-            r = CycleCopy.dayReadout(day: cd, length: model.cycleLength, birthControl: store.birthControl, isToday: date == todayNumber)
+            r = CycleCopy.dayReadout(day: cd, length: model.cycleLength, birthControl: store.birthControl, isToday: date == todayNumber, periodLength: model.periodLength)
         }
         if date != todayNumber, let d = cal.date(byAdding: .day, value: date - todayNumber, to: .now) {
             r.title = "\(d.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) \u{00B7} day \(cd)"
@@ -448,7 +448,8 @@ private struct CycleCalendarCard: View {
                             selectedDay = selectedDay == date ? nil : date
                         } label: {
                             CycleDayCell(date: date, cycleDay: cell.cycleDay, length: model.cycleLength, birthControl: store.birthControl,
-                                         isToday: cell.isToday, isPredicted: cell.isPredicted, isSelected: selectedDay == date)
+                                         isToday: cell.isToday, isPredicted: cell.isPredicted, isSelected: selectedDay == date,
+                                         periodLength: model.periodLength)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(cellLabel(cell))
@@ -479,7 +480,7 @@ private struct CycleCalendarCard: View {
             if cd > model.cycleLength {
                 parts.append("cycle day \(cd), past your usual length")
             } else {
-                let p = CycleEstimator.phase(day: cd, length: model.cycleLength)
+                let p = model.cyclePhase(day: cd, length: model.cycleLength)
                 parts.append("cycle day \(cd), \(BodyLogStyle.phaseName(p, birthControl: store.birthControl))")
             }
         }
@@ -497,12 +498,13 @@ private struct CycleDayCell: View {
     let isToday: Bool
     let isPredicted: Bool
     let isSelected: Bool
+    var periodLength = CycleEstimator.typicalPeriodLength
     @Environment(\.colorScheme) private var scheme
 
     /// Days past her usual length get no phase (the period is due or late).
     private var phase: CyclePhase {
         guard let d = cycleDay, d <= length else { return .unknown }
-        return CycleEstimator.phase(day: d, length: length)
+        return CycleEstimator.phase(day: d, length: length, periodLength: periodLength)
     }
 
     var body: some View {

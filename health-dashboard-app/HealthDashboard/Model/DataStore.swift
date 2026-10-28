@@ -119,7 +119,8 @@ struct AppData: Codable {
     var checkIns: [CheckIn] = []
     var savedDrinks: [Drink] = Drink.common.prefix(1).map { $0 }
     var drinkLog: [LoggedDrink] = []
-    var bottleSizeML: Double = 500
+    /// 24 oz for new installs (Priya U1). Stored in ml like Apple Health.
+    var bottleSizeML: Double = 24 * 29.5735
     /// 64 oz. Shown in ounces; stored in ml like Apple Health.
     var waterGoalML: Double = 64 * 29.5735
     var waterLog: [WaterEntry] = []
@@ -165,7 +166,9 @@ struct AppData: Codable {
         checkIns = get(.checkIns, d.checkIns)
         savedDrinks = get(.savedDrinks, d.savedDrinks)
         drinkLog = get(.drinkLog, d.drinkLog)
-        bottleSizeML = get(.bottleSizeML, d.bottleSizeML)
+        // A save without a bottle size predates the setting: it was 500 ml
+        // then, so keep that rather than switching her to the new default.
+        bottleSizeML = get(.bottleSizeML, 500)
         waterGoalML = get(.waterGoalML, d.waterGoalML)
         // 1,500 ml was the old metric default; move it to the new 64 oz one.
         if waterGoalML == 1500 { waterGoalML = d.waterGoalML }

@@ -56,10 +56,18 @@ extension AppModel {
         guard let v = vo2Max else { return nil }
         return FitnessAge.isTopOfChart(vo2Max: v, sex: store.data.sex) ? "Under 20" : "\(FitnessAge.estimate(vo2Max: v, sex: store.data.sex))"
     }
-    /// "Above average for your age" (age-aware when her age is set), on the
-    /// same scale as the fitness age so the two never disagree.
+    /// "Above average for your age", on the same scale as the fitness age so
+    /// the two never disagree. Nil until she adds her age: without it there
+    /// is no age group to compare with (round 3, N8). Show
+    /// `fitnessLevelShown` on screen.
     var fitnessLevel: String? {
-        vo2Max.map { FitnessAge.level(vo2Max: $0, sex: store.data.sex, age: store.data.ageYears) }
+        guard let age = store.data.ageYears else { return nil }
+        return vo2Max.map { FitnessAge.level(vo2Max: $0, sex: store.data.sex, age: age) }
+    }
+    /// The level, or a prompt to add her age.
+    var fitnessLevelShown: String? {
+        guard vo2Max != nil else { return nil }
+        return fitnessLevel ?? "Add your age to compare"
     }
 
     var caloriesToday: Double { activeCalories + restingCalories }
@@ -125,15 +133,17 @@ extension AppModel {
     /// (1440+). A night with no drink logged counts as "No caffeine" only if
     /// she logged something in the app that day (a drink, water, alcohol or
     /// how she felt): a day she didn't open the log at all tells us nothing.
+    /// Her own nights only, also while the rest of the app shows example
+    /// data: the "14 of 21 nights" counter and the badge are claims about
+    /// her (round 3, N6).
     var cutoffTest: CaffeineCutoffTest {
-        if usingSampleData { return CaffeineCutoffTest.make(lastCaffeineByNight: SampleData.cutoffTest) }
         let cal = Calendar.current
         let drinks = store.data.drinkLog.map(\.date)
         guard !drinks.isEmpty else { return CaffeineCutoffTest.make(lastCaffeineByNight: []) }
         let logged = store.data.drinkLog.map(\.date) + store.data.waterLog.map(\.date)
             + store.data.alcoholLog.map(\.date) + store.data.moodLog.map(\.date)
         let activeDays = Set(logged.map { cal.startOfDay(for: AppDay.day(containing: $0)) })
-        let pairs: [(lastCaffeine: Minutes?, asleep: Int)] = nights.compactMap { n in
+        let pairs: [(lastCaffeine: Minutes?, asleep: Int)] = nights.filter(isRealNight).compactMap { n in
             let last = NightPairing.lastCaffeine(drinks: drinks, wakeDay: n.wakeDay, sleepOnset: n.sleepOnset)
             let day = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: n.wakeDay)) ?? n.wakeDay
             guard last != nil || activeDays.contains(day) else { return nil }
@@ -156,15 +166,20 @@ extension AppModel {
         SleepNeedEstimator.metNeed(asleep: night.asleepMinutes, need: sleepNeed.minutes)
     }
 
+    /// Her own nights from Apple Health (none while it's all example data).
+    var realNights: [NightRecord] { nights.filter(isRealNight) }
+
     /// Calendar-aware: a night with no record, or one that missed, ends a
     /// streak. Before this morning's night (or check-in) is in, streaks run
-    /// through yesterday instead of reading 0.
+    /// through yesterday instead of reading 0. Real nights only: example
+    /// nights never make a streak of hers (round 3, N6).
     var streaks: [StreakInfo] {
         let cal = Calendar.current
-        let days = nights.map { cal.startOfDay(for: $0.wakeDay) }
-        let nightPending = !nights.contains { cal.isDateInToday($0.wakeDay) }
-        let onTime = Set(nights.filter { $0.sleepOnset <= store.data.bedtime + 20 }.map { cal.startOfDay(for: $0.wakeDay) })
-        let met = Set(nights.filter(metNeed).map { cal.startOfDay(for: $0.wakeDay) })
+        let mine = realNights
+        let days = mine.map { cal.startOfDay(for: $0.wakeDay) }
+        let nightPending = !mine.contains { cal.isDateInToday($0.wakeDay) }
+        let onTime = Set(mine.filter { $0.sleepOnset <= store.data.bedtime + 20 }.map { cal.startOfDay(for: $0.wakeDay) })
+        let met = Set(mine.filter(metNeed).map { cal.startOfDay(for: $0.wakeDay) })
         let checkInDays = store.data.checkIns.map { cal.startOfDay(for: $0.date) }
         let checkInPending = !store.data.checkIns.contains { cal.isDateInToday($0.date) }
         return [

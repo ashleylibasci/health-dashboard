@@ -227,7 +227,8 @@ struct SleepStagesView: View {
                         InfoButton(topic: StageStyle.topic(stage)).padding(.vertical, -14).padding(.horizontal, -8)
                     }
                     if let delta, stage != .awake {
-                        Text(SleepText.signedCompact(delta))
+                        // Under 10 minutes is within the Watch's error (N16).
+                        Text(abs(delta) < 10 ? "about usual" : SleepText.signedCompact(delta))
                             .font(.scaled(size: 12, weight: .bold))
                             .foregroundStyle((deltaGood ? Accent.mint : Accent.coral).ink(scheme))
                             .padding(.horizontal, 7)

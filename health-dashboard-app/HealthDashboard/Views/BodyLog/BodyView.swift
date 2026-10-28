@@ -53,7 +53,7 @@ struct BodyView: View {
                                 .font(.scaled(size: 20, weight: .bold))
                             if model.recoveryIsExample { ExampleTag() }
                         }
-                        Text(model.recoveryUsualIsPersonal ? "Your usual is \(model.recoveryUsual)" : "Typical is \(model.recoveryUsual)")
+                        Text(model.recoveryUsualNote)
                             .font(.scaled(size: 14)).secondaryText()
                         if model.hasHeartData {
                             HStack(spacing: 6) {
@@ -87,7 +87,7 @@ struct BodyView: View {
     private var recoveryAccessibility: String {
         var text: String
         if let score = model.recoveryShown {
-            text = "Recovery \(score), \(model.recoveryLabel)\(model.recoveryIsExample ? ", example" : ""). \(model.recoveryUsualIsPersonal ? "Your usual" : "Typical") is \(model.recoveryUsual)."
+            text = "Recovery \(score), \(model.recoveryLabel)\(model.recoveryIsExample ? ", example" : ""). \(model.recoveryUsualNote)"
         } else {
             text = "Recovery: no reading yet."
         }
@@ -323,7 +323,7 @@ struct BodyView: View {
         case .fitness:
             BodyTile(title: "Fitness", accent: .mint, systemImage: "figure.run",
                      value: model.fitnessAgeText.map { "Age \($0.lowercased())" } ?? "\u{2013}",
-                     note: model.vo2Max.map { "VO\u{2082} max \(String(format: "%.1f", $0)) \u{00B7} \(model.fitnessLevel ?? "")" } ?? "Needs a few outdoor walks")
+                     note: model.vo2Max.map { "VO\u{2082} max \(String(format: "%.1f", $0)) \u{00B7} \(model.fitnessLevelShown ?? "")" } ?? "Needs a few outdoor walks")
         case .calories:
             BodyTile(title: "Calories", accent: .orange, systemImage: "flame.fill",
                      value: Int(model.caloriesToday.rounded()).formatted(), note: "kcal so far")
@@ -378,7 +378,9 @@ struct BodyView: View {
                      value: "Day \(day)", note: "Longer than \(model.usualLengthPhrase(typical))")
         case let .irregular(days):
             BodyTile(title: "Cycle", accent: .coral, systemImage: "drop.fill",
-                     value: days.map { "Day \($0 + 1)" } ?? "Log a period", note: "No countdowns")
+                     // The same count as Cycle and Log: days since the last period started (N11).
+                     value: days.map { "\($0) day\($0 == 1 ? "" : "s")" } ?? "Log a period",
+                     note: days == nil ? "No countdowns" : "Since your last period started")
         case .notTracking:
             EmptyView()
         }
@@ -481,7 +483,7 @@ private struct BodyTrendCard: View {
 
     private var usual: Double {
         switch metric {
-        case .hrv: return model.usingSampleData ? SampleData.baselineHRV : model.baselineHRV
+        case .hrv: return model.baselineHRV
         case .restingHR: return model.baselineRestingHR
         case .sleep: return Double(model.sleepNeed.minutes) / 60
         }
