@@ -49,14 +49,14 @@ struct DrinksView: View {
         // elsewhere in the app (Valtonen F8, Dubois 3).
         Screen(title: "Alcohol and your sleep", accent: .purple) {
             SampleDataBanner()
+            AlcoholSafetyNote()
             header
             logCard
-            effectCard
             nightsCard
-            recentCard
-            tipsCard
-            HowWeGotThisLink(title: "Alcohol and your sleep",
-                             method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. It doesn\u{2019}t separate amounts: a night after one glass counts the same as a night after several. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
+            rows
+            Card(density: .compact) {
+                LearnMoreRow("Learn more about alcohol", section: "alcohol", accent: .purple)
+            }
         }
         .sheet(item: $editing) { entry in
             AlcoholEntryEditor(entry: entry)
@@ -67,17 +67,25 @@ struct DrinksView: View {
         .sensoryFeedback(.increase, trigger: logCount)
     }
 
-    // MARK: Header
+    // MARK: Summary
 
+    private var alcoholToday: Int {
+        AppData.today(store.data.alcoholLog, date: \.date).map(\.count).reduce(0, +)
+    }
+
+    /// No judgment: today's count, and what her own nights show the
+    /// morning after (or how many more nights that needs).
     private var header: some View {
-        HStack(alignment: .top, spacing: 0) {
-            Text("No judgment, just what your own data shows the morning after.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            InfoButton(topic: .alcohol).padding(.vertical, -10)
-        }
-        .padding(.top, 4)
+        let e = effect
+        let n = alcoholToday
+        let need = HabitEffect.minimumNights
+        return SummaryHeader(eyebrow: "Alcohol today", value: n == 0 ? "None" : "\(n)",
+                             unit: n == 0 ? nil : (n == 1 ? "drink" : "drinks"),
+                             status: e.enoughData ? nil : SummaryStatus(text: "Not enough nights", accent: .purple),
+                             line: e.enoughData ? effectSentence(parts: 2) : "No judgment, just what your own data shows the morning after.",
+                             pairs: [StatPair(label: "After alcohol", value: e.enoughData ? "\(e.withCount) nights" : "\(e.withCount) of \(need) nights"),
+                                     StatPair(label: "Other nights", value: e.enoughData ? "\(e.withoutCount)" : "\(e.withoutCount) of \(need)")],
+                             accent: .purple, info: Topic.alcohol.explanation)
     }
 
     // MARK: Log
@@ -99,7 +107,11 @@ struct DrinksView: View {
 
     private var logCard: some View {
         Card(accent: .purple) {
-            Text("Log alcohol").font(.cardTitle)
+            HStack(spacing: Space.s) {
+                Text("Log alcohol").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.s)
+                LogTimeMenu(time: $time, accent: .purple)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Self.kinds, id: \.self) { k in
@@ -115,17 +127,9 @@ struct DrinksView: View {
                     .accessibilityLabel(count == 1 ? "1 drink" : "\(count) drinks")
                 countButton("plus", label: "One more") { count = min(15, count + 1) }
             }
-            Text(Self.standardDrinkLine)
-                .font(.secondary).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            LogTimeSelector(time: $time, accent: .purple, title: "When?")
             PrimaryButton(title: "Log \(Self.phrase(count: count, kind: kind))", accent: .purple, action: logDrinks)
-            AlcoholSafetyNote()
         }
     }
-
-    /// What one drink means here: a US standard drink (14 g of alcohol).
-    static let standardDrinkLine = "One drink is 5 oz of wine, 12 oz of 5% beer or seltzer, or a 1.5 oz shot. A cocktail or big pour is often 2 or more."
 
     private func kindChip(_ k: String) -> some View {
         let p = Palette(scheme: scheme)
@@ -160,8 +164,10 @@ struct DrinksView: View {
 
     private var effect: HabitEffect { model.alcoholEffect }
 
-    /// "After alcohol you sleep 25 min less, your HRV is 12% lower and you feel worse the next morning."
-    private var effectSentence: String {
+    /// "After alcohol you sleep 25 min less, your HRV is 12% lower and you
+    /// feel worse the next morning." The summary keeps the first `limit`
+    /// parts (the tiles under "After alcohol" have every one).
+    private func effectSentence(parts limit: Int) -> String {
         let e = effect
         var parts: [String] = []
         if abs(e.asleepDelta) < 5 { parts.append("you sleep about the same") }
@@ -177,6 +183,7 @@ struct DrinksView: View {
             else if c >= 0.3 { parts.append("you feel better the next morning") }
             else { parts.append("you feel about the same the next morning") }
         }
+        parts = Array(parts.prefix(limit))
         let joined: String
         if parts.count > 1 {
             joined = parts.dropLast().joined(separator: ", ") + " and " + (parts.last ?? "")
@@ -186,52 +193,38 @@ struct DrinksView: View {
         return "After alcohol \(joined)."
     }
 
-    private var effectCard: some View {
-        Card {
-            HStack {
-                Text("After alcohol").font(.cardTitle)
-                if model.usingSampleData { ExampleTag() }
-                Spacer()
-                Text("\(effect.withCount) night\(effect.withCount == 1 ? "" : "s")")
-                    .font(.secondary).fontWeight(.bold)
-                    .foregroundStyle(Accent.purple.ink(scheme))
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Accent.purple.fill(scheme).opacity(0.18), in: Capsule())
-            }
-            if effect.enoughData {
-                Text(effectSentence).font(.bodyEmphasis)
-                    .fixedSize(horizontal: false, vertical: true)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    EffectTile(title: "Sleep", value: signed(effect.asleepDelta, unit: " min"),
-                               good: abs(effect.asleepDelta) < 10 ? nil : effect.asleepDelta > 0,
-                               explanation: Explanation(id: "drinkSleep", title: "Sleep after alcohol",
-                                                        meaning: "How much longer or shorter you slept after alcohol than on your other nights.",
-                                                        forYou: "Alcohol often helps you fall asleep, then wakes you more in the second half of the night."))
-                    if let h = effect.hrvDeltaPct {
-                        EffectTile(title: "HRV", value: signed(Int(h.rounded()), unit: "%"), good: abs(h) < 3 ? nil : h > 0,
-                                   explanation: Topic.hrv.explanation)
-                    }
-                    if let r = effect.restingHRDelta {
-                        EffectTile(title: "Resting HR", value: signed(Int(r.rounded()), unit: " bpm"), good: abs(r) < 1 ? nil : r < 0,
-                                   explanation: Topic.restingHR.explanation)
-                    }
-                    if let c = effect.checkInDelta {
-                        EffectTile(title: "Morning feel", value: String(format: "%+.1f of 5", c), good: abs(c) < 0.3 ? nil : c > 0,
-                                   explanation: Explanation(id: "drinkFeel", title: "How you felt",
-                                                            meaning: "Your morning check-in (1 to 5) after alcohol compared with other mornings.",
-                                                            forYou: "Below zero means you felt less awake than usual the morning after."))
-                    }
+    @ViewBuilder
+    private var effectDetail: some View {
+        if effect.enoughData {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                EffectTile(title: "Sleep", value: signed(effect.asleepDelta, unit: " min"),
+                           good: abs(effect.asleepDelta) < 10 ? nil : effect.asleepDelta > 0,
+                           explanation: Explanation(id: "drinkSleep", title: "Sleep after alcohol",
+                                                    meaning: "How much longer or shorter you slept after alcohol than on your other nights.",
+                                                    forYou: "Alcohol often helps you fall asleep, then wakes you more in the second half of the night."))
+                if let h = effect.hrvDeltaPct {
+                    EffectTile(title: "HRV", value: signed(Int(h.rounded()), unit: "%"), good: abs(h) < 3 ? nil : h > 0,
+                               explanation: Topic.hrv.explanation)
                 }
-                Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
-                    .font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Not enough nights yet").font(.bodyEmphasis)
-                Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
-                    .font(.bodyText).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
+                if let r = effect.restingHRDelta {
+                    EffectTile(title: "Resting HR", value: signed(Int(r.rounded()), unit: " bpm"), good: abs(r) < 1 ? nil : r < 0,
+                               explanation: Topic.restingHR.explanation)
+                }
+                if let c = effect.checkInDelta {
+                    EffectTile(title: "Morning feel", value: String(format: "%+.1f of 5", c), good: abs(c) < 0.3 ? nil : c > 0,
+                               explanation: Explanation(id: "drinkFeel", title: "How you felt",
+                                                        meaning: "Your morning check-in (1 to 5) after alcohol compared with other mornings.",
+                                                        forYou: "Below zero means you felt less awake than usual the morning after."))
+                }
             }
+            .foregroundStyle(Palette(scheme: scheme).primary)
+            Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
+                .font(.secondary)
+        } else {
+            Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
         }
+        HowWeGotThisLink(title: "Alcohol and your sleep",
+                         method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. It doesn\u{2019}t separate amounts: a night after one glass counts the same as a night after several. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
     }
 
     /// The comparison mixes all nights, so cycle changes are in it too.
@@ -255,8 +248,8 @@ struct DrinksView: View {
         return points.min { abs($0.index - i) < abs($1.index - i) }
     }
 
-    private var nightsReadout: (title: String, value: String, detail: String) {
-        guard let p = selectedPoint else {
+    private func nightsReadout(_ point: DrinkNightPoint?) -> (title: String, value: String, detail: String) {
+        guard let p = point else {
             let drink = points.filter(\.afterDrinks)
             let other = points.filter { !$0.afterDrinks }
             let a = drink.isEmpty ? 0 : drink.map(\.asleep).reduce(0, +) / drink.count
@@ -277,13 +270,11 @@ struct DrinksView: View {
 
     private var nightsCard: some View {
         Card(accent: .purple) {
-            HStack {
-                Text("Your recent nights").font(.bodyEmphasis)
-                if model.usingSampleData { ExampleTag() }
-            }
-            let r = nightsReadout
+            Text("Your recent nights").font(.bodyEmphasis).accessibilityAddTraits(.isHeader)
+            let r = nightsReadout(selectedPoint)
             ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .purple,
-                         onClear: selected == nil ? nil : { selected = nil })
+                         onClear: selected == nil ? nil : { selected = nil },
+                         detailSlots: [nightsReadout(nil).detail] + points.map { nightsReadout($0).detail })
             DrinkNightsChart(points: points, selected: selectedPoint?.index, selection: $selected)
                 .frame(height: 170)
                 .accessibilityElement(children: .ignore)
@@ -318,42 +309,36 @@ struct DrinksView: View {
 
     private var recent: [AppData.AlcoholEntry] { model.recentAlcohol(days: 14) }
 
-    private var recentCard: some View {
-        Card {
-            HStack {
-                Text("Logged alcohol").font(.cardTitle).accessibilityAddTraits(.isHeader)
-                Spacer()
-                Text("Last 2 weeks").font(.secondary).fontWeight(.semibold).secondaryText()
-            }
-            if recent.isEmpty {
-                Text("Nothing logged in the last two weeks.").font(.bodyText).secondaryText()
-            } else {
-                LogEntryList(items: recent, onTap: { editing = $0 },
-                             onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in
-                    LogEntryRow(systemImage: Self.symbol(for: entry.kind), accent: .purple,
-                                title: Self.phrase(count: entry.count, kind: entry.kind),
-                                detail: entry.count == 1 ? "1 drink" : "\(entry.count) drinks",
-                                time: LogFormat.time(entry.date))
-                }
-                Text("Tap an entry to change it. Swipe left to delete.")
-                    .font(.secondary).secondaryText()
-            }
-        }
+    private var recentSummary: String {
+        recent.isEmpty ? "None in the last 2 weeks" : "\(recent.count) in the last 2 weeks"
     }
 
-    private var tipsCard: some View {
-        Card(accent: .mint) {
-            Label("What helps most", systemImage: "lightbulb.fill")
-                .font(.bodyEmphasis)
-                .foregroundStyle(Accent.mint.ink(scheme))
-            Text("Finish your last drink 3 or more hours before bed, and have a glass of water between drinks. A standard drink takes most women about 2 hours to clear, and nothing speeds it up: not coffee, water or sleep. Cocktails are often 2 or more.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Energy drinks and alcohol in the same evening can hide how drunk you feel, so they\u{2019}re best kept apart.")
-                .font(.bodyText).secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-            LinkRow(title: "Water", subtitle: "Log a bottle", systemImage: "drop.fill", accent: .blue) {
-                WaterView()
+    private var rows: some View {
+        RowCard {
+            ExpandRow(title: "After alcohol", summary: effect.enoughData ? "Sleep, HRV, heart rate and mornings" : "Not enough nights yet",
+                      systemImage: "chart.bar.fill", accent: .purple) {
+                effectDetail
+            }
+            RowDivider()
+            ExpandRow(title: "Logged alcohol", summary: recentSummary, systemImage: "list.bullet", accent: .purple) {
+                if recent.isEmpty {
+                    Text("Nothing logged in the last two weeks.")
+                } else {
+                    LogEntryList(items: recent, onTap: { editing = $0 },
+                                 onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in
+                        LogEntryRow(systemImage: Self.symbol(for: entry.kind), accent: .purple,
+                                    title: Self.phrase(count: entry.count, kind: entry.kind),
+                                    detail: entry.count == 1 ? "1 drink" : "\(entry.count) drinks",
+                                    time: LogFormat.time(entry.date))
+                    }
+                    .foregroundStyle(Palette(scheme: scheme).primary)
+                    Text("Tap an entry to change it. Swipe left to delete.")
+                        .font(.secondary)
+                }
+            }
+            RowDivider()
+            ExpandRow(title: "What helps most", summary: "Your last drink, water, and timing", systemImage: "lightbulb.fill", accent: .mint) {
+                ForEach(AlcoholCopy.tips, id: \.self) { Text($0) }
             }
         }
     }
@@ -361,33 +346,29 @@ struct DrinksView: View {
 
 // MARK: - Pieces
 
-/// After 4 or more drinks in the last few hours: a calm alcohol-poisoning
-/// line with the signs and a 911 button. Facts only, no judgment. Shows
-/// nothing otherwise.
+/// After 4 or more drinks in the last few hours: one calm line with a
+/// 911 button; the signs of alcohol poisoning open in a sheet. Facts only,
+/// no judgment. Shows nothing otherwise.
 struct AlcoholSafetyNote: View {
     @EnvironmentObject var model: AppModel
+    @State private var showsSigns = false
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         if model.showsAlcoholSafetyLine {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Looking out for you and your friends", systemImage: "heart.fill")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(Accent.pink.ink(scheme))
-                Text("4 or more drinks in an evening is a lot for most women, and blood alcohol keeps rising for a while after the last one. Signs of alcohol poisoning: confusion, throwing up, slow or uneven breathing, pale or bluish skin, or can\u{2019}t be woken. If you see any, call 911. Don\u{2019}t leave a friend alone to sleep it off; keep her on her side.")
-                    .font(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Link(destination: URL(string: "tel:911")!) {
-                    Label("Call 911", systemImage: "phone.fill")
-                        .font(.bodyEmphasis)
-                        .foregroundStyle(Accent.pink.ink(scheme))
-                        .frame(minHeight: 44)
+            CalloutBar(text: "Confusion, slow breathing or can\u{2019}t be woken? Call 911.", systemImage: "heart.fill",
+                       accent: .pink, links: [.call("911")]) { showsSigns = true }
+                .bottomSheet(isPresented: $showsSigns, title: "Looking out for you") {
+                    Text(AlcoholCopy.poisoningSigns)
+                        .font(.bodyText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Link(destination: CalloutLink.call("911").url) {
+                        Label("Call 911", systemImage: "phone.fill")
+                            .font(.bodyEmphasis)
+                            .foregroundStyle(Accent.pink.ink(scheme))
+                            .frame(minHeight: Sizes.minTap)
+                    }
                 }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Accent.pink.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
-            .accessibilityElement(children: .contain)
         }
     }
 }

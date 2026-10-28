@@ -12,16 +12,13 @@ struct LogView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    @State private var caffeineTime: LogTime = .now
     @State private var toast: UndoToast?
     @State private var showsSymptoms = false
-    /// Haptics: adding (caffeine, water, alcohol), saving (flow, water goal),
-    /// picking (stress, symptoms).
+    /// Haptics: adding (alcohol), saving (flow), picking (stress,
+    /// symptoms). The caffeine and water cards play their own.
     @State private var addCount = 0
     @State private var saveCount = 0
     @State private var selectCount = 0
-    /// Bounces a drink's "+" when it's logged.
-    @State private var bounces: [UUID: Int] = [:]
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -45,112 +42,12 @@ struct LogView: View {
     // MARK: Caffeine
 
     private var caffeineSection: some View {
-        let p = Palette(scheme: scheme)
-        let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
-        return VStack(alignment: .leading, spacing: Space.s) {
+        VStack(alignment: .leading, spacing: Space.s) {
             LogSectionHeader(title: "Caffeine", systemImage: "cup.and.saucer.fill", accent: .yellow) {
                 HistoryLink { CaffeineView() }
             }
-            VStack(spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                    Text("\(model.caffeineMgToday)")
-                        .font(.numberM)
-                        .contentTransition(numericTransition)
-                        .motion(.log, value: model.caffeineMgToday)
-                    Text("mg today").font(.secondary).foregroundStyle(p.secondary)
-                    Spacer(minLength: 0)
-                }
-                .accessibilityElement(children: .combine)
-                .padding(.horizontal, Space.l)
-                .padding(.top, Space.m)
-                LogTimeSelector(time: $caffeineTime, accent: .yellow, title: "When did you have it?")
-                    .padding(.horizontal, Space.l)
-                    .padding(.vertical, Space.m)
-                Divider().overlay(p.cardBorder)
-                ForEach(store.data.savedDrinks) { drink in
-                    drinkButton(drink)
-                    Divider().overlay(p.cardBorder)
-                }
-                NavigationLink { CustomDrinkView() } label: {
-                    HStack(spacing: Space.m) {
-                        Image(systemName: "plus")
-                            .font(.scaled(size: 15, weight: .bold))
-                            .frame(width: Sizes.icon, height: Sizes.icon)
-                            .background(Accent.yellow.fill(scheme).opacity(0.24), in: Circle())
-                            .accessibilityHidden(true)
-                        Text("New caffeine drink").font(.bodyEmphasis)
-                        Spacer()
-                    }
-                    .foregroundStyle(Accent.yellow.onTint(scheme))
-                    .padding(.horizontal, Space.l)
-                    .frame(minHeight: Sizes.tallRow)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.pressable)
-            }
-            .background(Accent.yellow.tint(scheme), in: shape)
+            CaffeineQuickLog(toast: $toast)
         }
-    }
-
-    private func drinkButton(_ drink: Drink) -> some View {
-        Button { logCaffeine(drink) } label: {
-            HStack(spacing: Space.m) {
-                Image(systemName: BodyLogStyle.symbol(for: drink.icon))
-                    .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(BodyLogStyle.accent(for: drink.icon).ink(scheme))
-                    .frame(width: Sizes.icon, height: Sizes.icon)
-                    .background(BodyLogStyle.accent(for: drink.icon).fill(scheme).opacity(0.22), in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(drink.name)
-                        .font(.bodyEmphasis)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 6) {
-                        Text("\(drink.caffeineMg) mg").font(.secondary).secondaryText()
-                        if drink.isCustom { CustomDrinkBadge(accent: .purple) }
-                    }
-                }
-                Spacer(minLength: Space.s)
-                Image(systemName: "plus")
-                    .font(.scaled(size: 14, weight: .bold))
-                    .foregroundStyle(Accent.yellow.onTint(scheme))
-                    .frame(width: 32, height: 32)
-                    .background(Accent.yellow.fill(scheme).opacity(0.24), in: Circle())
-                    .symbolEffect(.bounce, value: bounces[drink.id, default: 0])
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, Space.l)
-            .padding(.vertical, Space.s)
-            .frame(minHeight: 58)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressable)
-        .accessibilityLabel("Add \(drink.name), \(drink.caffeineMg) mg, \(caffeineTime.phrase)")
-    }
-
-    private func logCaffeine(_ drink: Drink) {
-        let chosen = caffeineTime
-        let id = UUID()
-        withMotion(.log) {
-            model.logDrink(id: id, drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: chosen.date, saveToHealth: true)
-        }
-        let when = store.data.drinkLog.first { $0.id == id }?.date ?? .now
-        var message = LogFormat.loggedLine(LogFormat.midSentence(drink), time: chosen, at: when)
-        // Past today's cutoff: say so here, as the Watch does. The advice
-        // itself is on the Caffeine screen.
-        if AppDay.contains(when) {
-            let t = model.appDayMinutes(when)
-            if let cutoff = model.caffeineCutoffShown, t > cutoff {
-                message += " Past today\u{2019}s \(Clock.format(cutoff)) cutoff."
-            } else if model.caffeineCutoffShown == nil, model.caffeineAtBedtime >= 25 {
-                message += " About \(model.caffeineAtBedtime) mg will be left at bedtime."
-            }
-        }
-        toast = UndoToast(message) { withMotion(.undo) { model.deleteDrink(id) } }
-        caffeineTime = .now
-        addCount += 1
-        bounces[drink.id, default: 0] += 1
     }
 
     // MARK: Period or bleeding
@@ -324,76 +221,13 @@ struct LogView: View {
 
     // MARK: Water
 
-    /// Bottles drawn: up to the goal, or (with an eating-disorder history,
-    /// no goal) just the ones she's had.
-    private var bottleCount: Int {
-        let n = model.hidesEffortTargets ? model.waterBottlesToday : model.waterGoalBottles
-        return max(1, min(Int(n.rounded(.up)), 8))
-    }
-
-    private var waterText: String {
-        model.hidesEffortTargets
-            ? "\(LogFormat.bottlesPhrase(model.waterBottlesToday)) today"
-            : "\(LogFormat.bottles(model.waterBottlesToday)) of \(LogFormat.bottlesPhrase(model.waterGoalBottles))"
-    }
-
-    private func addWater(_ bottles: Double) {
-        let id = UUID()
-        let ml = store.data.bottleSizeML * bottles
-        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
-        withMotion(.log) { model.addWater(ml: ml, id: id) }
-        var message = "Added \(LogFormat.oz(ml)) at \(Clock.format(model.now))."
-        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
-            message += " That\u{2019}s today\u{2019}s goal."
-            saveCount += 1
-        } else {
-            addCount += 1
-        }
-        toast = UndoToast(message) { withMotion(.undo) { model.deleteWater(id) } }
-    }
-
     private var waterSection: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             LogSectionHeader(title: "Water", systemImage: "drop.fill", accent: .blue) {
                 HistoryLink { WaterView() }
             }
-            Card(accent: .blue) {
-                HStack(spacing: Space.s) {
-                    ForEach(0..<bottleCount, id: \.self) { i in
-                        LogBottle(fill: min(max(model.waterBottlesToday - Double(i), 0), 1))
-                    }
-                    Spacer(minLength: Space.s)
-                    VStack(alignment: .trailing, spacing: Space.xxs) {
-                        Text(LogFormat.oz(model.waterTodayML))
-                            .font(.numberM)
-                            .contentTransition(numericTransition)
-                            .motion(.log, value: model.waterTodayML)
-                        if !model.hidesEffortTargets {
-                            Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.secondary).secondaryText()
-                        }
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Water, \(waterText), \(LogFormat.oz(model.waterTodayML))")
-                HStack(spacing: Space.s) {
-                    waterButton("1 bottle", bottles: 1)
-                    waterButton("\u{00BD} bottle", bottles: 0.5)
-                }
-            }
+            WaterQuickLog(toast: $toast)
         }
-    }
-
-    private func waterButton(_ title: String, bottles: Double) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
-        return Button { addWater(bottles) } label: {
-            Label(title, systemImage: "plus")
-                .font(.bodyEmphasis)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .foregroundStyle(Accent.blue.onTint(scheme))
-                .background(Accent.blue.fill(scheme).opacity(0.2), in: shape)
-        }
-        .buttonStyle(.pressable)
-        .accessibilityLabel("Add \(title) of water, \(LogFormat.oz(store.data.bottleSizeML * bottles)), now")
     }
 
     // MARK: Stress
@@ -487,7 +321,9 @@ struct LogView: View {
 
     private var alcoholSection: some View {
         VStack(alignment: .leading, spacing: Space.s) {
+            // What one drink is: in the ⓘ, not a paragraph on the card (Amara 21).
             LogSectionHeader(title: "Alcohol", systemImage: "wineglass.fill", accent: .purple) {
+                InfoButton(topic: .alcohol).padding(.vertical, -12)
                 HistoryLink { DrinksView() }
             }
             Card(accent: .purple) {
@@ -513,9 +349,6 @@ struct LogView: View {
                         .accessibilityLabel("Log one \(kind), now")
                     }
                 }
-                Text(DrinksView.standardDrinkLine + " Change the time or amount in History.")
-                    .font(.secondary).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
                 AlcoholSafetyNote()
             }
         }
@@ -532,6 +365,416 @@ struct LogView: View {
 }
 
 // MARK: - Shared by the Log, Caffeine, Water and Drinks screens
+
+/// The caffeine log card, on the Log tab and on the Caffeine screen (one
+/// implementation, so a fix lands in both): when she had it, her saved
+/// drinks as one-tap rows, and a new drink. Logging shows the Undo toast
+/// through `toast`.
+///
+/// On the Log tab (`compact == false`) it leads with today's total, the
+/// time chips and every saved drink. On the Caffeine screen the summary
+/// above has the total, so it's titled "Log caffeine" with the time as one
+/// pill (`LogTimeMenu`), shows her first three saved drinks, and puts the
+/// rest, the common drinks and "New caffeine drink" in a More drinks sheet.
+struct CaffeineQuickLog: View {
+    @Binding var toast: UndoToast?
+    var compact = false
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var time: LogTime = .now
+    @State private var showsMore = false
+    @State private var addCount = 0
+    /// Bounces a drink's "+" when it's logged.
+    @State private var bounces: [UUID: Int] = [:]
+
+    private static let shownSaved = 3
+
+    private var shownDrinks: [Drink] {
+        compact ? Array(store.data.savedDrinks.prefix(Self.shownSaved)) : store.data.savedDrinks
+    }
+
+    /// Saved drinks past the first three, then common drinks she hasn't saved.
+    private var moreDrinks: [Drink] {
+        let saved = Set(store.data.savedDrinks.map(\.name))
+        return Array(store.data.savedDrinks.dropFirst(Self.shownSaved)) + Drink.common.filter { !saved.contains($0.name) }
+    }
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
+        VStack(spacing: 0) {
+            titleRow(p)
+                .padding(.horizontal, Space.l)
+                .padding(.top, Space.m)
+                .padding(.bottom, compact ? Space.m : 0)
+            if !compact {
+                LogTimeSelector(time: $time, accent: .yellow, title: "When did you have it?")
+                    .padding(.horizontal, Space.l)
+                    .padding(.vertical, Space.m)
+            }
+            Divider().overlay(p.cardBorder)
+            ForEach(shownDrinks) { drink in
+                drinkButton(drink)
+                Divider().overlay(p.cardBorder)
+            }
+            if compact {
+                Button { showsMore = true } label: {
+                    plainRowLabel(title: "More drinks", systemImage: "ellipsis")
+                }
+                .buttonStyle(.pressable)
+                .accessibilityHint("Common drinks, and a new caffeine drink")
+            } else {
+                newDrinkLink
+            }
+        }
+        .background(Accent.yellow.tint(scheme), in: shape)
+        .sensoryFeedback(.increase, trigger: addCount)
+        .bottomSheet(isPresented: $showsMore, title: "More drinks") {
+            moreSheet
+                .environmentObject(model)
+                .environmentObject(store)
+        }
+    }
+
+    @ViewBuilder
+    private func titleRow(_ p: Palette) -> some View {
+        if compact {
+            HStack(spacing: Space.s) {
+                Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: Space.s)
+                LogTimeMenu(time: $time, accent: .yellow)
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                Text("\(model.caffeineMgToday)")
+                    .font(.numberM)
+                    .contentTransition(reduceMotion ? .opacity : .numericText())
+                    .motion(.log, value: model.caffeineMgToday)
+                Text("mg today").font(.secondary).foregroundStyle(p.secondary)
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var newDrinkLink: some View {
+        NavigationLink { CustomDrinkView() } label: {
+            plainRowLabel(title: "New caffeine drink", systemImage: "plus")
+        }
+        .buttonStyle(.pressable)
+    }
+
+    private func plainRowLabel(title: String, systemImage: String) -> some View {
+        HStack(spacing: Space.m) {
+            Image(systemName: systemImage)
+                .font(.scaled(size: 15, weight: .bold))
+                .frame(width: Sizes.icon, height: Sizes.icon)
+                .background(Accent.yellow.fill(scheme).opacity(0.24), in: Circle())
+                .accessibilityHidden(true)
+            Text(title).font(.bodyEmphasis)
+            Spacer()
+        }
+        .foregroundStyle(Accent.yellow.onTint(scheme))
+        .padding(.horizontal, Space.l)
+        .frame(minHeight: Sizes.tallRow)
+        .contentShape(Rectangle())
+    }
+
+    private var moreSheet: some View {
+        let p = Palette(scheme: scheme)
+        let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
+        return VStack(alignment: .leading, spacing: Space.m) {
+            Text("Logs \(time.phrase)").font(.secondary).foregroundStyle(p.secondary)
+            VStack(spacing: 0) {
+                ForEach(moreDrinks) { drink in
+                    drinkButton(drink) { showsMore = false }
+                    Divider().overlay(p.cardBorder)
+                }
+                newDrinkLink
+            }
+            .background(Accent.yellow.tint(scheme), in: shape)
+            Text(CaffeineWaterCopy.typicalAmounts)
+                .font(.secondary).foregroundStyle(p.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// One drink as a row; a tap logs it at the chosen time (then `done`).
+    private func drinkButton(_ drink: Drink, then done: (() -> Void)? = nil) -> some View {
+        Button {
+            log(drink)
+            done?()
+        } label: {
+            HStack(spacing: Space.m) {
+                Image(systemName: BodyLogStyle.symbol(for: drink.icon))
+                    .font(.scaled(size: 16, weight: .semibold))
+                    .foregroundStyle(BodyLogStyle.accent(for: drink.icon).ink(scheme))
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(BodyLogStyle.accent(for: drink.icon).fill(scheme).opacity(0.22), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text(drink.name)
+                        .font(.bodyEmphasis)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        Text("\(drink.caffeineMg) mg").font(.secondary).secondaryText()
+                        if drink.isCustom { CustomDrinkBadge(accent: .purple) }
+                    }
+                }
+                Spacer(minLength: Space.s)
+                Image(systemName: "plus")
+                    .font(.scaled(size: 14, weight: .bold))
+                    .foregroundStyle(Accent.yellow.onTint(scheme))
+                    .frame(width: 32, height: 32)
+                    .background(Accent.yellow.fill(scheme).opacity(0.24), in: Circle())
+                    .symbolEffect(.bounce, value: bounces[drink.id, default: 0])
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, Space.l)
+            .padding(.vertical, Space.s)
+            .frame(minHeight: 58)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel("Add \(drink.name), \(drink.caffeineMg) mg, \(time.phrase)")
+        .contextMenu {
+            if store.data.savedDrinks.contains(where: { $0.id == drink.id }) {
+                Button(role: .destructive) {
+                    store.data.savedDrinks.removeAll { $0.id == drink.id }
+                    model.pushToWatch()
+                } label: {
+                    Label("Remove from My caffeine drinks", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private func log(_ drink: Drink) {
+        let chosen = time
+        let id = UUID()
+        withMotion(.log) {
+            model.logDrink(id: id, drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: chosen.date, saveToHealth: true)
+        }
+        let when = store.data.drinkLog.first { $0.id == id }?.date ?? .now
+        var message = LogFormat.loggedLine(LogFormat.midSentence(drink), time: chosen, at: when)
+        // Past today's cutoff: say so here, as the Watch does. The advice
+        // itself is on the Caffeine screen.
+        if AppDay.contains(when) {
+            let t = model.appDayMinutes(when)
+            if let cutoff = model.caffeineCutoffShown, t > cutoff {
+                message += " Past today\u{2019}s \(Clock.format(cutoff)) cutoff."
+            } else if model.caffeineCutoffShown == nil, model.caffeineAtBedtime >= 25 {
+                message += " About \(model.caffeineAtBedtime) mg will be left at bedtime."
+            }
+        }
+        toast = UndoToast(message) { withMotion(.undo) { model.deleteDrink(id) } }
+        time = .now
+        addCount += 1
+        bounces[drink.id, default: 0] += 1
+    }
+}
+
+/// The water card, on the Log tab and on the Water screen: "+ 1 bottle"
+/// and "+ ½ bottle", logged now. On the Log tab it leads with the bottles
+/// and today's total; on the Water screen (whose summary has them) it's
+/// just the buttons, with a row for an earlier time or another amount
+/// (`onMore`).
+struct WaterQuickLog: View {
+    @Binding var toast: UndoToast?
+    var showsTotal = true
+    var onMore: (() -> Void)? = nil
+    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var store: DataStore
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var addCount = 0
+    @State private var goalCount = 0
+
+    /// Bottles drawn: up to the goal, or (with an eating-disorder history,
+    /// no goal) just the ones she's had.
+    private var bottleCount: Int {
+        let n = model.hidesEffortTargets ? model.waterBottlesToday : model.waterGoalBottles
+        return max(1, min(Int(n.rounded(.up)), 8))
+    }
+
+    private var waterText: String {
+        model.hidesEffortTargets
+            ? "\(LogFormat.bottlesPhrase(model.waterBottlesToday)) today"
+            : "\(LogFormat.bottles(model.waterBottlesToday)) of \(LogFormat.bottlesPhrase(model.waterGoalBottles))"
+    }
+
+    var body: some View {
+        Card(accent: .blue) {
+            if showsTotal { totalRow }
+            // Stacked at the accessibility sizes, so "½ bottle" isn't
+            // broken over two lines beside a one-line "1 bottle".
+            AdaptiveStack(spacing: Space.s) {
+                waterButton("1 bottle", bottles: 1)
+                waterButton("\u{00BD} bottle", bottles: 0.5)
+            }
+            if let onMore {
+                Button(action: onMore) {
+                    HStack(spacing: Space.xs) {
+                        Text("Earlier, or another amount")
+                        Spacer(minLength: Space.s)
+                        Image(systemName: "chevron.right")
+                            .font(.scaled(size: 13, weight: .semibold))
+                            .accessibilityHidden(true)
+                    }
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(Accent.blue.ink(scheme))
+                    .frame(minHeight: Sizes.minTap)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sensoryFeedback(.increase, trigger: addCount)
+        .sensoryFeedback(.success, trigger: goalCount)
+    }
+
+    private var totalRow: some View {
+        HStack(spacing: Space.s) {
+            ForEach(0..<bottleCount, id: \.self) { i in
+                LogBottle(fill: min(max(model.waterBottlesToday - Double(i), 0), 1))
+            }
+            Spacer(minLength: Space.s)
+            VStack(alignment: .trailing, spacing: Space.xxs) {
+                Text(LogFormat.oz(model.waterTodayML))
+                    .font(.numberM)
+                    .contentTransition(reduceMotion ? .opacity : .numericText())
+                    .motion(.log, value: model.waterTodayML)
+                if !model.hidesEffortTargets {
+                    Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.secondary).secondaryText()
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Water, \(waterText), \(LogFormat.oz(model.waterTodayML))")
+    }
+
+    private func addWater(_ bottles: Double) {
+        let id = UUID()
+        let ml = store.data.bottleSizeML * bottles
+        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        withMotion(.log) { model.addWater(ml: ml, id: id) }
+        var message = "Added \(LogFormat.oz(ml)) at \(Clock.format(model.now))."
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+            message += " That\u{2019}s today\u{2019}s goal."
+            goalCount += 1
+        } else {
+            addCount += 1
+        }
+        toast = UndoToast(message) { withMotion(.undo) { model.deleteWater(id) } }
+    }
+
+    private func waterButton(_ title: String, bottles: Double) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.inner, style: .continuous)
+        return Button { addWater(bottles) } label: {
+            Label(title, systemImage: "plus")
+                .font(.bodyEmphasis)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .foregroundStyle(Accent.blue.onTint(scheme))
+                .background(Accent.blue.fill(scheme).opacity(0.2), in: shape)
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel("Add \(title) of water, \(LogFormat.oz(store.data.bottleSizeML * bottles)), now")
+    }
+}
+
+/// "When did you have it?" as one pill ("Now ▾", "30m ago", "9:10am") that
+/// opens a menu of the same presets as `LogTimeSelector`, plus another
+/// time in a sheet. For log cards under a summary, where the always-open
+/// chips cost a row (the Caffeine and Alcohol screens; the Log tab keeps
+/// the chips).
+struct LogTimeMenu: View {
+    @Binding var time: LogTime
+    var accent: Accent
+    @State private var picking = false
+    @Environment(\.colorScheme) private var scheme
+
+    private var label: String {
+        switch time {
+        case .ago(0): return "Now"
+        case let .ago(minutes): return "\(LogTime.presetLabel(minutes)) ago"
+        case let .exact(date): return Clock.format(Clock.minutesOfDay(date))
+        }
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(LogTime.presets, id: \.self) { minutes in
+                Button(LogTime.spokenLabel(minutes)) { time = .ago(minutes) }
+            }
+            Button("Another time\u{2026}") { picking = true }
+        } label: {
+            HStack(spacing: Space.xs) {
+                Text(label).lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.scaled(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+            .font(.bodyEmphasis)
+            .foregroundStyle(accent.onTint(scheme))
+            .padding(.horizontal, Space.m)
+            .frame(minHeight: Sizes.minTap)
+            .background(accent.fill(scheme).opacity(0.24), in: Capsule())
+            .fixedSize()
+        }
+        .accessibilityLabel("When you had it")
+        .accessibilityValue(time.phrase)
+        .sensoryFeedback(.selection, trigger: time)
+        .bottomSheet(isPresented: $picking, title: "When did you have it?") {
+            DatePicker("Time", selection: Binding(get: { time.date }, set: { time = .exact(LogTime.past($0)) }),
+                       displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+            Text("Times between midnight and \(Clock.format(AppDay.rolloverMinutes)) count toward the evening before.")
+                .font(.secondary).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// A thin gauge in a `SummaryHeader`'s footer: today against a ceiling
+/// (caffeine's 400 mg) or a goal (water), with a caption under it. A bar,
+/// not a ring: a ring a third full read as cut off.
+struct SummaryMeter: View {
+    /// 0 to 1; more than 1 fills the bar.
+    var fraction: Double
+    var accent: Accent
+    var caption: String
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        let ax = typeSize.isAccessibilitySize
+        VStack(alignment: .leading, spacing: Space.xs) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(p.track)
+                    Capsule().fill(accent.fill(scheme))
+                        .frame(width: geo.size.width * CGFloat(min(max(fraction, 0), 1)))
+                        .motion(.fill, value: fraction)
+                }
+            }
+            .frame(height: 8)
+            Text(caption)
+                .font(.secondary).fontWeight(.semibold)
+                .foregroundStyle(p.secondary)
+                .lineLimit(ax ? nil : 1).minimumScaleFactor(ax ? 1 : 0.8)
+                .fixedSize(horizontal: false, vertical: ax)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(caption)
+    }
+}
 
 /// When something was had: a preset ("now", "30 min ago"…) or a picked time.
 enum LogTime: Hashable {
@@ -694,8 +937,8 @@ struct LogEntryRow: View {
                 .background(accent.fill(scheme).opacity(0.22), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.scaled(size: 15, weight: .bold)).lineLimit(1)
-                Text(detail).font(.scaled(size: 13, weight: .semibold)).secondaryText().lineLimit(1)
+                Text(title).font(.scaled(size: 15, weight: .bold)).lineLimit(1).minimumScaleFactor(0.7)
+                Text(detail).font(.scaled(size: 13, weight: .semibold)).secondaryText().lineLimit(1).minimumScaleFactor(0.7)
             }
             Spacer(minLength: 8)
             Text(time).font(.scaled(size: 15, weight: .bold)).foregroundStyle(accent.ink(scheme))
