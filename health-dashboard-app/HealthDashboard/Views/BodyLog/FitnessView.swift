@@ -4,6 +4,7 @@ import HealthCore
 
 /// Cardio fitness: VO2 max, fitness age and a scrubbable history.
 struct FitnessView: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
@@ -50,9 +51,12 @@ struct FitnessView: View {
 
     private func hero(vo2: Double) -> some View {
         Card(padding: 18) {
-            HStack(alignment: .top) {
+            // VO2 max above fitness age at large text sizes; numbers never
+            // break across lines ("38 / .2").
+            AdaptiveStack(spacing: 12, alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(String(format: "%.1f", vo2)).font(.scaledNumber(48)).foregroundStyle(Accent.mint.ink(scheme))
+                        .keepsOnOneLine()
                     HStack(spacing: 0) {
                         Text("VO\u{2082} MAX").font(.scaled(size: 12, weight: .bold)).secondaryText()
                         InfoButton(title: "VO\u{2082} max",
@@ -61,15 +65,16 @@ struct FitnessView: View {
                             .padding(.vertical, -12)
                     }
                     Text(model.fitnessLevel ?? "").font(.scaled(size: 13, weight: .semibold)).secondaryText()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
+                if !typeSize.isAccessibilitySize { Spacer() }
                 if let fa = model.fitnessAgeText {
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                         HStack(spacing: 0) {
                             Text("FITNESS AGE").font(.scaled(size: 12, weight: .bold)).secondaryText()
                             InfoButton(topic: .fitnessAge).padding(.vertical, -12)
                         }
-                        Text(fa).font(.scaledNumber(fa.count > 3 ? 28 : 40))
+                        Text(fa).font(.scaledNumber(fa.count > 3 ? 28 : 40)).keepsOnOneLine()
                         if age > 0 {
                             Text("Real age \(age)").font(.scaled(size: 13, weight: .semibold)).secondaryText()
                         }
@@ -188,26 +193,25 @@ struct FitnessView: View {
 
     private var ageCard: some View {
         Card {
-            HStack(spacing: 12) {
+            LabeledControlRow {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(age == 0 ? "Add your age (optional)" : "Your age").font(.scaled(size: 15, weight: .bold))
                     Text("Compares your fitness with your own age group. Stays on your phone.")
                         .font(.scaled(size: 12)).secondaryText().fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
+            } control: {
                 Picker("Age", selection: ageBinding) {
                     Text("Not set").tag(0)
                     ForEach(13...90, id: \.self) { a in Text("\(a)").tag(a) }
                 }
                 .pickerStyle(.menu)
                 .tint(Accent.mint.ink(scheme))
+                .fixedSize()
             }
             .frame(minHeight: 44)
-            Picker("Compared with", selection: $store.data.sex) {
-                Text("Women").tag(FitnessAge.Sex.female)
-                Text("Men").tag(FitnessAge.Sex.male)
+            AdaptiveSegmentedPicker("Compared with", selection: $store.data.sex, options: [.female, .male], accent: .mint) { sex in
+                sex == .female ? "Women" : "Men"
             }
-            .pickerStyle(.segmented)
         }
     }
 }

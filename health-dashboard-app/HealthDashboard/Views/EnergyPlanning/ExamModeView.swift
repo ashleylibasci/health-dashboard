@@ -673,7 +673,7 @@ private struct ExamMorningChart: View {
             AxisMarks(values: [lo, wake, examStart]) { value in
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
-                        Text(Clock.format(m, suffix: false)).font(.scaled(size: 11, weight: .semibold)).foregroundStyle(p.secondary)
+                        Text(Clock.format(m, suffix: false)).font(.chartLabel(size: 11, weight: .semibold)).foregroundStyle(p.secondary)
                     }
                 }
             }

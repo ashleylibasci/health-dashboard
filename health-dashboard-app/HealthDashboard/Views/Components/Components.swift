@@ -253,19 +253,41 @@ struct BarRow: View {
     var valueText: String
     var accent: Accent
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
-        HStack(spacing: 10) {
-            Text(label).font(.scaled(size: 14, weight: .semibold)).frame(width: Font.scaledSize(110), alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Palette(scheme: scheme).track)
-                    Capsule().fill(accent.fill(scheme)).frame(width: geo.size.width * max(0, min(fraction, 1)))
+        Group {
+            if typeSize.isAccessibilitySize {
+                // The fixed label and value columns were wider than the
+                // screen at the largest sizes, which pushed whole screens
+                // past their left gutter. Label and value above the bar.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(label).font(.scaled(size: 14, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Text(valueText).font(.scaled(size: 14, weight: .bold)).keepsOnOneLine()
+                    }
+                    bar
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Text(label).font(.scaled(size: 14, weight: .semibold)).frame(width: Font.scaledSize(110), alignment: .leading)
+                    bar
+                    Text(valueText).font(.scaled(size: 14, weight: .bold)).frame(width: Font.scaledSize(52), alignment: .trailing)
                 }
             }
-            .frame(height: 10)
-            Text(valueText).font(.scaled(size: 14, weight: .bold)).frame(width: Font.scaledSize(52), alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var bar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette(scheme: scheme).track)
+                Capsule().fill(accent.fill(scheme)).frame(width: geo.size.width * max(0, min(fraction, 1)))
+            }
+        }
+        .frame(height: 10)
     }
 }
 

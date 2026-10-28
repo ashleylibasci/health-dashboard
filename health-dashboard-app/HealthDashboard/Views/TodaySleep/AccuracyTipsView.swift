@@ -117,7 +117,7 @@ struct AccuracyTipsView: View {
         let done = known.filter { if case .done = $0 { return true }; return false }.count
         let fraction = known.isEmpty ? 0 : Double(done) / Double(known.count)
         return Card(accent: .indigo) {
-            HStack(spacing: 16) {
+            AdaptiveStack(spacing: 16) {
                 Ring(value: fraction, accent: .indigo, lineWidth: 10, label: "\(done)/\(known.count)", size: 84,
                      accessibilityText: "\(done) of \(known.count) checks done")
                 VStack(alignment: .leading, spacing: 4) {

@@ -86,7 +86,7 @@ struct StressView: View {
                 InfoButton(topic: .stress).padding(.vertical, -14)
                 Spacer()
             }
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            AdaptiveStack(spacing: 10, alignment: .firstTextBaseline) {
                 Text(day.label?.rawValue ?? "No data yet")
                     .font(.scaledNumber(day.label == nil ? 28 : 44))
                     .foregroundStyle(accent.ink(scheme))
@@ -158,7 +158,9 @@ struct StressView: View {
             StressHoursChart(hours: day.hours, selected: nearestHour(day)?.hour, selection: $selectedHour)
                 .frame(height: 170)
             ScrubHint()
-            HStack(spacing: 12) {
+            // Wraps (one per line at the largest sizes) instead of breaking
+            // the words into letters.
+            FlowLayout(spacing: 12, lineSpacing: 6) {
                 swatch(Accent.mint.fill(scheme), "Low")
                 swatch(Accent.blue.fill(scheme), "Usual")
                 swatch(Accent.orange.fill(scheme), "Raised")
@@ -175,14 +177,16 @@ struct StressView: View {
     private func swatch(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
+                .accessibilityHidden(true)
             Text(text).font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                .keepsOnOneLine(minimumScale: 0.8)
         }
     }
 
     // MARK: Peak and calm
 
     private func momentsCard(_ day: StressDay) -> some View {
-        HStack(spacing: 10) {
+        AdaptiveStack(spacing: 10) {
             StressStat(title: "Peak",
                        value: day.peak.map { Self.hourText($0.hour) } ?? "\u{2014}",
                        note: day.peak?.level.map { "level \($0), \(Self.band($0).name.lowercased())" } ?? "no readings yet",
@@ -386,6 +390,10 @@ private struct StressHoursChart: View {
             AxisMarks(position: .leading, values: [0, 50, 100])
         }
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ClockChartDescriptor(
+            title: "Stress by hour today", seriesName: "Stress level", yTitle: "Stress, 0 to 100",
+            points: hours.compactMap { h in h.level.map { (h.hour * 60, Double($0)) } },
+            yLabel: { "level \(Int($0.rounded()))" }))
     }
 }
 

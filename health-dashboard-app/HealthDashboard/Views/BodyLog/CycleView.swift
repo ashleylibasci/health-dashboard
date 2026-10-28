@@ -217,7 +217,7 @@ private struct PhasesSection: View {
 
     private var hero: some View {
         Card(padding: 18) {
-            HStack(spacing: 16) {
+            AdaptiveStack(spacing: 16) {
                 Ring(value: min(Double(day) / Double(max(length, 1)), 1), accent: accent,
                      label: "\(day)", caption: "Day of ~\(length)", size: 124,
                      accessibilityText: "Cycle day \(day) of about \(length)")

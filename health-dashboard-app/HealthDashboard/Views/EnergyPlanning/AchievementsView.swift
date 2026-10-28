@@ -7,6 +7,7 @@ struct AchievementsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     @State private var selectedBadge: String? = nil
 
@@ -65,11 +66,11 @@ struct AchievementsView: View {
     private func badgesCard(_ badges: [AppModel.Badge]) -> some View {
         let earned = badges.filter(\.earned).count
         let selected = badges.first { $0.id == selectedBadge }
-        let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: typeSize.isAccessibilitySize ? 2 : 3)
         return Card {
-            HStack {
+            AdaptiveStack(spacing: 4) {
                 SectionLabel(text: "Badges")
-                Spacer()
+                if !typeSize.isAccessibilitySize { Spacer() }
                 Text("\(earned) of \(badges.count) earned").font(.scaled(size: 13, weight: .semibold)).secondaryText()
             }
             LazyVGrid(columns: columns, spacing: 14) {
@@ -89,9 +90,10 @@ struct AchievementsView: View {
 
     private func badgeDetail(_ b: AppModel.Badge) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            AdaptiveStack(spacing: 4) {
                 Text(b.title).font(.scaled(size: 16, weight: .bold))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                if !typeSize.isAccessibilitySize { Spacer() }
                 Text(b.earned ? "Earned" : "\(b.progress) / \(b.goal)")
                     .font(.scaled(size: 13, weight: .bold))
                     .foregroundStyle(b.earned ? Accent.mint.ink(scheme) : Palette(scheme: scheme).secondary)
@@ -111,10 +113,12 @@ struct AchievementsView: View {
     private func nextCard(_ b: AppModel.Badge) -> some View {
         Card(accent: .yellow) {
             SectionLabel(text: "Next up", accent: .yellow)
-            HStack(alignment: .firstTextBaseline) {
+            AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
                 Text(b.title).font(.scaled(size: 18, weight: .bold))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                if !typeSize.isAccessibilitySize { Spacer() }
                 Text("\(b.progress) / \(b.goal)").font(.scaledNumber(18)).foregroundStyle(Accent.yellow.ink(scheme))
+                    .keepsOnOneLine()
             }
             BarRow(label: "Progress", fraction: b.fraction, valueText: "\(Int((b.fraction * 100).rounded()))%", accent: .yellow)
             Text(b.howTo).font(.scaled(size: 14)).secondaryText()
@@ -135,6 +139,7 @@ private struct StreakRow: View {
         HStack(spacing: 12) {
             VStack(spacing: 0) {
                 Text("\(streak.current)").font(.scaledNumber(26)).foregroundStyle(accent.ink(scheme))
+                    .keepsOnOneLine()
                 Image(systemName: "flame.fill").font(.scaled(size: 11)).foregroundStyle(accent.ink(scheme))
                     .accessibilityHidden(true)
             }

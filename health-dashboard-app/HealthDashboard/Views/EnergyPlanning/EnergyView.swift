@@ -83,10 +83,7 @@ struct EnergyView: View {
     }
 
     private var dayPicker: some View {
-        Picker("Day", selection: $day) {
-            ForEach(Day.allCases) { d in Text(label(d)).tag(d) }
-        }
-        .pickerStyle(.segmented)
+        AdaptiveSegmentedPicker("Day", selection: $day, options: Array(Day.allCases), accent: .yellow) { d in label(d) }
     }
 
     /// Today's score is below her usual: the score card links to "Why is my
@@ -613,15 +610,18 @@ private struct EnergyCurveChart: View {
     var summary: String
     @Environment(\.colorScheme) private var scheme
 
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var lineColor: Color { Accent.mint.fill(scheme) }
     private var area: LinearGradient {
         LinearGradient(colors: [lineColor.opacity(0.35), lineColor.opacity(0.02)], startPoint: .top, endPoint: .bottom)
     }
     private var start: Int { energy.curve.first?.time ?? 420 }
     private var end: Int { max(energy.curve.last?.time ?? 1560, start + 60) }
+    /// Every 3 hours, or every 6 (about three labels) at accessibility sizes.
     private var ticks: [Int] {
-        let first = ((start + 179) / 180) * 180
-        return Array(stride(from: first, through: end, by: 180))
+        let step = typeSize.isAccessibilitySize ? 360 : 180
+        let first = ((start + step - 1) / step) * step
+        return Array(stride(from: first, through: end, by: step))
     }
     /// Past the end of the curve (well after bedtime) the marker stays at the end.
     private var nowPoint: (time: Minutes, level: Double)? {
@@ -652,13 +652,17 @@ private struct EnergyCurveChart: View {
                 AxisGridLine().foregroundStyle(Palette(scheme: scheme).track)
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
-                        Text(Self.hourLabel(m)).font(.scaled(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
+                        Text(Self.hourLabel(m)).font(.chartLabel(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
                     }
                 }
             }
         }
         .chartScrub($selection)
         .accessibilityLabel(summary)
+        .accessibilityChartDescriptor(ClockChartDescriptor(
+            title: "Energy through the day", seriesName: "Energy", yTitle: "Energy, 0 to 100",
+            points: energy.curve.map { ($0.time, $0.level) },
+            yLabel: { "\(Int($0.rounded())) of 100" }))
     }
 
     @ChartContentBuilder private var bandMark: some ChartContent {
@@ -689,7 +693,7 @@ private struct EnergyCurveChart: View {
             .foregroundStyle(Accent.mint.ink(scheme))
             .annotation(position: .top, spacing: 2) {
                 Text("Peak \(Clock.format(energy.highest.time))")
-                    .font(.scaled(size: 10, weight: .bold))
+                    .font(.chartLabel(size: 10, weight: .bold))
                     .foregroundStyle(Accent.mint.ink(scheme))
             }
         PointMark(x: .value("Time", energy.lowest.time), y: .value("Energy", energy.lowest.level))
@@ -697,7 +701,7 @@ private struct EnergyCurveChart: View {
             .foregroundStyle(Accent.coral.ink(scheme))
             .annotation(position: .bottom, spacing: 2) {
                 Text("Dip \(Clock.format(energy.lowest.time))")
-                    .font(.scaled(size: 10, weight: .bold))
+                    .font(.chartLabel(size: 10, weight: .bold))
                     .foregroundStyle(Accent.coral.ink(scheme))
             }
     }
@@ -711,7 +715,7 @@ private struct EnergyCurveChart: View {
                 .symbolSize(110)
                 .foregroundStyle(Palette(scheme: scheme).primary)
                 .annotation(position: .top, spacing: 4) {
-                    Text(nowIsPastEnd ? "Now: past bedtime" : "Now").font(.scaled(size: 11, weight: .bold))
+                    Text(nowIsPastEnd ? "Now: past bedtime" : "Now").font(.chartLabel(size: 11, weight: .bold))
                         .foregroundStyle(Palette(scheme: scheme).primary)
                 }
         }
@@ -778,7 +782,7 @@ private struct EnergyBankChart: View {
             AxisMarks(values: [wake, clampedNow, bedtime]) { value in
                 AxisValueLabel {
                     if let m = value.as(Int.self) {
-                        Text(Clock.format(m)).font(.scaled(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
+                        Text(Clock.format(m)).font(.chartLabel(size: 11)).foregroundStyle(Palette(scheme: scheme).tertiary)
                     }
                 }
             }
@@ -809,7 +813,7 @@ private struct EnergyBankChart: View {
                 .symbolSize(70)
                 .foregroundStyle(Palette(scheme: scheme).primary)
                 .annotation(position: .top, spacing: 4) {
-                    Text("Now").font(.scaled(size: 11, weight: .bold))
+                    Text("Now").font(.chartLabel(size: 11, weight: .bold))
                 }
         }
     }
