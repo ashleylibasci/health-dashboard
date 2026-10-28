@@ -569,7 +569,7 @@ private struct EnergyCurvePanel: View {
                              selected: selection,
                              selection: $selection.snapping { AppModel.nearestPoint($0, in: e)?.time },
                              summary: summary)
-                .frame(height: 190)
+                .frame(height: 175)
                 .motion(.dataSwap, value: isToday)
             ScrubHint(each: "moment")
         }
