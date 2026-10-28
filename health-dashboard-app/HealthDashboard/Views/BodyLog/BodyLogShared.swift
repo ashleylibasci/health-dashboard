@@ -162,7 +162,7 @@ enum ConditionCatalog {
              change: "Saved for your own reference; nothing else changes. If your cycle has become unpredictable, choose \u{201C}Irregular or not sure\u{201D} in Settings to turn off countdowns.",
              meaning: "The years before menopause, when cycles get irregular and hot flashes and poor sleep are common."),
         Item(name: "Eating-disorder history",
-             change: "Hides calories, step counts and exercise targets everywhere, whatever the calories setting says.",
+             change: "Hides calories, step counts, exercise targets and your water goal everywhere, whatever the calories setting says. Shows where to find support.",
              meaning: "A past or current eating disorder. Numbers about food and exercise can be unhelpful, so the app leaves them out."),
     ]
 

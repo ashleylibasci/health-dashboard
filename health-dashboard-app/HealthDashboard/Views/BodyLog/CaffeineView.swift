@@ -18,7 +18,8 @@ struct CaffeineView: View {
     @State private var selectedTiming: Int?
     @State private var logCount = 0
 
-    private let dailyLimit = 400
+    /// The ring is a gauge against this, not a goal to fill.
+    private let dailyLimit = CaffeineModel.dailyGuideMg
     private let bedtimeGoal = 25
 
     enum TimingDay: String, CaseIterable, Identifiable {
@@ -77,7 +78,7 @@ struct CaffeineView: View {
     // MARK: Hero
 
     private var lastDrinkName: String {
-        model.todaysDrinks.last?.name ?? "Last drink"
+        model.todaysDrinks.last?.name ?? "Last caffeine"
     }
 
     private var hero: some View {
@@ -95,13 +96,40 @@ struct CaffeineView: View {
                         heroStat(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "None today", accent: .orange)
                         InfoButton(topic: .caffeineCutoff).padding(.bottom, -10)
                     }
-                    Text("of \(dailyLimit) mg daily limit")
-                        .font(.scaled(size: 13, weight: .semibold))
-                        .secondaryText()
+                    HStack(spacing: 0) {
+                        Text("Up to \(dailyLimit) mg a day is generally fine")
+                            .font(.scaled(size: 13, weight: .semibold))
+                            .secondaryText()
+                            .fixedSize(horizontal: false, vertical: true)
+                        InfoButton(title: "How much caffeine a day",
+                                   meaning: "Up to \(dailyLimit) mg a day is generally fine for healthy adults; under \(CaffeineModel.lowerGuideMg) mg if you could be pregnant or are trying. About \(CaffeineModel.lowerGuideMg) mg in one go is the most that's generally fine at once.",
+                                   forYou: "It's a ceiling, not a target: less is fine, and none is fine too. Some people feel shaky, anxious or get a racing heart on much less. The ring shows how close today is to \(dailyLimit) mg.")
+                            .padding(.vertical, -12)
+                    }
                 }
                 Spacer(minLength: 0)
             }
+            ForEach(dailyNotes, id: \.self) { note in
+                Label(note, systemImage: "info.circle.fill")
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .foregroundStyle(Accent.orange.ink(scheme))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    /// Gentle notes, no alarm: over 400 mg today, and a single drink over
+    /// 200 mg (a big single dose).
+    private var dailyNotes: [String] {
+        var notes: [String] = []
+        let total = model.caffeineMgToday
+        if total > dailyLimit {
+            notes.append("That\u{2019}s \(total) mg today, more than the \(dailyLimit) mg that\u{2019}s generally fine. Water or decaf for the rest of the day is easier on your heart and sleep. Feeling shaky or a racing heart? Stop there.")
+        }
+        if let big = model.todaysDrinks.last(where: { $0.mg > CaffeineModel.lowerGuideMg }) {
+            notes.append("Your \(big.name) was \(big.mg) mg in one go: a big single dose. Over \(CaffeineModel.lowerGuideMg) mg at once is more likely to make you jittery; a smaller size or splitting it up helps.")
+        }
+        return notes
     }
 
     private func heroStat(label: String, value: String, accent: Accent) -> some View {
@@ -120,7 +148,7 @@ struct CaffeineView: View {
     private var logCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Log a drink").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text("Log caffeine").font(.scaled(size: 17, weight: .bold)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("Logs \(logTime.phrase)").font(.scaled(size: 13, weight: .semibold)).secondaryText()
             }
@@ -139,7 +167,7 @@ struct CaffeineView: View {
                         store.data.savedDrinks.removeAll { $0.id == drink.id }
                         model.pushToWatch()
                     } label: {
-                        Label("Remove from My drinks", systemImage: "trash")
+                        Label("Remove from My caffeine drinks", systemImage: "trash")
                     }
                 }
             }
@@ -148,7 +176,7 @@ struct CaffeineView: View {
             NavigationLink { CustomDrinkView() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "plus").font(.scaled(size: 15, weight: .bold)).accessibilityHidden(true)
-                    Text("New drink").font(.scaled(size: 15, weight: .bold))
+                    Text("New caffeine drink").font(.scaled(size: 15, weight: .bold))
                 }
                 .foregroundStyle(Accent.yellow.ink(scheme))
                 .frame(maxWidth: .infinity, minHeight: 52)
@@ -188,7 +216,7 @@ struct CaffeineView: View {
                                                  halfLifeHours: model.caffeineHalfLifeHours)
             let smaller = room >= 5 ? " A smaller drink still fits: up to about \(room) mg now." : ""
             text = "Your \(drink.name) \(when) would leave about \(left) mg in you at bedtime\(withOthers), so skip more caffeine today." + smaller
-                + (model.caffeineLastsLonger ? " On your birth control caffeine stays about twice as long." : "")
+                + (model.caffeineLastsLonger ? " On your birth control caffeine stays \(model.caffeineLongerPhrase)." : "")
         }
         return Label(text, systemImage: tooMuch ? "exclamationmark.triangle.fill" : "checkmark.circle")
             .font(.scaled(size: 13, weight: .semibold))
@@ -232,6 +260,9 @@ struct CaffeineView: View {
                             .accessibilityLabel("Log \(drink.name), \(drink.caffeineMg) mg, \(logTime.phrase)")
                         }
                 }
+                Text("Typical amounts. Coffee-shop coffee is stronger than home brewed, and energy drinks and pre-workouts vary a lot (150 to 300 mg), so check your label. For a different amount, use New caffeine drink.")
+                    .font(.scaled(size: 12)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -263,7 +294,7 @@ struct CaffeineView: View {
                     LogEntryRow(systemImage: symbol(for: entry), accent: .yellow, title: entry.name,
                                 detail: "\(entry.mg) mg", time: Clock.format(Clock.minutesOfDay(entry.date)))
                 }
-                Text("Tap a drink to change its time or caffeine. Swipe left to delete.")
+                Text("Tap an entry to change its time or caffeine. Swipe left to delete.")
                     .font(.scaled(size: 12)).secondaryText()
             }
         }
@@ -377,7 +408,7 @@ struct CaffeineView: View {
                 InfoButton(topic: .caffeineCutoff)
             }
             HowWeGotThisLink(title: "Caffeine in your body",
-                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 9 on the combined pill, ring or patch, which slow how fast the liver clears it; the app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below 25 mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
+                             method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 8 (one and a half times as long) on the combined pill, which slows how fast the liver clears it, from one small study; the ring and patch probably do the same. The app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below 25 mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the note under your usual drink checks its real size.")
         }
     }
 
@@ -435,7 +466,7 @@ struct CaffeineView: View {
         if !noWindow { parts.append("best caffeine window \(timing.bestWindow.label),") }
         if let d = timingEnergy.zone(.afternoonDip) { parts.append("afternoon dip \(d.range.label),") }
         if let nap = timing.coffeeNapAt { parts.append("coffee nap at \(Clock.format(nap)),") }
-        else if timingDay == .today, let first = model.caffeineDoses.first?.time { parts.append("first drink at \(Clock.format(first)),") }
+        else if timingDay == .today, let first = model.caffeineDoses.first?.time { parts.append("first caffeine at \(Clock.format(first)),") }
         parts.append(noWindow ? "no safe time for a typical drink; one small drink early." : "cutoff \(Clock.format(timing.cutoff)).")
         return parts.joined(separator: " ")
     }
@@ -461,7 +492,7 @@ struct CaffeineView: View {
         let dip = timingEnergy.zone(.afternoonDip)?.range
         let title = Clock.format(t)
         if let nap = timing.coffeeNapAt, abs(t - nap) <= 10 {
-            return (title, "Coffee nap", "A small coffee, then a 20-minute nap. The caffeine kicks in just as you wake up.")
+            return (title, "Coffee nap", "A regular coffee, then a 20-minute nap. The caffeine kicks in just as you wake up.")
         }
         if let groggy, groggy.contains(t) {
             return (title, "Still groggy", "Caffeine works less well while you're waking up. Daylight and water help more. Wait until \(Clock.format(groggy.end)).")

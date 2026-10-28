@@ -59,7 +59,7 @@ struct LogView: View {
                             .frame(width: 36, height: 36)
                             .background(Accent.indigo.tint(scheme), in: Circle())
                             .accessibilityHidden(true)
-                        Text("New drink").font(.scaled(size: 15, weight: .bold))
+                        Text("New caffeine drink").font(.scaled(size: 15, weight: .bold))
                         Spacer()
                     }
                     .foregroundStyle(Accent.indigo.ink(scheme))
@@ -90,7 +90,7 @@ struct LogView: View {
 
     private var caffeineSubtitle: String {
         let count = model.todaysDrinks.count
-        let drinks = count == 0 ? "Nothing logged yet" : "\(count) drink\(count == 1 ? "" : "s") \u{00B7} tap to edit times"
+        let drinks = count == 0 ? "Nothing logged yet" : "\(count) caffeine drink\(count == 1 ? "" : "s") \u{00B7} tap to edit times"
         return "\(drinks) \u{00B7} ~\(model.caffeineAtBedtime) mg left at bedtime"
     }
 
@@ -138,10 +138,17 @@ struct LogView: View {
 
     // MARK: Water
 
-    private var bottleCount: Int { max(1, min(Int(model.waterGoalBottles.rounded(.up)), 8)) }
+    /// Bottles drawn: up to the goal, or (with an eating-disorder history,
+    /// no goal) just the ones she's had.
+    private var bottleCount: Int {
+        let n = model.hidesEffortTargets ? model.waterBottlesToday : model.waterGoalBottles
+        return max(1, min(Int(n.rounded(.up)), 8))
+    }
 
     private var waterText: String {
-        "\(LogFormat.bottles(model.waterBottlesToday)) of \(LogFormat.bottlesPhrase(model.waterGoalBottles))"
+        model.hidesEffortTargets
+            ? "\(LogFormat.bottlesPhrase(model.waterBottlesToday)) today"
+            : "\(LogFormat.bottles(model.waterBottlesToday)) of \(LogFormat.bottlesPhrase(model.waterGoalBottles))"
     }
 
     private func addWater(_ bottles: Double) {
@@ -165,7 +172,9 @@ struct LogView: View {
                     Spacer(minLength: 8)
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(LogFormat.oz(model.waterTodayML)).font(.scaledNumber(20))
-                        Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                        if !model.hidesEffortTargets {
+                            Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.scaled(size: 12, weight: .semibold)).secondaryText()
+                        }
                     }
                 }
                 .accessibilityElement(children: .ignore)
@@ -176,7 +185,7 @@ struct LogView: View {
                 }
                 if let lastWater { confirmation(lastWater) }
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
-                LinkRow(title: "Water", subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML)) \u{00B7} change times, sizes and goal",
+                LinkRow(title: "Water", subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML)) \u{00B7} change times, sizes" + (model.hidesEffortTargets ? "" : " and goal"),
                         systemImage: "drop.fill", accent: .blue) {
                     WaterView()
                 }
@@ -214,7 +223,7 @@ struct LogView: View {
                     .font(.scaled(size: 13, weight: .semibold)).secondaryText()
             }
             Card(accent: .purple) {
-                Text("Tap to log one drink now. Change the time or number on the Drinks screen.")
+                Text("Tap to log one drink now. Change the time or number on the Drinks screen. " + DrinksView.standardDrinkLine)
                     .font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
                 FlowLayout(spacing: 8) {
@@ -237,6 +246,7 @@ struct LogView: View {
                         }
                 }
                 if let lastAlcohol { confirmation(lastAlcohol) }
+                AlcoholSafetyNote()
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
                 LinkRow(title: "Drinks and your body", subtitle: "What drinks do to your sleep \u{00B7} edit entries",
                         systemImage: "wineglass.fill", accent: .purple) {

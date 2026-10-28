@@ -54,7 +54,7 @@ struct DrinksView: View {
             recentCard
             tipsCard
             HowWeGotThisLink(title: "Drinks and your body",
-                             method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
+                             method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. It doesn\u{2019}t separate amounts: a night after one glass counts the same as a night after several. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
         }
         .sheet(item: $editing) { entry in
             AlcoholEntryEditor(entry: entry)
@@ -110,6 +110,9 @@ struct DrinksView: View {
                     .accessibilityLabel(count == 1 ? "1 drink" : "\(count) drinks")
                 countButton("plus", label: "One more") { count = min(15, count + 1) }
             }
+            Text(Self.standardDrinkLine)
+                .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
             LogTimeSelector(time: $time, accent: .purple, title: "When?")
             PrimaryButton(title: "Log \(Self.phrase(count: count, kind: kind))", accent: .purple, action: logDrinks)
             if let lastLogged {
@@ -117,8 +120,12 @@ struct DrinksView: View {
                     .font(.scaled(size: 13, weight: .semibold))
                     .foregroundStyle(Accent.mint.ink(scheme))
             }
+            AlcoholSafetyNote()
         }
     }
+
+    /// What one drink means here: a US standard drink (14 g of alcohol).
+    static let standardDrinkLine = "One drink is 5 oz of wine, 12 oz of 5% beer or seltzer, or a 1.5 oz shot. A cocktail or big pour is often 2 or more."
 
     private func kindChip(_ k: String) -> some View {
         let p = Palette(scheme: scheme)
@@ -214,7 +221,7 @@ struct DrinksView: View {
                                                             forYou: "Below zero means you felt less awake than usual the morning after."))
                     }
                 }
-                Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks, compared with \(effect.withoutCount) without." + cycleNote)
+                Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after drinks, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
                     .font(.scaled(size: 13)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -334,7 +341,10 @@ struct DrinksView: View {
             Label("What helps most", systemImage: "lightbulb.fill")
                 .font(.scaled(size: 15, weight: .bold))
                 .foregroundStyle(Accent.mint.ink(scheme))
-            Text("Finish your last drink 3 or more hours before bed, and have a glass of water between drinks. Your body clears about one drink an hour.")
+            Text("Finish your last drink 3 or more hours before bed, and have a glass of water between drinks. A standard drink takes most women about 2 hours to clear, and nothing speeds it up: not coffee, water or sleep. Cocktails are often 2 or more.")
+                .font(.scaled(size: 14)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Energy drinks and alcohol in the same evening can hide how drunk you feel, so they\u{2019}re best kept apart.")
                 .font(.scaled(size: 14)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Water", subtitle: "Log a bottle", systemImage: "drop.fill", accent: .blue) {
@@ -345,6 +355,37 @@ struct DrinksView: View {
 }
 
 // MARK: - Pieces
+
+/// After 4 or more drinks in the last few hours: a calm alcohol-poisoning
+/// line with the signs and a 911 button. Facts only, no judgment. Shows
+/// nothing otherwise.
+struct AlcoholSafetyNote: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if model.showsAlcoholSafetyLine {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Looking out for you and your friends", systemImage: "heart.fill")
+                    .font(.scaled(size: 14, weight: .bold))
+                    .foregroundStyle(Accent.pink.ink(scheme))
+                Text("4 or more drinks in an evening is a lot for most women, and blood alcohol keeps rising for a while after the last one. Signs of alcohol poisoning: confusion, throwing up, slow or uneven breathing, pale or bluish skin, or can\u{2019}t be woken. If you see any, call 911. Don\u{2019}t leave a friend alone to sleep it off; keep her on her side.")
+                    .font(.scaled(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                Link(destination: URL(string: "tel:911")!) {
+                    Label("Call 911", systemImage: "phone.fill")
+                        .font(.scaled(size: 14, weight: .bold))
+                        .foregroundStyle(Accent.pink.ink(scheme))
+                        .frame(minHeight: 44)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Accent.pink.tint(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .accessibilityElement(children: .contain)
+        }
+    }
+}
 
 /// "Example" on cards that show the sample analysis, not hers.
 struct ExampleTag: View {

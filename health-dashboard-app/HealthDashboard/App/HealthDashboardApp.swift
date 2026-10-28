@@ -42,6 +42,7 @@ struct HealthDashboardApp: App {
             }
             .environmentObject(store)
             .environmentObject(model)
+            .environment(\.hidesEffortTargets, store.data.conditions.contains("Eating-disorder history"))
             .preferredColorScheme(appearance == "light" ? .light : appearance == "system" ? nil : .dark)
             .onChange(of: scenePhase, initial: true) { _, phase in
                 // Every time the app comes forward: today's numbers, then the Watch.

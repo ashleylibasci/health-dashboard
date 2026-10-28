@@ -18,7 +18,7 @@ struct ConditionsView: View {
     private var removeMessage: String {
         confirmRemove == "PMDD"
             ? "The 988 Lifeline will no longer show on the Body and Cycle screens. If it just takes up too much room, you can keep it as one line instead."
-            : "Calories, step counts and exercise targets will show again in the app."
+            : "Calories, step counts, exercise targets and your water goal will show again in the app."
     }
 
     private func remove(_ name: String) {
@@ -127,6 +127,10 @@ struct ConditionsView: View {
             .accessibilityElement(children: .combine)
             .overlay(alignment: .topTrailing) { info(item).offset(x: 10, y: -10) }
 
+            if item.name == "Eating-disorder history" {
+                EatingDisorderSupportRow()
+            }
+
             if item.name == "PCOS" {
                 LinkRow(title: "Living with PCOS", subtitle: "What changes, what to log, trusted info",
                         systemImage: "book.fill", accent: .indigo) {
@@ -185,5 +189,30 @@ struct ConditionsView: View {
             .accessibilityLabel("Add \(item.name)")
         }
         .padding(.vertical, 6)
+    }
+}
+
+/// Where to get support with an eating disorder: the ANAD helpline (the
+/// NEDA helpline closed in 2023) and campus counseling (Cole 6).
+struct EatingDisorderSupportRow: View {
+    @Environment(\.colorScheme) private var scheme
+    private static let anad = URL(string: "tel:18883757767")!
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Support if you want it: the ANAD eating-disorder helpline is free, 1-888-375-7767 (US). Your campus counseling center can help too.")
+                .font(.scaled(size: 13))
+                .fixedSize(horizontal: false, vertical: true)
+            Link(destination: Self.anad) {
+                Label("Call ANAD", systemImage: "phone.fill")
+                    .font(.scaled(size: 14, weight: .bold))
+                    .foregroundStyle(Accent.indigo.ink(scheme))
+                    .frame(minHeight: 44)
+            }
+            .accessibilityLabel("Call the ANAD helpline, 1-888-375-7767")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Accent.indigo.fill(scheme).opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

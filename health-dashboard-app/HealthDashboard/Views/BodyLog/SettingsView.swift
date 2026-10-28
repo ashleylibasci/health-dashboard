@@ -344,8 +344,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Water")
             Card(padding: 12) {
-                LinkRow(title: "Bottle size and daily goal",
-                        subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML)) \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))",
+                LinkRow(title: model.hidesEffortTargets ? "Bottle size" : "Bottle size and daily goal",
+                        subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML))" + (model.hidesEffortTargets ? "" : " \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))"),
                         systemImage: "drop.fill", accent: .blue) {
                     WaterView()
                 }

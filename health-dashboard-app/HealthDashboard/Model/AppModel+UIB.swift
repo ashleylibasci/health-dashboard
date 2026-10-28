@@ -112,7 +112,7 @@ extension AppModel {
     /// The copy for when there's no safe clock time for a typical drink.
     var caffeineEarlyOnlyText: String {
         let cause = caffeineLastsLonger
-            ? "On your birth control, caffeine stays in your body about twice as long."
+            ? "On your birth control, caffeine stays in your body \(caffeineLongerPhrase)."
             : "With your bedtime, caffeine has little time to clear."
         let largest = caffeineLargestDoseAtWake
         let coffee = Self.referenceCoffee

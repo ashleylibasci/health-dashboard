@@ -30,7 +30,7 @@ extension AppModel {
     // MARK: Conditions
 
     /// With an eating-disorder history, the app shows no step goals, effort
-    /// targets or exercise prescriptions (and no calories).
+    /// targets or exercise prescriptions, no calories and no water goal.
     var hidesEffortTargets: Bool { store.data.conditions.contains("Eating-disorder history") }
 
     // MARK: Usual values

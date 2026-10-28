@@ -302,7 +302,7 @@ private struct TodayWidgetView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(mg) mg caffeine").font(.headline)
                     Text(s.caffeineNote).font(.caption2)
-                    Text("\(ounces(water)) of \(ounces(s.waterGoalML)) water").font(.caption2)
+                    Text(s.showsWaterGoal ? "\(ounces(water)) of \(ounces(s.waterGoalML)) water" : "\(ounces(water)) water").font(.caption2)
                 }
                 .accessibilityElement(children: .combine)
             } else {
@@ -314,9 +314,11 @@ private struct TodayWidgetView: View {
                         Text("mg").font(.system(size: 13, weight: .semibold)).foregroundStyle(p.secondary)
                     }
                     Text(s.caffeineNote).font(.system(size: 12)).foregroundStyle(p.secondary).lineLimit(1)
-                    ProgressView(value: min(water / max(s.waterGoalML, 1), 1))
-                        .tint(Accent.blue.fill(scheme))
-                    Text("\(ounces(water)) of \(ounces(s.waterGoalML))")
+                    if s.showsWaterGoal {
+                        ProgressView(value: min(water / max(s.waterGoalML, 1), 1))
+                            .tint(Accent.blue.fill(scheme))
+                    }
+                    Text(s.showsWaterGoal ? "\(ounces(water)) of \(ounces(s.waterGoalML))" : "\(ounces(water)) water")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Accent.blue.ink(scheme))
                     Spacer(minLength: 0)

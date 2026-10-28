@@ -128,7 +128,7 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Brisk walks, runs or cycling a few times a week bring it down. It updates slowly, over weeks.")
         case .calories: Explanation(id: id, title: "Calories",
             meaning: "An estimate of the energy your body used today: resting energy just to keep you alive, plus active energy from moving.",
-            forYou: "Watch estimates can be off by 10–20%. It's useful for trends, not exact numbers. This is off by default; you can turn it on in Settings.")
+            forYou: "Watch estimates are often off by 20–30% or more, and more at rest. It's useful for trends, not exact numbers. This is off by default; you can turn it on in Settings.")
         case .bodyClock: Explanation(id: id, title: "Your body clock",
             meaning: "Whether your body naturally prefers earlier or later sleep and wake times. It's partly genetic and tends to run latest around age 20.",
             forYou: "Being an evening type isn't laziness. Your peak focus comes later in the day, so morning classes need more help: morning light, a steady wake time and a smaller weekend shift.",
@@ -138,14 +138,14 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Under an hour is the goal. Cutting your weekend shift is the easiest way to shrink it.")
         case .caffeineCutoff: Explanation(id: id, title: "Caffeine cutoff",
             meaning: "The latest time to have caffeine so that very little is left in your body at bedtime.",
-            forYou: "Caffeine takes about 5 hours for half of it to leave your body, and about twice that on the combined pill, ring or patch (the app uses the longer time if you use one). So an afternoon coffee is still partly there at midnight, even if you can fall asleep. It makes sleep lighter.",
-            howWeGotIt: "The latest time a 12 oz drip coffee (140 mg) would be down to under 25 mg by your planned bedtime, rounded down to the half hour. A smaller drink, like a single espresso, can be a little later and a bigger one needs to be earlier; the Caffeine screen tells you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then the cutoff shows as \u{201C}None today\u{201D}, and the app tells you the biggest single drink you could have soon after waking instead.")
+            forYou: "Caffeine takes about 5 hours for half of it to leave your body. On the combined pill it takes about one and a half times as long, about 8 hours, and probably on the ring and patch too (the app uses the longer time if you use one). So an afternoon coffee is still partly there at midnight, even if you can fall asleep. It makes sleep lighter.",
+            howWeGotIt: "The latest time a 12 oz drip coffee (140 mg) would be down to under 25 mg by your planned bedtime, rounded down to the half hour. A smaller drink, like a single espresso, can be a little later and a bigger one needs to be earlier; the Caffeine screen tells you when what you've had adds up to too much. On the longer half-life that time can come before you're even up. Then the cutoff shows as \u{201C}None today\u{201D}, and the app tells you the biggest single coffee or tea you could have soon after waking instead. The 8 hours on the pill comes from one small study (Abernethy & Todd, 1985), so treat it as a rough guide.")
         case .caffeineLeft: Explanation(id: id, title: "Caffeine left at bedtime",
             meaning: "How much of today's caffeine is predicted to still be in your body when you go to bed.",
             forYou: "Under 25 mg is the goal. That's about a fifth of a 12 oz drip coffee.",
             howWeGotIt: "Why 25 mg: in sleep-lab studies, caffeine still in the body at bedtime made sleep lighter and shorter even when people fell asleep fine, and bigger amounts did more. There's no exact safe line, and some people are more sensitive than others. 25 mg is a cautious rule of thumb the app uses, a small amount where the effect is usually minor, not a medical cutoff. The caffeine cutoff test can show what works for you.")
         case .coffeeNap: Explanation(id: id, title: "Coffee nap",
-            meaning: "Drinking a small coffee and then napping for 20 minutes. The caffeine kicks in just as you wake up.",
+            meaning: "Drinking a regular coffee and then napping for 20 minutes. The caffeine kicks in just as you wake up.",
             forYou: "Only worth it when your afternoon dip starts before your caffeine cutoff.")
         case .cutoffTest: Explanation(id: id, title: "Caffeine cutoff test",
             meaning: "A personal experiment: for 21 days the app compares your sleep on days your last caffeine was early with days it was late. A day with no caffeine counts only if you logged something else that day, so a day you forgot to log isn't counted as caffeine-free.",
@@ -172,8 +172,8 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "When the clocks change by an hour, your body clock doesn't change overnight. It takes a few days to adjust.",
             forYou: "You can keep your usual bedtime and wake time by the clock (nothing moves; when the clocks go back you just get an extra hour that night), or use the extra hour to become a slightly earlier riser. Neither option changes your alarm.")
         case .alcohol: Explanation(id: id, title: "Drinks and your body",
-            meaning: "Alcohol can help you fall asleep but makes the second half of the night lighter, with less REM and more wake-ups, and raises your heart rate overnight.",
-            forYou: "The app compares your own nights with and without drinks so you can see the effect on you.")
+            meaning: "Alcohol can help you fall asleep but makes the second half of the night lighter, with less REM and more wake-ups, and raises your heart rate overnight. One standard drink is 5 oz of wine, 12 oz of 5% beer or seltzer, or a 1.5 oz shot. Women reach a higher blood alcohol level than men from the same drinks, because of less body water.",
+            forYou: "A standard drink takes most women about 2 hours to clear. Nothing speeds it up: not coffee, water or sleep. Cocktails and big pours are often 2 or more. The app compares your own nights with and without drinks so you can see the effect on you; it doesn't separate one drink from several.")
         case .lateNight: Explanation(id: id, title: "Late-night cost",
             meaning: "What a bedtime well past your usual does to the next day and the day after, from your own nights.",
             forYou: "One very late night can take a couple of days to fully recover from.")

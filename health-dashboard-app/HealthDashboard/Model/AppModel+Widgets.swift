@@ -30,6 +30,7 @@ extension AppModel {
             caffeineNote: caffeineCutoffShown.map { "Cutoff \(BodyLogStyle.shortTime($0))" } ?? "One small drink early",
             waterML: waterTodayML,
             waterGoalML: store.data.waterGoalML,
+            waterGoalHidden: hidesEffortTargets,
             bottleML: store.data.bottleSizeML,
             bedtime: AppDay.date(store.data.bedtime, relativeTo: nextWakeDay),
             bedtimeStreak: onTime,

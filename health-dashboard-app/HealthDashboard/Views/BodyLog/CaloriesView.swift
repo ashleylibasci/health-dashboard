@@ -13,8 +13,9 @@ struct CaloriesView: View {
             if model.caloriesHiddenByCondition {
                 Card(accent: .indigo) {
                     Text("Calories are hidden").font(.scaled(size: 18, weight: .bold))
-                    Text("You added eating-disorder history to your health conditions, so the app keeps calories, step counts and exercise targets out of sight everywhere. You can change that in Health conditions.")
+                    Text("You added eating-disorder history to your health conditions, so the app keeps calories, step counts, exercise targets and your water goal out of sight everywhere. You can change that in Health conditions.")
                         .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                    EatingDisorderSupportRow()
                     LinkRow(title: "Health conditions", systemImage: "heart.text.square.fill", accent: .purple) { ConditionsView() }
                 }
             } else {
@@ -27,10 +28,10 @@ struct CaloriesView: View {
                     SettingToggleRow(title: "Show calories on Body", detail: "Turn off anytime. No targets, no food diary.",
                                      systemImage: "flame.fill", accent: .orange, isOn: $store.data.showCalories)
                 }
-                Text("Apple Watch estimates calories from your heart rate and movement. Treat these as estimates, not exact counts.")
+                Text("Apple Watch estimates calories from your heart rate and movement. They\u{2019}re often off by 20\u{2013}30% or more, so treat these as estimates, not exact counts.")
                     .font(.scaled(size: 12)).secondaryText().fixedSize(horizontal: false, vertical: true)
                 HowWeGotThisLink(title: "Calories",
-                                 method: "Resting energy comes from Apple Health's estimate of what your body uses at rest, based on your height, weight and age in the Health app. Active energy comes from your heart rate and movement on your Apple Watch. Both are added up from midnight.")
+                                 method: "Resting energy comes from Apple Health's estimate of what your body uses at rest, based on your height, weight, age and sex in the Health app. Make sure Sex is set to Female in Health > Health Details. Active energy comes from your heart rate and movement on your Apple Watch. Both are added up from midnight, and both are estimates that are often off by 20\u{2013}30% or more.")
             }
         }
     }
@@ -53,7 +54,7 @@ struct CaloriesView: View {
         return Card {
             part(title: "Resting", value: model.restingCalories, fraction: model.restingCalories / total, accent: .indigo,
                  meaning: "The energy your body uses just to keep you going: breathing, your heart, your brain, keeping warm. It's most of what you use every day, even on a lazy one.",
-                 forYou: "Your brain alone uses about a fifth of it. Studying all day is real work for your body.")
+                 forYou: "Your brain uses about a fifth of it every day, studying or resting. That\u{2019}s one reason regular meals matter.")
             part(title: "Active", value: model.activeCalories, fraction: model.activeCalories / total, accent: .orange,
                  meaning: "Extra energy from moving: walking to class, stairs, workouts.",
                  forYou: "It goes up and down a lot from day to day. That's normal and nothing to chase.")

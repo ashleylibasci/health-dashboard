@@ -242,7 +242,7 @@ extension AppModel {
                 : "Try five minutes of slow breathing (in for 4, out for 6), or a short walk outside."
         case .caffeineCutoff?:
             if caffeineCutoffBeforeWake {
-                return "Tomorrow, keep it to one small drink (up to about \(caffeineLargestDoseAtWake) mg) soon after you wake. Caffeine stays in your body about twice as long on your birth control."
+                return "Tomorrow, keep it to one small drink (up to about \(caffeineLargestDoseAtWake) mg) soon after you wake. On your birth control, caffeine stays in your body \(caffeineLongerPhrase)."
             }
             return "Have your last caffeine before \(Clock.format(caffeineCutoff)) tomorrow."
         case .daylight?:
@@ -292,7 +292,7 @@ extension AppModel {
                   progress: min(store.data.checkIns.count, 14), goal: 14, howTo: "Do your morning check-in 14 times."),
             Badge(title: "Slept your need 5 nights running", systemImage: "zzz", accent: .blue,
                   progress: inARow(need, 5), goal: 5, howTo: "Get at least your sleep need 5 nights in a row."),
-            Badge(title: "First drink logged", systemImage: "cup.and.saucer.fill", accent: .yellow,
+            Badge(title: "First coffee or tea logged", systemImage: "cup.and.saucer.fill", accent: .yellow,
                   progress: min(store.data.drinkLog.count, 1), goal: 1, howTo: "Log a coffee, tea or energy drink."),
             Badge(title: "Hydrated week", systemImage: "drop.fill", accent: .blue,
                   progress: min(waterDays, 7), goal: 7, howTo: "Reach your water goal on 7 days."),
