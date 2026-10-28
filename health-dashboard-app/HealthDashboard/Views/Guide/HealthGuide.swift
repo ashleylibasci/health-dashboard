@@ -69,7 +69,7 @@ struct GuideSection: Identifiable, Hashable {
 /// One Health guide article: a title, a one-line summary for the list,
 /// and the body as paragraphs, bullet lists and subheadings, with an
 /// optional source line ("From the CDC's 2024 guidance") and call or text
-/// buttons (988, 911).
+/// buttons (a phone number to call or text).
 struct GuideArticle: Identifiable, Hashable {
     enum Block: Hashable {
         case paragraph(String)
