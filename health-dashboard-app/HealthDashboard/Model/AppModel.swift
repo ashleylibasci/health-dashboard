@@ -106,7 +106,7 @@ final class AppModel: ObservableObject {
     @Published var restingHRDelta = SampleData.restingHRDelta
     @Published var daylightToday = SampleData.daylightToday
     @Published var stepsToday = SampleData.stepsToday
-    @Published var cycleDay: Int? = SampleData.cycleDay
+    @Published var cycleDay: Int?
     @Published var cycleLength = SampleData.cycleLength
     @Published var workNights = SampleData.workNights
     @Published var freeNights = SampleData.freeNights
@@ -773,10 +773,9 @@ final class AppModel: ObservableObject {
         if let last = starts.last {
             cycleDay = (cal.dateComponents([.day], from: last, to: cal.startOfDay(for: .now)).day ?? 0) + 1
             cycleLength = lengths.usual ?? Self.typicalCycleLength
-        } else if usingSampleData {
-            cycleDay = SampleData.cycleDay
-            cycleLength = SampleData.cycleLength
         } else {
+            // No period logged: no cycle day, even while the rest is example
+            // data. A made-up cycle would put a period on her calendar.
             cycleDay = nil
             cycleLength = Self.typicalCycleLength
         }
@@ -979,7 +978,14 @@ final class AppModel: ObservableObject {
         let watchRelevant = planRelevant || old.savedDrinks != new.savedDrinks
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
         // (alarmOverride is written by pushToWatch itself, which then sends.)
-        if watchRelevant { pushToWatch() }
+        if watchRelevant {
+            pushToWatch()
+        } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
+                    || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
+                    || old.waterGoalML != new.waterGoalML {
+            // Widgets show today's water, caffeine and cycle.
+            Task { @MainActor in self.publishWidgetSnapshot() }
+        }
         if planRelevant || old.alarmOverride != new.alarmOverride { Task { await updateAlarmNudge() } }
 
         // A logged or edited bleed moves the cycle day straight away.
@@ -1127,6 +1133,8 @@ final class AppModel: ObservableObject {
     /// a one-off window for one morning (exam mode); it's kept until that
     /// morning has passed, so later pushes don't overwrite it.
     func pushToWatch(alarm: TimeRange? = nil, wakeDay: Date? = nil) {
+        // Widgets and complications get the same moment's numbers.
+        publishWidgetSnapshot()
         let cal = Calendar.current
         if let alarm {
             let day = wakeDay.map { cal.startOfDay(for: $0) } ?? Self.wakeDay(forWindowEnding: alarm.end)
