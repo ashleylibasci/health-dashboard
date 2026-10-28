@@ -728,8 +728,17 @@ struct LogTimeMenu: View {
         .accessibilityLabel("When you had it")
         .accessibilityValue(time.phrase)
         .sensoryFeedback(.selection, trigger: time)
-        .bottomSheet(isPresented: $picking, title: "When did you have it?") {
-            DatePicker("Time", selection: Binding(get: { time.date }, set: { time = .exact(LogTime.past($0)) }),
+        .logTimeWheel(isPresented: $picking, time: $time)
+    }
+}
+
+extension View {
+    /// "When did you have it?": a time wheel in a sheet, for any time other
+    /// than the presets. Picks the most recent time that clock time came round.
+    func logTimeWheel(isPresented: Binding<Bool>, time: Binding<LogTime>) -> some View {
+        bottomSheet(isPresented: isPresented, title: "When did you have it?") {
+            DatePicker("Time", selection: Binding(get: { time.wrappedValue.date },
+                                                  set: { time.wrappedValue = .exact(LogTime.past($0)) }),
                        displayedComponents: .hourAndMinute)
                 .datePickerStyle(.wheel)
                 .labelsHidden()
@@ -824,6 +833,7 @@ struct LogTimeSelector: View {
     @Binding var time: LogTime
     var accent: Accent = .yellow
     var title = "When?"
+    @State private var picking = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -835,14 +845,24 @@ struct LogTimeSelector: View {
                 Text(title).font(.scaled(size: 13, weight: .bold)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } control: {
-                HStack(spacing: 8) {
-                    Text("Other").font(.scaled(size: 13)).secondaryText().accessibilityHidden(true)
-                        .keepsOnOneLine()
-                    DatePicker("Pick another time", selection: exactTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .tint(accent.ink(scheme))
-                        .timePickerAccessibility("Pick another time", time: time.date)
+                // The picked time in the app's own format ("5:03pm"), not the
+                // system picker's "5:03 PM" (design review F26).
+                Button { picking = true } label: {
+                    HStack(spacing: 8) {
+                        Text("Other").font(.scaled(size: 13)).secondaryText()
+                            .keepsOnOneLine()
+                        Text(Clock.format(Clock.minutesOfDay(time.date)))
+                            .font(.bodyEmphasis)
+                            .foregroundStyle(accent.ink(scheme))
+                            .keepsOnOneLine()
+                            .padding(.horizontal, Space.m)
+                            .frame(minHeight: Sizes.minTap)
+                            .background(Palette(scheme: scheme).chip, in: Capsule())
+                    }
                 }
+                .buttonStyle(.pressable)
+                .accessibilityLabel("Pick another time")
+                .accessibilityValue(Clock.format(Clock.minutesOfDay(time.date)))
             }
             // Four equal chips, "Now / 30m / 1h / 2h"; two rows of two at
             // the largest text sizes.
@@ -854,10 +874,7 @@ struct LogTimeSelector: View {
             }
         }
         .sensoryFeedback(.selection, trigger: time)
-    }
-
-    private var exactTime: Binding<Date> {
-        Binding(get: { time.date }, set: { time = .exact(LogTime.past($0)) })
+        .logTimeWheel(isPresented: $picking, time: $time)
     }
 
     private func chip(_ minutes: Int) -> some View {
