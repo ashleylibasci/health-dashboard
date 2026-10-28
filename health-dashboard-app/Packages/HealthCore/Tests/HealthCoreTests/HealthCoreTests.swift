@@ -168,7 +168,9 @@ final class PlanningTests: XCTestCase {
     }
     func testCyclePhase() {
         XCTAssertEqual(CycleEstimator.phase(day: 22), .luteal)
-        XCTAssertTrue(CycleEstimator.isLateLuteal(day: 22))
+        // Late luteal is the last 7 days of a 29-day cycle: days 23–29.
+        XCTAssertFalse(CycleEstimator.isLateLuteal(day: 22))
+        XCTAssertTrue(CycleEstimator.isLateLuteal(day: 23))
         XCTAssertEqual(CycleEstimator.phase(day: 3), .period)
     }
     func testExamPlan() {

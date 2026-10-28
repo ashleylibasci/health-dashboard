@@ -795,7 +795,8 @@ final class AppModel: ObservableObject {
     func recomputeCycle() {
         let cal = Calendar.current
         let starts = Self.mergedPeriodStarts(health: healthPeriodStarts, logged: store.data.flowLog)
-        let lengths = CycleEstimator.lengths(periodStarts: starts)
+        // Only cycles since her last birth-control change set her usual length.
+        let lengths = CycleEstimator.lengths(periodStarts: starts, since: store.data.methodChangedDate)
         cycleLengthsRunLong = lengths.runLong
         personalCycleLength = lengths.usual
         if let last = starts.last {
@@ -1024,7 +1025,12 @@ final class AppModel: ObservableObject {
         let newMethod = new.cycleSetup == .hormonal ? new.birthControl : nil
         if oldMethod != newMethod {
             let startChangedToo = old.packStartDate != new.packStartDate
-            Task { @MainActor in self.normalizePack(keepStart: startChangedToo) }
+            Task { @MainActor in
+                self.normalizePack(keepStart: startChangedToo)
+                // Cycles before the change don't set her natural length.
+                self.store.data.methodChangedDate = Calendar.current.startOfDay(for: .now)
+                self.recomputeCycle()
+            }
         }
 
         // Starting over (Delete all data): Apple Health again, not the example.

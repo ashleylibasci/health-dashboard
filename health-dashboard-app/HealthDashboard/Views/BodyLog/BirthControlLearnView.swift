@@ -83,11 +83,16 @@ struct BirthControlLearnView: View {
         }
 
         noticeCard(bc)
+        MissedDoseCard(method: bc)
+        BirthControlMedicinesCard(method: bc)
 
         if bc == .combinedPill || bc == .ring || bc == .patch {
+            // ACHES in full, and migraine with aura (Okafor G).
             Card(accent: .pink) {
                 Text("Get care right away if").font(.scaled(size: 15, weight: .bold)).foregroundStyle(Accent.pink.ink(scheme))
-                Text("Leg pain or swelling, chest pain, or sudden shortness of breath. These can be signs of a blood clot, a rare risk with estrogen. New migraines with aura: tell your doctor.")
+                Text("Severe belly pain, chest pain or sudden shortness of breath, a severe headache, vision changes or loss, or leg pain or swelling. These can be signs of a blood clot or stroke, rare risks with estrogen.")
+                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+                Text("New migraines with aura (flashing lights, zigzags or blind spots before the headache)? Contact your doctor before your next dose, and use condoms meanwhile.")
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -119,7 +124,7 @@ struct BirthControlLearnView: View {
             .font(.scaled(size: 12, weight: .semibold))
             .secondaryText()
             HStack(alignment: .top, spacing: 0) {
-                Text("The bleed in your break week is a withdrawal bleed, caused by the hormones pausing. It isn't a true period. Skipping the break on purpose is fine for most combined pills, rings and patches (you can mark it in your pack settings); if your pack has pills in more than one color, ask a pharmacist how.")
+                Text("The bleed in your break week is a withdrawal bleed, caused by the hormones pausing. It isn't a true period. Skipping the break on purpose is fine for most rings and patches, and for pills whose active pills are all the same color (you can mark it in your pack settings). If your active pills come in more than one color, ask a pharmacist how.")
                     .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
                 InfoButton(topic: .withdrawalBleed).padding(.vertical, -10)
             }
@@ -168,10 +173,12 @@ struct BirthControlLearnView: View {
         case .shot:
             return [Notice(text: "Periods stop after a few shots", evidence: "Very common", accent: .blue),
                     Notice(text: "Some weight gain", evidence: "Some evidence", accent: .yellow),
+                    Notice(text: "Mood changes", evidence: "Mixed evidence", accent: .yellow),
                     Notice(text: "Fertility takes months to return after stopping", evidence: "Common", accent: .indigo)]
         case .hormonalIUD:
             return [Notice(text: "Lighter periods, or none", evidence: "Very common", accent: .mint),
                     Notice(text: "Spotting in the first months", evidence: "Common", accent: .blue),
+                    Notice(text: "Mood changes", evidence: "Mixed evidence", accent: .yellow),
                     Notice(text: "Acne", evidence: "Sometimes", accent: .coral)]
         case .copperIUD:
             return [Notice(text: "Heavier or longer periods", evidence: "Common", accent: .coral),
@@ -193,6 +200,12 @@ struct BirthControlLearnView: View {
                         .background(n.accent.tint(scheme), in: Capsule())
                 }
                 .frame(minHeight: 32)
+            }
+            // Every hormonal method (Laurent F8).
+            if bc != .copperIUD {
+                Text(CycleCare.moodOnHormones)
+                    .font(.scaled(size: 13)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

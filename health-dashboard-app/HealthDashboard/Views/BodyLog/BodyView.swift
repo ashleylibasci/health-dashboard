@@ -278,19 +278,19 @@ struct BodyView: View {
                                forYou: "Set where you are in your pack (Cycle or Settings) so the app can show your active days and break week.")
         case let .suppressed(bc) where bc.ovulation != .stopped:
             return Explanation(id: "longGap", title: bc.rawValue, meaning: bc.note,
-                               forYou: "A long gap between bleeds is common on your method, so the app doesn't count down or call it late. Log any bleeding to keep a history.")
+                               forYou: "A long gap between bleeds is common on your method, so the app doesn't count down or call it late. Log any bleeding to keep a history. \(CycleCare.bleedingRedFlags)")
         case let .suppressed(bc):
             return Explanation(id: "suppressed", title: bc.rawValue,
                                meaning: bc.note,
-                               forYou: "There are no cycle phases or period countdowns on your method. Bleeding may be light, irregular or absent, and that's expected.")
+                               forYou: "There are no cycle phases or period countdowns on your method. Bleeding may be light, irregular or absent, and that's expected. \(CycleCare.bleedingRedFlags)")
         case let .overdue(day, typical):
             return Explanation(id: "overdue", title: "Longer cycle",
                                meaning: "Cycles vary. One that runs past your usual length now and then is common, and stress, illness or travel can delay a period.",
-                               forYou: "You're on day \(day), longer than \(model.usualLengthPhrase(typical)). Log your period when it starts. If you could be pregnant, or this keeps happening, check with a doctor.")
+                               forYou: "You're on day \(day), longer than \(model.usualLengthPhrase(typical)). Log your period when it starts. If you could be pregnant, or this keeps happening, check with a doctor. \(CycleCare.redS)")
         case .irregular:
             return Explanation(id: "irregular", title: "Irregular cycle",
                                meaning: model.irregularReasonText ?? "Your cycles vary a lot in length, so the app counts days since your last period instead of predicting the next one.",
-                               forYou: "Log the first day of each period. The history of your cycle lengths is useful to show a doctor.")
+                               forYou: "Log the first day of each period. The history of your cycle lengths is useful to show a doctor.\(model.cycleIsNatural ? " " + CycleCare.redS : "")")
         case .notTracking: return Topic.period.explanation
         }
     }

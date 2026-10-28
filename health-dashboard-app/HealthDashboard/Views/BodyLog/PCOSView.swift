@@ -43,9 +43,17 @@ struct PCOSView: View {
                 }
             }
 
+            Card {
+                SectionLabel(text: "How it\u{2019}s diagnosed")
+                Text("From irregular or missing periods plus signs of higher androgens (like acne, extra hair growth, or a blood test), once other causes are ruled out. In the first 8 years after your first period, an ultrasound or AMH test isn\u{2019}t used to diagnose it.")
+                    .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+            }
+
             Card(accent: .coral) {
                 Text("Talk to a doctor if").font(.scaled(size: 15, weight: .bold))
-                Text("Your period stops for 3 months or more, bleeding is very heavy, or anything feels off. Many PCOS treatments change cycles, so update the app if yours changes.")
+                Text("Your period stops for 3 months or more: regular bleeds, or medicine, protect the lining of your womb, so it\u{2019}s worth treating. Also if bleeding is very heavy or anything feels off. Many PCOS treatments change cycles, so update the app if yours changes.")
+                    .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+                Text("PCOS makes low mood, anxiety and eating problems more common. It\u{2019}s fine to ask to be checked for them too.")
                     .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
             }
 

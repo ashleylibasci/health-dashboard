@@ -156,14 +156,6 @@ struct PackSetupControl: View {
 
     private var packWord: String { method == .combinedPill ? "pack" : model.packThing }
 
-    private var missedThing: String {
-        switch method {
-        case .ring: return "your ring"
-        case .patch: return "a patch"
-        default: return "a pill"
-        }
-    }
-
     /// What "Skip this break" does today: from the break's first day, or,
     /// when she's already in the break, from today (the rest is left out).
     private var skipWhatItDoes: String {
@@ -182,9 +174,7 @@ struct PackSetupControl: View {
     }
 
     /// The same pregnancy caveat as the Cycle screen.
-    private var skipPregnancyNote: String {
-        "Missed or late with \(missedThing) this \(method == .combinedPill ? "pack" : "cycle") and no bleed comes in the break? Take a pregnancy test or ask a pharmacist before starting the next one."
-    }
+    private var skipPregnancyNote: String { CycleCare.noBleedAdvice(method) }
 
     private var skipMessage: String {
         "\(skipWhatItDoes) This changes only this \(packWord). \(skipOnePhaseNote)"
@@ -285,6 +275,11 @@ struct PackCheckCard: View {
         return date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
     }
 
+    /// Whole days `picked` falls after the day the new pack was due.
+    private func daysLate(_ picked: Date, after due: Date) -> Int {
+        cal.dateComponents([.day], from: cal.startOfDay(for: due), to: cal.startOfDay(for: picked)).day ?? 0
+    }
+
     private var pickRange: ClosedRange<Date> {
         let today = cal.startOfDay(for: .now)
         let from = cal.date(byAdding: .day, value: -(max(store.data.packLength, 1) + 7), to: today) ?? today
@@ -305,6 +300,13 @@ struct PackCheckCard: View {
                     .font(.scaled(size: 15, weight: .semibold))
                     .tint(Accent.indigo.ink(scheme))
                     .frame(minHeight: 44)
+                // 2 or more days late counts as missed pills (Okafor B).
+                if daysLate(picked, after: date) >= 2, let method = model.packMethod {
+                    Label(CycleCare.lateStartWarning(method), systemImage: "exclamationmark.circle.fill")
+                        .font(.scaled(size: 14, weight: .semibold))
+                        .foregroundStyle(Accent.coral.ink(scheme))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 HStack(spacing: 10) {
                     filledButton("Save") { model.setPackStart(picked); pickingDate = false }
                     plainButton("Cancel") { pickingDate = false }

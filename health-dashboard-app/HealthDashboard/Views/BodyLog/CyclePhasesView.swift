@@ -65,10 +65,11 @@ struct CyclePhasesView: View {
 
     @ViewBuilder
     private func phasesContent(day: Int, length: Int) -> some View {
+        // Okafor I: many women notice no difference between phases.
         if let avg = model.phaseAverages, !avg.isEmpty {
-            intro("Your own averages from \(model.nights.count) nights of Apple Watch data, compared with your normal, plus what each phase usually feels like.")
+            intro("Your own averages from \(model.nights.count) nights of Apple Watch data, compared with your normal, plus what some people notice in each phase. Many women notice no difference. Go by your own pattern.")
         } else {
-            intro("What each phase usually does, compared with your own normal. Your own averages show up here once you have two cycles of Apple Watch nights.")
+            intro("Many women notice no difference between phases. Some feel flatter before or during their period. Go by your own pattern; your averages appear here after two cycles of Apple Watch nights.")
         }
         if store.birthControl == .miniPill {
             Card(accent: .yellow) {

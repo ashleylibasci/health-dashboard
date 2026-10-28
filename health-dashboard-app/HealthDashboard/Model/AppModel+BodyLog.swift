@@ -77,4 +77,54 @@ extension AppModel {
         default: return true
         }
     }
+
+    // MARK: When to mention it to a clinician
+
+    /// A natural cycle the care notes apply to: no method, or the copper IUD.
+    /// Hormonal methods set their own bleeding pattern, so a long gap there
+    /// is expected, not a sign.
+    var cycleIsNatural: Bool {
+        guard store.data.cycleSetup != .notTracking else { return false }
+        guard let bc = store.birthControl else { return true }
+        return bc == .copperIUD
+    }
+
+    /// 90 days or more since her last period started, on a natural cycle
+    /// (Okafor E, Ruiz F1).
+    var showsNoPeriodPrompt: Bool {
+        cycleIsNatural && (daysSinceLastPeriodStart ?? 0) >= 90
+    }
+
+    /// Short or long cycles, a wide spread or few periods a year, from her
+    /// natural cycles since her last method change (Okafor L).
+    var cyclePatternNote: (title: String, text: String)? {
+        guard cycleIsNatural else { return nil }
+        let p = CycleEstimator.pattern(periodStarts: allPeriodStarts, since: store.data.methodChangedDate,
+                                       ageYears: store.data.ageYears)
+        guard p.hasNote else { return nil }
+        var parts: [String] = []
+        if p.outOfRange > 0 {
+            parts.append(p.outOfRange == 1
+                         ? "One of your last \(p.recent.count) cycles was shorter than 21 or longer than 35 days."
+                         : "\(p.outOfRange) of your last \(p.recent.count) cycles were shorter than 21 or longer than 35 days.")
+        }
+        if p.spreadIsWide, let spread = p.spread {
+            parts.append("Your recent cycles varied by \(spread) days; more than \(p.spreadLimit) counts as irregular.")
+        }
+        if p.fewPerYear { parts.append("You had fewer than 8 periods in the last year.") }
+        if p.worthMentioning {
+            parts.append("Worth mentioning to a clinician. It\u{2019}s common and easy to check, and your history here helps.")
+            return ("Worth mentioning to a clinician", parts.joined(separator: " "))
+        }
+        parts.append("One like that now and then is common. If it keeps happening, mention it to a clinician.")
+        return ("A cycle outside the usual range", parts.joined(separator: " "))
+    }
+
+    /// She changed birth control in the last 6 months and is now on a
+    /// natural cycle: cycles may take a while to settle (Okafor M).
+    var recentlyChangedMethod: Bool {
+        guard cycleIsNatural, store.birthControl == nil, let changed = store.data.methodChangedDate else { return false }
+        let days = Calendar.current.dateComponents([.day], from: changed, to: .now).day ?? 999
+        return days <= 182
+    }
 }

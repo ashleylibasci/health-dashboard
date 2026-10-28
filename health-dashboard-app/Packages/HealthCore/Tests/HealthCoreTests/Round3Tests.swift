@@ -143,3 +143,77 @@ final class Round3CycleTests: XCTestCase {
         XCTAssertEqual(display, .phases(day: 6, length: 29, phase: .period))
     }
 }
+
+/// Women's health review (Okafor J, K, L, M).
+final class CycleReviewTests: XCTestCase {
+    private let cal = Calendar(identifier: .gregorian)
+    private let d0 = Date(timeIntervalSince1970: 1_780_000_000)
+    private func starts(_ gaps: [Int], from start: Date? = nil) -> [Date] {
+        var out = [cal.startOfDay(for: start ?? d0)]
+        for g in gaps { out.append(cal.date(byAdding: .day, value: g, to: out.last!)!) }
+        return out
+    }
+
+    // J: ovulation about 13 days before the next period, a 3-day window around it.
+    func testOvulationIsLengthMinus13() {
+        XCTAssertEqual(CycleEstimator.ovulationDay(length: 29), 16)
+        XCTAssertEqual(CycleEstimator.phase(day: 14, length: 29), .follicular)
+        XCTAssertEqual(CycleEstimator.phase(day: 15, length: 29), .ovulation)
+        XCTAssertEqual(CycleEstimator.phase(day: 17, length: 29), .ovulation)
+        XCTAssertEqual(CycleEstimator.phase(day: 18, length: 29), .luteal)
+        XCTAssertEqual(CycleEstimator.phase(day: 13, length: 28), .follicular)
+        XCTAssertEqual(CycleEstimator.phase(day: 14, length: 28), .ovulation)
+    }
+
+    // K: late luteal is the last 7 days.
+    func testLateLutealIsLastSevenDays() {
+        XCTAssertFalse(CycleEstimator.isLateLuteal(day: 21, length: 28))
+        XCTAssertTrue(CycleEstimator.isLateLuteal(day: 22, length: 28))
+        XCTAssertTrue(CycleEstimator.isLateLuteal(day: 28, length: 28))
+        XCTAssertEqual((1...35).filter { CycleEstimator.isLateLuteal(day: $0, length: 35) }.count, 7)
+    }
+
+    // M: the usual length ignores bleeds from before the last method change.
+    func testUsualLengthOnlyFromCyclesSinceMethodChange() {
+        // Two pill bleeds 28 days apart, then natural cycles of 33 days.
+        let s = starts([28, 28, 33, 33, 34])
+        XCTAssertEqual(CycleEstimator.lengths(periodStarts: s, calendar: cal).usual, 33)
+        let change = s[2]
+        let since = CycleEstimator.lengths(periodStarts: s, since: change, calendar: cal)
+        XCTAssertEqual(since.gaps, [33, 33, 34])
+        XCTAssertEqual(since.usual, 33)
+        // One start since the change: no usual length yet.
+        XCTAssertNil(CycleEstimator.lengths(periodStarts: s, since: s[5], calendar: cal).usual)
+        // Only the most recent 12 cycles count.
+        let many = starts(Array(repeating: 40, count: 5) + Array(repeating: 30, count: 12))
+        XCTAssertEqual(CycleEstimator.lengths(periodStarts: many, calendar: cal).gaps.count, 12)
+        XCTAssertEqual(CycleEstimator.lengths(periodStarts: many, calendar: cal).usual, 30)
+    }
+
+    // L: cycles under 21 or over 35 days, a wide spread, or few periods a year.
+    func testCyclePatternFlags() {
+        let regular = CycleEstimator.pattern(periodStarts: starts([28, 30, 29, 31]), ageYears: 20, now: d0, calendar: cal)
+        XCTAssertFalse(regular.hasNote)
+        XCTAssertEqual(regular.spread, 3)
+
+        let oneLong = CycleEstimator.pattern(periodStarts: starts([28, 36, 29]), ageYears: 20, now: d0, calendar: cal)
+        XCTAssertEqual(oneLong.outOfRange, 1)
+        XCTAssertTrue(oneLong.hasNote)
+        XCTAssertFalse(oneLong.worthMentioning)
+
+        let twoShort = CycleEstimator.pattern(periodStarts: starts([19, 28, 20]), ageYears: 20, now: d0, calendar: cal)
+        XCTAssertTrue(twoShort.worthMentioning)
+
+        // A 10-day spread is wide at any age; 8 days only from 26 to 41.
+        XCTAssertTrue(CycleEstimator.pattern(periodStarts: starts([24, 34, 30]), ageYears: 20, now: d0, calendar: cal).spreadIsWide)
+        XCTAssertFalse(CycleEstimator.pattern(periodStarts: starts([25, 33, 30]), ageYears: 20, now: d0, calendar: cal).spreadIsWide)
+        XCTAssertTrue(CycleEstimator.pattern(periodStarts: starts([25, 33, 30]), ageYears: 30, now: d0, calendar: cal).spreadIsWide)
+        XCTAssertEqual(CycleEstimator.spreadLimit(ageYears: nil), 9)
+
+        // A year of history with only 6 periods.
+        let first = cal.date(byAdding: .day, value: -400, to: d0)!
+        let sparse = CycleEstimator.pattern(periodStarts: starts([60, 60, 60, 60, 60, 60], from: first), ageYears: 20, now: d0, calendar: cal)
+        XCTAssertTrue(sparse.fewPerYear)
+        XCTAssertTrue(sparse.worthMentioning)
+    }
+}

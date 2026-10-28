@@ -127,9 +127,14 @@ struct CycleLogView: View {
                 }
             }
             if flow == .heavy {
-                Text("Soaking through a pad or tampon every hour for several hours, or bleeding longer than 7 days, is worth a call to a doctor.")
+                // One ACOG wording everywhere, with the urgent tier (Okafor H).
+                Text(CycleCare.heavyBleeding)
                     .font(.scaled(size: 13))
                     .secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(CycleCare.heavyBleedingUrgent)
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .foregroundStyle(Accent.coral.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -142,7 +147,7 @@ struct CycleLogView: View {
         if model.ovulationStopped || store.birthControl == .hormonalIUD || store.birthControl == .miniPill {
             return "Logging bleeding and spotting keeps a history you can show your doctor. Bleeding on your method doesn\u{2019}t follow a monthly pattern, so it doesn\u{2019}t set phases or a countdown."
         }
-        return "Logging the first heavy-ish day of bleeding tells the app when a new cycle started. Spotting doesn't start a new cycle."
+        return "Logging the first day of real flow (more than spotting) tells the app when a new cycle started. Spotting doesn't start a new cycle."
     }
 
     // MARK: Symptoms

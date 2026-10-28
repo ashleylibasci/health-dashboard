@@ -40,17 +40,18 @@ enum BodyLogStyle {
         switch phase {
         case .period: "Period"
         case .follicular: "Follicular"
-        case .ovulation: "Ovulation"
+        // An estimate from her cycle length, never a confident ovulation or
+        // fertile day (Okafor C).
+        case .ovulation: "Mid-cycle"
         case .luteal: "Luteal"
         case .unknown: "Unknown"
         }
     }
 
-    /// Phase name hedged for birth control: on the mini pill ovulation may
-    /// or may not happen, so the middle of the cycle is just "Mid-cycle".
+    /// Phase name with her birth control. The middle of the cycle is always
+    /// "Mid-cycle": the app estimates it, it never detects ovulation.
     static func phaseName(_ phase: CyclePhase, birthControl: BirthControl?) -> String {
-        if phase == .ovulation, let bc = birthControl, bc.ovulation == .sometimes { return "Mid-cycle" }
-        return phaseName(phase)
+        phaseName(phase)
     }
 
     /// Text and icon color for a phase. Each phase has its own hue:
@@ -98,12 +99,12 @@ enum BodyLogStyle {
     }
 
     /// A one-letter cue for each phase, so the calendar doesn't rely on
-    /// color alone: P, F, O (M on the mini pill), L.
+    /// color alone: P, F, M (mid-cycle), L.
     static func phaseLetter(_ phase: CyclePhase, birthControl: BirthControl? = nil) -> String {
         switch phase {
         case .period: "P"
         case .follicular: "F"
-        case .ovulation: birthControl?.ovulation == .sometimes ? "M" : "O"
+        case .ovulation: "M"
         case .luteal: "L"
         case .unknown: ""
         }
@@ -145,7 +146,7 @@ enum ConditionCatalog {
              meaning: "Tissue like the lining of the uterus grows elsewhere, which can cause painful periods and pelvic pain."),
         Item(name: "PMDD",
              change: "Keeps the 988 Suicide & Crisis Lifeline (call or text 988) on the Body and Cycle screens.",
-             meaning: "Premenstrual dysphoric disorder: severe mood changes, such as depression, anxiety or irritability, in the week or two before a period."),
+             meaning: "Premenstrual dysphoric disorder: severe mood changes, such as low mood, anxiety or irritability, in the final week before a period, that ease within a few days of it starting. On the pill, they can come around the break week instead. It\u{2019}s treatable: some antidepressants and a drospirenone pill are approved for it."),
         Item(name: "Thyroid condition",
              change: "Saved for your own reference; nothing else changes. Your usual heart rate and HRV already follow your last 30 days, so they catch up after a dose change.",
              meaning: "An over- or underactive thyroid changes your energy, heart rate and sleep."),
@@ -337,7 +338,7 @@ enum CycleCopy {
     /// The days each phase covers for a cycle of `length` days.
     static func range(_ phase: CyclePhase, length: Int, periodLength: Int = CycleEstimator.typicalPeriodLength) -> ClosedRange<Int> {
         let len = max(length, 21)
-        let ovulation = len - 14
+        let ovulation = CycleEstimator.ovulationDay(length: len)
         let bleed = max(periodLength, 1)
         switch phase {
         case .period: return 1...bleed
@@ -357,27 +358,29 @@ enum CycleCopy {
                            hrv: "Starts climbing back toward your usual.",
                            restingHR: "Drops back toward your usual.",
                            exercise: "Gentle movement can ease cramps. Go by feel.")
+        // Softened (Okafor I, Ruiz F7, F8): many women notice no difference
+        // between phases, so nothing here tells her to plan around them.
         case .follicular:
-            return Effects(energy: "Rising. Often your best-feeling stretch of the month.",
-                           sleep: "Usually deepest and most refreshing.",
-                           mood: "Often upbeat, social and motivated.",
-                           hrv: "Often at its highest.",
-                           restingHR: "Often at its lowest.",
-                           exercise: "A great week for hard workouts and trying for personal bests.")
-        case .ovulation:
-            return Effects(energy: "Many people feel a small lift or peak.",
+            return Effects(energy: "Some feel more energetic now; many notice no difference.",
                            sleep: "Usually steady.",
-                           mood: "Often confident. Some feel a one-sided twinge low in the belly.",
-                           hrv: "Steady, then starts to dip afterward.",
-                           restingHR: "Starts rising a little afterward.",
-                           exercise: "Still a strong time to train. Warm up well.")
+                           mood: "Some feel more upbeat; many notice no change.",
+                           hrv: "Often near its highest.",
+                           restingHR: "Often near its lowest.",
+                           exercise: "Train as planned. Notice how you feel and log it; some women feel stronger in some weeks, many notice no difference.")
+        case .ovulation:
+            return Effects(energy: "Some feel a small lift; many notice nothing.",
+                           sleep: "Usually steady.",
+                           mood: "Usually steady. Some feel a one-sided twinge low in the belly.",
+                           hrv: "Steady, then may dip a little afterward.",
+                           restingHR: "May rise a little afterward.",
+                           exercise: "Train as planned. Go by how you feel.")
         case .luteal:
-            return Effects(energy: "Steady at first, then often dips in the last week before your period.",
-                           sleep: "Warmer nights and lighter sleep; you may wake more. You need a bit more sleep.",
+            return Effects(energy: "Steady for many. Some feel flatter in the last week before their period.",
+                           sleep: "You run a little warmer, and some sleep more lightly late in this phase. Extra rest is fine.",
                            mood: "Late in this phase, irritability, anxiety or low mood (PMS) are common.",
-                           hrv: "A few points lower than usual. That's expected, not a problem.",
-                           restingHR: "A few beats higher than usual. Also expected.",
-                           exercise: "Steady workouts feel better than all-out efforts. Hydrate more.")
+                           hrv: "Often a little lower than usual. That's expected, not a problem.",
+                           restingHR: "Often a few beats higher than usual. Also expected.",
+                           exercise: "Train as planned and go by feel. You run a little warmer, so you may feel the heat more in hot workouts. Drink to thirst, and a bit more in the heat.")
         case .unknown:
             return Effects(energy: "", sleep: "", mood: "", hrv: "", restingHR: "", exercise: "")
         }
@@ -412,8 +415,10 @@ enum CycleCopy {
         let energy = phase == .luteal && !late ? "Steady." : e.energy
         let mood = phase == .luteal && !late ? "Usually steady." : e.mood
         var detail = "Energy: \(energy)\nSleep: \(e.sleep)\nMood: \(mood)"
-        if phase == .ovulation, birthControl?.ovulation == .sometimes {
-            detail = "On the mini pill you may or may not release an egg this cycle, so this is a rough guide.\n" + detail
+        if phase == .ovulation {
+            detail = (birthControl?.ovulation == .sometimes
+                      ? "On the mini pill you may or may not release an egg this cycle, so this is a rough guide.\n"
+                      : "A rough estimate, not your fertile days. Don\u{2019}t use it to avoid pregnancy.\n") + detail
         }
         return CycleReadout(title: isToday ? "Today \u{00B7} day \(day)" : "Day \(day) of ~\(length)",
                             value: name, detail: detail, accent: BodyLogStyle.phaseAccent(phase))

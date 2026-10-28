@@ -496,7 +496,7 @@ struct OnboardingFlow: View {
                     ovulationLegend(.stops)
                     ovulationLegend(.may)
                     ovulationLegend(.natural)
-                    InfoButton(topic: .ovulation).padding(.vertical, -12)
+                    InfoButton(explanation: Self.ovulationInfo).padding(.vertical, -12)
                 }
                 HStack(alignment: .top, spacing: 6) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -504,7 +504,7 @@ struct OnboardingFlow: View {
                         ovulationLegend(.may)
                         ovulationLegend(.natural)
                     }
-                    InfoButton(topic: .ovulation)
+                    InfoButton(explanation: Self.ovulationInfo)
                 }
             }
             SectionLabel(text: "Hormonal")
@@ -571,6 +571,12 @@ struct OnboardingFlow: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
+
+    /// What the legend means. The Cycle screen's mid-cycle ⓘ is about the
+    /// estimate; this one is about which methods stop ovulation.
+    private static let ovulationInfo = Explanation(id: "ovulationMethods", title: "Ovulation",
+        meaning: "When an egg is released, usually about 12 to 14 days before a period.",
+        forYou: "Some methods stop it, some may, and some don't. The app never shows ovulation or fertile days for methods that stop it. For the rest it shows a rough mid-cycle estimate, which isn't your fertile days.")
 
     private func ovulationLegend(_ kind: Ovulation) -> some View {
         let a = accent(for: kind)

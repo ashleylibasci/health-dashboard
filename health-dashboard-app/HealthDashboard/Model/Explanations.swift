@@ -155,19 +155,19 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "You may sleep a little more; cramps can break up sleep on the first days.")
         case .follicular: Explanation(id: id, title: "Follicular phase",
             meaning: "Starts on the first day of your period and runs until ovulation. Estrogen rises through it. The app shows your bleeding days separately as \u{201C}Period\u{201D}, so \u{201C}Follicular\u{201D} here means the days after it.",
-            forYou: "Often your best-recovered, highest-energy stretch, a good time for hard workouts.")
-        case .ovulation: Explanation(id: id, title: "Ovulation",
-            meaning: "When an egg is released, about two weeks before your next period. Your temperature starts to rise afterwards.",
-            forYou: "Some people feel a small energy lift here. If you're on a method that stops ovulation, this doesn't apply to you.")
+            forYou: "Some women feel their best this week; many notice no difference. Train as planned and go by how you feel.")
+        case .ovulation: Explanation(id: id, title: "Mid-cycle (estimate)",
+            meaning: "Ovulation is when an egg is released, usually about 12 to 14 days before your next period, though it varies more than that. The app's mid-cycle days are a rough estimate from your cycle length; it can't tell when you ovulate.",
+            forYou: "This is not your fertile window. Don't use it to avoid pregnancy. If you're on a method that stops ovulation, this doesn't apply to you.")
         case .luteal: Explanation(id: id, title: "Luteal phase",
             meaning: "From ovulation to your next period. Progesterone rises, which raises your temperature and resting heart rate a little.",
-            forYou: "Lighter sleep, a slightly higher heart rate and lower HRV are normal here. In the last week before your period the app adds a little to tonight's sleep need. Your recovery score isn't adjusted, so a slightly lower score now is expected. The sick check allows for it too.")
+            forYou: "A slightly higher heart rate and lower HRV are normal here, and some people sleep more lightly. Many women notice no difference in how they feel. In the last 7 days before your period the app adds a little to tonight's sleep need. Your recovery score isn't adjusted, so a slightly lower score now is expected. The sick check allows for it too.")
         case .pillPack: Explanation(id: id, title: "Pill pack",
             meaning: "On the combined pill, ring or patch you take hormones for a set number of days, then usually have a short break: 21 days and 7 off, or 24 and 4 off for some pills. Some people skip the break and use it continuously.",
             forYou: "These methods stop ovulation, so cycle phases like ovulation and luteal don't apply to you. The app doesn't predict them. Set your pack type and today's pill in Settings or on the Cycle screen so the break lands on the right days. You can also skip a break there.")
         case .withdrawalBleed: Explanation(id: id, title: "Withdrawal bleed",
             meaning: "The bleed in your break week. It's caused by the drop in hormones from the pill, ring or patch, not a true period.",
-            forYou: "It doesn't mean you ovulated, and it's fine if it's light. If you missed or were late with pills (or your ring or patch) this pack and no bleed comes, take a pregnancy test or check with a pharmacist before starting the next pack.")
+            forYou: "It doesn't mean you ovulated, and it's fine if it's light or doesn't come. Missed or late with a pill, ring or patch and no bleed in the break? Start your next pack, ring or patch on time anyway. Take a pregnancy test now, and again in 3 weeks if you had sex in the last 3 weeks. Sex in the last 5 days? Ask a pharmacist about emergency contraception.")
         case .timeChange: Explanation(id: id, title: "Clock change",
             meaning: "When the clocks change by an hour, your body clock doesn't change overnight. It takes a few days to adjust.",
             forYou: "You can keep your usual bedtime and wake time by the clock (nothing moves; when the clocks go back you just get an extra hour that night), or use the extra hour to become a slightly earlier riser. Neither option changes your alarm.")

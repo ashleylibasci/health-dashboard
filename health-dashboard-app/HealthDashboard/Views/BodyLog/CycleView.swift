@@ -157,8 +157,11 @@ private struct PhasesSection: View {
         timelineCard
         CycleCalendarCard()
         nextPeriodCard
+        if bc == .miniPill { MissedDoseCard(method: .miniPill) }
+        if bc == .hormonalIUD { BleedingCheckCard(extra: nil) }
+        CycleCareNotes()
         HowWeGotThisLink(title: "Your cycle day and phases",
-                         method: "Your cycle day counts from the first day of your last period, from Apple Health and the bleeding days you log here. Your average length is the middle value of the gaps between your recent periods. Phases are placed from that: your period (\(model.periodLength) days, \(store.data.flowLog.isEmpty ? "a typical length until you log one" : "from the bleeding you logged")), then the follicular phase, a 3-day mid-cycle window about 14 days before your next period, then the luteal phase. Real cycles vary, so treat every day as an estimate.")
+                         method: "Your cycle day counts from the first day of your last period, from Apple Health and the bleeding days you log here. Your average length is the middle value of the gaps between your last 12 periods\(store.data.methodChangedDate == nil ? "" : " since your last birth-control change"). Phases are placed from that: your period (\(model.periodLength) days, \(store.data.flowLog.isEmpty ? "a typical length until you log one" : "from the bleeding you logged")), then the follicular phase, a 3-day mid-cycle estimate about 13 days before your next period, then the luteal phase (its last 7 days count as late luteal). The day you really ovulate can be several days either side, so the mid-cycle days are not your fertile days. Treat every day as an estimate.")
     }
 
     private var bc: BirthControl? { store.birthControl }
@@ -183,12 +186,12 @@ private struct PhasesSection: View {
         return "Period in about \(days) days."
     }
 
-    /// "Period", "Follicular phase", "Ovulation window", "Luteal phase".
+    /// "Period", "Follicular phase", "Mid-cycle (estimate)", "Luteal phase".
     private var heroTitle: String {
         if pastUsual { return model.showsDueAroundNow ? "Due around now" : "Past your usual length" }
         switch phase {
         case .period: return "Period"
-        case .ovulation: return bc?.ovulation == .sometimes ? "Mid-cycle" : "Ovulation window"
+        case .ovulation: return bc?.ovulation == .sometimes ? "Mid-cycle" : "Mid-cycle (estimate)"
         default: return "\(BodyLogStyle.phaseName(phase, birthControl: bc)) phase"
         }
     }
@@ -202,14 +205,14 @@ private struct PhasesSection: View {
         }
         switch phase {
         case .period: return "Energy can dip on heavy days. Extra sleep and iron-rich food help."
-        case .follicular: return "Energy and recovery usually climb this week."
+        case .follicular: return "Some people feel more energetic this week; many notice no difference."
         case .ovulation:
             return bc?.ovulation == .sometimes
                 ? "On the mini pill you may or may not release an egg, so this is a rough middle-of-cycle guess."
-                : "A small energy lift is common. Wrist temperature rises a little afterward."
+                : "A rough estimate from your cycle length, not your fertile days. Don\u{2019}t use it to avoid pregnancy."
         case .luteal:
             return CycleEstimator.isLateLuteal(day: day, length: length)
-                ? "Lower HRV, a slightly higher resting heart rate and lighter sleep are expected this week. The app adds a little to tonight's sleep need."
+                ? "Lower HRV and a slightly higher resting heart rate are common this week, and some people sleep more lightly. The app adds a little to tonight's sleep need."
                 : "Lower HRV and a slightly higher resting heart rate are normal from now until your period."
         case .unknown: return "Log a period to see your phases."
         }
@@ -238,9 +241,9 @@ private struct PhasesSection: View {
     private func methodText(_ bc: BirthControl) -> String {
         switch bc.ovulation {
         case .sometimes:
-            return "On the mini pill, some people still release an egg each cycle and some don't, and bleeding can come at unexpected times. So the phases here are a rough guide, and there's no period countdown."
+            return "On the mini pill, some people still release an egg each cycle and some don't, and bleeding can come at unexpected times. So the phases here are a rough guide, and there's no period countdown. Late with a pill or think you could be pregnant? Take a pregnancy test."
         case .mostStill:
-            return "With a hormonal IUD, most people still ovulate, so your phases apply while your periods come. Periods are often lighter or stop, so there's no period countdown."
+            return "With a hormonal IUD, most people still ovulate, so your phases apply while your periods come. Periods are often lighter or stop, so there's no period countdown. Pregnancy is very rare with an IUD, but a positive test or pregnancy symptoms need a doctor soon."
         case .natural:
             return "The copper IUD has no hormones. You ovulate normally, so your phases work like a natural cycle. Periods can be heavier."
         case .stopped:
@@ -343,7 +346,7 @@ private struct PhasesSection: View {
                 Text(range).font(.scaledNumber(26))
                 Text(model.cycleLengthIsPersonal
                      ? "Estimated from your usual \(length)-day cycle. Real cycles vary by a few days either way."
-                     : "Estimated from a typical \(length)-day cycle until you\u{2019}ve logged two periods. Real cycles vary by a few days either way.")
+                     : "Estimated from a typical \(length)-day cycle until you\u{2019}ve logged two periods\(store.data.methodChangedDate == nil ? "" : " since your last birth-control change"). Real cycles vary by a few days either way.")
                     .font(.scaled(size: 14))
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
@@ -460,7 +463,7 @@ private struct CycleCalendarCard: View {
                     }
                 }
             }
-            Text("Letters: P period, F follicular, \(store.birthControl?.ovulation == .sometimes ? "M mid-cycle" : "O ovulation"), L luteal.")
+            Text("Letters: P period, F follicular, M mid-cycle (estimate), L luteal.")
                 .font(.scaled(size: 12, weight: .semibold)).secondaryText()
                 .accessibilityHidden(true)
             if !model.hidesPeriodCountdownOnScreens {
@@ -604,6 +607,7 @@ private struct PackSection: View {
         if skipping { skipNote }
         packCard
         statusCard
+        MissedDoseCard(method: method)
         setDayCard
         offCard
         trackCard
@@ -719,14 +723,6 @@ private struct PackSection: View {
         }
     }
 
-    private var missedThing: String {
-        switch method {
-        case .ring: return "your ring"
-        case .patch: return "a patch"
-        default: return "a pill"
-        }
-    }
-
     private var statusTitle: String {
         if isBreak { return model.packBreakName }
         if !hasBreak { return "\(model.packActiveName) \u{00B7} continuous" }
@@ -756,7 +752,7 @@ private struct PackSection: View {
                 .font(.scaled(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
             if hasBreak && !skipping {
-                Text("Missed or late with \(missedThing) this \(method == .combinedPill ? "pack" : "cycle") and no bleed comes in the break? Take a pregnancy test or ask a pharmacist before starting the next one.")
+                Text(CycleCare.noBleedAdvice(method))
                     .font(.scaled(size: 13))
                     .secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
@@ -788,6 +784,10 @@ private struct PackSection: View {
             trackRow("thermometer.medium", .coral, "Temperature running a bit higher and flat. Normal on your method.")
             trackRow("drop.fill", .pink, "Withdrawal bleeds and spotting, from what you log.")
             trackRow("face.smiling", .purple, "Headaches, mood and other symptoms you log, by date. Some people notice headaches in the break week.")
+            Text(hasBreak ? CycleCare.packBleedCantShowFuel : CycleCare.methodBleedCantShowFuel)
+                .font(.scaled(size: 13))
+                .secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Learn how the \(unitName) affects your body", systemImage: "book.fill", accent: .indigo) {
                 BirthControlLearnView()
             }
@@ -907,9 +907,9 @@ private struct SuppressedSection: View {
     private var heroText: String {
         switch method {
         case .hormonalIUD:
-            return "A long gap between bleeds is common on the hormonal IUD. Periods often get lighter, come less often, or stop. So the app doesn\u{2019}t count down to a period or call a cycle late."
+            return "A long gap between bleeds is common on the hormonal IUD. Periods often get lighter, come less often, or stop. So the app doesn\u{2019}t count down to a period or call a cycle late. Pregnancy is very rare with an IUD, but a positive test or pregnancy symptoms need a doctor soon."
         case .miniPill:
-            return "A long gap between bleeds is common on the mini pill. Bleeding can come at unexpected times or stop for a while. So the app doesn\u{2019}t count down to a period or call a cycle late."
+            return "A long gap between bleeds is common on the mini pill. Bleeding can come at unexpected times or stop for a while. So the app doesn\u{2019}t count down to a period or call a cycle late. Late with a pill or think you could be pregnant? Take a pregnancy test."
         default:
             return "Your \(name) stops your body from releasing an egg, so you don\u{2019}t have cycle phases, and the app doesn\u{2019}t count down to a period."
         }
@@ -941,7 +941,12 @@ private struct SuppressedSection: View {
                 .font(.scaled(size: 14))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            Text(CycleCare.methodBleedCantShowFuel)
+                .font(.scaled(size: 13))
+                .secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
         }
+        if method == .miniPill { MissedDoseCard(method: .miniPill) }
         Card {
             SectionLabel(text: "What we still track for you")
             Text(mayOvulate
@@ -950,13 +955,7 @@ private struct SuppressedSection: View {
                 .font(.scaled(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        Card(accent: .coral) {
-            Text("Check in with a doctor if").font(.scaled(size: 15, weight: .bold))
-            Text("Bleeding is very heavy (soaking a pad or tampon every hour or two), lasts more than 2 weeks, comes with a lot of pain, or you think you could be pregnant.")
-                .font(.scaled(size: 14))
-                .secondaryText()
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        BleedingCheckCard(extra: "Bleeding that lasts more than 2 weeks or comes with a lot of pain, or you think you could be pregnant: check in with a doctor too.")
     }
 
     private var historyCard: some View {
@@ -977,6 +976,32 @@ private struct SuppressedSection: View {
             }
             Text("Started on these days. A history like this is what a doctor will ask about.")
                 .font(.scaled(size: 13)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// When bleeding needs checking on a method that changes bleeding: the red
+/// flags for an STI or pregnancy test, heavy bleeding in one ACOG wording,
+/// and the urgent tier (Okafor F, H).
+private struct BleedingCheckCard: View {
+    var extra: String?
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Card(accent: .coral) {
+            Text("When to get bleeding checked").font(.scaled(size: 15, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
+            Text(CycleCare.bleedingRedFlags)
+                .font(.scaled(size: 14)).fixedSize(horizontal: false, vertical: true)
+            Text(CycleCare.heavyBleeding)
+                .font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+            if let extra {
+                Text(extra).font(.scaled(size: 14)).secondaryText().fixedSize(horizontal: false, vertical: true)
+            }
+            Text(CycleCare.heavyBleedingUrgent)
+                .font(.scaled(size: 14, weight: .semibold))
+                .foregroundStyle(Accent.coral.ink(scheme))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -1003,6 +1028,7 @@ private struct PackUnknownSection: View {
         Card {
             PackSetupControl()
         }
+        MissedDoseCard(method: method)
         Card(accent: .indigo) {
             SectionLabel(text: "On your \(method.inSentence)", accent: .indigo)
             Text("It stops your body from releasing an egg, so there are no ovulation or luteal phases and no period countdown. The bleed in your break week is a withdrawal bleed.")
@@ -1028,7 +1054,7 @@ private struct OverdueSection: View {
     @Environment(\.colorScheme) private var scheme
 
     private var doctorText: String {
-        let base = "You could be pregnant, your cycle runs more than a couple of weeks longer than usual, or long cycles keep happening. Campus health is a good place to start."
+        let base = "You could be pregnant, your cycle runs more than a couple of weeks longer than usual, or long cycles keep happening. Campus health is a good place to start. \(CycleCare.redS)"
         guard store.birthControl == .copperIUD else { return base }
         return "On the copper IUD pregnancy is rare, but a longer cycle is still worth a home pregnancy test. If it\u{2019}s positive, see a doctor soon: a pregnancy with an IUD in place needs checking quickly. Also check in if long cycles keep happening."
     }
@@ -1040,7 +1066,7 @@ private struct OverdueSection: View {
                 Text("Day \(day)").font(.scaledNumber(44))
                 InfoButton(explanation: Explanation(id: "overdue", title: "A longer cycle",
                                                    meaning: "Cycles vary. One that runs past your usual length now and then is common: stress, illness, travel, changes in sleep or exercise can all delay ovulation, and the period with it.",
-                                                   forYou: "Log your period when it starts and the app picks up from there. If you could be pregnant, a home test is reliable from the day your period was due."))
+                                                   forYou: "Log your period when it starts and the app picks up from there. If you could be pregnant: \(CycleCare.pregnancyTestTiming)"))
             }
             Text("Longer than \(model.usualLengthPhrase(typicalLength))")
                 .font(.scaled(size: 18, weight: .bold))
@@ -1075,6 +1101,7 @@ private struct OverdueSection: View {
             }
             .buttonStyle(.plain)
         }
+        CycleCareNotes()
         Card {
             Text("Check in with a doctor if").font(.scaled(size: 15, weight: .bold))
             Text(doctorText)
@@ -1157,7 +1184,14 @@ private struct IrregularSection: View {
                  : "The app doesn't predict ovulation or periods for irregular cycles. It keeps a history of the periods you log, which is the most useful thing to bring to a doctor.")
                 .font(.scaled(size: 14))
                 .fixedSize(horizontal: false, vertical: true)
+            if model.cycleIsNatural {
+                Text(CycleCare.redS)
+                    .font(.scaled(size: 13))
+                    .secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        CycleCareNotes()
     }
 
     @ViewBuilder
@@ -1203,15 +1237,17 @@ private struct IrregularSection: View {
                 return hasPCOS ? "A long cycle, over 45 days. Common with PCOS. Worth noting for your doctor."
                                : "A long cycle, over 45 days. Worth noting for your doctor."
             }
-            if b.days > 35 { return "Longer than the typical 21\u{2013}35 days." }
-            if b.days < 21 { return "A short cycle. Worth noting for your doctor if it keeps happening." }
+            if b.days > 35 { return "Longer than the typical 21\u{2013}35 days. Worth mentioning to a clinician if it keeps happening." }
+            if b.days < 21 { return "A short cycle. Worth mentioning to a clinician if it keeps happening." }
             return "Within the typical 21\u{2013}35 day range."
         }
         let lengths = bars.map(\.days)
         let spread = (lengths.max() ?? 0) - (lengths.min() ?? 0)
         if lengths.count < 2 { return "Typical cycles are 21\u{2013}35 days. Log more periods to see how yours vary." }
-        if spread <= 7 { return "Your cycles were within \(spread) day\(spread == 1 ? "" : "s") of each other. Typical cycles are 21\u{2013}35 days." }
-        return "Your cycles varied by \(spread) days. Typical cycles are 21\u{2013}35 days. A history like this is useful to share with a doctor."
+        // FIGO 2018: up to 9 days at 18–25, 7 days at 26–41 (Okafor L).
+        let limit = CycleEstimator.spreadLimit(ageYears: store.data.ageYears)
+        if spread <= limit { return "Your cycles were within \(spread) day\(spread == 1 ? "" : "s") of each other. Typical cycles are 21\u{2013}35 days." }
+        return "Your cycles varied by \(spread) days; more than \(limit) counts as irregular. Typical cycles are 21\u{2013}35 days. Worth mentioning to a clinician, with this history."
     }
 
     private var cycleChart: some View {

@@ -99,6 +99,9 @@ struct AppData: Codable {
     /// A pack check she answered "not now" to: the new-pack start or bleed
     /// date it was about, so the same prompt doesn't come back.
     var packCheckDismissed: Date?
+    /// The day she last changed birth control (or started or stopped one).
+    /// Her usual cycle length counts only cycles since then (Okafor M).
+    var methodChangedDate: Date?
 
     /// Minutes added to the learned sleep need by the user (±15 steps).
     var sleepNeedAdjustment = 0
@@ -156,6 +159,7 @@ struct AppData: Codable {
         packActiveDays = min(max(get(.packActiveDays, d.packActiveDays), 1), 28)
         packLength = min(max(get(.packLength, d.packLength), packActiveDays), 35)
         packCheckDismissed = get(.packCheckDismissed, d.packCheckDismissed)
+        methodChangedDate = get(.methodChangedDate, d.methodChangedDate)
         sleepNeedAdjustment = get(.sleepNeedAdjustment, d.sleepNeedAdjustment)
         upBy = get(.upBy, d.upBy)
         bedtime = get(.bedtime, d.bedtime)

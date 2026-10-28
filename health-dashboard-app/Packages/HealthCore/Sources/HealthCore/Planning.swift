@@ -106,9 +106,18 @@ public enum CycleEstimator {
     /// The period length used until her own logs give one.
     public static let typicalPeriodLength = 5
 
+    /// Days from the estimated ovulation day to the next period. The second
+    /// half of the cycle averages about 12–13 days and varies (7–17 days in
+    /// Bull 2019), so ovulation is placed at length − 13, and only ever shown
+    /// as a rough mid-cycle estimate (Okafor J).
+    public static let daysFromOvulationToPeriod = 13
+
+    /// Estimated ovulation day for a cycle of `length` days.
+    public static func ovulationDay(length: Int) -> Int { length - daysFromOvulationToPeriod }
+
     public static func phase(day: Int, length: Int = 29, periodLength: Int = typicalPeriodLength) -> CyclePhase {
         guard day >= 1 else { return .unknown }
-        let ovulation = length - 14
+        let ovulation = ovulationDay(length: length)
         switch day {
         case 1...max(periodLength, 1): return .period
         case ..<(ovulation - 1): return .follicular
@@ -116,7 +125,9 @@ public enum CycleEstimator {
         default: return .luteal
         }
     }
-    public static func isLateLuteal(day: Int, length: Int = 29) -> Bool { phase(day: day, length: length) == .luteal && day >= length - 9 }
+    /// The last 7 days before the next period (day length − 6 to length),
+    /// when PMS and lighter sleep are most common (Okafor K).
+    public static func isLateLuteal(day: Int, length: Int = 29) -> Bool { phase(day: day, length: length) == .luteal && day >= length - 6 }
 
     /// Usual cycle length (median of the gaps between period starts that
     /// fall in 20–45 days). Nil when there are no such gaps: callers must not
@@ -162,13 +173,68 @@ public enum CycleEstimator {
         public var runLong: Bool
     }
 
-    public static func lengths(periodStarts: [Date], calendar: Calendar = .current) -> Lengths {
-        let s = periodStarts.sorted()
+    /// How many recent cycles the usual length is taken from (about a year).
+    public static let recentCycles = 12
+
+    /// `since`: the day she last changed birth control. Only cycles that
+    /// start on or after it count, so pill bleeds and the months on a method
+    /// never set her natural length (Okafor M). The usual length uses her
+    /// most recent `recentCycles` cycles.
+    public static func lengths(periodStarts: [Date], since: Date? = nil, calendar: Calendar = .current) -> Lengths {
+        var s = periodStarts.sorted()
+        if let since { s = s.filter { $0 >= calendar.startOfDay(for: since) } }
         guard s.count >= 2 else { return Lengths(gaps: [], usual: nil, runLong: false) }
-        let gaps = zip(s, s.dropFirst()).map { calendar.dateComponents([.day], from: $0, to: $1).day ?? 0 }
+        let gaps = Array(zip(s, s.dropFirst()).map { calendar.dateComponents([.day], from: $0, to: $1).day ?? 0 }.suffix(recentCycles))
         let normal = gaps.filter { (20...45).contains($0) }.map(Double.init)
         let long = gaps.filter { $0 > 45 }.count
         return Lengths(gaps: gaps, usual: normal.median.map { Int($0.rounded()) }, runLong: long * 2 > gaps.count)
+    }
+
+    /// Patterns in her natural cycle lengths that are worth mentioning to a
+    /// clinician (Okafor L): cycles shorter than 21 or longer than 35 days,
+    /// lengths that vary by more than FIGO's 7–9 days, or fewer than 8
+    /// periods in a year. One odd cycle now and then is common, so a single
+    /// short or long one is reported but not flagged.
+    public struct Pattern: Hashable, Sendable {
+        /// The recent cycles looked at (up to 6), oldest first.
+        public var recent: [Int]
+        /// How many of them were under 21 or over 35 days.
+        public var outOfRange: Int
+        /// Longest minus shortest of the recent cycles (3 or more), else nil.
+        public var spread: Int?
+        /// The spread above which cycles count as irregular for her age.
+        public var spreadLimit: Int
+        /// Her history covers a year and has fewer than 8 period starts in it.
+        public var fewPerYear: Bool
+
+        public var spreadIsWide: Bool { (spread ?? 0) > spreadLimit }
+        /// Two or more out-of-range cycles, a wide spread, or few periods.
+        public var worthMentioning: Bool { outOfRange >= 2 || spreadIsWide || fewPerYear }
+        /// Anything to say at all (including a single odd cycle).
+        public var hasNote: Bool { outOfRange > 0 || worthMentioning }
+    }
+
+    /// Normal variation in cycle length (FIGO 2018): up to 9 days at 18–25
+    /// and 42–45, up to 7 days at 26–41. 9 when her age isn't known, so
+    /// a student isn't flagged for a normal spread.
+    public static func spreadLimit(ageYears: Int?) -> Int {
+        guard let a = ageYears else { return 9 }
+        return (26...41).contains(a) ? 7 : 9
+    }
+
+    public static func pattern(periodStarts: [Date], since: Date? = nil, ageYears: Int? = nil,
+                               now: Date = .now, calendar: Calendar = .current) -> Pattern {
+        var s = periodStarts.map { calendar.startOfDay(for: $0) }.sorted()
+        if let since { s = s.filter { $0 >= calendar.startOfDay(for: since) } }
+        let gaps = zip(s, s.dropFirst()).map { calendar.dateComponents([.day], from: $0, to: $1).day ?? 0 }
+        let recent = Array(gaps.suffix(6))
+        let out = recent.filter { $0 < 21 || $0 > 35 }.count
+        let spread = recent.count >= 3 ? (recent.max() ?? 0) - (recent.min() ?? 0) : nil
+        let yearAgo = calendar.date(byAdding: .day, value: -365, to: calendar.startOfDay(for: now)) ?? now
+        let coversYear = (s.first.map { $0 <= yearAgo }) ?? false
+        let inYear = s.filter { $0 > yearAgo }.count
+        return Pattern(recent: recent, outOfRange: out, spread: spread,
+                       spreadLimit: spreadLimit(ageYears: ageYears), fewPerYear: coversYear && inYear < 8)
     }
 }
 
