@@ -26,14 +26,14 @@ enum Topic: String, CaseIterable, Identifiable {
 
     var explanation: Explanation {
         switch self {
-        case .melatonin: Explanation(id: id, title: "Melatonin window",
-            meaning: "Melatonin is a hormone your own body makes at night to get you ready for sleep. It usually starts rising about 2 hours before you normally fall asleep and stays up through the night. It has nothing to do with taking melatonin pills.",
-            forYou: "This window is the hour before you usually fall asleep. By then melatonin has been rising for a while, so it's usually the easiest time to drift off instead of lying awake. Bright screens and overhead lights can hold melatonin back, so dim them in the couple of hours before if you can.",
-            howWeGotIt: "In studies, melatonin starts rising (in dim light) about 2 hours before people's usual time of falling asleep, though this varies from person to person. Your Watch can't measure melatonin, so this is an estimate: the window is the hour ending around the time you usually fall asleep on school nights, from your Apple Watch sleep data (or your planned bedtime until there are nights to learn from). The 15 minutes before it are your wind-down.")
+        case .melatonin: Explanation(id: id, title: "Sleep window",
+            meaning: "The hour before you usually fall asleep. Melatonin, a hormone your own body makes at night to get you ready for sleep, usually starts rising about 2 hours before then, so by this hour it has been up for a while. It has nothing to do with taking melatonin pills.",
+            forYou: "It's usually the easiest time to drift off instead of lying awake. Bright screens and overhead lights can hold melatonin back, so dim them from your wind-down on.",
+            howWeGotIt: "In studies, melatonin starts rising (in dim light) about 2 hours before people's usual time of falling asleep, though this varies from person to person. Your Watch can't measure melatonin, so this is a rough estimate: the hour ending at the time you usually fall asleep on school nights, from your Apple Watch sleep data (or your planned bedtime until there are nights to learn from), to the nearest 15 minutes. The hour before it is your wind-down.")
         case .grogginess: Explanation(id: id, title: "Grogginess",
             meaning: "The foggy, slow feeling right after you wake up. Scientists call it sleep inertia. Your brain takes a while to fully switch on, especially if you woke from deep sleep.",
             forYou: "Avoid big decisions, tests or driving if you can during this time. Daylight, water and moving around clear it faster. Waking at the end of a sleep cycle, which the smart alarm aims for, makes it shorter.",
-            howWeGotIt: "Grogginess fades over 20 to 60 minutes. We estimate it from whether you woke from light or deep sleep.")
+            howWeGotIt: "Grogginess mostly fades within about 30 minutes, and can last up to an hour after waking from deep sleep or after a short night. The app marks 30 minutes after a light-sleep wake and 60 after a deep-sleep one.")
         case .morningPeak: Explanation(id: id, title: "Morning peak",
             meaning: "The part of the day when your focus and alertness are naturally highest.",
             forYou: "Save your hardest thinking for this window: studying, problem sets, writing. Try not to spend it on email or scrolling.",
@@ -45,12 +45,12 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "A late-afternoon or evening rise in energy, when your body clock pushes back against the tiredness that has built up all day.",
             forYou: "A good time to be active or study with friends. Wrap up anything intense a couple of hours before bed so you can wind down.")
         case .windDown: Explanation(id: id, title: "Wind-down",
-            meaning: "The stretch just before your melatonin window, when it helps to start slowing down.",
-            forYou: "Dim the lights, put screens down or on night mode, and do something calm. It makes falling asleep much easier.")
+            meaning: "About 2 hours before you usually fall asleep, your body starts making its own sleep hormone (melatonin). Wind-down is the first of those two hours; the second is your sleep window.",
+            forYou: "Dim the lights, put screens down or on night mode, and do something calm. Bright light now holds the sleep hormone back and makes falling asleep harder.")
         case .energyScore: Explanation(id: id, title: "Energy score",
             meaning: "How much energy your body is predicted to have over the 16 hours after you wake, from 0 to 100. It's a different number from energy left, which is a battery for right now. Your usual is shown next to it. Until there are 7 days of your own, that's a starting point of 74: a fixed middle-of-the-range value the app begins from, not anyone's measured average.",
-            forYou: "Below usual means today will feel harder than normal. It's mostly driven by sleep debt and how rested your body is.",
-            howWeGotIt: "We use the two-process model of sleep, the standard model sleep researchers use: sleep pressure that builds while you're awake and clears while you sleep, plus your body clock's daily rhythm. Sleep debt flattens your peaks.")
+            forYou: "Below usual means today may feel harder than normal. It's mostly driven by sleep debt and how rested your body is. It's a rough guide, not a measurement: how you feel counts more.",
+            howWeGotIt: "It's based on the two-process model of sleep from sleep research: sleep pressure that builds while you're awake and clears while you sleep, plus your body clock's daily rhythm. The body-clock part's shape is our own estimate, timed from when you usually sleep, so treat the curve as a rough guide. Sleep debt deepens your dips.")
         case .energyBank: Explanation(id: id, title: "Energy left",
             meaning: "Think of it like a battery. It charges while you sleep and drains steadily while you're awake. It's a different number from your energy score, which rates the whole day.",
             forYou: "The percentage tells you how much you have left now and roughly how much you'll have at bedtime.",
@@ -64,13 +64,13 @@ enum Topic: String, CaseIterable, Identifiable {
         case .sleepNeed: Explanation(id: id, title: "Your sleep need",
             meaning: "How much sleep your body actually needs each night to feel and work its best. Everyone is different: some people need 7 hours, some need 9.",
             forYou: "Aim to get at least this much most nights. Getting less builds up sleep debt, even if you feel fine.",
-            howWeGotIt: "We look at three things from your own nights. 1) On nights with no alarm, once you've caught up, how long you naturally sleep. 2) The point where more sleep stops improving your next-day heart rate, HRV and energy. 3) How you felt in your morning check-ins, used only as a cross-check, because research shows people who sleep too little often say they feel fine while their bodies and performance are still affected (Van Dongen et al., 2003). With little data we start near the adult average of 8 hours and narrow it down as nights add up.")
+            howWeGotIt: "We look at three things from your own nights. 1) On nights with no alarm, how long you naturally sleep: a clue that tends to run high, because catch-up sleep can last a while. 2) The point where more sleep stops improving your next-day resting heart rate and HRV. 3) How you felt in your morning check-ins, used only as a cross-check, because research shows people who sleep too little often say they feel fine while their bodies and performance are still affected (Van Dongen et al., 2003). With little data we start near the adult average of 8 hours and narrow it down as nights add up. The range shown is the range of the clues: how far apart they are.")
         case .tonightNeed: Explanation(id: id, title: "Tonight's need",
-            meaning: "Your usual sleep need, plus a little extra if you have sleep debt to pay back, are in the last week before a natural-cycle period, or the sick check thinks you may be fighting something off (30 minutes).",
-            forYou: "This is the amount to aim for tonight.")
+            meaning: "Your usual sleep need, plus a little extra if you have sleep debt to pay back, the sick check thinks you may be fighting something off (30 minutes), or it's the last few days before a natural-cycle period or the first two days of it (about 10 minutes).",
+            forYou: "This is the amount to aim for tonight. Around your period, sleep may feel lighter; the 10 minutes is a small allowance, and extra rest is fine.")
         case .sleepDebt: Explanation(id: id, title: "Sleep debt",
             meaning: "How much sleep you've missed compared with your need, over the last two weeks. Recent nights count most.",
-            forYou: "Sleep debt flattens your energy peaks and deepens your dips. You don't have to pay it all back at once: tonight's need adds about a tenth of your debt (up to 45 minutes a night), so a big debt comes down over a week or two.")
+            forYou: "Sleep debt deepens your energy dips. You don't have to pay it all back at once: tonight's need adds about a tenth of your debt (up to 45 minutes a night), which brings a big debt down over about a week or two.")
         case .sleepStages: Explanation(id: id, title: "Sleep stages",
             meaning: "Through the night you cycle through light (core) sleep, deep sleep and REM sleep, about every 90 minutes, with brief wake-ups that are normal.",
             forYou: "Deep sleep comes mostly early in the night and REM mostly near morning, so going to bed late cuts deep sleep, and waking early cuts REM.")
@@ -82,7 +82,7 @@ enum Topic: String, CaseIterable, Identifiable {
             forYou: "Most REM happens in the last hours before you wake, so cutting your sleep short in the morning cuts REM, which matters before exams.")
         case .core: Explanation(id: id, title: "Core sleep",
             meaning: "Light sleep. It makes up about half the night and is the easiest stage to wake from.",
-            forYou: "The smart alarm tries to wake you during core sleep so you feel less groggy.")
+            forYou: "The smart alarm wakes you when you start stirring in its window, which often happens in lighter sleep.")
         case .awake: Explanation(id: id, title: "Awake",
             meaning: "Short wake-ups during the night. Most you won't remember.",
             forYou: "A few are completely normal. Lots of them can come from alcohol, caffeine, a warm room or stress.")
@@ -93,14 +93,14 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "How much later you sleep and wake on free days than on school nights.",
             forYou: "A big shift is like flying a time zone west every weekend and back every Monday, which is why Mondays feel rough.")
         case .smartAlarm: Explanation(id: id, title: "Smart alarm",
-            meaning: "Instead of one fixed time, your Apple Watch gets a window (for example 7:52–8:25). It wakes you the first time you seem to be in light sleep in that window, or at the end of it at the latest.",
-            forYou: "Waking from light sleep usually means less grogginess. The latest time is never later than when you need to be up.")
+            meaning: "Instead of one fixed time, your Apple Watch gets a 25-minute window (for example 8:00–8:25). It wakes you the first time you start stirring in that window, or at the end of it at the latest.",
+            forYou: "Stirring often means lighter sleep, which can make waking a bit easier. The latest time is never later than when you need to be up.")
         case .sleepCycle: Explanation(id: id, title: "Sleep cycle",
             meaning: "One trip through light, deep and REM sleep. For most people a cycle takes about 80 to 110 minutes. The wake plan uses yours, measured from your nights once there are enough of them.",
-            forYou: "Waking at the end of a cycle feels easier than waking in the middle of one.")
+            forYou: "Waking near the end of a cycle can feel a bit easier. Cycle timing varies from night to night, so the app never cuts more than about 25 minutes of sleep to land on one.")
         case .bestWakeWindow: Explanation(id: id, title: "Your best wake window",
-            meaning: "The time range where your past mornings went best, based on how you felt and your energy those days.",
-            forYou: "When it fits your schedule, the app aims your wake time inside this window.")
+            meaning: "The time range where your past mornings went best, based on how you felt and your energy those days. It only shows when those mornings clearly beat the rest; otherwise it says there's no clear best window yet.",
+            forYou: "Use it as a hint when you can choose your wake time. Sleeping enough matters more than when you wake.")
         case .recovery: Explanation(id: id, title: "Recovery",
             meaning: "How ready your body is today, from 0 to 100, compared with your own usual.",
             forYou: "Lower than usual means your body is still catching up (from short sleep, stress, illness, alcohol or a hard workout). Take it easier; higher means it's a good day to push.",
@@ -130,7 +130,7 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "An estimate of the energy your body used today: resting energy just to keep you alive, plus active energy from moving.",
             forYou: "Watch estimates are often off by 20–30% or more, and more at rest. It's useful for trends, not exact numbers. This is off by default; you can turn it on in Settings.")
         case .bodyClock: Explanation(id: id, title: "Your body clock",
-            meaning: "Whether your body naturally prefers earlier or later sleep and wake times. It's partly genetic and tends to run latest around age 20.",
+            meaning: "Whether your body naturally prefers earlier or later sleep and wake times. It's partly genetic and tends to run latest around age 20. The type names compare you with adults of all ages, so a later type is often typical for your age.",
             forYou: "Being an evening type isn't laziness. Your peak focus comes later in the day, so morning classes need more help: morning light, a steady wake time and a smaller weekend shift.",
             howWeGotIt: "We use the method of the Munich ChronoType Questionnaire (Roenneberg), applied to your tracked sleep: the midpoint of your sleep on free days (weekend mornings), corrected for catch-up sleep.")
         case .socialJetlag: Explanation(id: id, title: "Social jet lag",

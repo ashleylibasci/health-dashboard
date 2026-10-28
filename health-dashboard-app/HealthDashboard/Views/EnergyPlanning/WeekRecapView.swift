@@ -365,7 +365,7 @@ struct WeekRecapView: View {
         if w.bedtime >= lateBedtime {
             let target = max(store.data.bedtime, ((w.bedtime - 60) / 30) * 30)
             return Goal(title: "Keep \(night) bedtime before \(Clock.format(target))",
-                        detail: "Last \(night) night it was \(Clock.format(w.bedtime)). In bed by \(Clock.format(target)), you finish full sleep cycles and wake in light sleep, not halfway through deep sleep.")
+                        detail: "Last \(night) night it was \(Clock.format(w.bedtime)). In bed by \(Clock.format(target)), you get more of your sleep need before your alarm, and more of the deep sleep that comes early in the night.")
         }
         if let last = w.lastCaffeine, caffeineTooLate(w) {
             guard let cutoffTime = model.caffeineCutoffShown else {
@@ -377,8 +377,8 @@ struct WeekRecapView: View {
                         detail: "On \(day) your last drink was at \(Clock.format(last)). Caffeine after \(cutoff) is still in your system at bedtime and makes sleep lighter.")
         }
         if !w.wokeFromLightSleep {
-            return Goal(title: "Wake at the end of a sleep cycle every day",
-                        detail: "On \(day) you woke from deep sleep. The smart alarm on your Watch wakes you in light sleep in the half hour before your latest wake time.")
+            return Goal(title: "Try the smart alarm on your Watch",
+                        detail: "On \(day) you woke from deep sleep. The smart alarm wakes you when you start stirring in the 25 minutes before your latest wake time, which can feel a bit easier.")
         }
         if w.asleep < need - 30 {
             return Goal(title: "Get \(Clock.duration(need)) on \(night) night",
@@ -421,7 +421,9 @@ struct WeekRecapView: View {
 
     private var linksCard: some View {
         let plan = model.wakePlan()
-        let wakeSubtitle = plan.map { "\(model.nextWakeDayLabel) \(Clock.format($0.wake)), end of your \(ordinal($0.cycles)) cycle" } ?? "See your wake plan"
+        let wakeSubtitle = plan.map {
+            "\(model.nextWakeDayLabel) \(Clock.format($0.wake)), " + ($0.endsCycle ? "near the end of your \(ordinal($0.cycles)) cycle" : "your up-by time")
+        } ?? "See your wake plan"
         return Card {
             LinkRow(title: "Today's energy", subtitle: "\(model.energyToday.score) so far, with your peaks and dips",
                     systemImage: "bolt.fill", accent: .mint) { EnergyView() }

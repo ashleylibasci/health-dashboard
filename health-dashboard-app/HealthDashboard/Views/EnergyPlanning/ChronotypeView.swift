@@ -46,6 +46,8 @@ struct ChronotypeView: View {
             Text(c.category.rawValue).font(.scaled(size: 28, weight: .bold))
             Text(Self.plain(c.category)).font(.scaled(size: 15, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
+            Text(Self.forAgeGroup(c.category)).font(.scaled(size: 14)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
             AdaptiveStack(spacing: 4, alignment: .firstTextBaseline) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(c.midSleepFreeCorrected == c.midSleepFree ? "Middle of your sleep on free days" : "Body clock time (free-day middle, minus catch-up sleep)")
@@ -82,28 +84,39 @@ struct ChronotypeView: View {
         }
     }
 
+    /// The type names compare her with adults of all ages, but body clocks
+    /// run latest around 20 (Roenneberg 2004), so the same type means
+    /// something different at her age (Liu 13). The app is for college
+    /// students, so it compares with women in their late teens and early 20s.
+    nonisolated static func forAgeGroup(_ category: Chronotype.Category) -> String {
+        switch category {
+        case .veryEarly: return "Much earlier than most adults, and earlier still compared with people your age (late teens and early 20s)."
+        case .moderateMorning: return "Earlier than most adults, and earlier than most people your age (late teens and early 20s)."
+        case .intermediate: return "About average for adults, a little earlier than typical for your age (late teens and early 20s)."
+        case .moderateEvening: return "Later than most adults, typical for your age (late teens and early 20s)."
+        case .definiteEvening: return "Later than most adults, and on the late side even for your age (late teens and early 20s)."
+        case .veryLate: return "Later than most adults, and later than most people your age too."
+        }
+    }
+
     /// The method, short and plain, for the "how we got this" sheet.
     private func method(_ c: Chronotype) -> String {
         let n = model.workNights.count + model.freeNights.count
         let source = model.usingSampleData ? "Sample sleep is shown until your Watch has enough nights." : "From your last \(n) nights of sleep tracked by your Watch."
-        return "\(source) We find the middle of your sleep on free nights (no alarm), when your body picks its own timing. If you sleep longer on free nights to catch up, we adjust for that, so catch-up sleep doesn't make you look later than you are. This is the standard method sleep researchers use (the Munich ChronoType Questionnaire). Your type is partly genetic and runs latest around age 20. It updates as new nights come in."
+        return "\(source) We find the middle of your sleep on free nights (no alarm), when your body picks its own timing. If you sleep longer on free nights to catch up, we adjust for that, so catch-up sleep doesn't make you look later than you are. This is the standard method sleep researchers use (the Munich ChronoType Questionnaire). The type names compare you with adults of all ages; body clocks run latest around age 20, so we also say how you compare with people your age. Your type is partly genetic. It updates as new nights come in."
     }
 
     private func why(_ c: Chronotype) -> String {
         var text = ""
-        let melatonin = model.energyToday.zone(.melatonin)?.range.start
-        let wake = model.naturalWake
-        if let melatonin, let wake {
-            text = "Your body is ready for sleep from about \(Clock.format(round5(melatonin))) and, left alone, would wake around \(Clock.format(round5(wake)))."
-        } else if let melatonin {
-            text = "Your body is ready for sleep from about \(Clock.format(round5(melatonin)))."
-        } else if let wake {
-            text = "Left alone, you'd wake around \(Clock.format(round5(wake)))."
+        // No "ready for sleep from 11:45pm": the Watch can't measure the
+        // sleep hormone, so a clock time would claim too much (Park 7).
+        if let wake = model.naturalWake {
+            text = "Left alone, you'd wake around \(Clock.format(Int((Double(wake) / 15).rounded()) * 15))."
         }
         if model.isEveningLeaning {
             text += " Being an evening type isn't laziness; it's how your body is built right now."
         }
-        return text
+        return text.trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: Social jet lag
@@ -234,8 +247,8 @@ struct ChronotypeView: View {
                 ChronoInfoRow(systemImage: "figure.run", accent: .orange, label: "Second wind", value: workout,
                               note: "Your energy lifts again here: a good time for a workout or group study.", topic: .secondWind)
             }
-            ChronoInfoRow(systemImage: "moon.fill", accent: .purple, label: "Melatonin window", value: melatonin,
-                          note: "Your body's own sleep hormone has been rising for a while (it usually starts about 2 hours before you normally fall asleep). Not about melatonin pills. Falling asleep tends to come easiest now.",
+            ChronoInfoRow(systemImage: "moon.fill", accent: .purple, label: "Sleep window", value: melatonin,
+                          note: "The hour before you usually fall asleep. Your body's own sleep hormone (not a pill) has been rising for a while, so falling asleep tends to come easiest now. A rough estimate.",
                           topic: .melatonin)
             LinkRow(title: "See your energy peaks", systemImage: "chart.xyaxis.line", accent: .mint) { EnergyView() }
         }

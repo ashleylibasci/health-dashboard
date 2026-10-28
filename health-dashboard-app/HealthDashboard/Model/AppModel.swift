@@ -296,16 +296,25 @@ final class AppModel: ObservableObject {
     /// gets the extra 30 minutes.
     var unwellTonight: Bool { illness.confidence == .medium || illness.confidence == .high }
 
-    var tonightNeed: TonightNeed { TonightNeed(base: sleepNeed.minutes, debt: sleepDebt, lateLuteal: isLateLuteal, unwell: unwellTonight) }
+    /// The small cycle allowance on tonight's need (Park 9, Liu 5): about 10
+    /// minutes in the last 5 days before a natural-cycle period (the end of
+    /// late luteal) and the first 2 days of bleeding, when sleep may feel
+    /// lighter. Never on methods that stop ovulation (no `.phases` then).
+    var cycleSleepAllowance: Bool {
+        guard case let .phases(day, length, _) = cycleDisplay, day <= length else { return false }
+        return (isLateLuteal && day > length - 5) || day <= 2
+    }
+
+    var tonightNeed: TonightNeed { TonightNeed(base: sleepNeed.minutes, debt: sleepDebt, lateLuteal: cycleSleepAllowance, unwell: unwellTonight) }
 
     var wakeHistory: WakeHistory { WakeHistory.analyze(mornings) }
 
     var sleepCycleLength: Int { usingSampleData ? 92 : WakePlanner.cycleLength(from: sessions) }
 
-    /// The Watch listens for light sleep for the last 25 minutes before the
+    /// The Watch listens for stirring for the last 25 minutes before the
     /// latest wake time (a smart-alarm session lasts 30 minutes and keeps 5
-    /// for ringing), so the window is 22 minutes before the cycle ends to 3
-    /// after.
+    /// for ringing), so the window is 22 minutes before a cycle end to 3
+    /// after, or the 25 minutes up to up-by.
     static let alarmWindowLead = 22
 
     func wakePlan(upBy: Minutes? = nil, bedtime: Minutes? = nil) -> WakePlan? {
@@ -413,7 +422,12 @@ final class AppModel: ObservableObject {
     /// Older callers: `sleepDebt` is ignored (the debt before the night is used).
     func energyScore(for night: NightRecord, sleepDebt debt: Int) -> Int { energyScore(for: night) }
 
-    var energyBankAtWake: Double { EnergyBank.atWake(asleepMinutes: lastNight.asleep, sleepDebt: sleepDebtBeforeLastNight, hrvDeltaPct: hrvDeltaPct) }
+    /// In the luteal phase HRV runs a few percent lower on its own, so a dip
+    /// of up to 5% isn't taken off the bank (Park 14).
+    var energyBankAtWake: Double {
+        let hrv = inLutealPhase ? min(hrvDeltaPct + 5, max(hrvDeltaPct, 0)) : hrvDeltaPct
+        return EnergyBank.atWake(asleepMinutes: lastNight.asleep, sleepDebt: sleepDebtBeforeLastNight, hrvDeltaPct: hrv)
+    }
     var energyBankNow: Double { EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(0, now - lastNight.wake)) / 60) }
     var energyBankAtBedtime: Double { EnergyBank.level(atWake: energyBankAtWake, hoursAwake: Double(max(0, 1440 + store.data.bedtime - lastNight.wake)) / 60) }
 

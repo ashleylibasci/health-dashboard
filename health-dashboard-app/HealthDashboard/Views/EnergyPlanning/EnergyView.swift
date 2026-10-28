@@ -167,9 +167,9 @@ struct EnergyView: View {
             }
             let gain = e.score - model.energyToday.score
             if gain > 0 {
-                return "Waking at the end of a sleep cycle and \(plan.cycles) full cycles tonight add \(gain) \(gain == 1 ? "point" : "points")."
+                return "Tonight's plan of about \(Clock.duration(plan.asleep)) asleep adds \(gain) \(gain == 1 ? "point" : "points")."
             }
-            return "Forecast from tonight's plan: \(plan.cycles) full sleep cycles, up at \(Clock.format(plan.wake))."
+            return "Forecast from tonight's plan: about \(Clock.duration(plan.asleep)) asleep, up at \(Clock.format(plan.wake))."
         }
     }
 
@@ -369,13 +369,13 @@ struct EnergyView: View {
             }
             return text
         case .windDown:
-            return "Dim the lights and put screens down from \(Clock.format(z.range.start)). Your body temperature starts to drop here."
+            return "About 2 hours before you usually fall asleep, your body's own sleep hormone starts rising. Dim the lights and put screens down from around \(Clock.format(z.range.start))."
         case .melatonin:
             let bed = 1440 + store.data.bedtime
             if z.range.contains(bed) {
                 return "This is about your own body's sleep hormone, not pills. Your bedtime of \(Clock.format(bed)) lands inside it, so falling asleep should come easily."
             }
-            return "This is about your own body's sleep hormone, not pills. Your bedtime of \(Clock.format(bed)) misses it, which can make it harder to fall asleep; aim for about \(Clock.format(z.range.start + 30))."
+            return "This is about your own body's sleep hormone, not pills. Your bedtime of \(Clock.format(bed)) falls outside it, which can make it harder to fall asleep. It's an estimate from your usual sleep times."
         }
     }
 

@@ -259,10 +259,16 @@ final class Round2WakePlanTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(fallBack.cycles, normal.cycles)
         XCTAssertLessThanOrEqual(fallBack.wake, 480)
         XCTAssertLessThanOrEqual(fallBack.alarmWindow.end, 480)
-        // Wake on the new clock = bedtime + latency + cycles − 60.
-        XCTAssertEqual(fallBack.wake, 12 + fallBack.cycles * 92 - 60)
-        XCTAssertEqual(fallBack.asleep, fallBack.cycles * 92)
+        // 9h of elapsed time: the last cycle ends 68 minutes before up-by,
+        // so she sleeps until up-by on the new clock (Park 1).
+        XCTAssertFalse(fallBack.endsCycle)
+        XCTAssertEqual(fallBack.wake, 480)
+        XCTAssertEqual(fallBack.asleep, 540 - 12)
         XCTAssertTrue(fallBack.reasons.first!.detail.contains(Clock.format(fallBack.wake)))
+        // A night where a cycle ends close to up-by on the new clock wakes there.
+        let close = try! XCTUnwrap(WakePlanner.plan(.init(bedtime: 0, deadline: 430, tonightNeed: 470, clockShift: -60)))
+        XCTAssertTrue(close.endsCycle)
+        XCTAssertEqual(close.wake, 12 + close.cycles * 92 - 60)
     }
 
     /// Round 3 H10: the cutoff for the 140 mg reference coffee comes earlier

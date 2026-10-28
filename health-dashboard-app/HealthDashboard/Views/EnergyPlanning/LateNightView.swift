@@ -218,6 +218,13 @@ struct LateNightView: View {
             Text("Keep the next night at your planned \(Clock.format(store.data.bedtime)) bedtime and get morning daylight. That usually helps you bounce back faster than sleeping in.")
                 .font(.scaled(size: 14)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            // Moreno F7: 24 hours awake impairs driving about as much as a
+            // 0.10% blood alcohol level.
+            Label("Up all night or only a few hours' sleep? Don't drive the next day. Being awake 24 hours affects driving about as much as being drunk. Get a ride.",
+                  systemImage: "car.fill")
+                .font(.scaled(size: 14, weight: .semibold))
+                .foregroundStyle(Accent.coral.ink(scheme))
+                .fixedSize(horizontal: false, vertical: true)
             LinkRow(title: "Why do I feel off?", subtitle: "Your likeliest reasons today", systemImage: "questionmark.circle.fill", accent: .coral) { WhyOffView() }
             LinkRow(title: "Plan your wake time", systemImage: "sunrise.fill", accent: .orange) { WakePlanView() }
         }

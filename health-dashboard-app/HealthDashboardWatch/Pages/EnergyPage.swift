@@ -104,7 +104,7 @@ struct EnergyPage: View {
         case "Grogginess": return "grogginess"
         case "Afternoon dip": return "afternoonDip"
         case "Wind-down": return "windDown"
-        case "Melatonin": return "melatonin"
+        case "Melatonin", "Sleep window": return "melatonin"
         default: return "morningPeak"
         }
     }

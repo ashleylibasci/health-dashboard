@@ -111,6 +111,10 @@ struct SleepNeedView: View {
             .accessibilityElement(children: .combine)
             HowWeGotThisLink(title: "Your sleep need", method: methodText(need))
             NeedRangeBar(need: need.minutes, range: need.range)
+            Text("Purple band: the range of the clues, \(Clock.duration(need.range.start)) to \(Clock.duration(need.range.end)). Grey band: the 7 to 9 hours most adults need.")
+                .font(.scaled(size: 12))
+                .foregroundStyle(p.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(needNote(need))
                 .font(.scaled(size: 14))
                 .foregroundStyle(p.secondary)
@@ -148,8 +152,8 @@ struct SleepNeedView: View {
                     Text(partLabel(part)).font(.scaled(size: 14)).foregroundStyle(p.secondary)
                     if part.label.lowercased().contains("debt") {
                         InfoButton(topic: .sleepDebt).padding(.vertical, -14)
-                    } else if part.label.lowercased().contains("luteal") {
-                        InfoButton(topic: .luteal).padding(.vertical, -14)
+                    } else if part.label.lowercased().contains("period") {
+                        InfoButton(topic: .tonightNeed).padding(.vertical, -14)
                     } else if part.label.lowercased().contains("fighting") {
                         InfoButton(topic: .illness).padding(.vertical, -14)
                     } else if part.label.lowercased().contains("base") {
@@ -346,7 +350,7 @@ struct SleepNeedView: View {
 
     private func methodName(_ kind: SleepNeedEstimate.Method.Kind) -> String {
         switch kind {
-        case .rebound: return "Nights with no alarm"
+        case .rebound: return "Nights with no alarm (a clue that tends to run high)"
         case .hrv: return "Where more sleep stops helping your HRV"
         case .restingHR: return "Where more sleep stops lowering your resting heart rate"
         case .energy: return "Where more sleep stops lifting your energy"
@@ -365,7 +369,7 @@ struct SleepNeedView: View {
             let pct = total > 0 ? Int((method.weight / total * 100).rounded()) : 0
             text += "\n\u{2022} \(methodName(method.kind)): \(Clock.duration(method.minutes)) (counts \(pct)%)"
         }
-        text += "\n\nAfter a few alarm-free nights, once catch-up sleep wears off, the length you settle at is a strong clue. In the chart, the point where extra sleep stops improving the next day is another. How you feel counts least, because people who sleep too little for a while stop noticing it. The result is always kept between 6 and 10 hours."
+        text += "\n\nAfter a week or so without alarms, the last few nights get close to your need. It's a clue that tends to run high, because catch-up sleep can last a while. The range shown is the range of the clues: how far apart they are. In the chart, the point where extra sleep stops improving the next day is another. How you feel counts least, because people who sleep too little for a while stop noticing it. The result is always kept between 6 and 10 hours."
         return text
     }
 
@@ -401,7 +405,7 @@ struct SleepNeedView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Sleep-need check on your next break").font(.scaled(size: 15, weight: .bold))
-                    Text("Sleep without an alarm for 2 or more nights in a row. Once your debt is paid off, the length you settle at is your true need.")
+                    Text("Sleep without an alarm for a week, like on a break. The last few nights get close to your need, though it's a clue that tends to run a little high while you catch up.")
                         .font(.scaled(size: 13))
                         .foregroundStyle(p.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -695,7 +699,7 @@ private struct NeedRangeBar: View {
             .frame(height: 16)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Your range is \(Clock.duration(range.start)) to \(Clock.duration(range.end)). Most adults need between 7 and 9 hours.")
+        .accessibilityLabel("The range of the clues is \(Clock.duration(range.start)) to \(Clock.duration(range.end)). Most adults need between 7 and 9 hours.")
     }
 }
 

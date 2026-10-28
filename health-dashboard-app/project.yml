@@ -74,7 +74,7 @@ targets:
         WKBackgroundModes: [alarm]
         NSHealthShareUsageDescription: "Reads your heart rate and sleep to time your smart alarm and energy curve."
         NSHealthUpdateUsageDescription: "Saves the caffeine you log to Apple Health."
-        NSMotionUsageDescription: "Watches for movement during your wake window so the smart alarm can wake you from light sleep."
+        NSMotionUsageDescription: "Watches for movement during your wake window so the smart alarm can wake you when you start stirring."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard.watchkitapp

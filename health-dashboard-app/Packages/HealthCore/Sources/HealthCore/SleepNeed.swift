@@ -218,7 +218,10 @@ public struct TonightNeed: Hashable, Sendable {
         var parts = [Part(label: "Your base need", minutes: base)]
         let payback = min(Int((Double(debt) * 0.1 / 5).rounded()) * 5, 45)
         if payback > 0 { parts.append(.init(label: "Paying back sleep debt", minutes: payback)) }
-        if lateLuteal { parts.append(.init(label: "Late luteal phase", minutes: 10)) }
+        // About 10 minutes in the days around a natural-cycle period (the last
+        // few days before it and the first two of bleeding): sleep may feel
+        // lighter then. One small number, not a measured effect (Liu 5).
+        if lateLuteal { parts.append(.init(label: "Days around your period", minutes: 10)) }
         let effort = Int((max(0, effortAboveTarget) * 5).rounded())
         if effort > 0 { parts.append(.init(label: "Hard day", minutes: min(effort, 30))) }
         if unwell { parts.append(.init(label: "Fighting something off", minutes: 30)) }

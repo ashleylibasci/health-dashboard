@@ -14,10 +14,11 @@ struct ExamModeView: View {
     @State private var alarmSetFor: Set<String> = []
     @State private var morningSelection: Int? = nil
 
-    /// ExamPlanner's cycle length (its default).
-    private let cycle = 92
-    /// Minutes from waking until grogginess clears after a light-sleep wake.
-    private let grogginess = 40
+    /// Her own sleep cycle length, the one the plan uses.
+    private var cycle: Int { model.sleepCycleLength }
+    /// Minutes from waking until grogginess usually clears (up to an hour
+    /// after deep sleep). The energy curve uses the same (Park 12).
+    private let grogginess = ExamPlanner.grogginessMinutes
 
     var body: some View {
         let all = model.examsToShow
@@ -25,12 +26,15 @@ struct ExamModeView: View {
             SampleDataBanner()
             if let exam = all.first(where: { $0.id == examID }) ?? all.first {
                 let plan = ExamPlanner.plan(examStart: exam.start, daysUntil: min(exam.daysUntil, 2),
-                                            usualBedtime: store.data.bedtime, need: model.tonightNeed.total,
-                                            energyTemplate: model.energyToday, caffeineCutoff: model.caffeineCutoff)
+                                            usualBedtime: store.data.bedtime, latency: AppModel.planLatency,
+                                            cycleLength: model.sleepCycleLength, need: model.tonightNeed.total,
+                                            energyTemplate: model.energyToday, caffeineCutoff: model.caffeineCutoff,
+                                            windowLength: AppModel.alarmWindowLead)
                 let index = min(max(dayIndex, 0), max(plan.count - 1, 0))
                 modeCard(exam)
                 if store.data.examModeOn {
                     examPicker(all, selected: exam)
+                    if model.unwellTonight { sickCard }
                     countdownCard(exam, plan: plan)
                     planSection(exam, plan: plan, index: index)
                     if let examDay = plan.last {
@@ -43,7 +47,33 @@ struct ExamModeView: View {
                 noExamsCard
             }
             whyCard
+            if store.data.examModeOn { supportCard }
             linksCard
+        }
+    }
+
+    // MARK: Sick, and overwhelmed
+
+    /// The sick check thinks she may be fighting something off (Moreno F8).
+    private var sickCard: some View {
+        Card(accent: .coral) {
+            Label("Sick before an exam?", systemImage: "cross.case.fill")
+                .font(.scaled(size: 17, weight: .bold))
+                .foregroundStyle(Accent.coral.ink(scheme))
+            Text("Your body signals look like you may be fighting something off. Rest comes before study blocks, so the plan below drops them. Campus health can document that you're sick; ask your instructor or dean about a make-up.")
+                .font(.scaled(size: 14))
+                .fixedSize(horizontal: false, vertical: true)
+            LinkRow(title: "Sick check", subtitle: "What your body is showing", systemImage: "thermometer.medium", accent: .coral) { SickView() }
+        }
+    }
+
+    /// Where to turn when exam week is too much (Laurent F13).
+    private var supportCard: some View {
+        Card {
+            Text("Feeling overwhelmed?").font(.scaled(size: 17, weight: .bold))
+            Text("Exam weeks are hard, and you don't have to get through them alone. Your campus counseling center can help. If you're sick, dealing with something at home or just can't keep up, your dean of students or accessibility office can talk to you about extensions or a make-up. In a crisis, call or text 988 (US) any time.")
+                .font(.scaled(size: 14)).secondaryText()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -188,7 +218,7 @@ struct ExamModeView: View {
                         systemImage: "clock.arrow.circlepath", accent: .indigo) { TimeChangeView() }
             } else {
                 let upNext = tonight?.wake ?? model.wakePlan()?.wake ?? 502
-                LinkRow(title: "Tonight: wind down from \(Clock.format(bedTonight - 60))",
+                LinkRow(title: "Tonight: wind down from \(Clock.format(bedTonight - 90))",
                         subtitle: "Bed by \(Clock.format(bedTonight)), up at \(Clock.format(upNext)).",
                         systemImage: "moon.fill", accent: .orange) { WakePlanView() }
             }
@@ -260,15 +290,14 @@ struct ExamModeView: View {
             aValue = Clock.format(next.bedtimeBefore)
             bLabel = "Up \(weekdayName(dayDate(exam, next.dayOffset)))"
             bValue = Clock.format(next.wake)
-            let asleep = next.wake - next.bedtimeBefore - 12
+            let asleep = next.asleep
             sleep = asleep
-            let cycles = asleep / cycle
-            let short = need - asleep
-            note = short > 5
-                ? "\(cycles) full cycles, \(Clock.duration(short)) under tonight's need."
-                : "\(cycles) full cycles, enough to cover your need."
-            if next.dayOffset == 0 {
-                note += " Another cycle would end at \(Clock.format(next.wake + cycle)), too close to the \(exam.kind.lowercased())."
+            // The plan never goes below her need (Park 2).
+            note = next.endsCycle
+                ? "\(asleep / max(cycle, 1)) full sleep cycles of about \(cycle) minutes, covering your need."
+                : "Your full need. No cycle ends close enough to it, and more sleep beats finishing a cycle."
+            if next.bedtimeBefore < store.data.bedtime - 60 {
+                note += " That's well before your usual bedtime, so start winding down early."
             }
         } else {
             aLabel = "Bed"
@@ -343,16 +372,9 @@ struct ExamModeView: View {
         let energy = model.energyToday
         if d.dayOffset == 0 {
             rows.append(ExamPlanRow(id: 0, kind: .exam, time: "\(Clock.format(exam.start)) · \(exam.title)",
-                                note: "You're past grogginess (the foggy just-woke-up feeling) by about \(Clock.format(d.wake + grogginess)).", topic: .grogginess))
-            let afterNote: String
-            if let cutoff = model.caffeineCutoffShown {
-                afterNote = "Nothing after \(Clock.format(cutoff))."
-            } else {
-                afterNote = "Keep it to one small drink (up to about \(model.caffeineLargestDoseAtWake) mg)"
-                    + (model.caffeineLastsLonger ? ": on your birth control it lasts \(model.caffeineLongerPhrase)." : ".")
-            }
+                                note: "Grogginess (the foggy just-woke-up feeling) usually passes within about \(grogginess) minutes, so by about \(Clock.format(d.wake + grogginess)); up to an hour after deep sleep.", topic: .grogginess))
             rows.append(ExamPlanRow(id: 1, kind: .caffeine, time: "Coffee around \(Clock.format(d.caffeineBy))",
-                                note: "So it's working by \(Clock.format(exam.start)). \(afterNote)", topic: .caffeineCutoff))
+                                note: "So it's working by \(Clock.format(exam.start)). " + examCoffeeNote(d), topic: .caffeineCutoff))
             if let dip = energy.zone(.afternoonDip)?.range {
                 rows.append(ExamPlanRow(id: 2, kind: .after, time: "\(dip.label) dip",
                                     note: "A 20-minute nap is fine, early in the dip. Turn exam mode off once the \(exam.kind.lowercased()) is done.", topic: .afternoonDip))
@@ -365,7 +387,13 @@ struct ExamModeView: View {
         let stop = bed - 90
         let peak = energy.zone(.morningPeak)?.range
         var allPassed = true
-        for (j, block) in d.studyBlocks.enumerated() {
+        // Sick: rest first, no study blocks (Moreno F8).
+        let blocks = model.unwellTonight ? [] : d.studyBlocks
+        if model.unwellTonight {
+            rows.append(ExamPlanRow(id: 9, kind: .stop, time: "Rest today",
+                                note: "No study blocks while you may be sick. Light review only if you feel up to it."))
+        }
+        for (j, block) in blocks.enumerated() {
             let passed = isToday && block.end <= model.now
             if !passed { allPassed = false }
             let isMorning = block == peak
@@ -382,7 +410,7 @@ struct ExamModeView: View {
             rows.append(ExamPlanRow(id: 10 + j, kind: passed ? .passed : .study, time: block.label, note: note,
                                     topic: isMorning ? .morningPeak : .secondWind))
         }
-        if isToday && allPassed {
+        if isToday && allPassed && !model.unwellTonight {
             rows.append(ExamPlanRow(id: 20, kind: .study, time: "Tonight, until \(Clock.format(stop))",
                                 note: "Light review only: flashcards and notes. No new material this late."))
         }
@@ -409,7 +437,6 @@ struct ExamModeView: View {
 
     private func morningCard(_ exam: UpcomingExam, day d: ExamDayPlan) -> some View {
         let window = d.alarmWindow
-        let cycles = max(1, (d.wake - d.bedtimeBefore - 12) / cycle)
         let sentEarlier: Bool = model.activeAlarmOverride.map {
             Calendar.current.isDate($0.wakeDay, inSameDayAs: exam.date) && $0.start == window.start && $0.end == window.end
         } ?? false
@@ -420,7 +447,7 @@ struct ExamModeView: View {
             Text("Up \(Clock.format(d.wake)), clear-headed by \(Clock.format(d.wake + grogginess))")
                 .font(.scaled(size: 20, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Your smart alarm wakes you in light sleep between \(Clock.format(window.start)) and \(Clock.format(window.end)), at the end of your \(ordinal(cycles)) cycle. Grogginess fades in about \(grogginess) minutes, well before \(Clock.format(exam.start)).")
+            Text("Your smart alarm wakes you when you start stirring between \(Clock.format(window.start)) and \(Clock.format(window.end)). Grogginess usually fades within about \(grogginess) minutes (up to an hour after deep sleep), well before \(Clock.format(exam.start)).")
                 .font(.scaled(size: 14)).secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
             morningReadout(exam, day: d)
@@ -467,15 +494,15 @@ struct ExamModeView: View {
         let accent: Accent
         if t < window.start {
             value = "Still asleep"
-            detail = "Your smart alarm can start waking you from \(Clock.format(window.start)), as soon as you're in light sleep."
+            detail = "Your smart alarm can start waking you from \(Clock.format(window.start)), as soon as you start stirring."
             accent = .purple
         } else if t < d.wake {
             value = "Smart alarm window"
-            detail = "If you're in light sleep now, the alarm wakes you here instead of later. Waking from light sleep feels less groggy."
+            detail = "If you start stirring now, the alarm wakes you here instead of later. Stirring often means lighter sleep, which can feel a bit easier to wake from."
             accent = .orange
         } else if t < groggyEnd {
             value = t == d.wake ? "Up" : "Grogginess"
-            detail = "Your brain takes about \(grogginess) minutes to fully switch on. Get daylight and water; skip last-minute cramming."
+            detail = "Your brain usually takes about \(grogginess) minutes to fully switch on (up to an hour after deep sleep). Get daylight and water; skip last-minute cramming."
             accent = .indigo
         } else if t < exam.start {
             value = "Clear-headed"
@@ -507,6 +534,9 @@ struct ExamModeView: View {
             ExamWhyRow(systemImage: "brain.head.profile", accent: .purple, title: "Short nights cost recall",
                    detail: "After a short night, memory and focus drop. Sleep is when what you studied gets stored, so an all-nighter takes back more than it gives.",
                    topic: .rem)
+            ExamWhyRow(systemImage: "car.fill", accent: .orange, title: "Up all night? Don't drive",
+                   detail: "After an all-nighter or a very short night, driving is about as risky as driving drunk. Get a ride or take the bus.",
+                   topic: .lateNight)
             ExamWhyRow(systemImage: "moon.zzz.fill", accent: .coral, title: "Sleep debt: \(Clock.duration(model.sleepDebt))",
                    detail: "Sleep you've missed over the last two weeks. Paying some back before the exam is worth more than one more hour of review. Exam mode protects your bedtime first.",
                    topic: .sleepDebt)
@@ -534,6 +564,22 @@ struct ExamModeView: View {
 
     // MARK: Helpers
 
+    /// The exam-day coffee checked against that night's bedtime (Shah F1):
+    /// the biggest drink at the coffee time that still clears, and a plain
+    /// word when any coffee then will cost some sleep.
+    private func examCoffeeNote(_ d: ExamDayPlan) -> String {
+        let bed = 1440 + store.data.bedtime
+        let largest = CaffeineModel.largestDose(at: d.caffeineBy, bedtime: bed, halfLifeHours: model.caffeineHalfLifeHours)
+        let longer = model.caffeineLastsLonger ? " On your birth control caffeine lasts \(model.caffeineLongerPhrase)." : ""
+        if largest >= 150 {
+            return "Up to about \(largest) mg then still clears by bedtime."
+        }
+        if largest >= 25 {
+            return "Up to about \(largest) mg then clears by bedtime; a bigger one will cost some sleep tonight. Before an exam that can be worth it." + longer
+        }
+        return "Even a small coffee then will cost some sleep tonight. Before an exam that can be worth it; keep it to one regular cup." + longer
+    }
+
     private func dayDate(_ exam: UpcomingExam, _ offset: Int) -> Date {
         Calendar.current.date(byAdding: .day, value: offset, to: exam.date) ?? exam.date
     }
@@ -544,15 +590,6 @@ struct ExamModeView: View {
 
     private func weekdayName(_ d: Date) -> String {
         d.formatted(.dateTime.weekday(.abbreviated))
-    }
-
-    private func ordinal(_ n: Int) -> String {
-        switch n {
-        case 1: return "1st"
-        case 2: return "2nd"
-        case 3: return "3rd"
-        default: return "\(n)th"
-        }
     }
 }
 

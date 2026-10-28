@@ -6,7 +6,7 @@ import HealthCore
 
 // MARK: - Smart alarm
 
-/// Wakes her at the first sign of light sleep inside tonight's wake window,
+/// Wakes her when she starts stirring (often lighter sleep) inside tonight's wake window,
 /// or at the end of the window at the latest.
 ///
 /// How it works: a smart-alarm `WKExtendedRuntimeSession` (enabled by the
@@ -637,7 +637,7 @@ struct AlarmView: View {
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
             }
-            Text(fromLightSleep ? "You're in light sleep. Good time to get up." : "End of your wake window.")
+            Text(fromLightSleep ? "You were stirring. Good time to get up." : "End of your wake window.")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xE6D2BC))
                 .multilineTextAlignment(.center)

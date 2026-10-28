@@ -24,8 +24,8 @@ extension AppModel {
         e.curve.min { abs($0.time - t) < abs($1.time - t) }
     }
 
-    /// The zone a time falls in. Wind-down and melatonin win over the daytime
-    /// zones when they overlap.
+    /// The zone a time falls in. Wind-down and the sleep window win over the
+    /// daytime zones when they overlap.
     static func zone(at t: Minutes, in e: EnergyDay) -> EnergyDay.Zone? {
         let order: [EnergyDay.Zone.Kind] = [.melatonin, .windDown, .grogginess, .morningPeak, .afternoonDip, .secondWind]
         for k in order {
@@ -51,9 +51,9 @@ extension AppModel {
             EnergyMoment(time: time, level: level, kind: nil, title: title, meaning: meaning, action: action)
         }
         if let mel, time > mel.end {
-            return moment("Past your melatonin window",
-                          "Your body expected to be asleep by now. Staying up later than this nudges your body clock later, so tomorrow morning feels harder.",
-                          "Head to bed as soon as you can.")
+            return moment("Past your sleep window",
+                          "Your body expected to be asleep by now. Bright light and screens this late push your body clock later, so tomorrow morning feels harder.",
+                          "Keep the lights low and head to bed as soon as you can.")
         }
         if let down, time < down.start, let wind, time > wind.end {
             return moment("Evening",
@@ -79,10 +79,10 @@ extension AppModel {
         return moment("Steady stretch", "Your energy is fairly level here.", "Use it for whatever's next on your list.")
     }
 
-    /// "Melatonin window", "Morning peak", or "First peak" when that peak
+    /// "Sleep window", "Morning peak", or "First peak" when that peak
     /// starts after noon (late wake). Names follow the clock, from HealthCore.
     static func zoneTitle(_ zone: EnergyDay.Zone) -> String {
-        zone.kind == .melatonin ? "Melatonin window" : zone.title
+        zone.title
     }
 
     /// What the zone is, in one plain sentence or two.
@@ -92,8 +92,8 @@ extension AppModel {
         case .morningPeak: return "Your sharpest focus of the day."
         case .afternoonDip: return "A natural energy drop, mostly from your body clock. It happens even without lunch, though a big meal can add to it."
         case .secondWind: return "Your body clock pushes back against the day's tiredness, so your energy lifts again."
-        case .windDown: return "The stretch just before your body starts making its own sleep hormone."
-        case .melatonin: return "Your body's own sleep hormone has been rising for a while (it usually starts about 2 hours before you normally fall asleep). Not about melatonin pills. Falling asleep tends to come easiest now."
+        case .windDown: return "About 2 hours before you usually fall asleep, your body starts making its own sleep hormone (melatonin, not pills)."
+        case .melatonin: return "The hour before you usually fall asleep. Your body's own sleep hormone has been rising for a while (not about melatonin pills), so falling asleep tends to come easiest now."
         }
     }
 
@@ -105,7 +105,7 @@ extension AppModel {
         case .afternoonDip: return "Good time for easy tasks or a walk. A 20-minute nap early in the dip is fine."
         case .secondWind: return "Good for a workout or group study. Wrap up anything intense a couple of hours before bed."
         case .windDown: return "Dim the lights, put screens down and do something calm."
-        case .melatonin: return "Aim to be in bed in this window. Falling asleep is usually easiest now; much later and you may lie awake."
+        case .melatonin: return "Aim to be in bed in this window. Falling asleep is usually easiest now; much later and you may lie awake. It's an estimate from your usual sleep times."
         }
     }
 
@@ -116,8 +116,8 @@ extension AppModel {
         case .morningPeak: return "your sharpest focus of the day. Save it for your hardest studying."
         case .afternoonDip: return "a natural energy drop, mostly from your body clock (a big lunch can add to it). Plan easy tasks or a walk."
         case .secondWind: return "your energy lifts again. Good for a workout or group study."
-        case .windDown: return "start getting ready for bed: dim lights, screens down."
-        case .melatonin: return "your own sleep hormone has been rising for a couple of hours (not about pills). Usually the easiest time to fall asleep."
+        case .windDown: return "your own sleep hormone starts rising (not about pills). Dim lights, screens down."
+        case .melatonin: return "the hour before you usually fall asleep. Usually the easiest time to drift off."
         }
     }
 
@@ -229,9 +229,11 @@ extension AppModel {
         case .lateNight?:
             return "Be in bed by \(Clock.format(store.data.bedtime)) tonight and tomorrow. It usually takes two normal nights to bounce back."
         case .luteal?:
-            return hidesEffortTargets
-                ? "Aim for 20 extra minutes of sleep and go easy on yourself. " + lutealEasesLine
-                : "Go easier on hard workouts and aim for 20 extra minutes of sleep. " + lutealEasesLine
+            // One small number, only on the days it's added (Park 9, Liu 5).
+            let sleep = cycleSleepAllowance
+                ? "Tonight's need has about 10 minutes added; sleep may feel lighter now, and extra rest is fine. "
+                : "Sleep may feel lighter now, and extra rest is fine. "
+            return sleep + (hidesEffortTargets ? "Go easy on yourself. " : "Train as planned, easier if you feel flat. ") + lutealEasesLine
         case .illness?:
             return hidesEffortTargets
                 ? "Take an easy day: extra sleep and plenty of fluids. See a doctor if you feel unwell."
@@ -283,6 +285,13 @@ extension AppModel {
         let waterDays = waterByDay.values.filter { $0.map(\.ml).reduce(0, +) >= store.data.waterGoalML }.count
         let bed = Clock.format(store.data.bedtime)
         let test = cutoffTest
+        // On time on most of the last 30 nights, not 30 in a row: one off
+        // night doesn't wipe out a month (Laurent F12).
+        let today = cal.startOfDay(for: .now)
+        let onTimeOf30 = realNights.filter { n in
+            let ago = cal.dateComponents([.day], from: cal.startOfDay(for: n.wakeDay), to: today).day ?? 99
+            return ago >= 0 && ago < 30 && n.sleepOnset <= store.data.bedtime + 20
+        }.count
         var out: [Badge] = [
             Badge(title: "First week tracked", systemImage: "moon.stars.fill", accent: .purple,
                   progress: min(realNights.count, 7), goal: 7, howTo: "Wear your Watch to bed for 7 nights."),
@@ -299,8 +308,9 @@ extension AppModel {
             Badge(title: "Caffeine scientist", systemImage: "flask.fill", accent: .coral,
                   progress: min(test.nightsLogged, test.target), goal: test.target,
                   howTo: "Log your caffeine for \(test.target) days to find your own cutoff time."),
-            Badge(title: "30-night streak", systemImage: "flame.fill", accent: .orange,
-                  progress: inARow(onTime, 30), goal: 30, howTo: "Fall asleep on time 30 nights in a row."),
+            Badge(title: "On time 25 of 30 nights", systemImage: "flame.fill", accent: .orange,
+                  progress: min(onTimeOf30, 25), goal: 25,
+                  howTo: "Fall asleep within 20 minutes of your \(bed) bedtime on 25 of your last 30 nights. A few off nights are fine."),
         ]
         // A period-count goal only where periods are expected: hidden on
         // methods where bleeding is rare or has stopped, and a pack goal
