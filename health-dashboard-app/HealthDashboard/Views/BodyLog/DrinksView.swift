@@ -44,6 +44,7 @@ struct DrinksView: View {
         Screen(title: "Alcohol and your sleep", accent: .purple) {
             SampleDataBanner()
             AlcoholSafetyNote()
+            if !model.showsAlcoholSafetyLine { MorningAfterCallout() }
             header
             logCard
             nightsCard
@@ -396,6 +397,30 @@ struct AlcoholSafetyNote: View {
                             .foregroundStyle(Accent.pink.ink(scheme))
                             .frame(minHeight: Sizes.minTap)
                     }
+                }
+        }
+    }
+}
+
+/// The morning after 4 or more drinks: when last night's alcohol has
+/// likely cleared, and not to drive before then (D1). Next-morning drunk
+/// driving is common and invisible. Shows nothing otherwise.
+struct MorningAfterCallout: View {
+    @EnvironmentObject var model: AppModel
+    @State private var showsMore = false
+
+    var body: some View {
+        if let m = model.morningAfterClear {
+            let time = Clock.format(Clock.minutesOfDay(m.time))
+            CalloutBar(text: "Alcohol may not clear until about \(time). Don\u{2019}t drive before then.",
+                       systemImage: "car.fill", accent: .purple) { showsMore = true }
+                .bottomSheet(isPresented: $showsMore, title: "The morning after") {
+                    Text("Last night\u{2019}s \(DrinksView.drinksPhrase(m.drinks)) may still be in your body until about \(time). A standard drink takes most women about \(Int(AlcoholClearance.hoursPerDrink)) hours to clear, counted from your first drink, and nothing speeds it up: not coffee, a shower or sleep.")
+                        .font(.bodyText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Don\u{2019}t drive before then, even if you feel fine. Water and something to eat help you feel better while you wait.")
+                        .font(.bodyText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
         }
     }

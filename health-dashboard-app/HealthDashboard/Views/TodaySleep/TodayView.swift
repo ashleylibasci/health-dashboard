@@ -136,6 +136,8 @@ struct TodayView: View {
     private var alertSlot: some View {
         if let alert, alert.0 == .sick {
             alertBar(alert)
+        } else if model.morningAfterClear != nil {
+            MorningAfterCallout()
         } else if showsPackCheck {
             PackCheckCard()
         } else if let alert {

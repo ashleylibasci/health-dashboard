@@ -179,6 +179,18 @@ extension AppModel {
         return store.data.alcoholLog.filter { window.contains($0.date) }
     }
 
+    /// The morning after 4+ standard drinks: when last night's alcohol has
+    /// likely cleared (about 2 hours a drink), while that's still ahead
+    /// (D1). `-demoFuel` previews show it whatever the clock says.
+    var morningAfterClear: (time: Date, drinks: Double)? {
+        let entries = alcoholEntries(beforeWakeDay: appDayDate)
+        let total = entries.map(\.standardDrinks).reduce(0, +)
+        guard total >= AlcoholClearance.morningAfterDrinks,
+              let clear = AlcoholClearance.clearTime(entries.map { ($0.date, $0.standardDrinks) }),
+              clear > .now || DemoMode.fuel else { return nil }
+        return (clear, total)
+    }
+
     /// Standard drinks the evening before a night (by its wake day).
     func standardDrinks(beforeWakeDay day: Date) -> Double {
         alcoholEntries(beforeWakeDay: day).map(\.standardDrinks).reduce(0, +)

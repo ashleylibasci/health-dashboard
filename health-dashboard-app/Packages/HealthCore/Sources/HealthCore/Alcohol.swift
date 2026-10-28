@@ -64,3 +64,34 @@ public struct AlcoholPour: Hashable, Sendable, Identifiable {
         drinks == drinks.rounded() ? "\(Int(drinks))" : String(format: "%.1f", drinks)
     }
 }
+
+/// When last night's alcohol has likely left her body. A standard drink
+/// takes most women about 2 hours to clear (the app's alcohol tips), at a
+/// steady pace that nothing speeds up: not coffee, water or sleep.
+public enum AlcoholClearance {
+    public static let hoursPerDrink = 2.0
+    /// The morning after this many standard drinks gets the "not cleared
+    /// until" card: 4 or more in an evening is binge drinking for women
+    /// (NIAAA), the same line as the evening's safety note.
+    public static let morningAfterDrinks = 4.0
+
+    /// When the last of `drinks` (time, standard drinks) is cleared: each
+    /// drink adds to what's in the body, which drops by one drink every
+    /// `hoursPerDrink` while any is left. Rounded up to the half hour, so
+    /// "about 11am" is never early. Nil without drinks.
+    public static func clearTime(_ drinks: [(date: Date, standardDrinks: Double)], hoursPerDrink: Double = hoursPerDrink,
+                                 calendar: Calendar = .current) -> Date? {
+        let sorted = drinks.filter { $0.standardDrinks > 0 }.sorted { $0.date < $1.date }
+        guard var t = sorted.first?.date else { return nil }
+        let perSecond = 1 / (hoursPerDrink * 3600)
+        var level = 0.0
+        for d in sorted {
+            level = max(0, level - d.date.timeIntervalSince(t) * perSecond) + d.standardDrinks
+            t = d.date
+        }
+        let clear = t.addingTimeInterval(level / perSecond)
+        let minute = calendar.component(.minute, from: clear), second = calendar.component(.second, from: clear)
+        let past = (minute % 30) * 60 + second
+        return past == 0 ? clear : clear.addingTimeInterval(Double(30 * 60 - past))
+    }
+}
