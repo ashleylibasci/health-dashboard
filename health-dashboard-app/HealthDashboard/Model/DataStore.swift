@@ -31,6 +31,16 @@ struct AppData: Codable {
         var date: Date
         var kind: String       // "Wine", "Beer", "Seltzer", "Cocktail", "Shot"
         var count: Int
+        /// An `AlcoholPour` id ("Wine.redCup"); nil (older entries) is the
+        /// kind's usual serving, one standard drink.
+        var pour: String? = nil
+
+        /// US standard drinks: the count times the pour's size.
+        var standardDrinks: Double { Double(count) * (AlcoholPour.pour(id: pour)?.standardDrinks ?? 1) }
+        /// "1 red cup of wine", "2 beers".
+        var phrase: String {
+            (AlcoholPour.pour(id: pour) ?? AlcoholPour.standard(for: kind))?.phrase(count: count) ?? "\(count) \(kind.lowercased())"
+        }
     }
     enum Flow: String, Codable, CaseIterable { case none = "No flow", spotting = "Spotting", light = "Light", medium = "Medium", heavy = "Heavy" }
     struct FlowEntry: Codable, Hashable, Identifiable {

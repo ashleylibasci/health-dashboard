@@ -14,6 +14,7 @@ struct LogView: View {
 
     @State private var toast: UndoToast?
     @State private var showsSymptoms = false
+    @State private var pourKind: PourKind?
     /// Haptics: adding (alcohol), saving (flow), picking (stress,
     /// symptoms). The caffeine and water cards play their own.
     @State private var addCount = 0
@@ -318,9 +319,14 @@ struct LogView: View {
 
     private static let quickKinds = ["Wine", "Beer", "Seltzer", "Cocktail", "Shot"]
 
-    private var alcoholToday: Int {
-        AppData.today(store.data.alcoholLog, date: \.date).map(\.count).reduce(0, +)
+    /// A kind whose pour sheet is open.
+    private struct PourKind: Identifiable {
+        var kind: String
+        var id: String { kind }
     }
+
+    /// Standard drinks today: a red cup of wine counts as about 3.
+    private var alcoholToday: Double { model.alcoholDrinksToday }
 
     private var alcoholSection: some View {
         VStack(alignment: .leading, spacing: Space.s) {
@@ -331,16 +337,16 @@ struct LogView: View {
             }
             Card(accent: .purple) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Tap to log one now").font(.bodyEmphasis)
+                    Text("Tap what you had").font(.bodyEmphasis)
                     Spacer(minLength: Space.s)
-                    Text(alcoholToday == 0 ? "None today" : "\(alcoholToday) today")
+                    Text(alcoholToday == 0 ? "None today" : "\(DrinksView.drinksPhrase(alcoholToday)) today")
                         .font(.secondary).secondaryText()
                         .contentTransition(numericTransition)
                         .motion(.log, value: alcoholToday)
                 }
                 FlowLayout(spacing: Space.s) {
                     ForEach(Self.quickKinds, id: \.self) { kind in
-                        Button { logAlcohol(kind) } label: {
+                        Button { pourKind = PourKind(kind: kind) } label: {
                             Label(kind, systemImage: "plus")
                                 .font(.scaled(size: 14, weight: .bold))
                                 .padding(.horizontal, 14)
@@ -349,18 +355,30 @@ struct LogView: View {
                                 .background(Accent.purple.fill(scheme).opacity(0.18), in: Capsule())
                         }
                         .buttonStyle(.pressable)
-                        .accessibilityLabel("Log one \(kind), now")
+                        .accessibilityLabel("Log \(kind.lowercased()), now")
+                        .accessibilityHint("Pick the pour: a glass, a can, a red cup")
                     }
                 }
                 AlcoholSafetyNote()
             }
+            // How big a pour: one tap on the picture logs it (D2).
+            .bottomSheet(item: $pourKind, title: { "How big a pour of \($0.kind.lowercased())?" }) { item in
+                Text("Logs now. Party pours are often 2 or 3 standard drinks.")
+                    .font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                PourChoices(kind: item.kind, selection: .constant("")) { pour in
+                    pourKind = nil
+                    logAlcohol(pour)
+                }
+            }
         }
     }
 
-    private func logAlcohol(_ kind: String) {
-        let entry = AppData.AlcoholEntry(date: .now, kind: kind, count: 1)
+    private func logAlcohol(_ pour: AlcoholPour) {
+        let entry = AppData.AlcoholEntry(date: .now, kind: pour.kind, count: 1, pour: pour.id)
         withMotion(.log) { store.data.alcoholLog.append(entry) }
-        toast = UndoToast("Logged \(DrinksView.phrase(count: 1, kind: kind)) at \(Clock.format(model.now)).") {
+        let size = pour.isStandard ? "" : " (\(DrinksView.drinksPhrase(pour.standardDrinks)))"
+        toast = UndoToast("Logged \(entry.phrase)\(size) at \(Clock.format(model.now)).") {
             withMotion(.undo) { store.data.alcoholLog.removeAll { $0.id == entry.id } }
         }
         addCount += 1

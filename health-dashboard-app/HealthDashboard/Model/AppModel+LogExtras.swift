@@ -154,22 +154,48 @@ extension AppModel {
         return store.data.alcoholLog.filter { $0.date >= since }.sorted { $0.date > $1.date }
     }
 
-    /// Drinks logged in the last 6 hours, each counted (an evening out, or
-    /// an afternoon party).
-    var alcoholRecentCount: Int {
+    /// Standard drinks logged in the last 6 hours (an evening out, or an
+    /// afternoon party). A red cup of wine counts as about 3.
+    var alcoholRecentDrinks: Double {
         let since = Date.now.addingTimeInterval(-6 * 3600)
-        return store.data.alcoholLog.filter { $0.date >= since && $0.date <= .now }.map(\.count).reduce(0, +)
+        return store.data.alcoholLog.filter { $0.date >= since && $0.date <= .now }.map(\.standardDrinks).reduce(0, +)
     }
 
-    /// 4 or more drinks in one evening is binge drinking for women (NIAAA):
-    /// screens show the calm alcohol-poisoning safety line.
-    var showsAlcoholSafetyLine: Bool { alcoholRecentCount >= 4 }
+    /// Standard drinks logged today (since the rollover).
+    var alcoholDrinksToday: Double { AppData.today(store.data.alcoholLog, date: \.date).map(\.standardDrinks).reduce(0, +) }
+
+    /// 4 or more standard drinks in one evening is binge drinking for women
+    /// (NIAAA): screens show the calm alcohol-poisoning safety line.
+    var showsAlcoholSafetyLine: Bool { alcoholRecentDrinks >= 4 }
 
     /// Drinks logged the evening before `night`: 5pm the day before to 5am
     /// that morning, the same window `followedDrinks` uses.
     func alcoholEntries(before night: NightRecord) -> [AppData.AlcoholEntry] {
-        let window = NightPairing.alcoholWindow(wakeDay: night.wakeDay)
+        alcoholEntries(beforeWakeDay: night.wakeDay)
+    }
+
+    func alcoholEntries(beforeWakeDay day: Date) -> [AppData.AlcoholEntry] {
+        let window = NightPairing.alcoholWindow(wakeDay: day)
         return store.data.alcoholLog.filter { window.contains($0.date) }
+    }
+
+    /// Standard drinks the evening before a night (by its wake day).
+    func standardDrinks(beforeWakeDay day: Date) -> Double {
+        alcoholEntries(beforeWakeDay: day).map(\.standardDrinks).reduce(0, +)
+    }
+
+    /// Nights after 1–2 standard drinks, and after 3 or more, each compared
+    /// with nights without (D2: the dose matters for sleep and HRV). Nil on
+    /// example data, whose nights carry no amounts.
+    var alcoholEffectByAmount: (light: HabitEffect, heavy: HabitEffect)? {
+        guard !usingSampleData else { return nil }
+        let amounts = Dictionary(nights.map { ($0.wakeDay, standardDrinks(beforeWakeDay: $0.wakeDay)) }, uniquingKeysWith: max)
+        func band(_ range: ClosedRange<Double>) -> HabitEffect {
+            HabitEffect.compare(nights.filter { (amounts[$0.wakeDay] ?? 0) == 0 || range.contains(amounts[$0.wakeDay] ?? 0) }) {
+                range.contains(amounts[$0.wakeDay] ?? 0)
+            }
+        }
+        return (band(0.5...2.5), band(3...100))
     }
 
     /// The last `count` nights, oldest first, flagged when they followed drinks.
@@ -181,7 +207,7 @@ extension AppModel {
             let after = followedDrinks(night)
             let entries = alcoholEntries(before: night)
             let asleep = after && usingSampleData ? night.asleepMinutes - 25 : night.asleepMinutes
-            let text: String? = entries.isEmpty ? nil : entries.map { $0.count > 1 ? "\($0.kind) ×\($0.count)" : $0.kind }.joined(separator: ", ")
+            let text: String? = entries.isEmpty ? nil : entries.map(\.phrase).joined(separator: ", ")
             return DrinkNightPoint(index: i, night: night, asleep: asleep, afterDrinks: after, drinksText: text)
         }
     }
