@@ -77,6 +77,47 @@ public enum DrinkSize: String, CaseIterable, Codable, Sendable {
     }
 }
 
+/// Her caffeine, her sleep (E4): how long she took to fall asleep on
+/// nights with more than `CaffeineModel.bedtimeLimitMg` still in her body
+/// at bedtime, against the other nights. Caffeine clearance varies a lot
+/// between people, and the pill slows it, so her own nights say more than
+/// the average.
+public struct CaffeineSleepComparison: Hashable, Sendable {
+    public struct Night: Hashable, Sendable {
+        public var caffeineAtBedtime: Double
+        /// Bedtime to falling asleep.
+        public var minutesToFallAsleep: Int
+        public init(caffeineAtBedtime: Double, minutesToFallAsleep: Int) {
+            self.caffeineAtBedtime = caffeineAtBedtime; self.minutesToFallAsleep = minutesToFallAsleep
+        }
+    }
+
+    /// Logged nights before a result shows, and the fewest on each side.
+    public static let nightsNeeded = 20
+    public static let nightsPerSide = 5
+
+    public var nights: Int
+    /// Nights with more than the limit left at bedtime, and the rest.
+    public var over: Int
+    public var under: Int
+    /// Average minutes to fall asleep, over-limit nights minus the rest.
+    public var minutesLonger: Int?
+
+    public var enoughData: Bool {
+        nights >= Self.nightsNeeded && over >= Self.nightsPerSide && under >= Self.nightsPerSide
+    }
+
+    public static func make(_ nights: [Night], limit: Double = CaffeineModel.bedtimeLimitMg) -> CaffeineSleepComparison {
+        let a = nights.filter { $0.caffeineAtBedtime > limit }.map { Double($0.minutesToFallAsleep) }
+        let b = nights.filter { $0.caffeineAtBedtime <= limit }.map { Double($0.minutesToFallAsleep) }
+        let delta: Int? = {
+            guard !a.isEmpty, !b.isEmpty else { return nil }
+            return Int((a.reduce(0, +) / Double(a.count) - b.reduce(0, +) / Double(b.count)).rounded())
+        }()
+        return CaffeineSleepComparison(nights: nights.count, over: a.count, under: b.count, minutesLonger: delta)
+    }
+}
+
 public struct CaffeineDose: Hashable, Codable, Sendable {
     public var time: Minutes
     public var mg: Int

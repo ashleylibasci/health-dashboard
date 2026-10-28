@@ -167,10 +167,40 @@ struct CaffeineView: View {
                 CaffeineTimingView()
             }
             RowDivider()
+            ExpandRow(title: "Your caffeine, your sleep", summary: caffeineSleepSummary, systemImage: "moon.zzz.fill", accent: .purple) {
+                caffeineSleepDetail
+            }
+            RowDivider()
             MetricRow(title: "Find your caffeine limit", note: "\(min(test.nightsLogged, test.target)) of \(test.target) nights",
                       systemImage: "flask.fill", accent: .mint) {
                 CutoffTestView()
             }
+        }
+    }
+
+    /// "14 min longer to fall asleep", or "12 of 20 nights".
+    private var caffeineSleepSummary: String {
+        let c = model.caffeineSleep
+        guard c.enoughData, let d = c.minutesLonger else {
+            return "\(min(c.nights, CaffeineSleepComparison.nightsNeeded)) of \(CaffeineSleepComparison.nightsNeeded) nights"
+        }
+        if abs(d) < 5 { return "About the same either way" }
+        return "\(abs(d)) min \(d > 0 ? "longer" : "quicker") to fall asleep"
+    }
+
+    /// Her own nights, with how many there are (E4).
+    @ViewBuilder
+    private var caffeineSleepDetail: some View {
+        let c = model.caffeineSleep
+        let limit = Int(CaffeineModel.bedtimeLimitMg)
+        if c.enoughData, let d = c.minutesLonger {
+            Text(abs(d) < 5
+                 ? "On nights with more than \(limit) mg left at bedtime, you fell asleep about as quickly as on other nights."
+                 : "On nights with more than \(limit) mg left at bedtime, you took \(abs(d)) minutes \(d > 0 ? "longer" : "less") to fall asleep.")
+            Text("From your \(c.nights) logged nights: \(c.over) with more than \(limit) mg left, \(c.under) with less. A pattern in your own nights, not proof: other things change on those days too.")
+                .font(.secondary)
+        } else {
+            Text("After \(CaffeineSleepComparison.nightsNeeded) nights of logging (at least \(CaffeineSleepComparison.nightsPerSide) with more than \(limit) mg left at bedtime and \(CaffeineSleepComparison.nightsPerSide) with less), this shows how your caffeine changes how fast you fall asleep. So far: \(c.nights) nights, \(c.over) over \(limit) mg.")
         }
     }
 

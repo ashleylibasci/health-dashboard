@@ -13,6 +13,22 @@ final class FuelTests: XCTestCase {
         XCTAssertEqual(DrinkSize.allCases.map(\.shopName), ["short", "tall", "grande", "venti"])
     }
 
+    // E4: over-limit nights against the rest, only with 20 nights and 5 a side.
+    func testCaffeineSleepComparison() {
+        typealias N = CaffeineSleepComparison.Night
+        let over = Array(repeating: N(caffeineAtBedtime: 60, minutesToFallAsleep: 30), count: 6)
+        let under = Array(repeating: N(caffeineAtBedtime: 10, minutesToFallAsleep: 16), count: 14)
+        let c = CaffeineSleepComparison.make(over + under)
+        XCTAssertTrue(c.enoughData)
+        XCTAssertEqual(c.minutesLonger, 14)
+        XCTAssertEqual(c.over, 6)
+        XCTAssertFalse(CaffeineSleepComparison.make(Array((over + under).prefix(19))).enoughData)
+        XCTAssertFalse(CaffeineSleepComparison.make(under + under).enoughData)   // nothing over the limit
+        XCTAssertNil(CaffeineSleepComparison.make(under).minutesLonger)
+        // Exactly the limit counts as under.
+        XCTAssertEqual(CaffeineSleepComparison.make([N(caffeineAtBedtime: 35, minutesToFallAsleep: 5)]).under, 1)
+    }
+
     // D2: every kind has its usual serving (1 standard drink) first, and a
     // red cup of wine is about 3.
     func testPours() {

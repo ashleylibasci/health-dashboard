@@ -82,6 +82,27 @@ extension AppModel {
         Int(CaffeineModel.amount(at: bedtimeTonight, doses: [CaffeineDose(time: t, mg: mg)], halfLifeHours: caffeineHalfLifeHours).rounded())
     }
 
+    /// Her caffeine, her sleep (E4): every night whose day she logged
+    /// something (caffeine or water, so a day with no caffeine is a real
+    /// zero), with what her logged caffeine left at that night's bedtime
+    /// and how long she took to fall asleep. Example nights carry the
+    /// designs' effect (14 minutes longer over the limit), as the alcohol
+    /// comparison does.
+    var caffeineSleep: CaffeineSleepComparison {
+        let cal = Calendar.current
+        let logged = Set((store.data.drinkLog.map(\.date) + store.data.waterLog.map(\.date)).map { AppDay.day(containing: $0) })
+        let nights: [CaffeineSleepComparison.Night] = nights.compactMap { n in
+            guard let day = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: n.wakeDay)), logged.contains(day) else { return nil }
+            let doses = store.data.drinkLog.filter { AppDay.contains($0.date, now: cal.date(byAdding: .hour, value: 12, to: day) ?? day) }
+                .map { CaffeineDose(time: AppDay.minutes($0.date, relativeTo: day), mg: $0.mg) }
+            let mg = CaffeineModel.amount(at: 1440 + n.bedtime, doses: doses, halfLifeHours: caffeineHalfLifeHours)
+            var latency = min(max(n.sleepOnset - n.bedtime, 0), 180)
+            if usingSampleData, mg > CaffeineModel.bedtimeLimitMg { latency += 14 }
+            return CaffeineSleepComparison.Night(caffeineAtBedtime: mg, minutesToFallAsleep: latency)
+        }
+        return CaffeineSleepComparison.make(nights)
+    }
+
     /// Her half-life is the longer one (combined pill, ring, patch).
     var caffeineLastsLonger: Bool { caffeineHalfLifeHours > CaffeineModel.typicalHalfLifeHours }
 
