@@ -195,7 +195,9 @@ struct Ring: View {
 }
 
 /// A tile with a title, a big value and a note. Used in grids, where it
-/// fills its cell so every tile in a row is the same height.
+/// fills its cell so every tile in a row is the same height. A neutral card
+/// with the accent on its icon only, so a grid of tiles doesn't spend the
+/// screen's colour budget (Tanaka F5).
 struct MetricTile: View {
     var title: String
     var value: String
@@ -227,7 +229,25 @@ struct MetricTile: View {
         }
         .padding(Space.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .tileSurface()
+    }
+}
+
+extension View {
+    /// The neutral card surface for tiles: the card colour, its hairline
+    /// border and, in light mode, the card's faint shadow.
+    func tileSurface() -> some View { modifier(TileSurface()) }
+}
+
+private struct TileSurface: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        let p = Palette(scheme: scheme)
+        let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
+        content
+            .background(p.card, in: shape)
+            .overlay(shape.strokeBorder(p.cardBorder))
+            .shadow(color: scheme == .light ? Color(hex: 0x141428, alpha: 0.06) : .clear, radius: 1, y: 1)
     }
 }
 

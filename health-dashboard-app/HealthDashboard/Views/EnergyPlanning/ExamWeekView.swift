@@ -201,8 +201,9 @@ struct ExamWeekView: View {
     private func linksCard(_ exam: UpcomingExam, plan: [ExamDayPlan]) -> some View {
         let tonight = plan.first { $0.dayOffset == -exam.daysUntil + 1 }?.bedtimeBefore ?? store.data.bedtime
         return Card {
-            LinkRow(title: "Tonight · bed \(Clock.format(tonight))", subtitle: "Your sleep plan",
-                    systemImage: "moon.fill", accent: .purple) { SleepView() }
+            // Switches to the Sleep tab rather than pushing a second copy of it.
+            TabLinkRow(title: "Tonight · bed \(Clock.format(tonight))", subtitle: "Your sleep plan on the Sleep tab",
+                       systemImage: "moon.fill", accent: .purple, tab: .sleep)
             LinkRow(title: "Caffeine", subtitle: model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0)) today" } ?? model.caffeineNoCutoffShort,
                     systemImage: "cup.and.saucer.fill", accent: .yellow) { CaffeineView() }
         }

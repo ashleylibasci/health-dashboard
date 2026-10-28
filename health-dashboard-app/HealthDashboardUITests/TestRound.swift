@@ -350,7 +350,8 @@ final class TestRound: XCTestCase {
         prefix = "\(tag)-scr-"
         launch(appearance: appearance, textSize: textSize)
         sleep(2)
-        for tile in ["Cycle", "Stress", "HRV", "Resting HR", "Breathing", "Fitness", "Sleep stages", "Body clock", "Last week", "Wins"] {
+        // The Body tab's rows (stress and sleep stages live on Today and Sleep).
+        for tile in ["Cycle", "Body clock", "HRV", "Resting HR", "Breathing", "Your week", "Streaks", "Fitness"] {
             goTab("Body")
             guard tap(tile) else { continue }
             sleep(1)
@@ -360,7 +361,7 @@ final class TestRound: XCTestCase {
         tap("Settings")
         shotPage("settings", maxPages: 8)
         goTab("Today")
-        for link in ["Why do I feel off?", "Streaks & achievements", "Getting accurate numbers"] {
+        for link in ["Stress", "Why do I feel off?", "Getting accurate numbers"] {
             goTab("Today")
             guard tap(link) else { continue }
             sleep(1)

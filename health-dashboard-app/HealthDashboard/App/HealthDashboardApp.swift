@@ -53,20 +53,29 @@ struct HealthDashboardApp: App {
     }
 }
 
+/// Four tabs, each a navigation stack whose root has its own `TabHeader`
+/// (so the system bar is hidden there). A link to another tab's main
+/// screen switches tabs through `openTab` rather than pushing a copy.
 struct RootTabView: View {
     @Environment(\.colorScheme) private var scheme
+    @State private var tab: AppTab = .today
 
     var body: some View {
-        TabView {
-            NavigationStack { TodayView() }
+        TabView(selection: $tab) {
+            NavigationStack { TodayView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Today", systemImage: "house") }
-            NavigationStack { SleepView() }
+                .tag(AppTab.today)
+            NavigationStack { SleepView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Sleep", systemImage: "moon") }
-            NavigationStack { BodyView() }
+                .tag(AppTab.sleep)
+            NavigationStack { BodyView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Body", systemImage: "heart") }
-            NavigationStack { LogView() }
+                .tag(AppTab.body)
+            NavigationStack { LogView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Log", systemImage: "plus") }
+                .tag(AppTab.log)
         }
+        .environment(\.openTab) { tab = $0 }
         // The app's chrome colour, not system blue.
         .tint(Accent.indigo.ink(scheme))
     }

@@ -2,17 +2,16 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// The Body tab: recovery up top, a scrubbable 14-night trend, then a grid of
-/// tiles into each detail screen. Every tile has an ⓘ.
+/// The Body tab. It leads with the two rhythms that change her day, cycle
+/// and energy, then groups everything else into row cards: Vitals and
+/// Progress. Recovery lives on Today, sleep stages on Sleep and stress on
+/// Today, so nothing here repeats another tab (Whitfield F3/F4, Valtonen
+/// F6). Explanations live on the screens each row opens (Valtonen F5).
 struct BodyView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
-
-    private enum Tile: Hashable {
-        case cycle, energy, stress, hrv, restingHR, breathing, wristTemp, fitness, calories, sleepStages, chronotype, weekRecap, wins
-    }
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -20,111 +19,112 @@ struct BodyView: View {
             SampleDataBanner()
             if model.showsCrisisLine { CrisisLineCard() }
             PackCheckCard()
-            recoveryHero
-            HowWeGotThisLink(topic: .recovery)
+            rhythms
             sickCard
-            tileGrid
-            BodyTrendCard()
-            conditionsRow
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink { SettingsView() } label: {
-                    Image(systemName: "gearshape")
-                        .font(.scaled(size: 17, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Settings")
-            }
+            vitals
+            progress
         }
     }
 
-    // MARK: Recovery
+    // MARK: Rhythms: cycle and energy first
 
-    private var recoveryHero: some View {
-        let p = Palette(scheme: scheme)
-        return ZStack(alignment: .topTrailing) {
-            NavigationLink { RecoveryView() } label: {
-                AdaptiveStack(spacing: 16) {
-                    Ring(value: Double(model.recoveryShown ?? 0) / 100, accent: .indigo, lineWidth: 12,
-                         label: model.recoveryShown.map { "\($0)" } ?? "\u{2013}", caption: "Recovery", size: 112)
-                    VStack(alignment: .leading, spacing: 6) {
-                        FlowLayout(spacing: 6) {
-                            Text(model.recoveryShown == nil ? "No reading yet" : model.recoveryLabel)
-                                .font(.scaled(size: 20, weight: .bold))
-                            if model.recoveryIsExample { ExampleTag() }
-                        }
-                        Text(model.recoveryUsualNote)
-                            .font(.scaled(size: 14)).secondaryText()
-                        if model.hasHeartData {
-                            FlowLayout(spacing: 6) {
-                                deltaPill(label: "HRV \(Int(model.hrv.rounded()))", delta: percentText(model.hrvDeltaPct), accent: .coral)
-                                deltaPill(label: "RHR \(Int(model.restingHR.rounded()))", delta: signedText(model.restingHRDelta), accent: .pink)
-                            }
-                        } else {
-                            Text("HRV and resting HR: no reading yet").font(.scaled(size: 12, weight: .semibold)).secondaryText()
-                        }
+    private var cycleShown: Bool {
+        if case .notTracking = model.cycleDisplay { return false }
+        return true
+    }
+
+    private var rhythms: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeading("Rhythms")
+            if typeSize.isAccessibilitySize || !cycleShown {
+                VStack(spacing: Space.m) {
+                    if cycleShown { cycleLink }
+                    energyLink
+                }
+            } else {
+                Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
+                    GridRow {
+                        cycleLink
+                        energyLink
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.scaled(size: 13, weight: .bold))
-                        .foregroundStyle(p.tertiary)
-                        .accessibilityHidden(true)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(p.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(p.cardBorder))
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(recoveryAccessibility)
-            .accessibilityAddTraits(.isButton)
-            InfoButton(topic: .recovery).padding(2)
+            Card(density: .compact) {
+                BodyRow(title: "Body clock", value: chronotypeValue, note: "When your body prefers to sleep",
+                        systemImage: "sun.and.horizon.fill", accent: .purple) { ChronotypeView() }
+            }
         }
     }
 
-    private var recoveryAccessibility: String {
-        var text: String
-        if let score = model.recoveryShown {
-            text = "Recovery \(score), \(model.recoveryLabel)\(model.recoveryIsExample ? ", example" : ""). \(model.recoveryUsualNote)"
-        } else {
-            text = "Recovery: no reading yet."
+    private var cycleLink: some View {
+        NavigationLink { CycleView() } label: { cycleTile }
+            .buttonStyle(.pressable)
+    }
+
+    private var energyLink: some View {
+        NavigationLink { EnergyView() } label: {
+            BodyTile(title: "Energy left", accent: .mint, systemImage: "bolt.fill",
+                     ring: model.energyBankNow / 100,
+                     ringLabel: "\(Int(model.energyBankNow.rounded()))%", ringCaption: nil,
+                     value: "Now",
+                     note: model.lastNightIsFresh ? "About \(Int(model.energyBankAtBedtime.rounded()))% at bedtime"
+                                                  : "No sleep recorded last night, so a rough guess")
         }
-        if model.hasHeartData {
-            text += " HRV \(Int(model.hrv.rounded())), \(percentText(model.hrvDeltaPct)). Resting heart rate \(Int(model.restingHR.rounded())), \(signedText(model.restingHRDelta))."
-        } else {
-            text += " No HRV or resting heart rate reading yet."
+        .buttonStyle(.pressable)
+        .accessibilityHint("Opens your energy curve for today")
+    }
+
+    /// Cycle is pink in every state (Tanaka F4); coral is kept for "worse".
+    @ViewBuilder
+    private var cycleTile: some View {
+        switch model.cycleDisplay {
+        case let .phases(day, length, phase):
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "drop.fill",
+                     ring: min(Double(day) / Double(max(length, 1)), 1), ringLabel: "\(day)", ringCaption: "Day",
+                     value: day > length ? (model.showsDueAroundNow ? "Due around now" : "Day \(day)")
+                                         : BodyLogStyle.phaseName(phase, birthControl: store.birthControl),
+                     note: day > length ? "Around \(model.usualLengthPhrase(length))" : periodNote)
+        case let .pack(day, activeDays, packLength):
+            let hasBreak = activeDays < packLength
+            let isBreak = hasBreak && day > activeDays
+            let toBreak = activeDays - day + 1
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
+                     ring: Double(day) / Double(max(packLength, 1)), ringLabel: "\(day)", ringCaption: "Pack",
+                     value: isBreak ? model.packBreakName : model.packActiveName,
+                     note: !hasBreak ? "Continuous, no break"
+                         : isBreak ? "Withdrawal bleed days"
+                         : model.packSkippingBreak ? "Skipping this break"
+                         : "Break in \(toBreak) day\(toBreak == 1 ? "" : "s")")
+        case let .suppressed(bc) where bc.hasBreakWeek:
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
+                     value: bc.rawValue, note: "Set where you are in your pack")
+        case let .suppressed(bc) where bc.ovulation != .stopped:
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
+                     value: bc.rawValue, note: "Long gaps between bleeds are common")
+        case let .suppressed(bc):
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "pills.fill",
+                     value: bc.rawValue, note: "No phases. Bleeding may vary")
+        case let .overdue(day, typical):
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "drop.fill",
+                     value: "Day \(day)", note: "Longer than \(model.usualLengthPhrase(typical))")
+        case let .irregular(days):
+            BodyTile(title: "Cycle", accent: .pink, systemImage: "drop.fill",
+                     // The same count as Cycle and Log: days since the last period started (N11).
+                     value: days.map { "\($0) day\($0 == 1 ? "" : "s")" } ?? "Log a period",
+                     note: days == nil ? "No countdowns" : "Since your last period started")
+        case .notTracking:
+            EmptyView()
         }
-        return text
     }
 
-    private func deltaPill(label: String, delta: String, accent: Accent) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
-            Text(delta).foregroundStyle(accent.ink(scheme))
-        }
-        .keepsOnOneLine(minimumScale: 0.7)
-        .font(.scaled(size: 12, weight: .semibold))
-        .padding(.horizontal, 9)
-        .frame(minHeight: Font.scaledSize(24))
-        .background(accent.fill(scheme).opacity(0.18), in: Capsule())
+    private var periodNote: String {
+        guard let days = model.periodCountdownDays else { return "No countdowns" }
+        return days <= 1 ? "Period in about 1 day" : "Period in about \(days) days"
     }
 
-    private func percentText(_ value: Double) -> String {
-        let v = Int(value.rounded())
-        return v < 0 ? "\u{2212}\(abs(v))%" : "+\(v)%"
-    }
-
-    private func signedText(_ value: Double) -> String {
-        let v = Int(value.rounded())
-        return v < 0 ? "\u{2212}\(abs(v))" : "+\(v)"
-    }
-
-    private func signedDecimal(_ value: Double, unit: String) -> String {
-        let s = String(format: "%.1f", abs(value))
-        return (value < -0.05 ? "\u{2212}" : "+") + s + unit
+    private var chronotypeValue: String {
+        guard let type = model.chronotype else { return "Learning" }
+        return type.category.rawValue.replacingOccurrences(of: " type", with: "")
     }
 
     // MARK: Might be getting sick
@@ -136,7 +136,7 @@ struct BodyView: View {
         switch ill.confidence {
         case .none, .low: accent = .mint
         case .medium: accent = .orange
-        case .high: accent = .pink
+        case .high: accent = .coral
         }
         let noData = !model.hasHeartData
         let title = noData ? "Sick check: no reading yet" : "Sick check: \(ill.confidence.rawValue.lowercased())"
@@ -153,284 +153,142 @@ struct BodyView: View {
             case .medium, .high: note = "\(flagged) signals moved together. Tap to see what to do."
             }
         }
-        return ZStack(alignment: .topTrailing) {
-            NavigationLink { SickView() } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: ill.confidence == .none || ill.confidence == .low ? "checkmark.shield.fill" : "thermometer.medium")
-                        .font(.scaled(size: 17, weight: .semibold))
-                        .foregroundStyle(accent.ink(scheme))
-                        .frame(width: 40, height: 40)
-                        .background(accent.fill(scheme).opacity(0.22), in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title).font(.scaled(size: 15, weight: .bold))
-                        Text(note).font(.scaled(size: 13)).secondaryText().fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 30)
+        let p = Palette(scheme: scheme)
+        return NavigationLink { SickView() } label: {
+            HStack(spacing: Space.m) {
+                Image(systemName: ill.confidence == .none || ill.confidence == .low ? "checkmark.shield.fill" : "thermometer.medium")
+                    .font(.scaled(size: 16, weight: .semibold))
+                    .foregroundStyle(accent.ink(scheme))
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text(title).font(.bodyEmphasis)
+                    Text(note).font(.secondary).foregroundStyle(p.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(accent.fill(scheme).opacity(0.2)))
-                .contentShape(Rectangle())
+                Spacer(minLength: Space.s)
+                Image(systemName: "chevron.right")
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .foregroundStyle(p.tertiary)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            InfoButton(topic: .illness)
+            .padding(Space.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .tileSurface()
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.pressable)
+        .accessibilityElement(children: .combine)
+        .padding(.top, Space.s)
     }
 
-    // MARK: Tiles
+    // MARK: Vitals
 
-    private var tiles: [Tile] {
-        var list: [Tile] = []
-        if cycleTileShown { list.append(.cycle) }
-        list.append(contentsOf: [.energy, .stress, .hrv, .restingHR, .breathing, .wristTemp, .fitness])
-        if model.showsCalories { list.append(.calories) }
-        list.append(contentsOf: [.sleepStages, .chronotype, .weekRecap, .wins])
-        return list
-    }
-
-    private var cycleTileShown: Bool {
-        if case .notTracking = model.cycleDisplay { return false }
-        return true
-    }
-
-    /// Two tiles a row, or one at accessibility text sizes so titles
-    /// aren't cut to "Rest…".
-    private var tileRows: [[Tile]] {
-        let list = tiles
-        let perRow = typeSize.isAccessibilitySize ? 1 : 2
-        return stride(from: 0, to: list.count, by: perRow).map { Array(list[$0..<min($0 + perRow, list.count)]) }
-    }
-
-    private var tileGrid: some View {
-        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-            ForEach(tileRows, id: \.self) { row in
-                GridRow {
-                    if row.count == 2 {
-                        tileLink(row[0])
-                        tileLink(row[1])
-                    } else if let only = row.first {
-                        tileLink(only).gridCellColumns(typeSize.isAccessibilitySize ? 1 : 2)
-                    }
-                }
+    private var vitals: some View {
+        let heart = model.hasHeartData
+        return VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeading("Vitals")
+            Card(density: .compact) {
+                BodyRow(title: "HRV", value: heart ? "\(Int(model.hrv.rounded())) ms" : "No reading",
+                        note: heart ? hrvNote : "Wear your Watch to bed", trend: heart ? hrvTrend : nil,
+                        systemImage: "waveform.path.ecg", accent: .indigo) { HeartMetricView(metric: .hrv) }
+                divider
+                BodyRow(title: "Resting HR", value: heart ? "\(Int(model.restingHR.rounded())) bpm" : "No reading",
+                        note: heart ? restingHRNote : "Wear your Watch to bed", trend: heart ? restingHRTrend : nil,
+                        systemImage: "heart.fill", accent: .pink) { HeartMetricView(metric: .restingHR) }
+                divider
+                BodyRow(title: "Breathing", value: model.respiratoryRateDelta.map { signedDecimal($0, unit: "/min") } ?? "\u{2013}",
+                        note: model.respiratoryRateDelta == nil ? "Wear your Watch to bed" : breathingNote,
+                        systemImage: "lungs.fill", accent: .blue) { SickView() }
+                    .accessibilityHint("Opens the sick check")
+                divider
+                BodyRow(title: "Wrist temp", value: model.wristTempDelta.map { TempFormat.delta($0) } ?? "\u{2013}",
+                        note: model.wristTempDelta == nil ? "Wear your Watch to bed" : wristNote,
+                        systemImage: "thermometer.medium", accent: .orange) { SickView() }
+                    .accessibilityHint("Opens the sick check")
             }
         }
     }
 
-    private func tileLink(_ tile: Tile) -> some View {
-        ZStack(alignment: .topTrailing) {
-            NavigationLink { destination(tile) } label: { tileView(tile) }
-                .buttonStyle(.plain)
-                .accessibilityHint(tile == .breathing || tile == .wristTemp ? "Opens the sick check" : "")
-            InfoButton(explanation: info(tile))
-        }
+    private var divider: some View {
+        Divider().overlay(Palette(scheme: scheme).cardBorder).padding(.leading, Sizes.icon + Space.m)
     }
 
-    @ViewBuilder
-    private func destination(_ tile: Tile) -> some View {
-        switch tile {
-        case .cycle: CycleView()
-        case .energy: EnergyView()
-        case .stress: StressView()
-        case .hrv: HeartMetricView(metric: .hrv)
-        case .restingHR: HeartMetricView(metric: .restingHR)
-        case .breathing, .wristTemp: SickView()
-        case .fitness: FitnessView()
-        case .calories: CaloriesView()
-        case .sleepStages: SleepStagesView()
-        case .chronotype: ChronotypeView()
-        case .weekRecap: WeekRecapView()
-        case .wins: AchievementsView()
-        }
+    private var hrvNote: String {
+        let v = Int(model.hrvDeltaPct.rounded())
+        if v == 0 { return "Right at your usual" }
+        return "\(abs(v))% \(v > 0 ? "above" : "below") your usual"
     }
 
-    private func info(_ tile: Tile) -> Explanation {
-        switch tile {
-        case .cycle: return cycleInfo
-        case .energy: return Topic.energyBank.explanation
-        case .stress: return Topic.stress.explanation
-        case .hrv: return model.hrvExplanation
-        case .restingHR: return model.restingHRExplanation
-        case .breathing: return Topic.breathingRate.explanation
-        case .wristTemp: return BodyLogStyle.wristTempExplanation(ovulationStopped: model.ovulationStopped)
-        case .fitness: return Topic.fitnessAge.explanation
-        case .calories: return Topic.calories.explanation
-        case .sleepStages: return Topic.sleepStages.explanation
-        case .chronotype: return Topic.bodyClock.explanation
-        case .weekRecap: return Topic.energyScore.explanation
-        case .wins: return Explanation(id: "wins", title: "Wins",
-                                       meaning: "Streaks and milestones from your own habits: in bed on time, meeting your sleep need, morning check-ins.",
-                                       forYou: "Small streaks add up. Missing a night just starts a new one; it never erases what you did.")
-        }
+    private var hrvTrend: RowTrend? {
+        let v = Int(model.hrvDeltaPct.rounded())
+        guard v != 0 else { return nil }
+        let tone: RowTrend.Tone = model.hrvLevel == .wellBelow ? .worse : model.hrvLevel == .above ? .better : .neutral
+        return .init(up: v > 0, tone: tone)
     }
 
-    private var cycleInfo: Explanation {
-        switch model.cycleDisplay {
-        case let .phases(_, _, phase):
-            switch phase {
-            case .period: return Topic.period.explanation
-            case .follicular: return Topic.follicular.explanation
-            case .ovulation: return Topic.ovulation.explanation
-            case .luteal, .unknown: return Topic.luteal.explanation
-            }
-        case .pack: return Topic.pillPack.explanation
-        case let .suppressed(bc) where bc.hasBreakWeek:
-            return Explanation(id: "packUnknown", title: bc.rawValue, meaning: bc.note,
-                               forYou: "Set where you are in your pack (Cycle or Settings) so the app can show your active days and break week.")
-        case let .suppressed(bc) where bc.ovulation != .stopped:
-            return Explanation(id: "longGap", title: bc.rawValue, meaning: bc.note,
-                               forYou: "A long gap between bleeds is common on your method, so the app doesn't count down or call it late. Log any bleeding to keep a history. \(CycleCare.bleedingRedFlags)")
-        case let .suppressed(bc):
-            return Explanation(id: "suppressed", title: bc.rawValue,
-                               meaning: bc.note,
-                               forYou: "There are no cycle phases or period countdowns on your method. Bleeding may be light, irregular or absent, and that's expected. \(CycleCare.bleedingRedFlags)")
-        case let .overdue(day, typical):
-            return Explanation(id: "overdue", title: "Longer cycle",
-                               meaning: "Cycles vary. One that runs past your usual length now and then is common, and stress, illness or travel can delay a period.",
-                               forYou: "You're on day \(day), longer than \(model.usualLengthPhrase(typical)). Log your period when it starts. If you could be pregnant, or this keeps happening, check with a doctor. \(CycleCare.redS)")
-        case .irregular:
-            return Explanation(id: "irregular", title: "Irregular cycle",
-                               meaning: model.irregularReasonText ?? "Your cycles vary a lot in length, so the app counts days since your last period instead of predicting the next one.",
-                               forYou: "Log the first day of each period. The history of your cycle lengths is useful to show a doctor.\(model.cycleIsNatural ? " " + CycleCare.redS : "")")
-        case .notTracking: return Topic.period.explanation
-        }
+    private var restingHRNote: String {
+        let v = Int(model.restingHRDelta.rounded())
+        if v == 0 { return "Right at your usual" }
+        return "\(abs(v)) bpm \(v > 0 ? "above" : "below") your usual"
     }
 
-    @ViewBuilder
-    private func tileView(_ tile: Tile) -> some View {
-        switch tile {
-        case .cycle: cycleTile
-        case .energy:
-            BodyTile(title: "Energy left", accent: .yellow, systemImage: "bolt.fill",
-                     ring: model.energyBankNow / 100,
-                     ringLabel: "\(Int(model.energyBankNow.rounded()))%", ringCaption: nil,
-                     value: "Now",
-                     note: model.lastNightIsFresh ? "~\(Int(model.energyBankAtBedtime.rounded()))% at bedtime"
-                                                  : "No sleep recorded last night, so a rough guess")
-        case .stress:
-            BodyTile(title: "Stress", accent: .orange, systemImage: "waveform.path",
-                     value: stressValue, note: stressNote)
-        case .hrv:
-            BodyTile(title: "HRV", accent: .coral, systemImage: "waveform.path.ecg",
-                     value: model.hasHeartData ? "\(Int(model.hrv.rounded())) ms" : "No reading yet",
-                     note: model.hasHeartData ? "\(percentText(model.hrvDeltaPct)) vs your usual" : "Wear your Watch to bed")
-        case .restingHR:
-            BodyTile(title: "Resting HR", accent: .pink, systemImage: "heart.fill",
-                     value: model.hasHeartData ? "\(Int(model.restingHR.rounded())) bpm" : "No reading yet",
-                     note: model.hasHeartData ? "\(signedText(model.restingHRDelta)) vs your usual" : "Wear your Watch to bed")
-        case .breathing:
-            BodyTile(title: "Breathing", accent: .blue, systemImage: "lungs.fill",
-                     value: model.respiratoryRateDelta.map { signedDecimal($0, unit: "/min") } ?? "\u{2013}",
-                     note: model.respiratoryRateDelta == nil ? "Wear your Watch to bed" : breathingNote)
-        case .wristTemp:
-            BodyTile(title: "Wrist temp", accent: .coral, systemImage: "thermometer.medium",
-                     value: model.wristTempDelta.map { TempFormat.delta($0) } ?? "\u{2013}",
-                     note: model.wristTempDelta == nil ? "Wear your Watch to bed" : wristNote)
-        case .fitness:
-            BodyTile(title: "Fitness", accent: .mint, systemImage: "figure.run",
-                     // "Fitness age", so it never reads as her own age (round 3).
-                     // Under eating-disorder history: VO₂ max as a plain number,
-                     // with no fitness age or ranking (round 3, H6).
-                     value: model.hidesActivityNumbers
-                        ? (model.vo2Max.map { String(format: "%.1f", $0) } ?? "\u{2013}")
-                        : (model.fitnessAgeText.map { "Fitness age \($0.lowercased())" } ?? "\u{2013}"),
-                     note: model.vo2Max.map { v in
-                         let value = "VO\u{2082} max \(String(format: "%.1f", v))"
-                         return model.hidesActivityNumbers ? "VO\u{2082} max" : "\(value) \u{00B7} \(model.fitnessLevelShown ?? "")"
-                     } ?? "Needs a few outdoor walks")
-        case .calories:
-            BodyTile(title: "Calories", accent: .orange, systemImage: "flame.fill",
-                     value: Int(model.caloriesToday.rounded()).formatted(), note: "kcal so far")
-        case .sleepStages:
-            BodyTile(title: "Sleep stages", accent: .purple, systemImage: "moon.stars.fill",
-                     value: model.lastNightIsFresh ? Clock.duration(model.lastNight.asleep) : "No sleep",
-                     note: model.lastNightIsFresh ? "Last night" : "None recorded last night")
-        case .chronotype:
-            BodyTile(title: "Body clock", accent: .blue, systemImage: "sun.and.horizon.fill",
-                     value: chronotypeValue, note: "When your body prefers to sleep")
-        case .weekRecap:
-            BodyTile(title: "Last week", accent: .indigo, systemImage: "calendar",
-                     value: model.weekRecap.map { "\($0.averageEnergy)" } ?? "Soon",
-                     note: model.weekRecap == nil ? "Needs a week of nights" : "Average energy score")
-        case .wins:
-            BodyTile(title: "Wins", accent: .yellow, systemImage: "trophy.fill",
-                     value: winsValue, note: winsNote)
-        }
+    private var restingHRTrend: RowTrend? {
+        let v = Int(model.restingHRDelta.rounded())
+        guard v != 0 else { return nil }
+        let level = model.restingHRLevel
+        let tone: RowTrend.Tone = level == .above || level == .wellBelow ? .worse : level == .below ? .better : .neutral
+        return .init(up: v > 0, tone: tone)
     }
 
-    @ViewBuilder
-    private var cycleTile: some View {
-        switch model.cycleDisplay {
-        case let .phases(day, length, phase):
-            BodyTile(title: "Cycle", accent: day > length ? .indigo : BodyLogStyle.phaseAccent(phase), systemImage: "drop.fill",
-                     ring: min(Double(day) / Double(max(length, 1)), 1), ringLabel: "\(day)", ringCaption: "Day",
-                     value: day > length ? (model.showsDueAroundNow ? "Due around now" : "Day \(day)")
-                                         : BodyLogStyle.phaseName(phase, birthControl: store.birthControl),
-                     note: day > length ? "Around \(model.usualLengthPhrase(length))" : periodNote)
-        case let .pack(day, activeDays, packLength):
-            let hasBreak = activeDays < packLength
-            let isBreak = hasBreak && day > activeDays
-            let toBreak = activeDays - day + 1
-            BodyTile(title: "Cycle", accent: isBreak ? .coral : .indigo, systemImage: "pills.fill",
-                     ring: Double(day) / Double(max(packLength, 1)), ringLabel: "\(day)", ringCaption: "Pack",
-                     value: isBreak ? model.packBreakName : model.packActiveName,
-                     note: !hasBreak ? "Continuous, no break"
-                         : isBreak ? "Withdrawal bleed days"
-                         : model.packSkippingBreak ? "Skipping this break"
-                         : "Break in \(toBreak) day\(toBreak == 1 ? "" : "s")")
-        case let .suppressed(bc) where bc.hasBreakWeek:
-            BodyTile(title: "Cycle", accent: .indigo, systemImage: "pills.fill",
-                     value: bc.rawValue, note: "Set where you are in your pack")
-        case let .suppressed(bc) where bc.ovulation != .stopped:
-            BodyTile(title: "Cycle", accent: .indigo, systemImage: "pills.fill",
-                     value: bc.rawValue, note: "Long gaps between bleeds are common")
-        case let .suppressed(bc):
-            BodyTile(title: "Cycle", accent: .indigo, systemImage: "pills.fill",
-                     value: bc.rawValue, note: "No phases. Bleeding may vary")
-        case let .overdue(day, typical):
-            BodyTile(title: "Cycle", accent: .indigo, systemImage: "drop.fill",
-                     value: "Day \(day)", note: "Longer than \(model.usualLengthPhrase(typical))")
-        case let .irregular(days):
-            BodyTile(title: "Cycle", accent: .coral, systemImage: "drop.fill",
-                     // The same count as Cycle and Log: days since the last period started (N11).
-                     value: days.map { "\($0) day\($0 == 1 ? "" : "s")" } ?? "Log a period",
-                     note: days == nil ? "No countdowns" : "Since your last period started")
-        case .notTracking:
-            EmptyView()
-        }
-    }
-
-    private var periodNote: String {
-        guard let days = model.periodCountdownDays else { return "No countdowns" }
-        return days <= 1 ? "Period in ~1 day" : "Period in ~\(days) days"
-    }
-
-    /// The same wording as the Today tab.
-    private var stressValue: String {
-        if let felt = model.stressLoggedToday { return "Felt \(felt)/5" }
-        if let label = model.stressToday.label { return label.rawValue }
-        return "No data yet"
-    }
-
-    private var stressNote: String {
-        if let label = model.stressToday.label {
-            return model.stressLoggedToday != nil ? "Body signals: \(label.rawValue.lowercased())" : "Body signals at rest"
-        }
-        if model.stressLoggedToday != nil { return "What you logged today" }
-        return model.restingHRBaselineKnown ? "Wear your Watch today" : "Learning your resting heart rate"
+    private func signedDecimal(_ value: Double, unit: String) -> String {
+        let s = String(format: "%.1f", abs(value))
+        return (value < -0.05 ? "\u{2212}" : "+") + s + unit
     }
 
     private var breathingNote: String {
         guard let d = model.respiratoryRateDelta else { return "" }
-        return d >= 1 ? "Higher than usual" : "vs usual \u{00B7} sick check"
+        return d >= 1 ? "Higher than usual" : "Compared with your usual"
     }
 
     private var wristNote: String {
         guard let d = model.wristTempDelta else { return "" }
         if model.inLutealPhase && d > 0 && d < 0.6 { return "Normal this phase" }
-        return d >= 0.4 ? "Warmer than usual" : "vs your usual \u{00B7} sick check"
+        return d >= 0.4 ? "Warmer than usual" : "Compared with your usual"
+    }
+
+    // MARK: Progress
+
+    private var progress: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionHeading("Progress")
+            Card(density: .compact) {
+                BodyRow(title: "Your week", value: model.weekRecap.map { "\($0.averageEnergy)" } ?? "Soon",
+                        note: model.weekRecap == nil ? "Needs a week of nights" : "Average energy score, last week",
+                        systemImage: "calendar", accent: .indigo) { WeekRecapView() }
+                divider
+                BodyRow(title: "Streaks", value: winsValue, note: winsNote,
+                        systemImage: "flame.fill", accent: .orange) { AchievementsView() }
+                divider
+                BodyRow(title: "Fitness",
+                        // "Fitness age", so it never reads as her own age (round 3).
+                        // Under eating-disorder history: VO₂ max as a plain number,
+                        // with no fitness age or ranking (round 3, H6).
+                        value: model.hidesActivityNumbers
+                            ? (model.vo2Max.map { String(format: "%.1f", $0) } ?? "\u{2013}")
+                            : (model.fitnessAgeText.map { "Fitness age \($0.lowercased())" } ?? "\u{2013}"),
+                        note: model.vo2Max.map { v in
+                            let value = "VO\u{2082} max \(String(format: "%.1f", v))"
+                            return model.hidesActivityNumbers ? "VO\u{2082} max" : "\(value) \u{00B7} \(model.fitnessLevelShown ?? "")"
+                        } ?? "Needs a few outdoor walks",
+                        systemImage: "figure.run", accent: .mint) { FitnessView() }
+                if model.showsCalories {
+                    divider
+                    BodyRow(title: "Calories", value: Int(model.caloriesToday.rounded()).formatted(), note: "kcal so far today",
+                            systemImage: "bolt.heart.fill", accent: .orange) { CaloriesView() }
+                }
+            }
+        }
     }
 
     private var winsValue: String {
@@ -439,27 +297,165 @@ struct BodyView: View {
     }
 
     private var winsNote: String {
-        guard let best = model.streaks.max(by: { $0.current < $1.current }) else { return "Streaks" }
+        guard let best = model.streaks.max(by: { $0.current < $1.current }), best.current > 0 else { return "Start one tonight" }
         return "\(best.unit.capitalized): \(best.title.lowercased())"
     }
+}
 
-    private var chronotypeValue: String {
-        guard let type = model.chronotype else { return "Learning" }
-        return type.category.rawValue.replacingOccurrences(of: " type", with: "")
+/// A row in a Body card: icon tile, title and note, the value on the right
+/// and a chevron. At accessibility sizes the value goes under the title.
+struct BodyRow<Destination: View>: View {
+
+    var title: String
+    var value: String
+    var note: String
+    var trend: RowTrend? = nil
+    var systemImage: String
+    var accent: Accent
+    @ViewBuilder var destination: Destination
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        NavigationLink { destination } label: {
+            HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: Space.m) {
+                Image(systemName: systemImage)
+                    .font(.scaled(size: 16, weight: .semibold))
+                    .foregroundStyle(accent.ink(scheme))
+                    .frame(width: Sizes.icon, height: Sizes.icon)
+                    .background(accent.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.inner, style: .continuous))
+                    .accessibilityHidden(true)
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text(title).font(.bodyEmphasis)
+                        valueText
+                        noteLine(p)
+                    }
+                    Spacer(minLength: 0)
+                } else {
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text(title).font(.bodyEmphasis)
+                        noteLine(p)
+                    }
+                    Spacer(minLength: Space.s)
+                    valueText
+                        .multilineTextAlignment(.trailing)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.scaled(size: 13, weight: .semibold))
+                    .foregroundStyle(p.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: Sizes.tallRow)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(value), \(note)")
+        .accessibilityAddTraits(.isButton)
     }
 
-    // MARK: Conditions
+    private var valueText: some View {
+        Text(value)
+            .font(.cardTitle)
+            .monospacedDigit()
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+            .fixedSize(horizontal: false, vertical: true)
+    }
 
-    private var conditionsRow: some View {
-        Card {
-            LinkRow(title: "Health conditions",
-                    subtitle: store.data.conditions.isEmpty
-                        ? "Optional. Private, stays on your phone"
-                        : store.data.conditions.joined(separator: ", "),
-                    systemImage: "heart.text.square.fill", accent: .purple) {
-                ConditionsView()
+    private func noteLine(_ p: Palette) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            if let trend {
+                Image(systemName: trend.up ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                    .font(.scaled(size: 8, weight: .bold))
+                    .foregroundStyle(trendColor(trend.tone, p))
+                    .accessibilityHidden(true)
+            }
+            Text(note).font(.secondary).foregroundStyle(p.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func trendColor(_ tone: RowTrend.Tone, _ p: Palette) -> Color {
+        switch tone {
+        case .worse: Accent.coral.ink(scheme)
+        case .better: Accent.mint.ink(scheme)
+        case .neutral: p.tertiary
+        }
+    }
+}
+
+/// Which way a value moved, and whether that needs attention: the arrow is
+/// coral only when it does, mint when it's better than usual (Tanaka F2).
+struct RowTrend {
+    enum Tone { case worse, better, neutral }
+    var up: Bool
+    var tone: Tone
+}
+
+/// A Body tile on the neutral card surface, the icon and title in the
+/// feature's colour. With `ring` set it shows a small ring next to the
+/// value.
+private struct BodyTile: View {
+    var title: String
+    var accent: Accent
+    var systemImage: String
+    var ring: Double? = nil
+    var ringLabel: String = ""
+    var ringCaption: String? = nil
+    var value: String
+    var note: String
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            HStack(spacing: Space.s) {
+                Image(systemName: systemImage)
+                    .font(.scaled(size: 14, weight: .semibold))
+                    .frame(width: Font.scaledSize(18))
+                    .accessibilityHidden(true)
+                Text(title).font(.bodyEmphasis)
+                    .lineLimit(2).minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(accent.ink(scheme))
+            if let ring {
+                HStack(spacing: Space.m) {
+                    Ring(value: ring, accent: accent, lineWidth: 7, label: ringLabel, caption: ringCaption, size: 68)
+                    Text(value)
+                        .font(.scaledNumber(18))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                }
+            } else {
+                Text(value)
+                    .font(.numberM)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+            }
+            if !note.isEmpty {
+                Text(note).font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(Space.l)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .tileSurface()
+        .contentShape(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var parts = [title]
+        if ring != nil {
+            parts.append(ringCaption.map { "\($0) \(ringLabel)" } ?? ringLabel)
+        }
+        parts.append(value)
+        if !note.isEmpty { parts.append(note) }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -507,7 +503,7 @@ private struct BodyTrendCard: View {
 
     private var accent: Accent {
         switch metric {
-        case .hrv: .coral
+        case .hrv: .indigo
         case .restingHR: .pink
         case .sleep: .purple
         }
@@ -628,7 +624,7 @@ struct HeartMetricView: View {
     @Environment(\.colorScheme) private var scheme
 
     private var title: String { metric == .hrv ? "HRV" : "Resting heart rate" }
-    private var accent: Accent { metric == .hrv ? .coral : .pink }
+    private var accent: Accent { metric == .hrv ? .indigo : .pink }
 
     private var value: String {
         guard model.hasHeartData else { return "No reading yet" }
@@ -686,69 +682,3 @@ struct HeartMetricView: View {
     }
 }
 
-/// A tinted tile. With `ring` set it shows a small ring next to the value.
-/// The top-right corner is left free for the ⓘ button.
-private struct BodyTile: View {
-    var title: String
-    var accent: Accent
-    var systemImage: String
-    var ring: Double? = nil
-    var ringLabel: String = ""
-    var ringCaption: String? = nil
-    var value: String
-    var note: String
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.scaled(size: 13, weight: .semibold))
-                    .foregroundStyle(accent.ink(scheme))
-                    .accessibilityHidden(true)
-                Text(title).font(.scaled(size: 14, weight: .bold))
-                    .lineLimit(2).minimumScaleFactor(0.8)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 30)
-            }
-            .frame(minHeight: 20)
-            if let ring {
-                HStack(spacing: 10) {
-                    Ring(value: ring, accent: accent, lineWidth: 7, label: ringLabel, caption: ringCaption, size: 67)
-                    Text(value)
-                        .font(.scaledNumber(18))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                }
-            } else {
-                Text(value)
-                    .font(.scaledNumber(22))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-            }
-            if !note.isEmpty {
-                Text(note).font(.scaled(size: 12, weight: .semibold)).secondaryText()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(accent.tint(scheme), in: shape)
-        .overlay(shape.strokeBorder(accent.fill(scheme).opacity(0.18)))
-        .contentShape(shape)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityAddTraits(.isButton)
-    }
-
-    private var accessibilityText: String {
-        var parts = [title]
-        if ring != nil {
-            parts.append(ringCaption.map { "\($0) \(ringLabel)" } ?? ringLabel)
-        }
-        parts.append(value)
-        if !note.isEmpty { parts.append(note) }
-        return parts.joined(separator: ", ")
-    }
-}

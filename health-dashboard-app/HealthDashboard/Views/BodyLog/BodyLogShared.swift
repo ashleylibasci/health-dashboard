@@ -300,25 +300,9 @@ struct SettingToggleRow: View {
     }
 }
 
-/// The big heading used at the top of the Body and Log tabs.
-struct BodyLogTabHeader: View {
-    var title: String
-
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
-            Text(BodyLogStyle.todayLine)
-                .font(.scaled(size: 13, weight: .semibold))
-                .tracking(0.5)
-                .secondaryText()
-            Text(title)
-                .font(.screenTitle)
-                .accessibilityAddTraits(.isHeader)
-        }
-        .padding(.top, Space.xs)
-    }
-}
+/// The big heading used at the top of the Body and Log tabs: the same
+/// `TabHeader` every tab uses.
+typealias BodyLogTabHeader = TabHeader
 
 // MARK: - Cycle copy
 

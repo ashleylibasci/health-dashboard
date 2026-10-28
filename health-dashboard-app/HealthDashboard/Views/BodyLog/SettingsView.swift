@@ -2,7 +2,10 @@ import SwiftUI
 import UIKit
 import HealthCore
 
-/// Appearance, body setup, what the app shows, Apple Watch and data.
+/// Settings, opened from the avatar on every tab, in the order she's most
+/// likely to need them (Whitfield F13): You, Cycle & birth control, Sleep &
+/// alarm, Exams, Notifications, Widgets & Watch, Apple Health & data, and
+/// Appearance last.
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -34,17 +37,14 @@ struct SettingsView: View {
     var body: some View {
         Screen(title: "Settings", accent: .indigo) {
             profile
-            profileCard
-            appearanceSection
+            youSection
+            bodySection
             sleepSection
             calendarSection
-            bodySection
-            if model.packMethod != nil { packSection }
-            waterSection
-            showSection
-            watchSection
+            notificationsSection
+            widgetsSection
             dataSection
-            privacySection
+            appearanceSection
         }
         .task { await checkNotifications() }
         .onChange(of: store.data.peakDipNudges) { _, on in notificationToggleChanged(on) }
@@ -75,17 +75,21 @@ struct SettingsView: View {
         HStack(spacing: 14) {
             Image(systemName: "person.fill")
                 .font(.scaled(size: 24, weight: .semibold))
-                .foregroundStyle(Accent.coral.ink(scheme))
+                // The same avatar as the tab headers: indigo on the chip
+                // colour, coral being kept for "worse" (Tanaka F1).
+                .foregroundStyle(Accent.indigo.ink(scheme))
                 .frame(width: 56, height: 56)
-                .background(Accent.coral.fill(scheme).opacity(0.24), in: Circle())
+                .background(Palette(scheme: scheme).chip, in: Circle())
+                .overlay(Circle().strokeBorder(Palette(scheme: scheme).cardBorder))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(store.data.name.map { $0.isEmpty ? "Your profile" : $0 } ?? (model.usingSampleData ? "Sample profile" : "Your profile"))
+                Text(store.data.name.map { $0.isEmpty ? "Your profile" : $0 } ?? (model.usingSampleData ? "Example profile" : "Your profile"))
                     .font(.scaled(size: 20, weight: .bold))
                 Text(profileDetail).font(.scaled(size: 13)).secondaryText()
             }
         }
-        .padding(.top, 4)
+        .padding(.top, Space.xs)
+        .padding(.bottom, Space.s)
         .accessibilityElement(children: .combine)
     }
 
@@ -104,6 +108,40 @@ struct SettingsView: View {
     private var ageBinding: Binding<Int> {
         Binding(get: { store.data.ageYears ?? 0 },
                 set: { store.data.ageYears = $0 > 0 ? $0 : nil })
+    }
+
+    // MARK: You
+
+    private var youSection: some View {
+        let p = Palette(scheme: scheme)
+        return VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(text: "You")
+            profileCard
+            Card(density: .compact) {
+                LinkRow(title: "Health conditions",
+                        subtitle: store.data.conditions.isEmpty ? "None added. Optional, private, stays on your phone" : store.data.conditions.joined(separator: ", "),
+                        systemImage: "heart.text.square.fill", accent: .purple) {
+                    ConditionsView()
+                }
+                Divider().overlay(p.cardBorder)
+                LinkRow(title: model.hidesEffortTargets ? "Water bottle size" : "Water bottle and daily goal",
+                        subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML))" + (model.hidesEffortTargets ? "" : " \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))"),
+                        systemImage: "drop.fill", accent: .blue) {
+                    WaterView()
+                }
+                Divider().overlay(p.cardBorder)
+                SettingToggleRow(title: "Calories", detail: caloriesDetail,
+                                 systemImage: "flame.fill", accent: .orange, isOn: caloriesBinding)
+                    .disabled(model.caloriesHiddenByCondition)
+                Divider().overlay(p.cardBorder)
+                SettingToggleRow(title: "Alcohol tracking", detail: "How alcohol affects sleep and recovery. Off hides alcohol on the Log tab.",
+                                 systemImage: "wineglass.fill", accent: .purple, isOn: $store.data.drinksTracking)
+                Divider().overlay(p.cardBorder)
+                actionRow("Redo setup", systemImage: "arrow.counterclockwise", accent: .indigo) {
+                    confirmRedo = true
+                }
+            }
+        }
     }
 
     private var profileCard: some View {
@@ -283,27 +321,54 @@ struct SettingsView: View {
                             .font(.scaled(size: 13)).secondaryText()
                     }
                 }
-                Divider().overlay(p.cardBorder)
-                LinkRow(title: "Health conditions",
-                        subtitle: store.data.conditions.isEmpty ? "None added" : store.data.conditions.joined(separator: ", "),
-                        systemImage: "heart.text.square.fill", accent: .purple) {
-                    ConditionsView()
-                }
-                Divider().overlay(p.cardBorder)
-                actionRow("Redo setup", systemImage: "arrow.counterclockwise", accent: .indigo) {
-                    confirmRedo = true
+            }
+            // Your pack sits with the method it belongs to.
+            if model.packMethod != nil {
+                PackCheckCard()
+                Card {
+                    PackSetupControl()
                 }
             }
         }
     }
 
-    // MARK: Sleep schedule
+    // MARK: Sleep & alarm
+
+    /// "On · 8:00–8:25am · never after 8:30am". The switch itself is on the
+    /// Sleep tab, next to the alarm it controls (Whitfield F2).
+    private var smartAlarmSubtitle: String {
+        guard store.data.smartAlarmEnabled else {
+            return "Off. Turn it on from the Sleep tab or the Tonight card on Today."
+        }
+        if let window = model.wakePlan()?.alarmWindow {
+            return "On \u{00B7} \(window.label) \u{00B7} never after \(Clock.format(store.data.upBy)), your latest wake-up"
+        }
+        return "On \u{00B7} never after \(Clock.format(store.data.upBy)), your latest wake-up"
+    }
 
     private var sleepSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Sleep schedule")
+        let p = Palette(scheme: scheme)
+        return VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(text: "Sleep & alarm")
             Card {
                 SleepScheduleControl()
+            }
+            Card(density: .compact) {
+                TabLinkRow(title: "Smart alarm", subtitle: smartAlarmSubtitle,
+                           systemImage: "alarm.fill", accent: .orange, tab: .sleep)
+                    .accessibilityHint("Opens the Sleep tab")
+                if store.data.smartAlarmEnabled {
+                    Divider().overlay(p.cardBorder)
+                    SettingToggleRow(title: "iPhone backup alarm", detail: backupAlarmDetail,
+                                     systemImage: "iphone.radiowaves.left.and.right", accent: .orange,
+                                     isOn: backupAlarmBinding)
+                        .disabled(!PhoneBackupAlarm.isAvailable)
+                }
+                Divider().overlay(p.cardBorder)
+                LinkRow(title: "Wake plan", subtitle: "Why tonight's alarm is set when it is",
+                        systemImage: "sunrise.fill", accent: .orange) {
+                    WakePlanView()
+                }
             }
         }
     }
@@ -311,21 +376,9 @@ struct SettingsView: View {
     // MARK: Exams calendar
 
     private var calendarSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.s) {
             SectionLabel(text: "Exams")
             CalendarImportCard()
-        }
-    }
-
-    // MARK: Your pack
-
-    private var packSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Your pack")
-            PackCheckCard()
-            Card {
-                PackSetupControl()
-            }
         }
     }
 
@@ -338,41 +391,68 @@ struct SettingsView: View {
             .accessibilityHidden(true)
     }
 
-    // MARK: Water
+    // MARK: Notifications
 
-    private var waterSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Water")
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(text: "Notifications")
             Card(density: .compact) {
-                LinkRow(title: model.hidesEffortTargets ? "Bottle size" : "Bottle size and daily goal",
-                        subtitle: "Bottle \(LogFormat.oz(store.data.bottleSizeML))" + (model.hidesEffortTargets ? "" : " \u{00B7} goal \(LogFormat.oz(store.data.waterGoalML))"),
-                        systemImage: "drop.fill", accent: .blue) {
-                    WaterView()
+                SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when several overnight signals say you may be getting sick.",
+                                 systemImage: "thermometer.medium", accent: .coral, isOn: $store.data.sickAlerts)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                SettingToggleRow(title: "Peak and dip alerts", detail: "A notification 15 minutes before your focus peak and afternoon dip, once your own sleep is in.",
+                                 systemImage: "bolt.fill", accent: .mint, isOn: $store.data.peakDipNudges)
+                if notificationsBlocked {
+                    notificationsBlockedNote
                 }
             }
         }
     }
 
-    // MARK: Show in the app
+    // MARK: Widgets & Watch
 
-    private var showSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Show in the app")
+    private struct HowTo: Identifiable {
+        var id: String { title }
+        let title: String
+        let systemImage: String
+        let steps: String
+    }
+
+    /// Where to find each place the app shows up outside itself (Whitfield F10).
+    private let howTos: [HowTo] = [
+        HowTo(title: "Home Screen widget", systemImage: "apps.iphone",
+              steps: "Touch and hold an empty spot on your Home Screen, tap Edit, then Add Widget, and search for Health Dashboard. Pick Recovery, Cycle, Caffeine & water, or Bedtime streak."),
+        HowTo(title: "Lock Screen widget", systemImage: "lock.iphone",
+              steps: "Touch and hold your Lock Screen, tap Customize, then Lock Screen, and tap the space under the time to add one."),
+        HowTo(title: "Watch app", systemImage: "applewatch",
+              steps: "It installs with this app. Press the Digital Crown and open Health Dashboard: recovery, energy, tonight and quick logging."),
+        HowTo(title: "Watch face", systemImage: "applewatch.watchface",
+              steps: "Touch and hold your watch face, tap Edit, swipe to Complications, tap a spot and choose Health Dashboard."),
+    ]
+
+    private var widgetsSection: some View {
+        let p = Palette(scheme: scheme)
+        return VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(text: "Widgets & Watch")
+            Card {
+                ForEach(Array(howTos.enumerated()), id: \.element.id) { i, howTo in
+                    if i > 0 { Divider().overlay(p.cardBorder) }
+                    HStack(alignment: .top, spacing: Space.m) {
+                        settingIcon(howTo.systemImage, accent: .indigo)
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            Text(howTo.title).font(.bodyEmphasis)
+                            Text(howTo.steps).font(.secondary).foregroundStyle(p.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
             Card(density: .compact) {
-                SettingToggleRow(title: "Calories", detail: caloriesDetail,
-                                 systemImage: "flame.fill", accent: .orange, isOn: caloriesBinding)
-                    .disabled(model.caloriesHiddenByCondition)
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-                SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when several overnight signals say you may be getting sick.",
-                                 systemImage: "thermometer.medium", accent: .coral, isOn: $store.data.sickAlerts)
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-                SettingToggleRow(title: "Drinks tracking", detail: "How alcohol affects sleep and recovery. Off hides drinks on the Log tab.",
-                                 systemImage: "wineglass.fill", accent: .purple, isOn: $store.data.drinksTracking)
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-                SettingToggleRow(title: "Peak and dip nudges", detail: "A notification 15 minutes before your energy peak and your afternoon dip, once your own sleep is in.",
-                                 systemImage: "bolt.fill", accent: .yellow, isOn: $store.data.peakDipNudges)
-                if notificationsBlocked {
-                    notificationsBlockedNote
+                LinkRow(title: "Quick-log drinks",
+                        subtitle: store.data.savedDrinks.isEmpty ? "None saved yet" : store.data.savedDrinks.map(\.name).joined(separator: ", "),
+                        systemImage: "cup.and.saucer.fill", accent: .yellow) {
+                    CaffeineView()
                 }
             }
         }
@@ -433,13 +513,6 @@ struct SettingsView: View {
 
     // MARK: Apple Watch
 
-    private var smartAlarmDetail: String {
-        if let window = model.wakePlan()?.alarmWindow {
-            return "\(window.label) window \u{00B7} up by \(Clock.format(store.data.upBy))"
-        }
-        return "Up by \(Clock.format(store.data.upBy))"
-    }
-
     @ObservedObject private var backupAlarm = PhoneBackupAlarm.shared
 
     /// Turning it on asks iOS for alarm permission while she's looking.
@@ -462,37 +535,6 @@ struct SettingsView: View {
         return "A regular iPhone alarm at your smart alarm's latest time, in case your Watch can't wake you. Stopping the Watch alarm cancels it."
     }
 
-    private var watchSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Apple Watch")
-            Card(density: .compact) {
-                SettingToggleRow(title: "Smart alarm", detail: smartAlarmDetail, systemImage: "alarm.fill", accent: .purple,
-                                 isOn: $store.data.smartAlarmEnabled)
-                if store.data.smartAlarmEnabled {
-                    Divider().overlay(Palette(scheme: scheme).cardBorder)
-                    SettingToggleRow(title: "Weekdays only", detail: "Skips Saturday and Sunday mornings.",
-                                     systemImage: "calendar", accent: .purple, isOn: $store.data.alarmWeekdaysOnly)
-                    Divider().overlay(Palette(scheme: scheme).cardBorder)
-                    SettingToggleRow(title: "iPhone backup alarm", detail: backupAlarmDetail,
-                                     systemImage: "iphone.radiowaves.left.and.right", accent: .purple,
-                                     isOn: backupAlarmBinding)
-                        .disabled(!PhoneBackupAlarm.isAvailable)
-                }
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-                LinkRow(title: "Wake plan", subtitle: "Why tonight's alarm is set when it is",
-                        systemImage: "sunrise.fill", accent: .orange) {
-                    WakePlanView()
-                }
-                Divider().overlay(Palette(scheme: scheme).cardBorder)
-                LinkRow(title: "Quick-log drinks",
-                        subtitle: store.data.savedDrinks.isEmpty ? "None saved yet" : store.data.savedDrinks.map(\.name).joined(separator: ", "),
-                        systemImage: "cup.and.saucer.fill", accent: .yellow) {
-                    CaffeineView()
-                }
-            }
-        }
-    }
-
     // MARK: Data
 
     private var dataStatus: String {
@@ -510,8 +552,8 @@ struct SettingsView: View {
     }
 
     private var dataSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Apple Health & data source")
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionLabel(text: "Apple Health & data")
             Card {
                 HStack(spacing: 10) {
                     if model.loading {
@@ -535,6 +577,7 @@ struct SettingsView: View {
                 }
                 .disabled(model.loading || model.prefersSampleData)
             }
+            privacyCard
         }
     }
 
@@ -566,9 +609,8 @@ struct SettingsView: View {
         return text
     }
 
-    private var privacySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Privacy")
+    private var privacyCard: some View {
+        Group {
             Card {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lock.fill")
@@ -594,7 +636,7 @@ struct SettingsView: View {
                             .frame(width: 36, height: 36)
                             .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .accessibilityHidden(true)
-                        Text("Export my data").font(.scaled(size: 15, weight: .semibold))
+                        Text("Export data").font(.scaled(size: 15, weight: .semibold))
                         Spacer()
                     }
                     .foregroundStyle(Accent.indigo.ink(scheme))

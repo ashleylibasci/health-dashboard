@@ -4,15 +4,25 @@ import HealthCore
 
 /// "Example data · night 3 of 14", shown at the top of a screen while the
 /// app is still on example numbers. Renders nothing once the data is hers.
+///
+/// Three sizes (Valtonen F14, Whitfield F15):
+/// - Today (`prominent`), the first day it shows: the full banner, with why
+///   and the Apple Health note.
+/// - Today after that, and at accessibility text sizes: one line, "Example
+///   data · night 3 of 14 ⓘ", the why behind the ⓘ.
+/// - Every other screen: a small "Example data" capsule that opens the why.
 struct SampleDataBanner: View {
     /// On the Log tab: her logs are real even while the numbers are examples.
     var forLog: Bool = false
-    /// Today keeps the full "Example data · night 3 of 14" title at the
-    /// largest text sizes; other screens show "Example data ⓘ".
+    /// Today: the full banner the first day, then one line. Other screens
+    /// show the small capsule.
     var prominent: Bool = false
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// When Today first showed the full banner (seconds since 1970; 0 = never).
+    @AppStorage("exampleBannerFirstSeen") private var firstSeen: Double = 0
+    @State private var showingWhy = false
 
     private var nights: Int { min(model.realNightCount, AppModel.nightsNeeded) }
 
@@ -42,13 +52,32 @@ struct SampleDataBanner: View {
         return "Most numbers here aren't yours yet. Your own appear after \(AppModel.nightsNeeded) nights.\(lastNight)"
     }
 
+    private var explanation: Explanation {
+        Explanation(id: "example-data", title: "Example data",
+                    meaning: [title + ".", why, accessNote].compactMap { $0 }.joined(separator: " "),
+                    forYou: "")
+    }
+
+    /// The full banner on Today until the end of the first day it showed.
+    private var showsFullBanner: Bool {
+        guard prominent, !typeSize.isAccessibilitySize else { return false }
+        guard firstSeen > 0 else { return true }
+        return Calendar.current.isDateInToday(Date(timeIntervalSince1970: firstSeen))
+    }
+
     var body: some View {
         if model.usingSampleData {
-            if typeSize.isAccessibilitySize {
-                compactBanner
-            } else {
-                fullBanner
+            Group {
+                if showsFullBanner {
+                    fullBanner
+                        .onAppear { if firstSeen == 0 { firstSeen = Date.now.timeIntervalSince1970 } }
+                } else if prominent {
+                    compactBanner
+                } else {
+                    capsule
+                }
             }
+            .motionTransition(.commit, edge: .top)
         }
     }
 
@@ -87,29 +116,55 @@ struct SampleDataBanner: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// At accessibility text sizes the full banner filled the whole first
-    /// screen, so it shrinks to one line, "Example data ⓘ", and the why
-    /// moves behind the ⓘ. Today (`prominent`) keeps the full title.
+    /// One line, "Example data · night 3 of 14 ⓘ", with the why behind
+    /// the ⓘ. Today after the first day, and Today at accessibility sizes.
     private var compactBanner: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 4) {
-                Text(prominent ? title : "Example data")
+            HStack(alignment: .center, spacing: Space.xs) {
+                Text(title)
                     .font(.bodyEmphasis)
                     .foregroundStyle(Accent.yellow.ink(scheme))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
-                InfoButton(explanation: Explanation(id: "example-data", title: "Example data",
-                                                    meaning: [title + ".", why, accessNote].compactMap { $0 }.joined(separator: " "),
-                                                    forYou: ""))
+                InfoButton(explanation: explanation)
             }
             settingsLink
         }
         .padding(.leading, Space.l)
-        .padding(.vertical, 2)
+        .padding(.vertical, Space.xxs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+
+    /// A small "Example data" capsule for every screen but Today. Tapping it
+    /// opens why the numbers aren't hers yet.
+    private var capsule: some View {
+        Button { showingWhy = true } label: {
+            HStack(spacing: Space.xs) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.scaled(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text("Example data")
+                    .font(.scaled(size: 13, weight: .semibold))
+                Image(systemName: "info.circle")
+                    .font(.scaled(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+            .foregroundStyle(Accent.yellow.onTint(scheme))
+            .padding(.horizontal, 10)
+            .frame(minHeight: Font.scaledSize(26))
+            .background(Accent.yellow.fill(scheme).opacity(0.2), in: Capsule())
+            .frame(minHeight: Sizes.minTap)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, -Space.s)
+        .accessibilityLabel("Example data. \(title)")
+        .accessibilityHint("Explains why these numbers aren't yours yet")
+        .sheet(isPresented: $showingWhy) { ExplanationSheet(explanation: explanation) }
     }
 
     private var icon: some View {

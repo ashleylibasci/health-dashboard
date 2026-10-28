@@ -15,13 +15,15 @@ struct WhyOffView: View {
             if reasons.isEmpty {
                 allClearCard
             } else {
-                VStack(spacing: 10) {
-                    ForEach(Array(reasons.enumerated()), id: \.element.id) { i, r in
-                        WhyOffReasonRow(number: i + 1, reason: r, tryThis: model.tryThis(for: r))
-                    }
-                }
+                // The top reason's tip is the one thing to do, shown once,
+                // first; the other reasons keep their own (Whitfield F14).
                 if let top = reasons.first {
                     oneThingCard(top, second: reasons.dropFirst().first)
+                }
+                VStack(spacing: Space.m) {
+                    ForEach(Array(reasons.enumerated()), id: \.element.id) { i, r in
+                        WhyOffReasonRow(number: i + 1, reason: r, tryThis: i == 0 ? nil : model.tryThis(for: r))
+                    }
                 }
             }
             matchCard
@@ -119,7 +121,7 @@ struct WhyOffView: View {
 private struct WhyOffReasonRow: View {
     var number: Int
     var reason: AppModel.OffReason
-    var tryThis: String
+    var tryThis: String?
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -144,6 +146,7 @@ private struct WhyOffReasonRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            if let tryThis {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "lightbulb.fill")
                     .font(.scaled(size: 13, weight: .semibold))
@@ -155,6 +158,7 @@ private struct WhyOffReasonRow: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Accent.yellow.tint(scheme), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
         }
     }
 }

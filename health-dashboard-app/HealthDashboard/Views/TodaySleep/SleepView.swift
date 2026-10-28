@@ -10,6 +10,7 @@ struct SleepView: View {
     var body: some View {
         let plan = model.wakePlan()
         Screen(title: "Sleep", accent: .purple) {
+            TabHeader("Sleep")
             SampleDataBanner()
             if model.lastNightIsFresh {
                 lastNightCard

@@ -40,7 +40,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
 - Never claim a feature that isn't built. When data is missing, say so; never fall back to sample numbers on a real phone.
 - Sample data (`SampleData.swift`) is used in the simulator and until Health has 14 nights. It is always labelled with `SampleDataBanner`.
 - Water is stored in ml (as Apple Health stores it) and shown in oz.
-- Ashley is on a combined pill. Birth control is handled by `CycleDisplay` (pack / suppressed / phases / irregular / overdue). The pack position is set in Settings → Your pack.
+- Ashley is on a combined pill. Birth control is handled by `CycleDisplay` (pack / suppressed / phases / irregular / overdue). The pack position is set in Settings → Cycle & birth control.
 
 ## History
 1. Designs, then a native build delivered by zip. The app runs on her iPhone.
@@ -54,7 +54,7 @@ Dark by default, with a light mode. Designs: the "Health Dashboard Redesign" can
    - stress and other earlier features restored.
 3. Test round 1: six simulated student testers (Maya on the pill, Jordan the night owl, Priya the runner/Watch user, Theo the first-timer at the largest text size, Sam the statistician, Riley with PCOS) read the code; ~120 findings, all fixed.
 4. Test round 2: same testers re-checked and found ~60 smaller issues/regressions; all fixed. See TEST-FINDINGS.md (bottom section lists what's still open).
-5. Ashley asked for: water in oz, choosing where she is in her pack in Settings (Settings → Your pack, also on the Cycle screen and in onboarding), bedtime and wake time at any hour.
+5. Ashley asked for: water in oz, choosing where she is in her pack in Settings (Settings → Cycle & birth control, also on the Cycle screen and in onboarding), bedtime and wake time at any hour.
 
 6. Round 3 on the Mac (Oct 27, 2026): real builds, the simulator test round, and the six student testers (the "student-testers" BMad party) on real screens. Findings and their status are in TEST-FINDINGS.md. The old app's features were ported in the same session (see Layout).
 
