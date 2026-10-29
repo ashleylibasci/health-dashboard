@@ -488,14 +488,16 @@ private struct TodayWidgetView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .tint(pastCutoff ? Accent.coral.fill(scheme) : Accent.yellow.fill(scheme))
+                            .layoutPriority(1)
                             .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams" + (pastCutoff ? ", past your cutoff" : ""))
                         }
                         if s.bottleML > 0 {
                             Button(intent: LogBottleIntent()) {
-                                Label("1", systemImage: "waterbottle.fill")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .lineLimit(1)
-                                    .fixedSize()
+                                HStack(spacing: 1) {
+                                    Image(systemName: "plus").font(.system(size: 9, weight: .heavy))
+                                    Image(systemName: "waterbottle.fill").font(.system(size: 12, weight: .bold))
+                                }
+                                .fixedSize()
                             }
                             .tint(Accent.blue.fill(scheme))
                             .accessibilityLabel("Log a bottle of water, \(ounces(s.bottleML))")
