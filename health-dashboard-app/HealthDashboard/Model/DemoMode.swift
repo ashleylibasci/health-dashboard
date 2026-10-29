@@ -21,6 +21,11 @@ import HealthCore
 /// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
 ///   big night last night and a hard training day today.
 /// - `-demoClock 14:30`: Today as if it were that time (see `clock`).
+/// - `-demoPillHistory` (with `-demoCycle pill`): four earlier packs of
+///   pills (three missed), withdrawal bleeds, spotting, symptoms and
+///   check-ins, for the pill-history screens and the visit summary.
+/// - `-demoPillEvent vomiting|spotting` (with `-demoCycle pill`): that
+///   logged today, for the pill callouts.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -42,8 +47,9 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings`: opens on that screen (Body tab), for
-    /// screenshots.
+    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery`: opens on that screen
+    /// (Body tab), for screenshots. The pill-visit summary also saves its
+    /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
@@ -57,8 +63,16 @@ enum DemoMode {
         let minutes = parts[0] * 60 + parts[1]
         return minutes < AppDay.rolloverMinutes ? minutes + 1440 : minutes
     }
+    static let pillHistory = args.contains("-demoPillHistory")
+    static let pillEvent = value(after: "-demoPillEvent")
+    /// `-demoPackDay <n>`: with `-demoCycle pill`, today is pill n (18 by
+    /// default), for break-day previews.
+    static let packDay = min(max(Int(value(after: "-demoPackDay") ?? "") ?? 18, 2), 28)
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
+    static let pillHistory = false
+    static let pillEvent: String? = nil
+    static let packDay = 18
     static let open: String? = nil
     static let clock: Minutes? = nil
     static let cycle: String? = nil
@@ -89,7 +103,7 @@ enum DemoMode {
             // method change on its own resets the pack (normalizePack).
             data.packActiveDays = 21
             data.packLength = 28
-            data.packStartDate = cal.date(byAdding: .day, value: -17, to: today)
+            data.packStartDate = cal.date(byAdding: .day, value: -(packDay - 1), to: today)
             // Pills 1–17 marked taken at about 9pm, except pill 11, and the
             // 9pm reminder on (H-A1).
             data.pillReminder = true
@@ -100,8 +114,8 @@ enum DemoMode {
             if away {
                 data.pillHomeTimeZone = TimeZone.current.identifier == "America/New_York" ? "America/Los_Angeles" : "America/New_York"
             }
-            data.pillsTaken = (1...17).filter { $0 != 11 }.compactMap { day in
-                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - 18, to: today) ?? today)
+            data.pillsTaken = (1...min(packDay - 1, 21)).filter { $0 != 11 }.compactMap { day in
+                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - packDay, to: today) ?? today)
             }
         case "hormonalIUD":
             data.cycleSetup = .hormonal
@@ -123,6 +137,8 @@ enum DemoMode {
         }
         if exams { addExams(to: &data, today: today, calendar: cal) }
         if fuel { seedFuelLogs(&data, today: today, calendar: cal) }
+        if cycle == "pill", pillHistory { seedPillHistory(&data, today: today, calendar: cal) }
+        if cycle == "pill", let pillEvent { seedPillEvent(pillEvent, &data, today: today, calendar: cal) }
         data.onboarded = true
         store.data = data
     }
@@ -171,5 +187,107 @@ enum DemoMode {
         }
         data.waterLog = [AppData.WaterEntry(date: at(0, 10 * 60), ml: data.bottleSizeML)]
         data.symptomLog = data.flowLog.filter { $0.flow == .heavy }.map { AppData.SymptomEntry(date: $0.date, symptoms: ["Fatigue"]) }
+    }
+
+    /// `-demoPillHistory`: four packs before the current one (21 + 7, on
+    /// this pill since the first). Pill 2 of the oldest-but-one pack, pill
+    /// 9 of the last and pill 15 of the one before were missed. Bleeds in
+    /// every break, getting lighter; spotting early on; headaches and
+    /// cramps mostly in break weeks; morning check-ins and mood a little
+    /// lower then.
+    @MainActor
+    private static func seedPillHistory(_ data: inout AppData, today: Date, calendar cal: Calendar) {
+        guard let start = data.packStartDate else { return }
+        let packs = -4 ... -1
+        func day(_ pack: Int, _ d: Int, minutes: Int = 0) -> Date {
+            let midnight = cal.date(byAdding: .day, value: pack * 28 + d - 1, to: start) ?? start
+            return cal.date(byAdding: .minute, value: minutes, to: midnight) ?? midnight
+        }
+        data.methodChangedDate = day(-4, 1)
+        let missed: Set<[Int]> = [[-3, 2], [-2, 15], [-1, 9]]
+        data.pillsTaken = packs.flatMap { pack in
+            (1...21).filter { !missed.contains([pack, $0]) }.map { day(pack, $0, minutes: 21 * 60 - 10 + ($0 * 7) % 25) }
+        } + data.pillsTaken
+        // Bleed days 23–27 in the oldest packs, 23–26 later; lighter over time.
+        let bleeds: [Int: [AppData.Flow]] = [-4: [.light, .heavy, .medium, .medium, .light],
+                                             -3: [.light, .medium, .medium, .light, .spotting],
+                                             -2: [.light, .medium, .light, .spotting],
+                                             -1: [.light, .medium, .light, .spotting]]
+        var flows: [AppData.FlowEntry] = []
+        for (pack, list) in bleeds {
+            for (i, flow) in list.enumerated() { flows.append(.init(date: day(pack, 23 + i, minutes: 9 * 60), flow: flow)) }
+        }
+        // Breakthrough spotting in the first two packs.
+        flows += [.init(date: day(-4, 9, minutes: 9 * 60), flow: .spotting), .init(date: day(-4, 10, minutes: 9 * 60), flow: .spotting),
+                  .init(date: day(-3, 12, minutes: 9 * 60), flow: .spotting)]
+        data.flowLog = (data.flowLog + flows).sorted { $0.date < $1.date }
+        var symptoms: [AppData.SymptomEntry] = []
+        for pack in packs {
+            symptoms.append(.init(date: day(pack, 22, minutes: 20 * 60), symptoms: ["Headache"]))
+            symptoms.append(.init(date: day(pack, 23, minutes: 20 * 60), symptoms: ["Cramps", "Headache"]))
+            if pack != -2 { symptoms.append(.init(date: day(pack, 24, minutes: 20 * 60), symptoms: ["Headache", "Fatigue"])) }
+        }
+        symptoms.append(.init(date: day(-2, 6, minutes: 20 * 60), symptoms: ["Headache"]))
+        data.symptomLog = (data.symptomLog + symptoms).sorted { $0.date < $1.date }
+        // A morning check-in most days: 2–3 in break weeks, 3–4 otherwise.
+        let firstDay = day(-4, 1)
+        let days = cal.dateComponents([.day], from: firstDay, to: today).day ?? 0
+        data.checkIns = (0..<days).compactMap { i -> AppData.CheckIn? in
+            guard i % 5 != 3, let date = cal.date(byAdding: .minute, value: i * 1440 + 8 * 60 + 15, to: firstDay) else { return nil }
+            let packDay = i % 28 + 1
+            let awake = packDay > 21 ? 2 + (i % 3 == 0 ? 1 : 0) : 3 + (i % 2)
+            return AppData.CheckIn(date: date, awake: awake, tags: [])
+        }
+        // Mood, anxiety and irritability most evenings (B1): lower mood and
+        // more irritable in break weeks.
+        data.moodRatings = (0..<days).flatMap { i -> [AppData.MoodRating] in
+            guard i % 6 != 4, let date = cal.date(byAdding: .minute, value: i * 1440 + 21 * 60 + 20, to: firstDay) else { return [] }
+            let inBreak = i % 28 >= 21
+            // A day-to-day wobble that doesn't repeat pack to pack.
+            func wobble(_ salt: Int) -> Int { (i * i * 7 + i * 13 + salt) % 9 }
+            let mood = inBreak ? (wobble(1) < 5 ? 2 : 3) : (wobble(1) < 2 ? 3 : wobble(1) == 8 ? 5 : 4)
+            let anxiety = inBreak ? (wobble(2) < 6 ? 3 : 2) : (wobble(2) < 6 ? 2 : wobble(2) == 8 ? 4 : 3)
+            let irritable = inBreak ? (wobble(3) < 4 ? 4 : 3) : (wobble(3) < 6 ? 1 : 2)
+            return [AppData.MoodRating(date: date, scale: .mood, value: mood),
+                    AppData.MoodRating(date: date, scale: .anxiety, value: anxiety),
+                    AppData.MoodRating(date: date, scale: .irritability, value: irritable)]
+        }
+    }
+
+    /// `-demoPillHistory`: the example nights reach back four packs, with
+    /// resting heart rate about 2 beats higher on break days (E2). The
+    /// demo pack started `packDay` − 1 days ago.
+    static func pillHistoryNights(_ nights: [NightRecord], today: Date = .now, calendar cal: Calendar = .current) -> [NightRecord] {
+        let day0 = cal.startOfDay(for: today)
+        let older = nights.prefix(49).compactMap { n -> NightRecord? in
+            guard let day = cal.date(byAdding: .day, value: -49, to: n.wakeDay) else { return nil }
+            var copy = n
+            copy.wakeDay = day
+            return copy
+        }
+        guard let packStart = cal.date(byAdding: .day, value: -(packDay - 1), to: day0) else { return nights }
+        let packs = PackCalendar(start: packStart, activeDays: 21, packLength: 28)
+        return (older + nights).map { n in
+            guard packs.isBreak(day: packs.position(of: n.wakeDay, calendar: cal).day) else { return n }
+            var copy = n
+            copy.outcome.restingHRDelta = (n.outcome.restingHRDelta ?? 0) + 2
+            return copy
+        }
+    }
+
+    /// `-demoPillEvent`: vomiting this morning, or spotting yesterday and
+    /// today.
+    @MainActor
+    private static func seedPillEvent(_ event: String, _ data: inout AppData, today: Date, calendar cal: Calendar) {
+        let morning = cal.date(byAdding: .minute, value: 7 * 60, to: today) ?? today
+        switch event {
+        case "vomiting":
+            data.symptomLog.append(.init(date: morning, symptoms: ["Vomiting"]))
+        case "spotting":
+            let yesterday = cal.date(byAdding: .day, value: -1, to: morning) ?? morning
+            data.flowLog += [.init(date: yesterday, flow: .spotting), .init(date: morning, flow: .spotting)]
+        default:
+            break
+        }
     }
 }

@@ -79,7 +79,12 @@ struct RootTabView: View {
             NavigationStack {
                 BodyView().toolbar(.hidden, for: .navigationBar)
                     .navigationDestination(isPresented: $demoOpen) {
-                        if DemoMode.open == "cycleSettings" { CycleSettingsView() } else { CycleView() }
+                        switch DemoMode.open {
+                        case "cycleSettings": CycleSettingsView()
+                        case "visitSummary": VisitSummaryView()
+                        case "recovery": RecoveryView()
+                        default: CycleView()
+                        }
                     }
                     .task {
                         guard DemoMode.open != nil, !demoOpen else { return }

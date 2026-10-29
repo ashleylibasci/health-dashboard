@@ -596,6 +596,7 @@ private struct PackSection: View {
             }
         }
         PillAwayCallout()
+        PillLogCallouts()
         header
         RowCard {
             if model.pillToday != nil {
@@ -606,6 +607,7 @@ private struct PackSection: View {
         }
         if skipping { skipNote }
         packCard
+        PackHistoryRows()
         RowCard {
             ExpandRow(title: "Not right? Set your pack day",
                       summary: model.packNextShort ?? "Pack type and today\u{2019}s \(unit)",

@@ -30,6 +30,11 @@ final class HealthKitService {
         ]
         #if os(iOS)
         types.insert(HKQuantityType(.timeInDaylight))
+        // Moods from the Mindfulness app count as mood ratings (F2).
+        if #available(iOS 18.0, *) { types.insert(HKSampleType.stateOfMindType()) }
+        // Her latest blood pressure, for the pill-visit summary (G1).
+        types.insert(HKQuantityType(.bloodPressureSystolic))
+        types.insert(HKQuantityType(.bloodPressureDiastolic))
         #endif
         return types
     }

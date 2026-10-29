@@ -18,7 +18,8 @@ struct CycleLogView: View {
     @State private var pendingDate: Date? = nil
 
     static let symptomOptions = ["Cramps", "Headache", "Bloating", "Acne", "Tender breasts",
-                                 "Mood swings", "Fatigue", "Cravings", "Back pain", "Nausea"]
+                                 "Mood swings", "Fatigue", "Cravings", "Back pain", "Nausea",
+                                 "Vomiting", "Diarrhea"]
 
     private var options: [String] {
         var list = Self.symptomOptions

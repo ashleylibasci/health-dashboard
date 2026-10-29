@@ -38,7 +38,8 @@ extension AppModel {
         switch cycleHeartShift {
         case .luteal: "Allowed for: in the second half of your cycle resting heart rate runs a little higher and HRV a little lower."
         case .period: "Allowed for: in your period week resting heart rate runs a little lower and HRV a little higher."
-        case .none: nil
+        // On the pill: her own break-week shift, when she has one (E2).
+        case .none: recoveryPackNote
         }
     }
 

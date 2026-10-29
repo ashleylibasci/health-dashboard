@@ -26,9 +26,10 @@ extension AppModel {
             .sorted { $0.wakeDay < $1.wakeDay }
             .suffix(days)
         return recent.map { n in
+            let pack = packHeartAllowance(on: n.wakeDay)
             let score = Recovery.score(usual: Double(AppModel.recoveryAnchor),
-                                       hrvDeltaPct: n.outcome.hrvDeltaPct ?? 0,
-                                       restingHRDelta: n.outcome.restingHRDelta ?? 0,
+                                       hrvDeltaPct: (n.outcome.hrvDeltaPct ?? 0) - (pack?.hrvPct ?? 0),
+                                       restingHRDelta: (n.outcome.restingHRDelta ?? 0) - (pack?.restingHR ?? 0),
                                        sleepShortfall: max(0, need - n.asleepMinutes - SleepNeedEstimator.metNeedToleranceMinutes),
                                        cycle: cycleHeartShift(on: n.wakeDay))
             return RecoveryNight(day: n.wakeDay, score: score, bedtime: n.bedtime, asleep: n.asleepMinutes)
@@ -37,15 +38,17 @@ extension AppModel {
 
     /// How many points each input moved today's recovery, measured by
     /// scoring each input alone against the usual (HealthCore's model).
-    /// HRV and resting heart rate with a natural cycle's own shift taken
-    /// out, as in the score.
+    /// HRV and resting heart rate with a natural cycle's own shift (or her
+    /// break-week shift on the pill) taken out, as in the score.
     var recoveryPointsFromHRV: Int {
-        Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: cycleHeartShift.adjust(hrvDeltaPct: hrvDeltaPct),
+        Recovery.score(usual: Double(AppModel.recoveryAnchor),
+                       hrvDeltaPct: cycleHeartShift.adjust(hrvDeltaPct: hrvDeltaPct) - (packHeartAllowanceToday?.hrvPct ?? 0),
                        restingHRDelta: 0, sleepShortfall: 0) - AppModel.recoveryAnchor
     }
     var recoveryPointsFromRestingHR: Int {
         Recovery.score(usual: Double(AppModel.recoveryAnchor), hrvDeltaPct: 0,
-                       restingHRDelta: cycleHeartShift.adjust(restingHRDelta: restingHRDelta), sleepShortfall: 0) - AppModel.recoveryAnchor
+                       restingHRDelta: cycleHeartShift.adjust(restingHRDelta: restingHRDelta) - (packHeartAllowanceToday?.restingHR ?? 0),
+                       sleepShortfall: 0) - AppModel.recoveryAnchor
     }
     var recoveryPointsFromSleep: Int {
         let shortfall = max(0, sleepNeed.minutes - lastNight.asleep - SleepNeedEstimator.metNeedToleranceMinutes)

@@ -83,6 +83,7 @@ struct LogView: View {
                 HistoryLink { CycleLogView() }
             }
             IronPromptCallout()
+            PillLogCallouts()
             Card {
                 AdaptiveStack(spacing: Space.xs, alignment: .firstTextBaseline) {
                     Text("Flow today").font(.bodyEmphasis)
@@ -260,6 +261,8 @@ struct LogView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .motionTransition(.reveal, edge: .top)
                 }
+                // Three more one-tap scales (B1).
+                MoodScalesToggle(toast: $toast)
             }
             .motion(.reveal, value: model.feltStressedToday)
         }

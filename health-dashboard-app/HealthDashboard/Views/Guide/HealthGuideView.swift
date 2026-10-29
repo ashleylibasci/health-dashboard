@@ -141,6 +141,10 @@ struct GuideArticleView: View {
             if !article.links.isEmpty {
                 GuideLinkButtons(links: article.links, accent: accent)
             }
+            // "Taking something new?" above the medicines list (H-A9).
+            if article.id.hasPrefix("medicines-"), let method = article.methods?.first {
+                MedicineCheckField(method: method)
+            }
             Card {
                 ForEach(Array(article.body.enumerated()), id: \.offset) { _, block in
                     blockView(block, p)

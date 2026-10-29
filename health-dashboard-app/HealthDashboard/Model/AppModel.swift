@@ -53,6 +53,9 @@ final class AppModel: ObservableObject {
     /// Apple's Medications has a reminder schedule for her pill, so this app
     /// sends only the repeat (never two reminders at once).
     @Published var healthPillHasSchedule = false
+    /// Moods from Apple's State of Mind log by app day, 1–5 (F2,
+    /// `MoodHealth`). Her own taps here win on the same day.
+    @Published var healthMoodByDay: [Date: Int] = [:]
 
     /// Where Apple Health stands, for the accuracy and settings screens.
     enum HealthConnection: Equatable {
@@ -378,10 +381,13 @@ final class AppModel: ObservableObject {
     var recoveryUsualIsPersonal: Bool { personalRecoveryUsual != nil }
     var energyUsualIsPersonal: Bool { personalEnergyUsual != nil }
 
-    /// A natural cycle's own shift today is allowed for (`cycleHeartShift`).
+    /// A natural cycle's own shift today is allowed for (`cycleHeartShift`),
+    /// and on the pill her own break-week shift (`packHeartAllowanceToday`).
     var recovery: Int {
-        Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct, restingHRDelta: restingHRDelta,
-                       sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15), cycle: cycleHeartShift)
+        let pack = packHeartAllowanceToday
+        return Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct - (pack?.hrvPct ?? 0),
+                              restingHRDelta: restingHRDelta - (pack?.restingHR ?? 0),
+                              sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15), cycle: cycleHeartShift)
     }
     /// The label for today's shown recovery (`recoveryShown`); "" when there
     /// is no number.
@@ -529,6 +535,7 @@ final class AppModel: ObservableObject {
     private func applySampleData() {
         usingSampleData = true
         nights = SampleData.nights()
+        if DemoMode.pillHistory { nights = DemoMode.pillHistoryNights(nights) }
         realNightDays = []
         sessions = []
         mornings = SampleData.mornings()
@@ -943,6 +950,7 @@ final class AppModel: ObservableObject {
             await updateHealthConnection()
             await updateNudges()
             await updatePill()
+            await updateHealthMood()
         }
     }
 
@@ -1178,6 +1186,7 @@ final class AppModel: ObservableObject {
             || old.sleepNeedAdjustment != new.sleepNeedAdjustment || old.phoneBackupAlarm != new.phoneBackupAlarm
         let watchRelevant = planRelevant || old.savedDrinks != new.savedDrinks
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
+            || old.moodRatings != new.moodRatings
         // (alarmOverride is written by pushToWatch itself, which then sends.)
         if watchRelevant {
             pushToWatch()
@@ -1193,6 +1202,11 @@ final class AppModel: ObservableObject {
         // A logged or edited bleed moves the cycle day straight away.
         if old.flowLog != new.flowLog { recomputeCycle() }
 
+        if new.savesCycleToHealth, !old.savesCycleToHealth || old.flowLog != new.flowLog || old.symptomLog != new.symptomLog
+            || old.birthControl != new.birthControl || old.methodChangedDate != new.methodChangedDate {
+            Task { await syncCycleToHealth() }
+        }
+
         if Self.pillRelevantChange(old, new) { Task { await updatePill(readHealth: old.pillReadsHealth != new.pillReadsHealth) } }
 
         // A new method: the old pack type and start don't carry over.
@@ -1200,10 +1214,12 @@ final class AppModel: ObservableObject {
         let newMethod = new.cycleSetup == .hormonal ? new.birthControl : nil
         if oldMethod != newMethod {
             let startChangedToo = old.packStartDate != new.packStartDate
+            // A save that sets the change date itself (example data) keeps it.
+            let dateSetToo = old.methodChangedDate != new.methodChangedDate
             Task { @MainActor in
                 self.normalizePack(keepStart: startChangedToo)
                 // Cycles before the change don't set her natural length.
-                self.store.data.methodChangedDate = Calendar.current.startOfDay(for: .now)
+                if !dateSetToo { self.store.data.methodChangedDate = Calendar.current.startOfDay(for: .now) }
                 self.recomputeCycle()
             }
         }
@@ -1403,7 +1419,8 @@ final class AppModel: ObservableObject {
             waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
             todayWaterIDs: todaysWater.map(\.id),
-            stressHighAt: stressHighNow))
+            stressHighAt: stressHighNow,
+            moodToday: Dictionary(uniqueKeysWithValues: moodToday.map { ($0.key.rawValue, $0.value) })))
     }
 
     func handle(_ message: WatchMessage) {
@@ -1429,6 +1446,12 @@ final class AppModel: ObservableObject {
             Task {
                 if prefersSampleData { pushToWatch() } else { await syncWithHealth() }
             }
+        case let .loggedMood(entryID, scale, value, at):
+            if let scale = MoodScale(rawValue: scale) { logMood(scale, value, at: at, id: entryID) }
+            pushToWatch()
+        case let .undoMood(entryID):
+            removeMood(entryID)
+            pushToWatch()
         case let .alarmArmed(end, offOnWatch):
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: Self.watchReportsKey)

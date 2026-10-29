@@ -85,6 +85,7 @@ struct LogPage: View {
                     totals(now: now)
                     tiles
                     explainer(now: now)
+                    WatchMoodSection()
                 }
                 .animation(.spring(response: 0.45, dampingFraction: 0.8), value: sync.deliveryError)
             }
