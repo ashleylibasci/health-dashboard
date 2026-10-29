@@ -16,7 +16,8 @@ struct PackHistoryRows: View {
         if model.pillPack != nil {
             RowCard {
                 if let pattern {
-                    MetricRow(title: "Your \(model.breaksPhrase)", note: pattern,
+                    // The row's note is just the list, so it fits one line.
+                    MetricRow(title: "Your \(model.breaksPhrase)", note: patternNote,
                               systemImage: "calendar.badge.exclamationmark", accent: .pink) { showsPattern = true }
                     if showsMood || !bleeds.isEmpty { RowDivider() }
                 }
@@ -48,6 +49,13 @@ struct PackHistoryRows: View {
                     .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// "Headaches, cramps, more irritability".
+    private var patternNote: String {
+        let words = model.breakWeekPattern ?? []
+        let list = words.joined(separator: ", ")
+        return list.prefix(1).uppercased() + list.dropFirst()
     }
 
     /// "Lower in your break week" once there are two packs, else how far along.
