@@ -83,6 +83,7 @@ struct LogView: View {
                 HistoryLink { CycleLogView() }
             }
             IronPromptCallout()
+            PillLogCallouts()
             Card {
                 AdaptiveStack(spacing: Space.xs, alignment: .firstTextBaseline) {
                     Text("Flow today").font(.bodyEmphasis)

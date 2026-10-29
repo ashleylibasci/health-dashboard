@@ -596,6 +596,7 @@ private struct PackSection: View {
             }
         }
         PillAwayCallout()
+        PillLogCallouts()
         header
         RowCard {
             if model.pillToday != nil {
