@@ -40,12 +40,14 @@ extension AppModel {
                 .init(day: $0.day, packDay: $0.packDay, activeDays: pillPack?.activeDays ?? $0.packLength,
                       packLength: $0.packLength, time: pillTimeHere, taken: $0.taken, breakName: packBreakName)
             },
-            stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) }
+            stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) },
+            smartAlarmOn: store.data.smartAlarmEnabled
         ).save()
     }
 
-    /// Water, pills and stress tapped on a widget while the app wasn't
-    /// running: add them to the log. Water keeps the id it was saved to
+    /// Water, pills and stress tapped on a widget (and the smart alarm
+    /// switched in Control Center) while the app wasn't running: add them
+    /// to the log. Water keeps the id it was saved to
     /// Apple Health with, so nothing is counted or saved twice.
     func importPendingLogs() {
         for p in PendingLogs.takeAll() {
@@ -56,6 +58,9 @@ extension AppModel {
                 markPillTaken(at: p.date)
             case let .stress(level):
                 store.data.moodLog.append(AppData.MoodEntry(date: p.date, stress: level))
+            case let .smartAlarm(on):
+                // Moves the Watch alarm too (`storeDidChange`).
+                store.data.smartAlarmEnabled = on
             }
         }
     }

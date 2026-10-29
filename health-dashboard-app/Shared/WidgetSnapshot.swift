@@ -53,6 +53,9 @@ struct WidgetSnapshot: Codable, Equatable {
     /// Her latest stress rating (the Stress widget lights it up while it's
     /// from today). nil from older app builds.
     var stress: StressTap? = nil
+    /// The smart alarm is on in the app (the Control Center switch). nil
+    /// from older app builds.
+    var smartAlarmOn: Bool? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
@@ -124,6 +127,9 @@ struct WidgetSnapshot: Codable, Equatable {
         Self.defaults?.set(data, forKey: Self.key)
         #if canImport(WidgetKit)
         if old != data { WidgetCenter.shared.reloadAllTimelines() }
+        #endif
+        #if os(iOS)
+        if old != data, #available(iOS 18.0, *) { ControlCenter.shared.reloadAllControls() }
         #endif
     }
 

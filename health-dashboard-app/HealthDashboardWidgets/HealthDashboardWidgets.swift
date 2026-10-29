@@ -15,6 +15,11 @@ struct HealthDashboardWidgets: WidgetBundle {
         TodayWidget()
         StressWidget()
         StreakWidget()
+        if #available(iOS 18.0, *) {
+            LogLatteControl()
+            LogBottleControl()
+            SmartAlarmControl()
+        }
     }
 }
 

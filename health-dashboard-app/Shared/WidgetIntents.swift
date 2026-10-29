@@ -16,6 +16,8 @@ enum PendingLogs {
             case pill
             /// 1 (very calm) – 5 (very stressed).
             case stress(Int)
+            /// The smart alarm switched on or off.
+            case smartAlarm(Bool)
         }
         var id: UUID
         var date: Date
@@ -157,6 +159,28 @@ struct LogStressIntent: AppIntent {
         }
         await MainActor.run { PendingLogs.onAdded?() }
         return .result(dialog: "Logged stress \(level).")
+    }
+}
+
+/// The smart alarm on or off, from its Control Center switch (iOS 18).
+/// On, the Watch still needs its app opened before bed to turn the alarm on.
+struct SetSmartAlarmIntent: SetValueIntent {
+    static let title: LocalizedStringResource = "Smart alarm"
+    static let description = IntentDescription("Turns the smart alarm on your Watch on or off.")
+
+    @Parameter(title: "Smart alarm on")
+    var value: Bool
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        PendingLogs.add(.init(id: UUID(), date: .now, kind: .smartAlarm(value)))
+        if var snapshot = WidgetSnapshot.load() {
+            snapshot.smartAlarmOn = value
+            snapshot.save()
+        }
+        await MainActor.run { PendingLogs.onAdded?() }
+        return .result()
     }
 }
 #endif
