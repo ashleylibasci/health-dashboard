@@ -69,7 +69,8 @@ struct LearningView: View {
         Screen(title: "Learning you", accent: .purple) {
             SampleDataBanner()
             SummaryHeader(eyebrow: "Learning you",
-                          value: "\(ready) of \(items.count)", unit: "ready",
+                          value: model.usingSampleData ? "Example" : "\(ready) of \(items.count)",
+                          unit: model.usingSampleData ? nil : "ready",
                           line: line(items),
                           accent: .purple,
                           info: Explanation(id: "learning-you", title: "Learning you",
@@ -112,9 +113,11 @@ private struct LearningRow: View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: Space.m) {
             ZStack {
                 Circle().stroke(accent.track(scheme), lineWidth: 4)
-                Circle().trim(from: 0, to: max(item.progress, 0.001))
-                    .stroke(accent.fill(scheme), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+                if item.progress > 0 {
+                    Circle().trim(from: 0, to: item.progress)
+                        .stroke(accent.fill(scheme), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
                 if item.isReady {
                     Image(systemName: "checkmark")
                         .font(.scaled(size: 11, weight: .bold))
