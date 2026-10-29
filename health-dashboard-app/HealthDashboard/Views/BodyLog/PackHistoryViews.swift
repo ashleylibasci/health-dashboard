@@ -2,8 +2,8 @@ import SwiftUI
 import HealthCore
 
 /// "Your packs": the pill-history rows on Cycle, each one line with its
-/// page one tap down. Combined pill only; a row shows once it has
-/// something to say.
+/// page one tap down, and the pill-visit summary. Combined pill only; a
+/// history row shows once it has something to say.
 struct PackHistoryRows: View {
     @EnvironmentObject var model: AppModel
     @State private var showsPattern = false
@@ -13,7 +13,7 @@ struct PackHistoryRows: View {
         let mood = model.moodByPackDay(.mood)
         let showsMood = !(mood?.points.isEmpty ?? true)
         let pattern = model.breakWeekPatternLine
-        if !bleeds.isEmpty || showsMood || pattern != nil {
+        if model.pillPack != nil {
             RowCard {
                 if let pattern {
                     MetricRow(title: "Your \(model.breaksPhrase)", note: pattern,
@@ -32,6 +32,11 @@ struct PackHistoryRows: View {
                               systemImage: "drop.fill", accent: .pink) {
                         BleedsByPackView()
                     }
+                }
+                if !bleeds.isEmpty || showsMood || pattern != nil { RowDivider() }
+                MetricRow(title: "Summary for your pill visit", note: "One page to share or print",
+                          systemImage: "doc.text.fill", accent: .indigo) {
+                    VisitSummaryView()
                 }
             }
             .bottomSheet(isPresented: $showsPattern, title: "Your \(model.breaksPhrase)") {
