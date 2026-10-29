@@ -1,10 +1,12 @@
 import SwiftUI
 import UIKit
+import Charts
 import HealthCore
 
 /// The home screen, summary first: at most one line that needs her, then
-/// recovery (Today owns it), tonight's plan and today at a glance. One ⓘ
-/// per card; the details live on the screens each card opens.
+/// recovery (Today owns it), tonight's plan and today at a glance, led by
+/// whichever answers the question she has at this hour (D-T1). One ⓘ per
+/// card; the details live on the screens each card opens.
 struct TodayView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -12,6 +14,8 @@ struct TodayView: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openTab) private var openTab
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The smart alarm toggled from the Tonight card, kept for Undo.
     private struct AlarmUndo: Equatable {
@@ -25,6 +29,14 @@ struct TodayView: View {
     @State private var alarmUndone = 0
     /// The page the alert line opened.
     @State private var opened: Alert?
+    /// The part of the day Today is laid out for. Set when the app opens,
+    /// never while she's looking at it.
+    @State private var moment: Moment?
+    /// The app day the morning reveal last played (D-M2).
+    @AppStorage("todayRevealDay") private var revealDay = ""
+    /// True while the recovery ring waits, empty, for the reveal.
+    @State private var revealing = false
+    @State private var revealed = 0
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -34,11 +46,39 @@ struct TodayView: View {
                 examChip
             }
             alertSlot
-            recoveryCard
-            tonightCard
-            glanceHeader
-            tiles
+            // Same cards, different order: the hero follows the clock, and
+            // the pill sits under whichever card leads.
+            switch shownMoment {
+            case .morning:
+                recoveryCard
+                pillRow
+                tonightCard
+                glanceHeader
+                tiles
+            case .afternoon:
+                glanceHeader
+                tiles
+                pillRow
+                recoveryCard
+                tonightCard
+            case .evening:
+                tonightCard
+                pillRow
+                recoveryCard
+                glanceHeader
+                tiles
+            }
         }
+        .onAppear {
+            if moment == nil { moment = momentNow }
+            revealIfFirstOpen()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            moment = momentNow
+            revealIfFirstOpen()
+        }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: revealed)
         .navigationDestination(item: $opened) { alert in
             switch alert {
             case .sick: SickView()
@@ -63,9 +103,28 @@ struct TodayView: View {
 
     /// By the real clock: "Good evening" at 9pm, "Still up" at 1am.
     private var greeting: String {
-        let part = model.greetingPart
+        let part = DemoMode.clock.map { AppModel.greetingPart(hour: $0 / 60 % 24) } ?? model.greetingPart
         return name.isEmpty ? part : "\(part), \(name)"
     }
+
+    /// Now, in app-day minutes (`model.now`), or the `-demoClock` time.
+    private var clock: Minutes { DemoMode.clock ?? model.now }
+
+    // MARK: Following the clock
+
+    /// Morning leads with how she slept and recovered; afternoon with
+    /// energy now and the caffeine cutoff; evening with tonight.
+    private enum Moment { case morning, afternoon, evening }
+
+    /// Morning runs to noon, or two hours after a late wake (as the
+    /// check-in does); evening from 7pm.
+    private var momentNow: Moment {
+        let wake = model.lastNightIsFresh ? model.lastNight.wake : 0
+        if clock < max(12 * 60, wake + 120) { return .morning }
+        return clock < 19 * 60 ? .afternoon : .evening
+    }
+
+    private var shownMoment: Moment { moment ?? momentNow }
 
     // MARK: Exam chip
 
@@ -164,7 +223,7 @@ struct TodayView: View {
     /// The longer note: what the score is compared with, and what moved it.
     /// Behind the card's ⓘ (Whitfield F6), not on the card.
     private var recoveryNote: String {
-        var note = model.recoveryUsualNote
+        var note = recoveryUsualNote
         if model.recoveryIsExample {
             note += " Example: it uses example heart readings until your Watch has learned your usual."
         } else if !model.hasHeartData {
@@ -185,14 +244,62 @@ struct TodayView: View {
         return note
     }
 
-    /// One line under the label: "Below your usual of 78" (Valtonen F1).
-    private var recoveryLine: String {
-        guard let value = recoveryValue else { return "" }
-        let usual = model.recoveryUsual
-        let what = model.recoveryUsualIsPersonal ? "your usual of \(usual)" : "the starting point of \(usual)"
-        if value <= usual - 5 { return "Below \(what)" }
-        if value >= usual + 5 { return "Above \(what)" }
-        return "Around \(what)"
+    /// How far she is toward her own usual, or nil on pure example data
+    /// (the banner already says so). Her usual needs 14 nights of sleep
+    /// before the app leaves example data, then 7 days of heart readings.
+    private var learningUsual: String? {
+        if model.usingSampleData {
+            return model.realNightCount > 0 ? "\(min(model.realNightCount, AppModel.nightsNeeded - 1)) of \(AppModel.nightsNeeded) nights" : nil
+        }
+        return "\(min(model.recoveryDaysLearned, 6)) of 7 days"
+    }
+
+    /// Until she has her own usual: "a typical day", never "the starting
+    /// point" (F8).
+    private var recoveryUsualNote: String {
+        guard !model.recoveryUsualIsPersonal else { return model.recoveryUsualNote }
+        let learning = learningUsual.map { " (\($0) so far)" } ?? ""
+        return "Compared with a typical day (\(model.recoveryUsual)) until your Watch learns your usual\(learning)."
+    }
+
+    /// The day in one plain sentence under the label (D-T4), joined from
+    /// what Today already knows: "Short night, pill day 18. Bed by
+    /// 11:50pm." How the score compares with her usual is in the ⓘ.
+    private var daySentence: String {
+        var facts: [String] = []
+        if !model.lastNightIsFresh {
+            facts.append("no sleep recorded")
+        } else if model.lastNight.asleep - model.sleepNeed.minutes < -15 {
+            facts.append("short night")
+        } else {
+            facts.append("full night")
+        }
+        if let pill = model.pillToday {
+            facts.append(!pill.isPillDay ? model.packBreakName.lowercased()
+                         : pill.isNewPack ? "new pack today" : "pill day \(pill.packDay)")
+        }
+        if nextExam?.daysUntil == 0 { facts.append("exam today") }
+        let first = facts.joined(separator: ", ")
+        let bed = 1440 + model.tonightBedtime
+        let plan = clock < bed ? "Bed\u{00A0}by\u{00A0}\(Clock.format(bed))." : "Past your \(Clock.format(bed)) bedtime."
+        return first.prefix(1).uppercased() + first.dropFirst() + ". " + plan
+    }
+
+    // MARK: Morning reveal
+
+    /// The first open of the morning after a recorded night: the ring
+    /// fills and the number counts up, with one soft tap (D-M2). Once per
+    /// app day; with Reduce Motion the ring fades in instead.
+    private func revealIfFirstOpen() {
+        let day = model.appDayDate.formatted(.iso8601.year().month().day())
+        guard shownMoment == .morning, model.lastNightIsFresh, recoveryValue != nil, revealDay != day else { return }
+        revealDay = day
+        revealing = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.4) : .easeOut(duration: 0.9)) { revealing = false }
+            revealed += 1
+        }
     }
 
     private var recoveryExplanation: Explanation {
@@ -215,11 +322,14 @@ struct TodayView: View {
                     RecoveryView()
                 } label: {
                     AdaptiveStack(spacing: Space.l) {
-                        Ring(value: Double(value) / 100, accent: .indigo, label: "\(value)", caption: "Recovery", size: 104)
+                        let empty = revealing && !reduceMotion
+                        Ring(value: empty ? 0 : Double(value) / 100, accent: .indigo, label: empty ? "0" : "\(value)",
+                             caption: "Recovery", size: 104, accessibilityText: "Recovery: \(value)")
+                            .opacity(revealing && reduceMotion ? 0 : 1)
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text(model.recoveryLabel(for: value)).font(.heading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text(recoveryLine)
+                            Text(daySentence)
                                 .font(.secondary)
                                 .foregroundStyle(p.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -264,8 +374,19 @@ struct TodayView: View {
     /// HRV, resting heart rate and sleep in their own colours (indigo, pink,
     /// purple), with the change in secondary text and a ▲/▼ that's coral
     /// only when it needs attention (Tanaka F2, Valtonen F4). Each opens
-    /// its own screen; Sleep switches to the Sleep tab.
+    /// its own screen; Sleep switches to the Sleep tab. At accessibility
+    /// text sizes the dials stacked into a screen of rings, so they're
+    /// rows there (F10).
+    @ViewBuilder
     private var gauges: some View {
+        if typeSize.isAccessibilitySize {
+            gaugeRows
+        } else {
+            dials
+        }
+    }
+
+    private var dials: some View {
         let heart = model.hasHeartData
         let fresh = model.lastNightIsFresh
         return AdaptiveStack(spacing: Space.s, alignment: .top) {
@@ -296,6 +417,31 @@ struct TodayView: View {
             .buttonStyle(.pressable)
             .accessibilityHint("Opens the Sleep tab")
         }
+    }
+
+    private var gaugeRows: some View {
+        let heart = model.hasHeartData
+        let fresh = model.lastNightIsFresh
+        let hrv = heart ? hrvChange : .none(text: "No reading")
+        let resting = heart ? restingHRChange : .none(text: "No reading")
+        let sleep = sleepChange
+        return VStack(spacing: 0) {
+            MetricRow(title: "HRV", note: hrv.sentence, value: heart ? "\(Int(model.hrv.rounded())) ms" : nil,
+                      trend: hrv.rowTrend, systemImage: "waveform.path.ecg", accent: .indigo) {
+                HeartMetricView(metric: .hrv)
+            }
+            RowDivider()
+            MetricRow(title: "Resting HR", note: resting.sentence, value: heart ? "\(Int(model.restingHR.rounded())) bpm" : nil,
+                      trend: resting.rowTrend, systemImage: "heart.fill", accent: .pink) {
+                HeartMetricView(metric: .restingHR)
+            }
+            RowDivider()
+            MetricRow(title: "Sleep", note: sleep.sentence, value: fresh ? Clock.duration(model.lastNight.asleep) : nil,
+                      trend: sleep.rowTrend, systemImage: "bed.double.fill", accent: .purple) {
+                openTab(.sleep)
+            }
+        }
+        .padding(.horizontal, -Space.l)
     }
 
     private var hrvChange: GaugeChange {
@@ -329,6 +475,17 @@ struct TodayView: View {
         return .none(text: "on target")
     }
 
+    // MARK: Pill
+
+    /// Today's pill under the hero, with one-tap Taken (D-T2). Only on a
+    /// pack she's set (combined pill).
+    @ViewBuilder
+    private var pillRow: some View {
+        if model.pillToday != nil {
+            RowCard { PillTodayRow() }
+        }
+    }
+
     // MARK: Tonight
 
     /// The one bedtime and wake time (her best sleep times, the same the
@@ -355,7 +512,7 @@ struct TodayView: View {
                             Text("Bed by \(Clock.format(model.tonightBedtime))")
                                 .font(typeSize.isAccessibilitySize ? .cardTitle : .heading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text("Up at \(Clock.format(wake))").font(.bodyEmphasis)
+                            Text(tonightLine(wake: wake)).font(.bodyEmphasis)
                                 .foregroundStyle(p.secondary)
                         }
                         Spacer(minLength: Space.s)
@@ -374,6 +531,14 @@ struct TodayView: View {
             }
             alarmChip(tonight)
         }
+    }
+
+    /// "Up at 8:30am", and in the evening the countdown first: "Bed in
+    /// 2h 40m · up at 8:30am".
+    private func tonightLine(wake: Minutes) -> String {
+        let left = 1440 + model.tonightBedtime - clock
+        guard shownMoment == .evening, left > 0 else { return "Up at \(Clock.format(wake))" }
+        return "Bed in \(Clock.duration(left)) \u{00B7} up\u{00A0}at\u{00A0}\(Clock.format(wake))"
     }
 
     private var tonightExplanation: Explanation {
@@ -538,6 +703,10 @@ struct TodayView: View {
 
     private var caffeineNote: String {
         let count = model.todaysDrinks.count
+        if shownMoment == .afternoon, let cutoff = model.caffeineCutoffShown {
+            let drinks = count == 0 ? "" : (count == 1 ? "1 drink" : "\(count) drinks") + " \u{00B7} "
+            return drinks + (count == 0 ? "Cutoff" : "cutoff") + " \(Clock.format(cutoff))"
+        }
         if count == 0 { return "Tap to log coffee or tea" }
         return (count == 1 ? "1 caffeine drink" : "\(count) caffeine drinks") + " \u{00B7} tap to edit"
     }
@@ -565,28 +734,69 @@ struct TodayView: View {
     }
 
     /// Two columns, or one at accessibility text sizes so titles and
-    /// values aren't cut off.
+    /// values aren't cut off. In the afternoon energy now and caffeine
+    /// come first.
     @ViewBuilder
     private var tiles: some View {
+        let afternoon = shownMoment == .afternoon
         if typeSize.isAccessibilitySize {
             VStack(spacing: Space.m) {
-                sleepTile
-                caffeineTile
-                waterTile
-                stressTile
+                if afternoon {
+                    fourthTile
+                    caffeineTile
+                    waterTile
+                    sleepTile
+                } else {
+                    sleepTile
+                    caffeineTile
+                    waterTile
+                    fourthTile
+                }
             }
         } else {
             Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
-                GridRow {
-                    sleepTile
-                    caffeineTile
-                }
-                GridRow {
-                    waterTile
-                    stressTile
+                if afternoon {
+                    GridRow {
+                        fourthTile
+                        caffeineTile
+                    }
+                    GridRow {
+                        waterTile
+                        sleepTile
+                    }
+                } else {
+                    GridRow {
+                        sleepTile
+                        caffeineTile
+                    }
+                    GridRow {
+                        waterTile
+                        fourthTile
+                    }
                 }
             }
         }
+    }
+
+    /// Stress in the morning; from noon, energy now takes its slot (D-T3):
+    /// the most "right now" number, otherwise two taps deep on Body.
+    @ViewBuilder
+    private var fourthTile: some View {
+        if clock >= 12 * 60 {
+            energyTile
+        } else {
+            stressTile
+        }
+    }
+
+    private var energyTile: some View {
+        NavigationLink {
+            EnergyView()
+        } label: {
+            EnergyNowTile(energy: model.energyToday, now: clock, moment: model.energyMoment(at: clock, in: model.energyToday))
+        }
+        .buttonStyle(.pressable)
+        .accessibilityHint("Opens your energy curve for today")
     }
 
     /// Switches to the Sleep tab instead of pushing a second Sleep screen
@@ -613,7 +823,8 @@ struct TodayView: View {
 
     private var waterTile: some View {
         WaterTile(todayML: model.waterTodayML, goalML: model.waterGoalTodayML,
-                  bottleML: store.data.bottleSizeML, showsGoal: !model.hidesEffortTargets) {
+                  bottleML: store.data.bottleSizeML, paceML: model.waterPace(at: clock),
+                  showsGoal: !model.hidesEffortTargets) {
             withMotion(.log) { model.addWater() }
         }
     }
@@ -634,6 +845,8 @@ private struct WaterTile: View {
     var todayML: Double
     var goalML: Double
     var bottleML: Double
+    /// What a steady pace would have reached by now.
+    var paceML: Double
     /// False with an eating-disorder history: the total only, no goal.
     var showsGoal: Bool
     var add: () -> Void
@@ -641,12 +854,12 @@ private struct WaterTile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var added = 0
 
-    private var bottlesNote: String {
-        guard bottleML > 0 else { return "" }
-        let had = todayML / bottleML
-        guard showsGoal else { return "\(LogFormat.bottlesPhrase(had)) today" }
-        let goal = goalML / bottleML
-        return "\(LogFormat.bottles(had)) of \(LogFormat.bottlesPhrase(goal))"
+    /// The steady pace by now (F7): the bottles line said the amount
+    /// again. Nothing once the goal is reached, before waking, or without a
+    /// goal.
+    private var paceNote: String? {
+        guard showsGoal, todayML < goalML, paceML >= LogFormat.mlPerOunce else { return nil }
+        return "Pace: \(LogFormat.oz(paceML)) by now"
     }
 
     private var amount: String {
@@ -666,7 +879,9 @@ private struct WaterTile: View {
                         .font(.numberL).minimumScaleFactor(0.6).lineLimit(1)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .motion(.fill, value: amount)
-                    Text(bottlesNote).font(.secondary).foregroundStyle(p.secondary)
+                    if let paceNote {
+                        Text(paceNote).font(.secondary).foregroundStyle(p.secondary)
+                    }
                 }
                 .padding(Space.l)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -674,7 +889,7 @@ private struct WaterTile: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(showsGoal ? "Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML)), \(bottlesNote)" : "Water: \(LogFormat.oz(todayML)), \(bottlesNote)")
+            .accessibilityLabel(showsGoal ? "Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML))" + (paceNote.map { ", \($0)" } ?? "") : "Water: \(LogFormat.oz(todayML))")
             .accessibilityHint(showsGoal ? "Opens water, where you can change your bottle size and goal" : "Opens water, where you can change your bottle size")
             Button {
                 added += 1
@@ -697,6 +912,77 @@ private struct WaterTile: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .tileSurface()
+    }
+}
+
+/// Energy now as a tile (D-T3): the curve's level now, a 56pt curve of the
+/// day with a "now" dot, and where she is ("Afternoon dip till 6:07pm").
+/// The same "now" as the readout on Energy.
+private struct EnergyNowTile: View {
+    var energy: EnergyDay
+    var now: Minutes
+    var moment: AppModel.EnergyMoment
+    @Environment(\.colorScheme) private var scheme
+
+    private var start: Minutes { energy.curve.first?.time ?? 420 }
+    private var end: Minutes { max(energy.curve.last?.time ?? 1560, start + 60) }
+    private var nowTime: Minutes { min(max(now, start), end) }
+
+    /// "Afternoon dip till 6:07pm" inside a zone, otherwise the moment's
+    /// own name ("Climbing out of the dip").
+    private var whereNow: String {
+        guard let zone = AppModel.zone(at: moment.time, in: energy) else { return moment.title }
+        return "\(AppModel.zoneTitle(zone)) till\u{00A0}\(Clock.format(zone.range.end))"
+    }
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        let line = Accent.mint.fill(scheme)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                Text("Energy now").font(.bodyEmphasis)
+                Spacer(minLength: 0)
+                Image(systemName: "bolt.fill")
+                    .font(.scaled(size: 15, weight: .semibold))
+                    .foregroundStyle(Accent.mint.ink(scheme))
+                    .accessibilityHidden(true)
+            }
+            Text("\(moment.level)")
+                .font(.numberL)
+                .lineLimit(1)
+            Chart {
+                ForEach(energy.curve, id: \.time) { point in
+                    AreaMark(x: .value("Time", point.time), y: .value("Energy", point.level))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(LinearGradient(colors: [line.opacity(0.3), line.opacity(0.02)],
+                                                        startPoint: .top, endPoint: .bottom))
+                }
+                ForEach(energy.curve, id: \.time) { point in
+                    LineMark(x: .value("Time", point.time), y: .value("Energy", point.level))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(line)
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                }
+                if let level = energy.level(at: nowTime) {
+                    PointMark(x: .value("Now", nowTime), y: .value("Energy", level))
+                        .symbolSize(60)
+                        .foregroundStyle(p.primary)
+                }
+            }
+            .chartXScale(domain: start...end)
+            .chartYScale(domain: -8.0...112.0)
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 56)
+            .accessibilityHidden(true)
+            Text(whereNow).font(.secondary).foregroundStyle(p.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Space.l)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .tileSurface()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Energy now: \(moment.level) of 100, \(whereNow)")
     }
 }
 
@@ -746,6 +1032,13 @@ private struct GaugeChange {
 
     static func none(text: String) -> GaugeChange {
         GaugeChange(up: nil, text: text, spoken: text, tone: .neutral)
+    }
+
+    /// The row note at accessibility sizes: "6% below your usual".
+    var sentence: String { spoken.prefix(1).uppercased() + spoken.dropFirst() }
+
+    var rowTrend: RowTrend? {
+        up.map { RowTrend(up: $0, tone: tone == .worse ? .worse : tone == .better ? .better : .neutral) }
     }
 }
 

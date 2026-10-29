@@ -20,6 +20,7 @@ import HealthCore
 ///   with an after-exam check-in).
 /// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
 ///   big night last night and a hard training day today.
+/// - `-demoClock 14:30`: Today as if it were that time (see `clock`).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -46,9 +47,20 @@ enum DemoMode {
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
+    /// `-demoClock 14:30`: Today greets, orders its cards and reads energy
+    /// now as if it were that time (screenshots of the morning, afternoon
+    /// and evening). Other screens keep the real clock. In app-day
+    /// minutes, so `00:30` is 1470.
+    static let clock: Minutes? = value(after: "-demoClock").flatMap { text in
+        let parts = text.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2, (0..<24).contains(parts[0]), (0..<60).contains(parts[1]) else { return nil }
+        let minutes = parts[0] * 60 + parts[1]
+        return minutes < AppDay.rolloverMinutes ? minutes + 1440 : minutes
+    }
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let open: String? = nil
+    static let clock: Minutes? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif

@@ -49,15 +49,17 @@ struct TabHeader: View {
     }
 }
 
-/// The round button into Settings, with her initial when she gave a name.
-/// The same on all four tabs.
+/// The round button into Settings: her initials when she gave a name,
+/// otherwise a gear, so it reads as Settings (F9). The same on all four tabs.
 struct SettingsAvatar: View {
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
 
-    private var initial: String? {
-        let name = (store.data.name ?? "").trimmingCharacters(in: .whitespaces)
-        return name.first.map { String($0).uppercased() }
+    /// "AL" for "Ashley Libasci", "A" for "Ashley"; nil without a name.
+    static func initials(_ name: String?) -> String? {
+        let words = (name ?? "").split(whereSeparator: \.isWhitespace)
+        let letters = [words.first, words.count > 1 ? words.last : nil].compactMap { $0?.first }
+        return letters.isEmpty ? nil : String(letters).uppercased()
     }
 
     var body: some View {
@@ -66,10 +68,12 @@ struct SettingsAvatar: View {
             SettingsView()
         } label: {
             Group {
-                if let initial {
-                    Text(initial).font(.scaled(size: 17, weight: .bold))
+                if let initials = Self.initials(store.data.name) {
+                    Text(initials).font(.scaled(size: initials.count > 1 ? 15 : 17, weight: .bold))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
                 } else {
-                    Image(systemName: "person.fill").font(.scaled(size: 16, weight: .semibold))
+                    Image(systemName: "gearshape.fill").font(.scaled(size: 17, weight: .semibold))
                 }
             }
             .foregroundStyle(Accent.indigo.ink(scheme))

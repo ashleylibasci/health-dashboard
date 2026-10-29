@@ -65,15 +65,20 @@ struct SettingsView: View {
         let p = Palette(scheme: scheme)
         return NavigationLink { ProfileSettingsView() } label: {
             HStack(spacing: 14) {
-                Image(systemName: "person.fill")
-                    .font(.scaled(size: 24, weight: .semibold))
-                    // The same avatar as the tab headers: indigo on the chip
-                    // colour, coral being kept for "worse" (Tanaka F1).
-                    .foregroundStyle(Accent.indigo.ink(scheme))
-                    .frame(width: 56, height: 56)
-                    .background(p.chip, in: Circle())
-                    .overlay(Circle().strokeBorder(p.cardBorder))
-                    .accessibilityHidden(true)
+                Group {
+                    if let initials = SettingsAvatar.initials(store.data.name) {
+                        Text(initials).font(.scaled(size: 22, weight: .bold))
+                    } else {
+                        Image(systemName: "person.fill").font(.scaled(size: 24, weight: .semibold))
+                    }
+                }
+                // Her initials, as on the tab headers: indigo on the chip
+                // colour, coral being kept for "worse" (Tanaka F1).
+                .foregroundStyle(Accent.indigo.ink(scheme))
+                .frame(width: 56, height: 56)
+                .background(p.chip, in: Circle())
+                .overlay(Circle().strokeBorder(p.cardBorder))
+                .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(store.data.name.map { $0.isEmpty ? "Your profile" : $0 } ?? (model.usingSampleData ? "Example profile" : "Your profile"))
                         .font(.scaled(size: 20, weight: .bold))

@@ -39,6 +39,8 @@ final class AppModel: ObservableObject {
     /// Her own averages over recent days, once there are at least 7.
     @Published private(set) var personalRecoveryUsual: Int?
     @Published private(set) var personalEnergyUsual: Int?
+    /// Days of her own recovery readings so far (her usual needs 7).
+    @Published private(set) var recoveryDaysLearned = 0
     /// Her own day-to-day spread of recovery scores (standard deviation),
     /// once there are 14 days. Scales the recovery labels.
     @Published private(set) var personalRecoverySpread: Double?
@@ -547,6 +549,7 @@ final class AppModel: ObservableObject {
         personalRecoveryUsual = nil
         personalEnergyUsual = nil
         personalRecoverySpread = nil
+        recoveryDaysLearned = 0
         hrv = SampleData.hrv; restingHR = SampleData.restingHR
         hrvDeltaPct = SampleData.hrvDeltaPct; restingHRDelta = SampleData.restingHRDelta
         daylightToday = SampleData.daylightToday; stepsToday = SampleData.stepsToday
@@ -994,6 +997,7 @@ final class AppModel: ObservableObject {
                                       cycle: cycleHeartShift(on: n.wakeDay)))
             }
         personalRecoveryUsual = recoveries.count >= 7 ? recoveries.mean.map { Int($0.rounded()) } : nil
+        recoveryDaysLearned = recoveries.count
         personalRecoverySpread = recoveries.count >= 14 ? recoveries.standardDeviation : nil
         let energies: [Double] = recent.prefix(14).map { Double(energyScore(for: $0)) }
         personalEnergyUsual = energies.count >= 7 ? energies.mean.map { Int($0.rounded()) } : nil
