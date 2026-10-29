@@ -536,7 +536,7 @@ struct TodayView: View {
     private func tonightLine(wake: Minutes) -> String {
         let left = 1440 + model.tonightBedtime - clock
         guard shownMoment == .evening, left > 0 else { return "Up at \(Clock.format(wake))" }
-        return "Bed in \(Clock.duration(left)) \u{00B7} up at \(Clock.format(wake))"
+        return "Bed in \(Clock.duration(left)) \u{00B7} up\u{00A0}at\u{00A0}\(Clock.format(wake))"
     }
 
     private var tonightExplanation: Explanation {
