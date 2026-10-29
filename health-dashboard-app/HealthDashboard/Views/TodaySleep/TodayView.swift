@@ -279,7 +279,7 @@ struct TodayView: View {
         if nextExam?.daysUntil == 0 { facts.append("exam today") }
         let first = facts.joined(separator: ", ")
         let bed = 1440 + model.tonightBedtime
-        let plan = clock < bed ? "Bed by \(Clock.format(bed))." : "Past your \(Clock.format(bed)) bedtime."
+        let plan = clock < bed ? "Bed\u{00A0}by\u{00A0}\(Clock.format(bed))." : "Past your \(Clock.format(bed)) bedtime."
         return first.prefix(1).uppercased() + first.dropFirst() + ". " + plan
     }
 
