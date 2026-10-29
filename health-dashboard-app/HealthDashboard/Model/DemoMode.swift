@@ -20,6 +20,8 @@ import HealthCore
 ///   with an after-exam check-in).
 /// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
 ///   big night last night and a hard training day today.
+/// - `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
+///   Activity right away, with that Watch alarm state.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -46,9 +48,13 @@ enum DemoMode {
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
+    /// `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
+    /// Activity straight away (bed in 45 minutes), with that Watch alarm state.
+    static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let open: String? = nil
+    static let bedtimeActivity: String? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif

@@ -1301,6 +1301,13 @@ final class AppModel: ObservableObject {
         return nil
     }
 
+    /// The Watch says the next alarm is on (it reported the same latest time).
+    var watchAlarmIsOn: Bool {
+        guard let next = nextAlarmWindow,
+              let armed = UserDefaults.standard.object(forKey: Self.armedEndKey) as? Double else { return false }
+        return abs(Date(timeIntervalSinceReferenceDate: armed).timeIntervalSince(next.end)) < 120
+    }
+
     /// The Watch can only turn the alarm on while its app is open, at most 36
     /// hours ahead. When the next alarm isn't on (the Watch says so, or
     /// it follows a skipped weekend), a phone notification the evening
@@ -1349,6 +1356,7 @@ final class AppModel: ObservableObject {
         // iPhone backup alarm follows the same window.
         publishWidgetSnapshot()
         updatePhoneBackupAlarm()
+        updateBedtimeActivity()
         let cal = Calendar.current
         if let alarm {
             let day = wakeDay.map { cal.startOfDay(for: $0) } ?? Self.wakeDay(forWindowEnding: alarm.end)
@@ -1441,6 +1449,8 @@ final class AppModel: ObservableObject {
                 defaults.removeObject(forKey: Self.armedEndKey)
             }
             Task { await updateAlarmNudge() }
+            // "Watch alarm on" on the bedtime Live Activity.
+            updateBedtimeActivity()
         }
     }
 }
