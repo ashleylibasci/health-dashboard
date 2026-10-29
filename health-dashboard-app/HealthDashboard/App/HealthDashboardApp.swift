@@ -64,7 +64,9 @@ struct HealthDashboardApp: App {
 /// screen switches tabs through `openTab` rather than pushing a copy.
 struct RootTabView: View {
     @Environment(\.colorScheme) private var scheme
-    @State private var tab: AppTab = .today
+    @State private var tab: AppTab = DemoMode.open == nil ? .today : .body
+    /// `-demoOpen` (Debug): the screen pushed on Body at launch.
+    @State private var demoOpen = false
 
     var body: some View {
         TabView(selection: $tab) {
@@ -74,7 +76,17 @@ struct RootTabView: View {
             NavigationStack { SleepView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(AppTab.sleep)
-            NavigationStack { BodyView().toolbar(.hidden, for: .navigationBar) }
+            NavigationStack {
+                BodyView().toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(isPresented: $demoOpen) {
+                        if DemoMode.open == "cycleSettings" { CycleSettingsView() } else { CycleView() }
+                    }
+                    .task {
+                        guard DemoMode.open != nil, !demoOpen else { return }
+                        try? await Task.sleep(for: .milliseconds(500))
+                        demoOpen = true
+                    }
+            }
                 .tabItem { Label("Body", systemImage: "heart") }
                 .tag(AppTab.body)
             NavigationStack { LogView().toolbar(.hidden, for: .navigationBar) }

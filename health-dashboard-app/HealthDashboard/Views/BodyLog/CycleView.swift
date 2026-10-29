@@ -595,6 +595,7 @@ private struct PackSection: View {
                 withMotion(.reveal) { editing = true }
             }
         }
+        PillAwayCallout()
         header
         RowCard {
             if model.pillToday != nil {

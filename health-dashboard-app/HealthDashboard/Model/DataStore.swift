@@ -109,6 +109,10 @@ struct AppData: Codable {
     /// Also count doses logged in Apple Health (Apple's Medications, or any
     /// app that saves doses there). iOS 26 and later.
     var pillReadsHealth = false
+    /// The time zone her pill time belongs to (H-A11): the reminders stay
+    /// at her home time when she travels. Set the first time they're
+    /// scheduled.
+    var pillHomeTimeZone: String?
     /// Packs she had when she last counted, counting the one she was on
     /// (H-A6), and pill 1 of that pack. Nil until she sets it.
     var refillPacks: Int?
@@ -184,6 +188,7 @@ struct AppData: Codable {
         pillReminder = get(.pillReminder, d.pillReminder)
         pillTime = min(max(get(.pillTime, d.pillTime), 0), 1439)
         pillReadsHealth = get(.pillReadsHealth, d.pillReadsHealth)
+        pillHomeTimeZone = get(.pillHomeTimeZone, d.pillHomeTimeZone)
         refillPacks = get(.refillPacks, d.refillPacks)
         refillCountedFrom = get(.refillCountedFrom, d.refillCountedFrom)
         methodChangedDate = get(.methodChangedDate, d.methodChangedDate)

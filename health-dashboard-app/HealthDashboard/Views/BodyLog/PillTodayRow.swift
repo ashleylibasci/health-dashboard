@@ -52,8 +52,11 @@ struct PillTodayRow: View {
         guard pill.isPillDay else {
             return model.nextPackStart.map { "New pack \(PackPosition.shortDate($0))" } ?? "New pack soon"
         }
-        let time = Clock.format(store.data.pillTime)
-        let due = Clock.minutesOfDay(.now) >= store.data.pillTime || !Calendar.current.isDateInToday(pill.day)
+        // Away from home, her home pill time on this clock (H-A11).
+        let time = model.pillAwayFromHome
+            ? "\(BodyLogStyle.shortTime(model.pillTimeHere)) here"
+            : Clock.format(store.data.pillTime)
+        let due = Clock.minutesOfDay(.now) >= model.pillTimeHere || !Calendar.current.isDateInToday(pill.day)
         if pill.isNewPack { return due ? "Due at \(time) \u{00B7} starting on time matters most" : "Take at \(time) \u{00B7} starting on time matters most" }
         return due ? "Due at \(time) \u{00B7} not taken yet" : "Take at \(time)"
     }

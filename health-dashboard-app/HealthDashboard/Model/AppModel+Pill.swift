@@ -118,6 +118,7 @@ extension AppModel {
             || old.packActiveDays != new.packActiveDays || old.packLength != new.packLength
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
             || old.refillPacks != new.refillPacks || old.refillCountedFrom != new.refillCountedFrom
+            || old.pillHomeTimeZone != new.pillHomeTimeZone
     }
 
     /// Reads Apple Health's doses (when she turned that on), then
@@ -139,15 +140,48 @@ extension AppModel {
             await PillReminders.cancelAll()
             return
         }
+        if store.data.pillHomeTimeZone == nil { store.data.pillHomeTimeZone = TimeZone.current.identifier }
+        // At her home pill time, wherever she is (H-A11). A home midnight is
+        // checked at home noon, the same date wherever she's travelled.
+        let home = pillHomeCalendar
         let plan = PillReminderPlan.reminders(pack: pack, pillTime: store.data.pillTime, now: .now,
-                                              isTaken: { isPillTaken(on: $0) },
-                                              skipOnTime: appleRemindsPill)
-        await PillReminders.reschedule(plan, pillTime: store.data.pillTime, packLength: pack.packLength)
+                                              isTaken: { isPillTaken(on: $0.addingTimeInterval(12 * 3600)) },
+                                              skipOnTime: appleRemindsPill, calendar: home)
+        await PillReminders.reschedule(plan, pillTime: store.data.pillTime, packLength: pack.packLength, calendar: home)
         if DemoMode.pillNotice, !Self.demoNoticeSent, let today = pillToday, today.isPillDay, today.taken == nil {
             Self.demoNoticeSent = true
             let soon = PillReminder(kind: .onTime, fire: .now.addingTimeInterval(10), day: today.day, packDay: today.packDay)
             await PillReminders.add([soon], pillTime: store.data.pillTime, packLength: pack.packLength, exactly: true)
         }
+    }
+
+    // MARK: Travelling (H-A11)
+
+    /// The calendar in her home time zone (where her pill time was set).
+    var pillHomeCalendar: Calendar {
+        var cal = Calendar.current
+        if let id = store.data.pillHomeTimeZone, let tz = TimeZone(identifier: id) { cal.timeZone = tz }
+        return cal
+    }
+
+    /// Her phone is in a time zone whose clock differs from home's right now.
+    var pillAwayFromHome: Bool {
+        guard store.birthControl == .combinedPill, let id = store.data.pillHomeTimeZone,
+              let home = TimeZone(identifier: id) else { return false }
+        return home.secondsFromGMT(for: .now) != TimeZone.current.secondsFromGMT(for: .now)
+    }
+
+    /// Her home pill time on this phone's clock (6pm here for 9pm at home).
+    var pillTimeHere: Minutes {
+        let home = pillHomeCalendar
+        let t = store.data.pillTime
+        guard let at = home.date(bySettingHour: t / 60, minute: t % 60, second: 0, of: home.startOfDay(for: .now)) else { return t }
+        return Clock.minutesOfDay(at)
+    }
+
+    /// "I live here now": her pill time stays the same on the clock, here.
+    func usePillTimeZoneHere() {
+        store.data.pillHomeTimeZone = TimeZone.current.identifier
     }
 
     /// `-demoPillNotice` fired its one notification.

@@ -11,14 +11,16 @@ enum PillReminders {
 
     /// Replaces every pending pill reminder with `plan`. Does nothing more
     /// if notifications aren't allowed.
-    static func reschedule(_ plan: [PillReminder], pillTime: Minutes, packLength: Int) async {
+    static func reschedule(_ plan: [PillReminder], pillTime: Minutes, packLength: Int, calendar: Calendar = .current) async {
         await cancelAll()
-        await add(plan, pillTime: pillTime, packLength: packLength)
+        await add(plan, pillTime: pillTime, packLength: packLength, calendar: calendar)
     }
 
     /// Schedules `plan` alongside what's pending. `exactly`: to the second
-    /// (the demo's), not the minute.
-    static func add(_ plan: [PillReminder], pillTime: Minutes, packLength: Int, exactly: Bool = false) async {
+    /// (the demo's), not the minute. The times are pinned to `calendar`'s
+    /// time zone (her home's), so they don't slide when she travels (H-A11).
+    static func add(_ plan: [PillReminder], pillTime: Minutes, packLength: Int, exactly: Bool = false,
+                    calendar: Calendar = .current) async {
         guard !plan.isEmpty, await Nudges.isAllowed() else { return }
         await registerCategory()
         let hidden = await PrivateNotice.bodyHiddenWhenLocked()
@@ -29,7 +31,7 @@ enum PillReminders {
             content.sound = .default
             let trigger: UNNotificationTrigger = exactly
                 ? UNTimeIntervalNotificationTrigger(timeInterval: max(r.fire.timeIntervalSinceNow, 1), repeats: false)
-                : UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: r.fire),
+                : UNCalendarNotificationTrigger(dateMatching: calendar.dateComponents([.timeZone, .year, .month, .day, .hour, .minute], from: r.fire),
                                                 repeats: false)
             let id = prefix + r.kind.rawValue + "-" + String(Int(r.fire.timeIntervalSince1970))
             try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
