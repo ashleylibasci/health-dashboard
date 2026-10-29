@@ -31,6 +31,16 @@ struct AppData: Codable {
         var date: Date
         var kind: String       // "Wine", "Beer", "Seltzer", "Cocktail", "Shot"
         var count: Int
+        /// An `AlcoholPour` id ("Wine.redCup"); nil (older entries) is the
+        /// kind's usual serving, one standard drink.
+        var pour: String? = nil
+
+        /// US standard drinks: the count times the pour's size.
+        var standardDrinks: Double { Double(count) * (AlcoholPour.pour(id: pour)?.standardDrinks ?? 1) }
+        /// "1 red cup of wine", "2 beers".
+        var phrase: String {
+            (AlcoholPour.pour(id: pour) ?? AlcoholPour.standard(for: kind))?.phrase(count: count) ?? "\(count) \(kind.lowercased())"
+        }
     }
     enum Flow: String, Codable, CaseIterable { case none = "No flow", spotting = "Spotting", light = "Light", medium = "Medium", heavy = "Heavy" }
     struct FlowEntry: Codable, Hashable, Identifiable {
@@ -153,6 +163,9 @@ struct AppData: Codable {
     /// The goal before 72 oz. Saves keep whatever goal they had.
     static let previousWaterGoalML: Double = 64 * 29.5735
     var waterLog: [WaterEntry] = []
+    /// When she last said "hot day today" on Water: the water goal goes up
+    /// for that app day (D6).
+    var hotDay: Date?
     /// Caffeine and water entries from Apple Health she deleted here, so
     /// they aren't read back in (ones another app saved can't be deleted
     /// from Health by this app).
@@ -163,6 +176,9 @@ struct AppData: Codable {
     var moodLog: [MoodEntry] = []
     /// Sleep and exam features: bedtime nudge, tomorrow's list, after-exam check-ins.
     var sleepExtras = SleepExtrasData()
+    /// The time zone she was in each day (midnight → identifier), the last
+    /// 60 days, so travel days stay out of her baselines (E1).
+    var timeZoneByDay: [Date: String] = [:]
 
     init() {}
 
@@ -218,12 +234,14 @@ struct AppData: Codable {
         // 1,500 ml was the old metric default; it moved to 64 oz back then.
         if waterGoalML == 1500 { waterGoalML = Self.previousWaterGoalML }
         waterLog = get(.waterLog, d.waterLog)
+        hotDay = get(.hotDay, d.hotDay)
         removedHealthLogIDs = get(.removedHealthLogIDs, d.removedHealthLogIDs)
         alcoholLog = get(.alcoholLog, d.alcoholLog)
         flowLog = get(.flowLog, d.flowLog)
         symptomLog = get(.symptomLog, d.symptomLog)
         moodLog = get(.moodLog, d.moodLog)
         sleepExtras = get(.sleepExtras, d.sleepExtras)
+        timeZoneByDay = get(.timeZoneByDay, d.timeZoneByDay)
     }
 
     /// Entries from today's app day only (since the rollover, 4:00am or

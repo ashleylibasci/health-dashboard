@@ -23,6 +23,7 @@ struct RecoveryPage: View {
                         score.staleStyle(snapshot.isStale(now: now))
                         energyButton.staleStyle(snapshot.isStale(now: now))
                     }
+                    DownshiftOffer(snapshot: snapshot, now: now)
                     cycleRow(now: now)
                 }
             }

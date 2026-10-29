@@ -136,6 +136,8 @@ struct TodayView: View {
     private var alertSlot: some View {
         if let alert, alert.0 == .sick {
             alertBar(alert)
+        } else if model.morningAfterClear != nil {
+            MorningAfterCallout()
         } else if showsPackCheck {
             PackCheckCard()
         } else if let alert {
@@ -610,7 +612,7 @@ struct TodayView: View {
     }
 
     private var waterTile: some View {
-        WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
+        WaterTile(todayML: model.waterTodayML, goalML: model.waterGoalTodayML,
                   bottleML: store.data.bottleSizeML, showsGoal: !model.hidesEffortTargets) {
             withMotion(.log) { model.addWater() }
         }

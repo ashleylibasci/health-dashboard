@@ -14,6 +14,7 @@ struct LogView: View {
 
     @State private var toast: UndoToast?
     @State private var showsSymptoms = false
+    @State private var pourKind: PourKind?
     /// Haptics: adding (alcohol), saving (flow), picking (stress,
     /// symptoms). The caffeine and water cards play their own.
     @State private var addCount = 0
@@ -81,6 +82,7 @@ struct LogView: View {
             LogSectionHeader(title: bleedingWord, systemImage: "drop.fill", accent: .pink) {
                 HistoryLink { CycleLogView() }
             }
+            IronPromptCallout()
             Card {
                 AdaptiveStack(spacing: Space.xs, alignment: .firstTextBaseline) {
                     Text("Flow today").font(.bodyEmphasis)
@@ -251,8 +253,24 @@ struct LogView: View {
                         stressButton(level)
                     }
                 }
+                if model.feltStressedToday {
+                    // B6: caffeine raises anxiety, more so in big doses.
+                    Text(stressCaffeineLine)
+                        .font(.secondary).secondaryText()
+                        .fixedSize(horizontal: false, vertical: true)
+                        .motionTransition(.reveal, edge: .top)
+                }
             }
+            .motion(.reveal, value: model.feltStressedToday)
         }
+    }
+
+    /// Today's caffeine beside a stressed check-in: "Caffeine today:
+    /// 230 mg. Big doses can feel like anxiety."
+    private var stressCaffeineLine: String {
+        let mg = model.caffeineMgToday
+        if mg > CaffeineModel.lowerGuideMg { return "Caffeine today: \(mg) mg. Big doses can feel like anxiety." }
+        return mg == 0 ? "No caffeine today." : "Caffeine today: \(mg) mg."
     }
 
     static func stressWord(_ level: Int) -> String {
@@ -308,6 +326,9 @@ struct LogView: View {
     private var checkInSubtitle: String {
         if let today = store.checkIn(on: .now) { return "Done today \u{00B7} \(today.awake) of 5 awake" }
         if !model.canCheckInNow { return "Check in after you wake up" }
+        // "How awake were you this morning?" at 5pm asks about a morning
+        // long gone (design review F28): a quiet line, still tappable.
+        if model.now >= 720 { return "Missed today \u{00B7} back tomorrow" }
         return CheckInView.prompt + " 10 seconds."
     }
 
@@ -315,9 +336,14 @@ struct LogView: View {
 
     private static let quickKinds = ["Wine", "Beer", "Seltzer", "Cocktail", "Shot"]
 
-    private var alcoholToday: Int {
-        AppData.today(store.data.alcoholLog, date: \.date).map(\.count).reduce(0, +)
+    /// A kind whose pour sheet is open.
+    private struct PourKind: Identifiable {
+        var kind: String
+        var id: String { kind }
     }
+
+    /// Standard drinks today: a red cup of wine counts as about 3.
+    private var alcoholToday: Double { model.alcoholDrinksToday }
 
     private var alcoholSection: some View {
         VStack(alignment: .leading, spacing: Space.s) {
@@ -328,16 +354,16 @@ struct LogView: View {
             }
             Card(accent: .purple) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Tap to log one now").font(.bodyEmphasis)
+                    Text("Tap what you had").font(.bodyEmphasis)
                     Spacer(minLength: Space.s)
-                    Text(alcoholToday == 0 ? "None today" : "\(alcoholToday) today")
+                    Text(alcoholToday == 0 ? "None today" : "\(DrinksView.drinksPhrase(alcoholToday)) today")
                         .font(.secondary).secondaryText()
                         .contentTransition(numericTransition)
                         .motion(.log, value: alcoholToday)
                 }
                 FlowLayout(spacing: Space.s) {
                     ForEach(Self.quickKinds, id: \.self) { kind in
-                        Button { logAlcohol(kind) } label: {
+                        Button { pourKind = PourKind(kind: kind) } label: {
                             Label(kind, systemImage: "plus")
                                 .font(.scaled(size: 14, weight: .bold))
                                 .padding(.horizontal, 14)
@@ -346,18 +372,30 @@ struct LogView: View {
                                 .background(Accent.purple.fill(scheme).opacity(0.18), in: Capsule())
                         }
                         .buttonStyle(.pressable)
-                        .accessibilityLabel("Log one \(kind), now")
+                        .accessibilityLabel("Log \(kind.lowercased()), now")
+                        .accessibilityHint("Pick the pour: a glass, a can, a red cup")
                     }
                 }
                 AlcoholSafetyNote()
             }
+            // How big a pour: one tap on the picture logs it (D2).
+            .bottomSheet(item: $pourKind, title: { "How big a pour of \($0.kind.lowercased())?" }) { item in
+                Text("Logs now. Party pours are often 2 or 3 standard drinks.")
+                    .font(.secondary).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                PourChoices(kind: item.kind, selection: .constant("")) { pour in
+                    pourKind = nil
+                    logAlcohol(pour)
+                }
+            }
         }
     }
 
-    private func logAlcohol(_ kind: String) {
-        let entry = AppData.AlcoholEntry(date: .now, kind: kind, count: 1)
+    private func logAlcohol(_ pour: AlcoholPour) {
+        let entry = AppData.AlcoholEntry(date: .now, kind: pour.kind, count: 1, pour: pour.id)
         withMotion(.log) { store.data.alcoholLog.append(entry) }
-        toast = UndoToast("Logged \(DrinksView.phrase(count: 1, kind: kind)) at \(Clock.format(model.now)).") {
+        let size = pour.isStandard ? "" : " (\(DrinksView.drinksPhrase(pour.standardDrinks)))"
+        toast = UndoToast("Logged \(entry.phrase)\(size) at \(Clock.format(model.now)).") {
             withMotion(.undo) { store.data.alcoholLog.removeAll { $0.id == entry.id } }
         }
         addCount += 1
@@ -366,16 +404,16 @@ struct LogView: View {
 
 // MARK: - Shared by the Log, Caffeine, Water and Drinks screens
 
-/// The caffeine log card, on the Log tab and on the Caffeine screen (one
-/// implementation, so a fix lands in both): when she had it, her saved
-/// drinks as one-tap rows, and a new drink. Logging shows the Undo toast
-/// through `toast`.
+/// The caffeine log card, on the Log tab and on the Caffeine screen: one
+/// component that looks and works the same in both (design review F27).
+/// When she had it is one pill (`LogTimeMenu`); her first three saved
+/// drinks are one-tap rows; the rest, the common drinks and "New caffeine
+/// drink" are in a More drinks sheet. Logging shows the Undo toast through
+/// `toast`.
 ///
-/// On the Log tab (`compact == false`) it leads with today's total, the
-/// time chips and every saved drink. On the Caffeine screen the summary
-/// above has the total, so it's titled "Log caffeine" with the time as one
-/// pill (`LogTimeMenu`), shows her first three saved drinks, and puts the
-/// rest, the common drinks and "New caffeine drink" in a More drinks sheet.
+/// Only the title differs: on the Log tab (`compact == false`) it's
+/// today's total; on the Caffeine screen, whose summary has the total,
+/// it's "Log caffeine".
 struct CaffeineQuickLog: View {
     @Binding var toast: UndoToast?
     var compact = false
@@ -385,16 +423,17 @@ struct CaffeineQuickLog: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var time: LogTime = .now
+    /// Small to extra large; back to regular after each log, like the time.
+    @State private var size: DrinkSize = .regular
     @State private var showsMore = false
     @State private var addCount = 0
     /// Bounces a drink's "+" when it's logged.
     @State private var bounces: [UUID: Int] = [:]
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private static let shownSaved = 3
 
-    private var shownDrinks: [Drink] {
-        compact ? Array(store.data.savedDrinks.prefix(Self.shownSaved)) : store.data.savedDrinks
-    }
+    private var shownDrinks: [Drink] { Array(store.data.savedDrinks.prefix(Self.shownSaved)) }
 
     /// Saved drinks past the first three, then common drinks she hasn't saved.
     private var moreDrinks: [Drink] {
@@ -408,27 +447,17 @@ struct CaffeineQuickLog: View {
         VStack(spacing: 0) {
             titleRow(p)
                 .padding(.horizontal, Space.l)
-                .padding(.top, Space.m)
-                .padding(.bottom, compact ? Space.m : 0)
-            if !compact {
-                LogTimeSelector(time: $time, accent: .yellow, title: "When did you have it?")
-                    .padding(.horizontal, Space.l)
-                    .padding(.vertical, Space.m)
-            }
+                .padding(.vertical, Space.m)
             Divider().overlay(p.cardBorder)
             ForEach(shownDrinks) { drink in
                 drinkButton(drink)
                 Divider().overlay(p.cardBorder)
             }
-            if compact {
-                Button { showsMore = true } label: {
-                    plainRowLabel(title: "More drinks", systemImage: "ellipsis")
-                }
-                .buttonStyle(.pressable)
-                .accessibilityHint("Common drinks, and a new caffeine drink")
-            } else {
-                newDrinkLink
+            Button { showsMore = true } label: {
+                plainRowLabel(title: "More drinks", systemImage: "ellipsis")
             }
+            .buttonStyle(.pressable)
+            .accessibilityHint("Common drinks, and a new caffeine drink")
         }
         .background(Accent.yellow.tint(scheme), in: shape)
         .sensoryFeedback(.increase, trigger: addCount)
@@ -439,14 +468,39 @@ struct CaffeineQuickLog: View {
         }
     }
 
+    /// The title, then the size and time pills; the pills move under the
+    /// title when they don't fit beside it (large text sizes).
     @ViewBuilder
     private func titleRow(_ p: Palette) -> some View {
-        if compact {
-            HStack(spacing: Space.s) {
-                Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Space.s)
-                LogTimeMenu(time: $time, accent: .yellow)
+        let pills = HStack(spacing: Space.s) {
+            DrinkSizeMenu(size: $size)
+            LogTimeMenu(time: $time, accent: .yellow)
+        }
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Space.s) {
+                title(p)
+                pills
             }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) {
+                    title(p)
+                    Spacer(minLength: Space.s)
+                    pills
+                }
+                VStack(alignment: .leading, spacing: Space.s) {
+                    title(p)
+                    pills
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func title(_ p: Palette) -> some View {
+        if compact {
+            Text("Log caffeine").font(.cardTitle).accessibilityAddTraits(.isHeader)
+                .fixedSize()
         } else {
             HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                 Text("\(model.caffeineMgToday)")
@@ -454,8 +508,8 @@ struct CaffeineQuickLog: View {
                     .contentTransition(reduceMotion ? .opacity : .numericText())
                     .motion(.log, value: model.caffeineMgToday)
                 Text("mg today").font(.secondary).foregroundStyle(p.secondary)
-                Spacer(minLength: 0)
             }
+            .fixedSize()
             .accessibilityElement(children: .combine)
         }
     }
@@ -487,7 +541,8 @@ struct CaffeineQuickLog: View {
         let p = Palette(scheme: scheme)
         let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
         return VStack(alignment: .leading, spacing: Space.m) {
-            Text("Logs \(time.phrase)").font(.secondary).foregroundStyle(p.secondary)
+            Text(size == .regular ? "Logs \(time.phrase)" : "Logs \(size.label.lowercased()) \(time.phrase)")
+                .font(.secondary).foregroundStyle(p.secondary)
             VStack(spacing: 0) {
                 ForEach(moreDrinks) { drink in
                     drinkButton(drink) { showsMore = false }
@@ -521,7 +576,9 @@ struct CaffeineQuickLog: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
-                        Text("\(drink.caffeineMg) mg").font(.secondary).secondaryText()
+                        Text("\(size.mg(drink.caffeineMg)) mg").font(.secondary).secondaryText()
+                            .contentTransition(reduceMotion ? .opacity : .numericText())
+                            .motion(.dataSwap, value: size)
                         if drink.isCustom { CustomDrinkBadge(accent: .purple) }
                     }
                 }
@@ -540,7 +597,7 @@ struct CaffeineQuickLog: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable)
-        .accessibilityLabel("Add \(drink.name), \(drink.caffeineMg) mg, \(time.phrase)")
+        .accessibilityLabel("Add \(Self.name(drink, size: size)), \(size.mg(drink.caffeineMg)) mg, \(time.phrase)")
         .contextMenu {
             if store.data.savedDrinks.contains(where: { $0.id == drink.id }) {
                 Button(role: .destructive) {
@@ -553,14 +610,23 @@ struct CaffeineQuickLog: View {
         }
     }
 
+    /// "Latte", or "Latte (large)" in another size.
+    static func name(_ drink: Drink, size: DrinkSize) -> String {
+        size == .regular ? drink.name : "\(drink.name) (\(size.label.lowercased()))"
+    }
+
     private func log(_ drink: Drink) {
         let chosen = time
+        let chosenSize = size
         let id = UUID()
         withMotion(.log) {
-            model.logDrink(id: id, drinkID: drink.id, name: drink.name, mg: drink.caffeineMg, at: chosen.date, saveToHealth: true)
+            model.logDrink(id: id, drinkID: drink.id, name: Self.name(drink, size: chosenSize),
+                           mg: chosenSize.mg(drink.caffeineMg), at: chosen.date, saveToHealth: true)
         }
         let when = store.data.drinkLog.first { $0.id == id }?.date ?? .now
-        var message = LogFormat.loggedLine(LogFormat.midSentence(drink), time: chosen, at: when)
+        let what = chosenSize == .regular ? LogFormat.midSentence(drink)
+            : "\(chosenSize.label.lowercased()) \(LogFormat.midSentence(drink)) (\(chosenSize.mg(drink.caffeineMg)) mg)"
+        var message = LogFormat.loggedLine(what, time: chosen, at: when)
         // Past today's cutoff: say so here, as the Watch does. The advice
         // itself is on the Caffeine screen.
         if AppDay.contains(when) {
@@ -573,8 +639,55 @@ struct CaffeineQuickLog: View {
         }
         toast = UndoToast(message) { withMotion(.undo) { model.deleteDrink(id) } }
         time = .now
+        size = .regular
         addCount += 1
         bounces[drink.id, default: 0] += 1
+    }
+}
+
+/// The drink size as one pill ("Regular ▾"), next to the time: small,
+/// regular, large or extra large, compared with the drink as listed, with
+/// the coffee-shop names that match (design review D4).
+struct DrinkSizeMenu: View {
+    @Binding var size: DrinkSize
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Menu {
+            Section("Coffee shop: tall is regular, grande large, venti extra large") {
+                ForEach(DrinkSize.allCases, id: \.self) { s in
+                    Button { size = s } label: {
+                        if s == size { Label(Self.menuLabel(s), systemImage: "checkmark") } else { Text(Self.menuLabel(s)) }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: Space.xs) {
+                Text(size.label).lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.scaled(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+            .font(.bodyEmphasis)
+            .foregroundStyle(Accent.yellow.onTint(scheme))
+            .padding(.horizontal, Space.m)
+            .frame(minHeight: Sizes.minTap)
+            .background(Accent.yellow.fill(scheme).opacity(size == .regular ? 0.12 : 0.24), in: Capsule())
+            .fixedSize()
+        }
+        .accessibilityLabel("Size")
+        .accessibilityValue(size.label)
+        .sensoryFeedback(.selection, trigger: size)
+    }
+
+    /// "Large · 1⅓× the caffeine".
+    static func menuLabel(_ s: DrinkSize) -> String {
+        switch s {
+        case .small: return "Small \u{00B7} \u{2154} the caffeine"
+        case .regular: return "Regular \u{00B7} as listed"
+        case .large: return "Large \u{00B7} 1\u{2153}\u{00D7} the caffeine"
+        case .extraLarge: return "Extra large \u{00B7} 2\u{00D7} the caffeine"
+        }
     }
 }
 
@@ -649,7 +762,7 @@ struct WaterQuickLog: View {
                     .contentTransition(reduceMotion ? .opacity : .numericText())
                     .motion(.log, value: model.waterTodayML)
                 if !model.hidesEffortTargets {
-                    Text("of \(LogFormat.oz(store.data.waterGoalML))").font(.secondary).secondaryText()
+                    Text("of \(LogFormat.oz(model.waterGoalTodayML))").font(.secondary).secondaryText()
                 }
             }
         }
@@ -660,10 +773,10 @@ struct WaterQuickLog: View {
     private func addWater(_ bottles: Double) {
         let id = UUID()
         let ml = store.data.bottleSizeML * bottles
-        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        let wasUnderGoal = model.waterTodayML < model.waterGoalTodayML
         withMotion(.log) { model.addWater(ml: ml, id: id) }
         var message = "Added \(LogFormat.oz(ml)) at \(Clock.format(model.now))."
-        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= model.waterGoalTodayML {
             message += " That\u{2019}s today\u{2019}s goal."
             goalCount += 1
         } else {
@@ -688,9 +801,8 @@ struct WaterQuickLog: View {
 
 /// "When did you have it?" as one pill ("Now ▾", "30m ago", "9:10am") that
 /// opens a menu of the same presets as `LogTimeSelector`, plus another
-/// time in a sheet. For log cards under a summary, where the always-open
-/// chips cost a row (the Caffeine and Alcohol screens; the Log tab keeps
-/// the chips).
+/// time in a sheet. For log cards, where the always-open chips cost a row
+/// (the caffeine card on the Log tab and Caffeine screen, and Alcohol).
 struct LogTimeMenu: View {
     @Binding var time: LogTime
     var accent: Accent
@@ -728,8 +840,17 @@ struct LogTimeMenu: View {
         .accessibilityLabel("When you had it")
         .accessibilityValue(time.phrase)
         .sensoryFeedback(.selection, trigger: time)
-        .bottomSheet(isPresented: $picking, title: "When did you have it?") {
-            DatePicker("Time", selection: Binding(get: { time.date }, set: { time = .exact(LogTime.past($0)) }),
+        .logTimeWheel(isPresented: $picking, time: $time)
+    }
+}
+
+extension View {
+    /// "When did you have it?": a time wheel in a sheet, for any time other
+    /// than the presets. Picks the most recent time that clock time came round.
+    func logTimeWheel(isPresented: Binding<Bool>, time: Binding<LogTime>) -> some View {
+        bottomSheet(isPresented: isPresented, title: "When did you have it?") {
+            DatePicker("Time", selection: Binding(get: { time.wrappedValue.date },
+                                                  set: { time.wrappedValue = .exact(LogTime.past($0)) }),
                        displayedComponents: .hourAndMinute)
                 .datePickerStyle(.wheel)
                 .labelsHidden()
@@ -824,6 +945,7 @@ struct LogTimeSelector: View {
     @Binding var time: LogTime
     var accent: Accent = .yellow
     var title = "When?"
+    @State private var picking = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -835,14 +957,24 @@ struct LogTimeSelector: View {
                 Text(title).font(.scaled(size: 13, weight: .bold)).secondaryText()
                     .fixedSize(horizontal: false, vertical: true)
             } control: {
-                HStack(spacing: 8) {
-                    Text("Other").font(.scaled(size: 13)).secondaryText().accessibilityHidden(true)
-                        .keepsOnOneLine()
-                    DatePicker("Pick another time", selection: exactTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .tint(accent.ink(scheme))
-                        .timePickerAccessibility("Pick another time", time: time.date)
+                // The picked time in the app's own format ("5:03pm"), not the
+                // system picker's "5:03 PM" (design review F26).
+                Button { picking = true } label: {
+                    HStack(spacing: 8) {
+                        Text("Other").font(.scaled(size: 13)).secondaryText()
+                            .keepsOnOneLine()
+                        Text(Clock.format(Clock.minutesOfDay(time.date)))
+                            .font(.bodyEmphasis)
+                            .foregroundStyle(accent.ink(scheme))
+                            .keepsOnOneLine()
+                            .padding(.horizontal, Space.m)
+                            .frame(minHeight: Sizes.minTap)
+                            .background(Palette(scheme: scheme).chip, in: Capsule())
+                    }
                 }
+                .buttonStyle(.pressable)
+                .accessibilityLabel("Pick another time")
+                .accessibilityValue(Clock.format(Clock.minutesOfDay(time.date)))
             }
             // Four equal chips, "Now / 30m / 1h / 2h"; two rows of two at
             // the largest text sizes.
@@ -854,10 +986,7 @@ struct LogTimeSelector: View {
             }
         }
         .sensoryFeedback(.selection, trigger: time)
-    }
-
-    private var exactTime: Binding<Date> {
-        Binding(get: { time.date }, set: { time = .exact(LogTime.past($0)) })
+        .logTimeWheel(isPresented: $picking, time: $time)
     }
 
     private func chip(_ minutes: Int) -> some View {

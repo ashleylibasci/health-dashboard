@@ -18,6 +18,8 @@ import HealthCore
 /// - `-demoExams`: with `-demoCycle`, a set of exams: an early quiz in two
 ///   days, a four-exam week about two weeks out, and ten past exams (nine
 ///   with an after-exam check-in).
+/// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
+///   big night last night and a hard training day today.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -43,8 +45,9 @@ enum DemoMode {
     /// screenshots.
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
+    static let fuel = args.contains("-demoFuel")
     #else
-    static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false
+    static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let open: String? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
@@ -107,6 +110,7 @@ enum DemoMode {
             data.flowLog = bleed(daysAgo: 70, days: 5) + bleed(daysAgo: 41, days: 5) + bleed(daysAgo: 12, days: 5)
         }
         if exams { addExams(to: &data, today: today, calendar: cal) }
+        if fuel { seedFuelLogs(&data, today: today, calendar: cal) }
         data.onboarded = true
         store.data = data
     }
@@ -132,5 +136,28 @@ enum DemoMode {
         data.sleepExtras.examReflections = past.map {
             SleepExtrasData.ExamReflection(id: UUID(), title: $0.0, examDay: day($0.1), felt: $0.2)
         }
+    }
+
+    /// `-demoFuel` (with `-demoCycle`): logs for the caffeine, alcohol and
+    /// water screens. A big night last night (a red cup of wine and two
+    /// shots), four weeks of morning lattes with a late coffee every third
+    /// day, a bottle of water this morning, and tiredness on heavy days.
+    @MainActor
+    private static func seedFuelLogs(_ data: inout AppData, today: Date, calendar cal: Calendar) {
+        func at(_ daysAgo: Int, _ minutes: Int) -> Date {
+            cal.date(byAdding: .minute, value: minutes, to: cal.date(byAdding: .day, value: -daysAgo, to: today) ?? today) ?? today
+        }
+        let latte = Drink.common[0], drip = AppModel.referenceCoffee
+        data.alcoholLog = [AppData.AlcoholEntry(date: at(1, 22 * 60), kind: "Wine", count: 1, pour: "Wine.redCup"),
+                           AppData.AlcoholEntry(date: at(1, 23 * 60 + 30), kind: "Shot", count: 2, pour: "Shot.standard")]
+        data.drinkLog = (1...28).flatMap { d -> [AppData.LoggedDrink] in
+            var drinks = [AppData.LoggedDrink(drinkID: latte.id, name: latte.name, mg: latte.caffeineMg, date: at(d, 9 * 60 + 30))]
+            if d % 3 == 0 {
+                drinks.append(AppData.LoggedDrink(drinkID: drip.id, name: drip.name, mg: drip.caffeineMg, date: at(d, 16 * 60 + 30)))
+            }
+            return drinks
+        }
+        data.waterLog = [AppData.WaterEntry(date: at(0, 10 * 60), ml: data.bottleSizeML)]
+        data.symptomLog = data.flowLog.filter { $0.flow == .heavy }.map { AppData.SymptomEntry(date: $0.date, symptoms: ["Fatigue"]) }
     }
 }

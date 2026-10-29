@@ -130,6 +130,11 @@ extension AppModel {
         let largest = caffeineLargestDoseAtWake
         let coffee = Self.referenceCoffee
         let left = caffeineLeftAtBedtime(mg: coffee.caffeineMg, at: caffeineWakeTime)
+        if left < Int(CaffeineModel.bedtimeLimitMg) {
+            // The cutoff is just after waking (within half an hour): a full
+            // coffee fits only as soon as she's up (F24).
+            return "\(cause) \(Self.referenceCoffeePhrase.prefix(1).uppercased() + Self.referenceCoffeePhrase.dropFirst()) has to be by \(Clock.format(caffeineCutoff)), right after you wake, to be under \(Int(CaffeineModel.bedtimeLimitMg)) mg by bedtime. So caffeine is early only today: as soon as you\u{2019}re up, or something smaller."
+        }
         let advice = largest >= 5
             ? "So no time today works for a full coffee. Best: one small drink soon after you wake, up to about \(largest) mg."
             : "So no time today works for a full coffee. Best: skip caffeine, or keep it very small and early."

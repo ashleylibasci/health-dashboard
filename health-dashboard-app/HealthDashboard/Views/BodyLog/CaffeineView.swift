@@ -85,20 +85,26 @@ struct CaffeineView: View {
             "\(model.todaysDrinks.last?.name ?? "Caffeine") \u{00B7} \(Clock.format(dose.time))"
         }
         var out = [StatPair(label: "Last drink", value: last ?? "None yet")]
-        if let cutoff = model.caffeineCutoffShown {
-            out.append(StatPair(label: "Cutoff", value: Clock.format(cutoff)))
-        } else {
-            // No clock time works for a full coffee today: what still fits.
-            out.append(StatPair(label: "Still fits", value: roomNow >= 5 ? "Up to \(roomNow) mg" : "Nothing more"))
-        }
+        // No clock time works for a full coffee today: "Early only", with
+        // the reason in the summary's ⓘ (design review F24).
+        out.append(StatPair(label: "Cutoff", value: model.caffeineCutoffShown.map { Clock.format($0) } ?? "Early only"))
         return out
+    }
+
+    /// The daily limit, led by why the cutoff is "Early only" when it is.
+    private var headerInfo: Explanation {
+        guard model.caffeineCutoffShown == nil else { return CaffeineWaterCopy.dailyLimit }
+        let room = roomNow >= 5 ? " Right now, up to \(roomNow) mg still fits." : ""
+        return Explanation(id: "caffeineEarlyOnly", title: "Cutoff: early only",
+                           meaning: model.caffeineEarlyOnlyText + room,
+                           forYou: CaffeineWaterCopy.dailyLimit.meaning + " " + CaffeineWaterCopy.dailyLimitForYou)
     }
 
     private var header: some View {
         let v = verdict
         let mg = model.caffeineMgToday
         return SummaryHeader(eyebrow: "Caffeine today", value: "\(mg)", unit: "mg", status: v.status, line: v.line,
-                             pairs: pairs, accent: .yellow, info: CaffeineWaterCopy.dailyLimit) {
+                             pairs: pairs, accent: .yellow, info: headerInfo) {
             SummaryMeter(fraction: Double(mg) / Double(dailyLimit), accent: .yellow,
                          caption: "Up to \(dailyLimit) mg a day is generally fine")
         }
@@ -122,7 +128,17 @@ struct CaffeineView: View {
             notes.append(Note(short: "Your \(big.name) was \(big.mg) mg in one go.",
                               full: "Your \(big.name) was \(big.mg) mg in one go: a big single dose. Over \(CaffeineModel.lowerGuideMg) mg at once is more likely to make you jittery; a smaller size or splitting it up helps."))
         }
+        if bleedingToday {
+            // D5: polyphenols in coffee and tea cut non-heme iron absorption.
+            notes.append(Note(short: "Bleeding today: coffee an hour away from meals helps your iron.",
+                              full: "Coffee or tea an hour away from meals lets you absorb more iron from your food. It matters most on bleeding days, when you\u{2019}re losing some."))
+        }
         return notes
+    }
+
+    /// Light, medium or heavy flow logged today (not spotting).
+    private var bleedingToday: Bool {
+        store.data.flowLog.contains { Calendar.current.isDateInToday($0.date) && [.light, .medium, .heavy].contains($0.flow) }
     }
 
     // MARK: Rows
@@ -139,7 +155,9 @@ struct CaffeineView: View {
                 todayList
             }
             RowDivider()
-            MetricRow(title: "Caffeine in your body", note: "About \(model.caffeineAtBedtime) mg at bedtime",
+            // "0 mg · About 0 mg at bedtime" said 0 twice (design review F23).
+            MetricRow(title: "Caffeine in your body",
+                      note: model.caffeineAtBedtime < 5 ? "Clears by bedtime" : "About \(model.caffeineAtBedtime) mg at bedtime",
                       value: "\(Int(model.caffeineInBody(at: model.now).rounded())) mg",
                       systemImage: "waveform.path.ecg", accent: .yellow) {
                 CaffeineBodyView()
@@ -149,10 +167,40 @@ struct CaffeineView: View {
                 CaffeineTimingView()
             }
             RowDivider()
+            ExpandRow(title: "Your caffeine, your sleep", summary: caffeineSleepSummary, systemImage: "moon.zzz.fill", accent: .purple) {
+                caffeineSleepDetail
+            }
+            RowDivider()
             MetricRow(title: "Find your caffeine limit", note: "\(min(test.nightsLogged, test.target)) of \(test.target) nights",
                       systemImage: "flask.fill", accent: .mint) {
                 CutoffTestView()
             }
+        }
+    }
+
+    /// "14 min longer to fall asleep", or "12 of 20 nights".
+    private var caffeineSleepSummary: String {
+        let c = model.caffeineSleep
+        guard c.enoughData, let d = c.minutesLonger else {
+            return "\(min(c.nights, CaffeineSleepComparison.nightsNeeded)) of \(CaffeineSleepComparison.nightsNeeded) nights"
+        }
+        if abs(d) < 5 { return "About the same either way" }
+        return "\(abs(d)) min \(d > 0 ? "longer" : "quicker") to fall asleep"
+    }
+
+    /// Her own nights, with how many there are (E4).
+    @ViewBuilder
+    private var caffeineSleepDetail: some View {
+        let c = model.caffeineSleep
+        let limit = Int(CaffeineModel.bedtimeLimitMg)
+        if c.enoughData, let d = c.minutesLonger {
+            Text(abs(d) < 5
+                 ? "On nights with more than \(limit) mg left at bedtime, you fell asleep about as quickly as on other nights."
+                 : "On nights with more than \(limit) mg left at bedtime, you took \(abs(d)) minutes \(d > 0 ? "longer" : "less") to fall asleep.")
+            Text("From your \(c.nights) logged nights: \(c.over) with more than \(limit) mg left, \(c.under) with less. A pattern in your own nights, not proof: other things change on those days too.")
+                .font(.secondary)
+        } else {
+            Text("After \(CaffeineSleepComparison.nightsNeeded) nights of logging (at least \(CaffeineSleepComparison.nightsPerSide) with more than \(limit) mg left at bedtime and \(CaffeineSleepComparison.nightsPerSide) with less), this shows how your caffeine changes how fast you fall asleep. So far: \(c.nights) nights, \(c.over) over \(limit) mg.")
         }
     }
 
@@ -232,7 +280,7 @@ struct CaffeineBodyView: View {
 
     private var cutoffSummary: String {
         model.caffeineCutoffShown.map { "\(Clock.format($0)) \u{00B7} your last caffeine of the day" }
-            ?? "No time today works for a full coffee"
+            ?? "Early only \u{00B7} right after you wake, or smaller"
     }
 
     private var bedtime: Minutes { 1440 + model.tonightBedtime }
@@ -315,7 +363,7 @@ struct CaffeineBodyView: View {
     private func chartSummary(_ points: [CaffeinePoint]) -> String {
         let peak = points.max { $0.mg < $1.mg }
         let peakText = peak.map { "peaks near \(Int($0.mg.rounded())) mg at \(Clock.format($0.time))" } ?? "stays at zero"
-        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "No cutoff time today: no time works for a full coffee."
+        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "Cutoff: early only, right after you wake."
         return "Caffeine in your body today \(peakText) and falls to about \(model.caffeineAtBedtime) mg by your \(Clock.format(bedtime)) bedtime. \(cutoffText) Goal under \(bedtimeGoal) mg."
     }
 }

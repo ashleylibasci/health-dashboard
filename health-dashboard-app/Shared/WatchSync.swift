@@ -72,6 +72,10 @@ struct WatchSnapshot: Codable, Equatable {
     var waterGoalML: Double? = nil
     var bottleML: Double? = nil
     var todayWaterIDs: [UUID]? = nil
+    /// The start of the latest still hour her stress read "High" (this hour
+    /// or the last), so the Watch can offer a one-minute breather. nil
+    /// otherwise, and from older phone builds.
+    var stressHighAt: Date? = nil
 
     struct Zone: Codable, Equatable {
         var title: String

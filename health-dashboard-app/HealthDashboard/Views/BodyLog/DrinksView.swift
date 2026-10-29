@@ -10,6 +10,8 @@ struct DrinksView: View {
     @Environment(\.colorScheme) private var scheme
 
     @State private var kind = "Wine"
+    /// The pour's `AlcoholPour` id: a glass, a red cup… (D2).
+    @State private var pour = "Wine.standard"
     @State private var count = 1
     @State private var time: LogTime = .now
     @State private var editing: AppData.AlcoholEntry?
@@ -21,17 +23,9 @@ struct DrinksView: View {
 
     static let kinds = ["Wine", "Beer", "Seltzer", "Cocktail", "Shot"]
 
-    /// "1 glass of wine", "2 beers", "3 shots".
-    static func phrase(count: Int, kind: String) -> String {
-        let one = count == 1
-        switch kind {
-        case "Wine": return "\(count) glass\(one ? "" : "es") of wine"
-        case "Beer": return "\(count) beer\(one ? "" : "s")"
-        case "Seltzer": return "\(count) seltzer\(one ? "" : "s")"
-        case "Cocktail": return "\(count) cocktail\(one ? "" : "s")"
-        case "Shot": return "\(count) shot\(one ? "" : "s")"
-        default: return "\(count) \(kind.lowercased())"
-        }
+    /// "3 drinks", "1.5 drinks", "1 drink": standard drinks.
+    static func drinksPhrase(_ d: Double) -> String {
+        "\(AlcoholPour.format(d)) drink\(d == 1 ? "" : "s")"
     }
 
     static func symbol(for kind: String) -> String {
@@ -50,6 +44,7 @@ struct DrinksView: View {
         Screen(title: "Alcohol and your sleep", accent: .purple) {
             SampleDataBanner()
             AlcoholSafetyNote()
+            if !model.showsAlcoholSafetyLine { MorningAfterCallout() }
             header
             logCard
             nightsCard
@@ -69,9 +64,8 @@ struct DrinksView: View {
 
     // MARK: Summary
 
-    private var alcoholToday: Int {
-        AppData.today(store.data.alcoholLog, date: \.date).map(\.count).reduce(0, +)
-    }
+    /// Standard drinks today: a red cup of wine counts as about 3.
+    private var alcoholToday: Double { model.alcoholDrinksToday }
 
     /// No judgment: today's count, and what her own nights show the
     /// morning after (or how many more nights that needs).
@@ -79,7 +73,7 @@ struct DrinksView: View {
         let e = effect
         let n = alcoholToday
         let need = HabitEffect.minimumNights
-        return SummaryHeader(eyebrow: "Alcohol today", value: n == 0 ? "None" : "\(n)",
+        return SummaryHeader(eyebrow: "Alcohol today", value: n == 0 ? "None" : AlcoholPour.format(n),
                              unit: n == 0 ? nil : (n == 1 ? "drink" : "drinks"),
                              status: e.enoughData ? nil : SummaryStatus(text: "Not enough nights", accent: .purple),
                              line: e.enoughData ? effectSentence(parts: 2) : "No judgment, just what your own data shows the morning after.",
@@ -95,9 +89,9 @@ struct DrinksView: View {
         lastLogTap = .now
         let chosen = time
         let date = min(time.date, .now)
-        let entry = AppData.AlcoholEntry(date: date, kind: kind, count: count)
+        let entry = AppData.AlcoholEntry(date: date, kind: kind, count: count, pour: pour)
         withMotion(.log) { store.data.alcoholLog.append(entry) }
-        toast = UndoToast(LogFormat.loggedLine(Self.phrase(count: count, kind: kind), time: chosen, at: date)) {
+        toast = UndoToast(LogFormat.loggedLine(entry.phrase, time: chosen, at: date)) {
             withMotion(.undo) { store.data.alcoholLog.removeAll { $0.id == entry.id } }
         }
         time = .now
@@ -119,6 +113,7 @@ struct DrinksView: View {
                     }
                 }
             }
+            PourChoices(kind: kind, selection: $pour)
             HStack(spacing: 12) {
                 Text("How many").font(.bodyEmphasis)
                 Spacer()
@@ -127,14 +122,22 @@ struct DrinksView: View {
                     .accessibilityLabel(count == 1 ? "1 drink" : "\(count) drinks")
                 countButton("plus", label: "One more") { count = min(15, count + 1) }
             }
-            PrimaryButton(title: "Log \(Self.phrase(count: count, kind: kind))", accent: .purple, action: logDrinks)
+            PrimaryButton(title: "Log \(pendingEntry.phrase)", accent: .purple, action: logDrinks)
         }
     }
+
+    /// What the Log button would log.
+    private var pendingEntry: AppData.AlcoholEntry { AppData.AlcoholEntry(date: .now, kind: kind, count: count, pour: pour) }
 
     private func kindChip(_ k: String) -> some View {
         let p = Palette(scheme: scheme)
         let on = kind == k
-        return Button { withMotion(.select) { kind = k } } label: {
+        return Button {
+            withMotion(.select) {
+                kind = k
+                pour = AlcoholPour.standard(for: k)?.id ?? pour
+            }
+        } label: {
             Label(k, systemImage: Self.symbol(for: k))
                 .font(.bodyEmphasis)
                 .padding(.horizontal, 14)
@@ -218,13 +221,40 @@ struct DrinksView: View {
                 }
             }
             .foregroundStyle(Palette(scheme: scheme).primary)
-            Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol, compared with \(effect.withoutCount) without. It doesn\u{2019}t separate amounts, so one drink and several count the same." + cycleNote)
+            Text("From \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol, compared with \(effect.withoutCount) without." + cycleNote)
                 .font(.secondary)
+            byAmount
         } else {
             Text("You have \(effect.withCount) night\(effect.withCount == 1 ? "" : "s") after alcohol and \(effect.withoutCount) without. We need at least \(HabitEffect.minimumNights) of each to compare fairly. If you have drinks, log them and wear your Watch to bed; the comparison fills in over time. There\u{2019}s no need to drink to get there.")
         }
         HowWeGotThisLink(title: "Alcohol and your sleep",
-                         method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. It doesn\u{2019}t separate amounts: a night after one glass counts the same as a night after several. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
+                         method: "We take the nights that followed an evening when you logged drinks (anything from 5pm to 5am, so each drink counts for one night only) and compare them with your other nights: how long you slept, your HRV and resting heart rate the next morning compared with your usual, and your morning check-in. Drinks are counted as standard drinks (a 5 oz glass of wine, a 12 oz beer or a shot each; a red cup of wine is about 3), and the nights are also split by how much: 1 to 2 drinks, and 3 or more. We need at least \(HabitEffect.minimumNights) nights of each before showing a result, and it gets more reliable as nights add up.")
+    }
+
+    /// Sleep after 1–2 standard drinks and after 3 or more, each against
+    /// nights without: the dose matters (D2).
+    @ViewBuilder
+    private var byAmount: some View {
+        if let split = model.alcoholEffectByAmount {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text("By how much").font(.bodyEmphasis).accessibilityAddTraits(.isHeader)
+                amountLine("After 1\u{2013}2 drinks", split.light)
+                amountLine("After 3 or more", split.heavy)
+            }
+        }
+    }
+
+    private func amountLine(_ label: String, _ e: HabitEffect) -> some View {
+        let value: String
+        if !e.enoughData {
+            value = "\(e.withCount) of \(HabitEffect.minimumNights) nights so far"
+        } else if abs(e.asleepDelta) < 5 {
+            value = "about the same sleep (\(e.withCount) nights)"
+        } else {
+            value = "\(Clock.duration(abs(e.asleepDelta))) \(e.asleepDelta < 0 ? "less" : "more") sleep (\(e.withCount) nights)"
+        }
+        return Text("\(label): \(value)").font(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The comparison mixes all nights, so cycle changes are in it too.
@@ -327,8 +357,7 @@ struct DrinksView: View {
                     LogEntryList(items: recent, onTap: { editing = $0 },
                                  onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in
                         LogEntryRow(systemImage: Self.symbol(for: entry.kind), accent: .purple,
-                                    title: Self.phrase(count: entry.count, kind: entry.kind),
-                                    detail: entry.count == 1 ? "1 drink" : "\(entry.count) drinks",
+                                    title: entry.phrase, detail: Self.drinksPhrase(entry.standardDrinks),
                                     time: LogFormat.time(entry.date))
                     }
                     .foregroundStyle(Palette(scheme: scheme).primary)
@@ -368,6 +397,30 @@ struct AlcoholSafetyNote: View {
                             .foregroundStyle(Accent.pink.ink(scheme))
                             .frame(minHeight: Sizes.minTap)
                     }
+                }
+        }
+    }
+}
+
+/// The morning after 4 or more drinks: when last night's alcohol has
+/// likely cleared, and not to drive before then (D1). Next-morning drunk
+/// driving is common and invisible. Shows nothing otherwise.
+struct MorningAfterCallout: View {
+    @EnvironmentObject var model: AppModel
+    @State private var showsMore = false
+
+    var body: some View {
+        if let m = model.morningAfterClear {
+            let time = Clock.format(Clock.minutesOfDay(m.time))
+            CalloutBar(text: "Alcohol may not clear until about \(time). Don\u{2019}t drive before then.",
+                       systemImage: "car.fill", accent: .purple) { showsMore = true }
+                .bottomSheet(isPresented: $showsMore, title: "The morning after") {
+                    Text("Last night\u{2019}s \(DrinksView.drinksPhrase(m.drinks)) may still be in your body until about \(time). A standard drink takes most women about \(Int(AlcoholClearance.hoursPerDrink)) hours to clear, counted from your first drink, and nothing speeds it up: not coffee, a shower or sleep.")
+                        .font(.bodyText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Don\u{2019}t drive before then, even if you feel fine. Water and something to eat help you feel better while you wait.")
+                        .font(.bodyText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
         }
     }
@@ -481,16 +534,19 @@ private struct DrinkNightsChart: View {
     }
 }
 
-/// Edit a logged drink: kind, number and time (any day in the last two weeks).
+/// Edit a logged drink: kind, pour, number and time (any day in the last
+/// two weeks).
 private struct AlcoholEntryEditor: View {
     let entry: AppData.AlcoholEntry
     @EnvironmentObject var store: DataStore
     @State private var kind: String
+    @State private var pour: String
     @Environment(\.colorScheme) private var scheme
 
     init(entry: AppData.AlcoholEntry) {
         self.entry = entry
         _kind = State(wrappedValue: entry.kind)
+        _pour = State(wrappedValue: entry.pour ?? AlcoholPour.standard(for: entry.kind)?.id ?? "")
     }
 
     var body: some View {
@@ -503,7 +559,10 @@ private struct AlcoholEntryEditor: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(DrinksView.kinds, id: \.self) { k in
-                            Button { kind = k } label: {
+                            Button {
+                                kind = k
+                                pour = AlcoholPour.standard(for: k)?.id ?? pour
+                            } label: {
                                 Text(k)
                                     .font(.bodyEmphasis)
                                     .padding(.horizontal, 14)
@@ -516,6 +575,8 @@ private struct AlcoholEntryEditor: View {
                         }
                     }
                 }
+                Text("Pour").font(.bodyEmphasis)
+                PourChoices(kind: kind, selection: $pour)
             }
         }
     }
@@ -525,5 +586,6 @@ private struct AlcoholEntryEditor: View {
         store.data.alcoholLog[i].date = min(date, .now)
         store.data.alcoholLog[i].count = max(1, count)
         store.data.alcoholLog[i].kind = kind
+        store.data.alcoholLog[i].pour = pour
     }
 }

@@ -559,6 +559,10 @@ final class AppModel: ObservableObject {
         activeCalories = SampleData.activeCalories; restingCalories = SampleData.restingCalories
         activeCaloriesYesterday = nil
         activeCaloriesEarlier = []
+        if DemoMode.fuel {
+            // A hard training day (the water goal goes up).
+            activeCalories = 650
+        }
         if DemoMode.sick {
             // Resting HR up, HRV down, breathing and wrist temperature up.
             restingHRDelta = 6; hrvDeltaPct = -24
@@ -595,6 +599,7 @@ final class AppModel: ObservableObject {
     /// Called when the app comes to the foreground: new day, new numbers.
     func becameActive() async {
         AppDay.rolloverMinutes = AppDay.rollover(forBedtime: store.data.bedtime)
+        recordTimeZone()
         importPendingDrinks()
         Task { await CalendarImport.shared.check(model: self) }
         guard store.data.onboarded else {
@@ -638,6 +643,8 @@ final class AppModel: ObservableObject {
         var dailyHRV: [Date: Double] = [:]
         var rhrByDay: [Date: Double] = [:]
         var overnight = false
+        /// Days left out of every "your usual" (E1, `baselineExclusions`).
+        var excluded: Set<Date> = []
     }
 
     private func loadHeart(main: [SleepSession], days: Int) async -> HeartData {
@@ -645,27 +652,32 @@ final class AppModel: ObservableObject {
         let rhr = (try? await health.dailyAverage(.restingHeartRate, unit: .bpm, days: days)) ?? [:]
         let overnight = (try? await health.overnightAverages(.heartRateVariabilitySDNN, unit: .msUnit, sessions: main, days: days)) ?? [:]
         let useOvernight = overnight.count >= 5
-        return HeartData(hrvByDay: useOvernight ? overnight : daily, dailyHRV: daily, rhrByDay: rhr, overnight: useOvernight)
+        return HeartData(hrvByDay: useOvernight ? overnight : daily, dailyHRV: daily, rhrByDay: rhr, overnight: useOvernight,
+                         excluded: baselineExclusions())
     }
 
     /// Her usual value before `day`: the median of the 30 days before it,
-    /// once there are at least 5 (one odd day can't set it).
-    static func baseline(_ byDay: [Date: Double], before day: Date, calendar: Calendar = .current) -> Double? {
-        let xs = window(byDay, before: day, calendar: calendar)
+    /// leaving out `excluding` (calendar days), once there are at least 5
+    /// (one odd day can't set it).
+    static func baseline(_ byDay: [Date: Double], before day: Date, excluding: Set<Date> = [],
+                         calendar: Calendar = .current) -> Double? {
+        let xs = window(byDay, before: day, excluding: excluding, calendar: calendar)
         return xs.count >= 5 ? xs.median : nil
     }
 
-    /// The values of the 30 days before `day` (the baseline window).
-    static func window(_ byDay: [Date: Double], before day: Date, calendar: Calendar = .current) -> [Double] {
+    /// The values of the 30 days before `day` (the baseline window), less
+    /// the days in `excluding`.
+    static func window(_ byDay: [Date: Double], before day: Date, excluding: Set<Date> = [],
+                       calendar: Calendar = .current) -> [Double] {
         guard let from = calendar.date(byAdding: .day, value: -30, to: day) else { return [] }
-        return byDay.filter { $0.key < day && $0.key >= from }.map(\.value)
+        return byDay.filter { $0.key < day && $0.key >= from && !excluding.contains(calendar.startOfDay(for: $0.key)) }.map(\.value)
     }
 
     private func night(_ s: SleepSession, heart: HeartData) -> NightRecord {
         let day = Calendar.current.startOfDay(for: s.wake)
         var outcome = NextDayOutcome()
-        if let v = heart.hrvByDay[day], let b = Self.baseline(heart.hrvByDay, before: day), b > 0 { outcome.hrvDeltaPct = (v - b) / b * 100 }
-        if let v = heart.rhrByDay[day], let b = Self.baseline(heart.rhrByDay, before: day) { outcome.restingHRDelta = v - b }
+        if let v = heart.hrvByDay[day], let b = Self.baseline(heart.hrvByDay, before: day, excluding: heart.excluded), b > 0 { outcome.hrvDeltaPct = (v - b) / b * 100 }
+        if let v = heart.rhrByDay[day], let b = Self.baseline(heart.rhrByDay, before: day, excluding: heart.excluded) { outcome.restingHRDelta = v - b }
         if let c = store.checkIn(forWakeDay: day) { outcome.checkIn = Double(c.awake) }
         return NightRecord(session: s, outcome: outcome)
     }
@@ -681,22 +693,22 @@ final class AppModel: ObservableObject {
         let rhrDay = [today, yesterday].first { heart.rhrByDay[$0] != nil }
         if let d = hrvDay, let v = heart.hrvByDay[d] {
             hrv = v
-            hrvDeltaPct = Self.baseline(heart.hrvByDay, before: d).map { $0 > 0 ? (v - $0) / $0 * 100 : 0 } ?? 0
+            hrvDeltaPct = Self.baseline(heart.hrvByDay, before: d, excluding: heart.excluded).map { $0 > 0 ? (v - $0) / $0 * 100 : 0 } ?? 0
         } else {
-            hrv = Self.baseline(heart.hrvByDay, before: today) ?? 0
+            hrv = Self.baseline(heart.hrvByDay, before: today, excluding: heart.excluded) ?? 0
             hrvDeltaPct = 0
         }
         if let d = rhrDay, let v = heart.rhrByDay[d] {
             restingHR = v
-            restingHRDelta = Self.baseline(heart.rhrByDay, before: d).map { v - $0 } ?? 0
+            restingHRDelta = Self.baseline(heart.rhrByDay, before: d, excluding: heart.excluded).map { v - $0 } ?? 0
         } else {
-            restingHR = Self.baseline(heart.rhrByDay, before: today) ?? 0
+            restingHR = Self.baseline(heart.rhrByDay, before: today, excluding: heart.excluded) ?? 0
             restingHRDelta = 0
         }
-        restingHRBaselineKnown = Self.baseline(heart.rhrByDay, before: rhrDay ?? today) != nil
-        stressHRVBaseline = Self.baseline(heart.dailyHRV, before: today)
-        let rhrWindow = Self.window(heart.rhrByDay, before: rhrDay ?? today)
-        let hrvWindow = Self.window(heart.hrvByDay, before: hrvDay ?? today)
+        restingHRBaselineKnown = Self.baseline(heart.rhrByDay, before: rhrDay ?? today, excluding: heart.excluded) != nil
+        stressHRVBaseline = Self.baseline(heart.dailyHRV, before: today, excluding: heart.excluded)
+        let rhrWindow = Self.window(heart.rhrByDay, before: rhrDay ?? today, excluding: heart.excluded)
+        let hrvWindow = Self.window(heart.hrvByDay, before: hrvDay ?? today, excluding: heart.excluded)
         restingHRSpread = HeartBands.spread(rhrWindow)
         hrvSpreadPct = HeartBands.spread(hrvWindow).flatMap { sd in hrvWindow.median.flatMap { $0 > 0 ? sd / $0 * 100 : nil } }
         restingHRUsualRange = HeartBands.usualRange(rhrWindow)
@@ -774,7 +786,7 @@ final class AppModel: ObservableObject {
                 lastNightIsReal = true
             }
             let sampleHeart = (hrv, restingHR, hrvDeltaPct, restingHRDelta, stressHRVBaseline)
-            if applyHeart(heart), Self.baseline(heart.hrvByDay, before: cal.startOfDay(for: .now)) != nil || restingHRBaselineKnown {
+            if applyHeart(heart), Self.baseline(heart.hrvByDay, before: cal.startOfDay(for: .now), excluding: heart.excluded) != nil || restingHRBaselineKnown {
                 heartIsReal = true
             } else {
                 (hrv, restingHR, hrvDeltaPct, restingHRDelta, stressHRVBaseline) = sampleHeart
@@ -855,7 +867,7 @@ final class AppModel: ObservableObject {
                                activeKcal: kcalHourly[h] ?? 0, asleep: asleep(inHour: h))
         }
         func delta(_ byDay: [Date: Double]) -> Double? {
-            guard let v = byDay[today] ?? byDay[yesterday], let b = Self.baseline(byDay, before: today) else { return nil }
+            guard let v = byDay[today] ?? byDay[yesterday], let b = Self.baseline(byDay, before: today, excluding: heart.excluded) else { return nil }
             return v - b
         }
         respiratoryRateDelta = delta(respiratory)
@@ -1167,7 +1179,7 @@ final class AppModel: ObservableObject {
             pushToWatch()
         } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
                     || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
-                    || old.waterGoalML != new.waterGoalML || old.conditions != new.conditions {
+                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions {
             // Widgets show today's water, caffeine and cycle (and hide the
             // water goal with an eating-disorder history).
             Task { @MainActor in self.publishWidgetSnapshot() }
@@ -1384,9 +1396,10 @@ final class AppModel: ObservableObject {
             caffeineTooMuchAtBedtime: caffeineTooMuchAtBedtime,
             waterTodayML: waterTodayML,
             // No goal on the Watch under eating-disorder history: total only.
-            waterGoalML: hidesActivityNumbers ? nil : store.data.waterGoalML,
+            waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
-            todayWaterIDs: todaysWater.map(\.id)))
+            todayWaterIDs: todaysWater.map(\.id),
+            stressHighAt: stressHighNow))
     }
 
     func handle(_ message: WatchMessage) {

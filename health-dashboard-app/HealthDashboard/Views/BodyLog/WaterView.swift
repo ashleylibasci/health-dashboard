@@ -47,7 +47,7 @@ struct WaterView: View {
     }
 
     private var bottleML: Double { store.data.bottleSizeML }
-    private var goalML: Double { store.data.waterGoalML }
+    private var goalML: Double { model.waterGoalTodayML }
     /// Eating-disorder history: no goal, percentage, "goal reached" or pace
     /// anywhere, just the total (Cole 5, Ruiz F13).
     private var hidesGoal: Bool { model.hidesEffortTargets }
@@ -68,7 +68,7 @@ struct WaterView: View {
         }
         let behind = gap / bottleML
         return (SummaryStatus(text: "Behind pace", accent: .yellow),
-                "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind. Spread it out: no more than about 1 liter (34 oz) an hour.")
+                "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind. Spread it out: no more than about 34 oz an hour.")
     }
 
     private var lastPair: StatPair {
@@ -103,11 +103,11 @@ struct WaterView: View {
 
     private func add(ml: Double, label: String, time: LogTime) {
         let id = UUID()
-        let wasUnderGoal = model.waterTodayML < store.data.waterGoalML
+        let wasUnderGoal = model.waterTodayML < model.waterGoalTodayML
         withMotion(.log) { model.addWater(ml: ml, at: time.date, id: id) }
         let when = store.data.waterLog.first { $0.id == id }?.date ?? .now
         var message = LogFormat.loggedLine(label, time: time, at: when).replacingOccurrences(of: "Logged ", with: "Added ")
-        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= store.data.waterGoalML {
+        if !model.hidesEffortTargets, wasUnderGoal, model.waterTodayML >= model.waterGoalTodayML {
             message += " That\u{2019}s today\u{2019}s goal."
             goalCount += 1
         } else {
@@ -117,6 +117,30 @@ struct WaterView: View {
     }
 
     // MARK: Rows
+
+    /// "88 oz · +16 oz for training", or "72 oz · your usual goal".
+    private var goalSummary: String {
+        let extra = model.waterExtraToday
+        guard extra.ml > 0 else { return "\(LogFormat.oz(goalML)) \u{00B7} your usual goal" }
+        return "\(LogFormat.oz(goalML)) \u{00B7} +\(LogFormat.oz(extra.ml)) for \(extra.reasons.joined(separator: " and "))"
+    }
+
+    /// Why today's goal is higher, and the hot-day switch (D6).
+    @ViewBuilder
+    private var goalDetail: some View {
+        if model.hardTrainingToday {
+            Text("Today counts as a hard training day from your Watch, so your goal has \(LogFormat.oz(AppModel.trainingExtraML)) extra for the sweat.")
+        } else {
+            Text("On a hard training day (from your Watch) your goal goes up \(LogFormat.oz(AppModel.trainingExtraML)) by itself.")
+        }
+        Toggle(isOn: Binding(get: { model.hotDayToday },
+                             set: { store.data.hotDay = $0 ? .now : nil })) {
+            Text("Hot day today (+\(LogFormat.oz(AppModel.hotDayExtraML)))").font(.bodyEmphasis)
+        }
+        .tint(Accent.blue.fill(scheme))
+        Text("Sweat losses vary a lot. Drink to thirst, and spread it out: no more than about 34 oz an hour.")
+            .font(.secondary)
+    }
 
     private var entriesSummary: String {
         guard let last = model.todaysWater.last else { return "None yet" }
@@ -146,9 +170,15 @@ struct WaterView: View {
                         .font(.secondary)
                 }
             }
+            if !hidesGoal {
+                RowDivider()
+                ExpandRow(title: "Today\u{2019}s goal", summary: goalSummary, systemImage: "figure.run", accent: .blue) {
+                    goalDetail
+                }
+            }
             RowDivider()
             MetricRow(title: hidesGoal ? "Your bottle" : "Bottle and goal",
-                      note: hidesGoal ? "\(LogFormat.oz(bottleML)) bottle" : "\(LogFormat.oz(bottleML)) bottle \u{00B7} \(LogFormat.oz(goalML)) goal",
+                      note: hidesGoal ? "\(LogFormat.oz(bottleML)) bottle" : "\(LogFormat.oz(bottleML)) bottle \u{00B7} \(LogFormat.oz(store.data.waterGoalML)) goal",
                       systemImage: "waterbottle.fill", accent: .blue) {
                 WaterBottleGoalView()
             }
@@ -179,7 +209,7 @@ struct WaterDayView: View {
     @State private var selected: Int?
 
     private var bottleML: Double { store.data.bottleSizeML }
-    private var goalML: Double { store.data.waterGoalML }
+    private var goalML: Double { model.waterGoalTodayML }
     /// Eating-disorder history: no goal, percentage or pace (Cole 5, Ruiz F13).
     private var hidesGoal: Bool { model.hidesEffortTargets }
 
@@ -199,10 +229,10 @@ struct WaterDayView: View {
         let pace = model.waterPace(at: model.now)
         let gap = pace - have
         if gap <= bottleML * 0.25 { return "On track for this time of day." }
-        // Never a catch-up faster than about 1 liter an hour (Ruiz F10).
+        // Never a catch-up faster than about 34 oz (1 liter) an hour (Ruiz F10).
         if gap < min(bottleML, 1000) { return "A little behind a steady pace. About \(LogFormat.oz(gap)) to catch up over the next hour or two." }
         let behind = gap / bottleML
-        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 1 liter (34 oz) an hour."
+        return "About \(LogFormat.bottles(behind)) bottle\((behind * 2).rounded() / 2 > 1 ? "s" : "") behind a steady pace for this time of day. No need to catch up at once: spread it out, no more than about 34 oz an hour."
     }
 
     private var chartStart: Minutes {
@@ -436,6 +466,7 @@ struct WaterBottleGoalView: View {
     private static let highGoalOz = 135.0
 
     private var bottleML: Double { store.data.bottleSizeML }
+    /// Her usual goal (the setting), not today's with any extra.
     private var goalML: Double { store.data.waterGoalML }
 
     var body: some View {
@@ -561,14 +592,14 @@ struct WaterBottleGoalView: View {
             Stepper(value: goalBinding, in: 16...170, step: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LogFormat.oz(goalML)).font(.numberM)
-                    Text(LogFormat.bottlesPhrase(model.waterGoalBottles))
+                    Text(LogFormat.bottlesPhrase(bottleML > 0 ? goalML / bottleML : 0))
                         .font(.secondary).secondaryText()
                 }
             }
             .frame(minHeight: 52)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Daily goal")
-            .accessibilityValue("\(LogFormat.ozNumber(goalML)) ounces, \(LogFormat.bottlesPhrase(model.waterGoalBottles))")
+            .accessibilityValue("\(LogFormat.ozNumber(goalML)) ounces, \(LogFormat.bottlesPhrase(bottleML > 0 ? goalML / bottleML : 0))")
             if goalML / LogFormat.mlPerOunce > Self.highGoalOz {
                 WaterRangeNote(text: CaffeineWaterCopy.highGoal)
             }
