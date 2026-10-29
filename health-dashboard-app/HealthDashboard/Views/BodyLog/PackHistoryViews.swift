@@ -109,7 +109,8 @@ struct BleedsByPackView: View {
         let days = bleeds.map(\.bleedDays).filter { $0 > 0 }
         guard !days.isEmpty else { return "None logged" }
         let avg = Double(days.reduce(0, +)) / Double(days.count)
-        return "\(Int(avg.rounded())) days on average"
+        let text = avg == avg.rounded() ? "\(Int(avg))" : String(format: "%.1f", avg)
+        return "\(text) days on average"
     }
 
     /// Lighter or shorter than the first of these packs, or about the same.
