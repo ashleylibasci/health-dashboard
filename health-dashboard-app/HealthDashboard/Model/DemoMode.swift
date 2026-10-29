@@ -49,7 +49,7 @@ enum DemoMode {
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
     /// `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
-    /// Activity straight away (bed in 45 minutes), with that Watch alarm state.
+    /// Activity straight away, with that Watch alarm state.
     static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false

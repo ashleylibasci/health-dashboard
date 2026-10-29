@@ -6,8 +6,9 @@ import HealthCore
 
 /// The bedtime Live Activity (D-W1) on the Lock Screen and in the Dynamic
 /// Island: "Bed in 45 min", "Bed by 11:50pm · up 8:30am", and the Watch
-/// alarm ("Watch alarm on", or a "Turn on Watch alarm" button). Purple, the
-/// app's sleep colour. Once it's past its time (2am) it just says good night.
+/// alarm ("Watch alarm on", "Watch alarm: open app on your Watch", or a
+/// "Turn on Watch alarm" button). Purple, the app's sleep colour. Once it's
+/// past its time (2am) it just says good night.
 struct BedtimeLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: BedtimeActivityAttributes.self) { context in
@@ -107,7 +108,7 @@ private struct BedIn: View {
     }
 }
 
-/// "Watch alarm on", "Open the app on your Watch to turn on the alarm", or
+/// "Watch alarm on", "Watch alarm: open app on your Watch", or
 /// a "Turn on Watch alarm" button. Nothing without a Watch.
 private struct AlarmLine: View {
     let alarm: BedtimeActivityAttributes.WatchAlarm
@@ -119,7 +120,7 @@ private struct AlarmLine: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Accent.orange.ink(.dark))
         case .openWatch:
-            Label("Open the app on your Watch to turn on the alarm", systemImage: "applewatch")
+            Label("Watch alarm: open app on your Watch", systemImage: "applewatch")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         case .off:

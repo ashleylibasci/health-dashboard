@@ -45,7 +45,8 @@ enum BedtimeActivities {
         guard now < finish, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let start = state.bedtime.addingTimeInterval(-lead)
         let attributes = Attributes(night: state.bedtime)
-        if now >= start {
+        // `-demoBedtimeActivity`: straight away, whatever the time.
+        if now >= start || DemoMode.bedtimeActivity != nil {
             _ = try? Activity.request(attributes: attributes, content: content)
         } else if #available(iOS 26.0, *) {
             let alert = AlertConfiguration(title: "Bed in an hour",
@@ -66,15 +67,9 @@ extension AppModel {
     var bedtimeActivityState: BedtimeActivityAttributes.ContentState? {
         guard store.data.onboarded, !usingSampleData || DemoMode.bedtimeActivity != nil else { return nil }
         let tonight = tonightPlan
-        var bed = AppDay.date(tonightBedtime, relativeTo: nextWakeDay)
-        var up = AppDay.date(tonight.wake ?? tonight.upBy, relativeTo: nextWakeDay)
-        // `-demoBedtimeActivity`: bed in 45 minutes, so it shows now.
-        if DemoMode.bedtimeActivity != nil {
-            let shift = Date.now.addingTimeInterval(45 * 60).timeIntervalSince(bed)
-            bed += shift
-            up += shift
-        }
-        return .init(bedtime: bed, upAt: up, alarm: watchAlarmTonight)
+        return .init(bedtime: AppDay.date(tonightBedtime, relativeTo: nextWakeDay),
+                     upAt: AppDay.date(tonight.wake ?? tonight.upBy, relativeTo: nextWakeDay),
+                     alarm: watchAlarmTonight)
     }
 
     /// The smart alarm for tomorrow morning, as the activity shows it.
