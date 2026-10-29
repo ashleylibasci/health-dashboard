@@ -15,7 +15,7 @@ struct PackHistoryRows: View {
         let pattern = model.breakWeekPatternLine
         if model.pillPack != nil {
             RowCard {
-                if let pattern {
+                if pattern != nil {
                     // The row's note is just the list, so it fits one line.
                     MetricRow(title: "Your \(model.breaksPhrase)", note: patternNote,
                               systemImage: "calendar.badge.exclamationmark", accent: .pink) { showsPattern = true }
