@@ -46,8 +46,9 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings`: opens on that screen (Body tab), for
-    /// screenshots.
+    /// `-demoOpen cycle|cycleSettings|visitSummary`: opens on that screen
+    /// (Body tab), for screenshots. The pill-visit summary also saves its
+    /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
@@ -230,10 +231,14 @@ enum DemoMode {
         data.moodRatings = (0..<days).flatMap { i -> [AppData.MoodRating] in
             guard i % 6 != 4, let date = cal.date(byAdding: .minute, value: i * 1440 + 21 * 60 + 20, to: firstDay) else { return [] }
             let inBreak = i % 28 >= 21
-            let wobble = i % 3 == 0 ? 1 : 0
-            return [AppData.MoodRating(date: date, scale: .mood, value: inBreak ? 2 + (i % 2) : 3 + (i % 4 == 0 ? 0 : 1)),
-                    AppData.MoodRating(date: date, scale: .anxiety, value: inBreak ? 3 : 2 + (i % 5 == 0 ? 1 : 0)),
-                    AppData.MoodRating(date: date, scale: .irritability, value: inBreak ? 3 + wobble : 1 + wobble)]
+            // A day-to-day wobble that doesn't repeat pack to pack.
+            func wobble(_ salt: Int) -> Int { (i * i * 7 + i * 13 + salt) % 9 }
+            let mood = inBreak ? (wobble(1) < 5 ? 2 : 3) : (wobble(1) < 2 ? 3 : wobble(1) == 8 ? 5 : 4)
+            let anxiety = inBreak ? (wobble(2) < 6 ? 3 : 2) : (wobble(2) < 6 ? 2 : wobble(2) == 8 ? 4 : 3)
+            let irritable = inBreak ? (wobble(3) < 4 ? 4 : 3) : (wobble(3) < 6 ? 1 : 2)
+            return [AppData.MoodRating(date: date, scale: .mood, value: mood),
+                    AppData.MoodRating(date: date, scale: .anxiety, value: anxiety),
+                    AppData.MoodRating(date: date, scale: .irritability, value: irritable)]
         }
     }
 
