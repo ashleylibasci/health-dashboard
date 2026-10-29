@@ -4,8 +4,9 @@ import Charts
 import HealthCore
 
 /// The home screen, summary first: at most one line that needs her, then
-/// recovery (Today owns it), tonight's plan and today at a glance. One ⓘ
-/// per card; the details live on the screens each card opens.
+/// recovery (Today owns it), tonight's plan and today at a glance, led by
+/// whichever answers the question she has at this hour (D-T1). One ⓘ per
+/// card; the details live on the screens each card opens.
 struct TodayView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -13,6 +14,7 @@ struct TodayView: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openTab) private var openTab
+    @Environment(\.scenePhase) private var scenePhase
 
     /// The smart alarm toggled from the Tonight card, kept for Undo.
     private struct AlarmUndo: Equatable {
@@ -26,6 +28,9 @@ struct TodayView: View {
     @State private var alarmUndone = 0
     /// The page the alert line opened.
     @State private var opened: Alert?
+    /// The part of the day Today is laid out for. Set when the app opens,
+    /// never while she's looking at it.
+    @State private var moment: Moment?
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -35,11 +40,34 @@ struct TodayView: View {
                 examChip
             }
             alertSlot
-            recoveryCard
-            pillRow
-            tonightCard
-            glanceHeader
-            tiles
+            // Same cards, different order: the hero follows the clock, and
+            // the pill sits under whichever card leads.
+            switch shownMoment {
+            case .morning:
+                recoveryCard
+                pillRow
+                tonightCard
+                glanceHeader
+                tiles
+            case .afternoon:
+                glanceHeader
+                tiles
+                pillRow
+                recoveryCard
+                tonightCard
+            case .evening:
+                tonightCard
+                pillRow
+                recoveryCard
+                glanceHeader
+                tiles
+            }
+        }
+        .onAppear {
+            if moment == nil { moment = momentNow }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { moment = momentNow }
         }
         .navigationDestination(item: $opened) { alert in
             switch alert {
@@ -71,6 +99,22 @@ struct TodayView: View {
 
     /// Now, in app-day minutes (`model.now`), or the `-demoClock` time.
     private var clock: Minutes { DemoMode.clock ?? model.now }
+
+    // MARK: Following the clock
+
+    /// Morning leads with how she slept and recovered; afternoon with
+    /// energy now and the caffeine cutoff; evening with tonight.
+    private enum Moment { case morning, afternoon, evening }
+
+    /// Morning runs to noon, or two hours after a late wake (as the
+    /// check-in does); evening from 7pm.
+    private var momentNow: Moment {
+        let wake = model.lastNightIsFresh ? model.lastNight.wake : 0
+        if clock < max(12 * 60, wake + 120) { return .morning }
+        return clock < 19 * 60 ? .afternoon : .evening
+    }
+
+    private var shownMoment: Moment { moment ?? momentNow }
 
     // MARK: Exam chip
 
@@ -436,7 +480,7 @@ struct TodayView: View {
                             Text("Bed by \(Clock.format(model.tonightBedtime))")
                                 .font(typeSize.isAccessibilitySize ? .cardTitle : .heading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text("Up at \(Clock.format(wake))").font(.bodyEmphasis)
+                            Text(tonightLine(wake: wake)).font(.bodyEmphasis)
                                 .foregroundStyle(p.secondary)
                         }
                         Spacer(minLength: Space.s)
@@ -455,6 +499,14 @@ struct TodayView: View {
             }
             alarmChip(tonight)
         }
+    }
+
+    /// "Up at 8:30am", and in the evening the countdown first: "Bed in
+    /// 2h 40m · up at 8:30am".
+    private func tonightLine(wake: Minutes) -> String {
+        let left = 1440 + model.tonightBedtime - clock
+        guard shownMoment == .evening, left > 0 else { return "Up at \(Clock.format(wake))" }
+        return "Bed in \(Clock.duration(left)) \u{00B7} up at \(Clock.format(wake))"
     }
 
     private var tonightExplanation: Explanation {
@@ -619,6 +671,10 @@ struct TodayView: View {
 
     private var caffeineNote: String {
         let count = model.todaysDrinks.count
+        if shownMoment == .afternoon, let cutoff = model.caffeineCutoffShown {
+            let drinks = count == 0 ? "" : (count == 1 ? "1 drink" : "\(count) drinks") + " \u{00B7} "
+            return drinks + (count == 0 ? "Cutoff" : "cutoff") + " \(Clock.format(cutoff))"
+        }
         if count == 0 { return "Tap to log coffee or tea" }
         return (count == 1 ? "1 caffeine drink" : "\(count) caffeine drinks") + " \u{00B7} tap to edit"
     }
@@ -646,25 +702,45 @@ struct TodayView: View {
     }
 
     /// Two columns, or one at accessibility text sizes so titles and
-    /// values aren't cut off.
+    /// values aren't cut off. In the afternoon energy now and caffeine
+    /// come first.
     @ViewBuilder
     private var tiles: some View {
+        let afternoon = shownMoment == .afternoon
         if typeSize.isAccessibilitySize {
             VStack(spacing: Space.m) {
-                sleepTile
-                caffeineTile
-                waterTile
-                fourthTile
+                if afternoon {
+                    fourthTile
+                    caffeineTile
+                    waterTile
+                    sleepTile
+                } else {
+                    sleepTile
+                    caffeineTile
+                    waterTile
+                    fourthTile
+                }
             }
         } else {
             Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
-                GridRow {
-                    sleepTile
-                    caffeineTile
-                }
-                GridRow {
-                    waterTile
-                    fourthTile
+                if afternoon {
+                    GridRow {
+                        fourthTile
+                        caffeineTile
+                    }
+                    GridRow {
+                        waterTile
+                        sleepTile
+                    }
+                } else {
+                    GridRow {
+                        sleepTile
+                        caffeineTile
+                    }
+                    GridRow {
+                        waterTile
+                        fourthTile
+                    }
                 }
             }
         }
