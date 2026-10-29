@@ -611,7 +611,8 @@ struct TodayView: View {
 
     private var waterTile: some View {
         WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
-                  bottleML: store.data.bottleSizeML, showsGoal: !model.hidesEffortTargets) {
+                  bottleML: store.data.bottleSizeML, paceML: model.waterPace(at: model.now),
+                  showsGoal: !model.hidesEffortTargets) {
             withMotion(.log) { model.addWater() }
         }
     }
@@ -632,6 +633,8 @@ private struct WaterTile: View {
     var todayML: Double
     var goalML: Double
     var bottleML: Double
+    /// What a steady pace would have reached by now.
+    var paceML: Double
     /// False with an eating-disorder history: the total only, no goal.
     var showsGoal: Bool
     var add: () -> Void
@@ -639,12 +642,12 @@ private struct WaterTile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var added = 0
 
-    private var bottlesNote: String {
-        guard bottleML > 0 else { return "" }
-        let had = todayML / bottleML
-        guard showsGoal else { return "\(LogFormat.bottlesPhrase(had)) today" }
-        let goal = goalML / bottleML
-        return "\(LogFormat.bottles(had)) of \(LogFormat.bottlesPhrase(goal))"
+    /// The steady pace by now (F7): the bottles line said the amount
+    /// again. Nothing once the goal is reached, before waking, or without a
+    /// goal.
+    private var paceNote: String? {
+        guard showsGoal, todayML < goalML, paceML >= LogFormat.mlPerOunce else { return nil }
+        return "Pace: \(LogFormat.oz(paceML)) by now"
     }
 
     private var amount: String {
@@ -664,7 +667,9 @@ private struct WaterTile: View {
                         .font(.numberL).minimumScaleFactor(0.6).lineLimit(1)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .motion(.fill, value: amount)
-                    Text(bottlesNote).font(.secondary).foregroundStyle(p.secondary)
+                    if let paceNote {
+                        Text(paceNote).font(.secondary).foregroundStyle(p.secondary)
+                    }
                 }
                 .padding(Space.l)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -672,7 +677,7 @@ private struct WaterTile: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(showsGoal ? "Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML)), \(bottlesNote)" : "Water: \(LogFormat.oz(todayML)), \(bottlesNote)")
+            .accessibilityLabel(showsGoal ? "Water: \(LogFormat.oz(todayML)) of \(LogFormat.oz(goalML))" + (paceNote.map { ", \($0)" } ?? "") : "Water: \(LogFormat.oz(todayML))")
             .accessibilityHint(showsGoal ? "Opens water, where you can change your bottle size and goal" : "Opens water, where you can change your bottle size")
             Button {
                 added += 1
