@@ -2,11 +2,13 @@ import SwiftUI
 import HealthCore
 
 /// One line on Cycle and the Log tab when something she logged matters for
-/// her pill: being sick on active pills (H-A7). The full note is in a
-/// sheet, with a way into the missed-pill helper. Shows nothing otherwise.
+/// her pill: being sick on active pills (H-A7), or spotting on active pills
+/// (H-A8). The full note is in a sheet, with a way into the missed-pill
+/// helper. At most one line; nothing otherwise.
 struct PillLogCallouts: View {
     @EnvironmentObject var model: AppModel
     @State private var showsSick = false
+    @State private var showsSpotting = false
 
     var body: some View {
         if let sick = model.pillSickTrigger {
@@ -16,6 +18,29 @@ struct PillLogCallouts: View {
                 .bottomSheet(isPresented: $showsSick, title: GuideArticle.sickOnPill.title) {
                     sickSheet(sick)
                 }
+        } else if model.spottingOnActivePills {
+            CalloutBar(text: "Spotting on active pills is common. It isn\u{2019}t a period.",
+                       systemImage: "drop.fill", accent: .pink) { showsSpotting = true }
+                .bottomSheet(isPresented: $showsSpotting, title: "Spotting on the pill") {
+                    spottingSheet
+                }
+        }
+    }
+
+    /// Breakthrough bleeding: expected early on and after a late pill.
+    @ViewBuilder
+    private var spottingSheet: some View {
+        Text("Light bleeding on active pills is called breakthrough bleeding. It\u{2019}s common in the first 3 months on a pill and after a late or missed pill, and the app doesn\u{2019}t count it as a period.")
+            .font(.bodyText).fixedSize(horizontal: false, vertical: true)
+        Text(model.spottingKeepsHappening
+             ? "It\u{2019}s happened in \(model.spottingPacksAfterThreeMonths) of your last 3 packs, after your first 3 months. Worth mentioning at your next pill visit."
+             : "If it keeps happening after your first 3 months, mention it at your next pill visit.")
+            .font(.bodyText).fixedSize(horizontal: false, vertical: true)
+        RowCard {
+            MetricRow(title: "Late with a pill?", note: "Two taps to what to do now",
+                      systemImage: "exclamationmark.circle.fill", accent: .yellow) {
+                MissedPillHelper()
+            }
         }
     }
 
