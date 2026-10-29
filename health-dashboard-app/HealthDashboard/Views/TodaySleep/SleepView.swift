@@ -234,7 +234,7 @@ struct SleepView: View {
             let day = exam.date.formatted(.dateTime.weekday(.wide))
             RowDivider()
             ExpandRow(title: "A cushion before \(exam.title)",
-                      summary: "Bed \(AppModel.cushionMinutes) minutes earlier tonight gives you a cushion",
+                      summary: "Bed \(AppModel.cushionMinutes) min earlier tonight for a cushion",
                       systemImage: "moon.zzz.fill", accent: .indigo) {
                 Text("\(exam.title) on \(day) means a short night before it. Going to bed about \(AppModel.cushionMinutes) minutes earlier on the two or three nights before softens the hit. It won\u{2019}t make up for the short night; it just gives you a cushion.")
                     .fixedSize(horizontal: false, vertical: true)
