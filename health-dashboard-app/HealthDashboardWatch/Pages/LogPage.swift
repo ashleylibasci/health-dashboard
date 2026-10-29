@@ -3,7 +3,8 @@ import WatchKit
 import HealthCore
 
 /// One-tap caffeine and water logging: today's total first, then the drinks
-/// saved on the iPhone (and a bottle of water), then what the cutoff means.
+/// saved on the iPhone (and a bottle of water), then one line on the cutoff
+/// with the rest behind a tap.
 /// A logged tile turns into its own Undo for a few seconds, so nothing on the
 /// page moves.
 struct LogPage: View {
@@ -158,7 +159,7 @@ struct LogPage: View {
             return isPastCutoff(now) ? ("past cutoff", true) : ("lingers at bedtime", true)
         }
         if snapshot.caffeineCutoffBeforeWake == true, !snapshot.isFromEarlierDay(now: now) {
-            return ("cutoff before you\u{2019}re up", false)
+            return ("one small drink early", false)
         }
         guard let cutoff = cutoff(now) else { return nil }
         if now >= cutoff { return ("past cutoff", true) }
@@ -185,14 +186,26 @@ struct LogPage: View {
         return phoneSays || loggedHereAfterCutoff(now)
     }
 
-    /// What the cutoff means, under the tiles.
+    /// What the cutoff means, in one line under the tiles; the whole
+    /// sentence is a tap away (D-W6).
+    @ViewBuilder
     private func explainer(now: Date) -> some View {
-        let warning = showsWarning(now)
-        return Text(cutoffText(now: now))
-            .font(.footnote)
-            .foregroundStyle(warning ? Accent.coral.ink(.dark) : WatchStyle.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 4)
+        if let line = cutoffLine(now: now) {
+            MoreLine(line: line, detail: cutoffText(now: now),
+                     color: showsWarning(now) ? Accent.coral.ink(.dark) : WatchStyle.secondaryText)
+        }
+    }
+
+    /// "Last by 2pm · in 3h 10m", "Skip more today", "Still in you at
+    /// bedtime"; nothing without a cutoff.
+    private func cutoffLine(now: Date) -> String? {
+        if showsWarning(now) { return "Still in you at bedtime" }
+        if snapshot.isFromEarlierDay(now: now) { return "Today\u{2019}s cutoff: open iPhone" }
+        if snapshot.caffeineCutoffBeforeWake == true { return "Why one small drink?" }
+        guard let cutoff = cutoff(now) else { return nil }
+        if now >= cutoff { return todayMg(now) == 0 ? "Past today\u{2019}s cutoff" : "Skip more today" }
+        let minutes = Int(cutoff.timeIntervalSince(now) / 60)
+        return "Last by \(WatchStyle.time(cutoff)) \u{00B7} in \(Clock.duration(minutes))"
     }
 
     private func cutoffText(now: Date) -> String {
