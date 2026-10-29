@@ -68,4 +68,49 @@ extension AppModel {
         case nil: "none logged"
         }
     }
+
+    // MARK: Break-week pattern (H-A4)
+
+    /// What stands out in her last three break weeks, as words ("headaches",
+    /// "lower mood"), strongest first; nil before three finished packs, empty
+    /// when nothing does.
+    var breakWeekPattern: [String]? {
+        guard let cal = packCalendar else { return nil }
+        let day = Calendar.current
+        var symptoms: [Date: Set<String>] = [:]
+        for entry in store.data.symptomLog {
+            symptoms[day.startOfDay(for: entry.date), default: []].formUnion(entry.symptoms)
+        }
+        var awake: [Date: Double] = [:]
+        for c in store.data.checkIns { awake[AppDay.day(containing: c.date)] = Double(c.awake) }
+        func scores(_ scale: MoodScale) -> [Date: Double] { moodByDay(scale).mapValues(Double.init) }
+        let found = BreakWeekPattern.find(
+            symptoms: symptoms,
+            scores: [.init(name: "lower mood", byDay: scores(.mood), higherIsWorse: false),
+                     .init(name: "more anxiety", byDay: scores(.anxiety), higherIsWorse: true),
+                     .init(name: "more irritability", byDay: scores(.irritability), higherIsWorse: true),
+                     .init(name: "feeling less rested", byDay: awake, higherIsWorse: false)],
+            packs: finishedPacks, in: cal)
+        return found.map { Array($0.prefix(3)).map(Self.patternWord) }
+    }
+
+    /// "Headaches, cramps and lower mood show up in your break weeks."
+    var breakWeekPatternLine: String? {
+        guard let words = breakWeekPattern, let first = words.first else { return nil }
+        let list = words.count == 1 ? first
+            : words.dropLast().joined(separator: ", ") + " and " + (words.last ?? "")
+        return list.prefix(1).uppercased() + list.dropFirst() + " show up in your \(breaksPhrase)."
+    }
+
+    /// "break weeks", or "break days" on a 24 + 4 pack.
+    var breaksPhrase: String { packBreakName == "Break days" ? "break days" : "break weeks" }
+
+    /// A logged symptom as it reads in a sentence.
+    private static func patternWord(_ name: String) -> String {
+        switch name {
+        case "Headache": "headaches"
+        case "Fatigue": "tiredness"
+        default: name.lowercased()
+        }
+    }
 }

@@ -6,13 +6,20 @@ import HealthCore
 /// something to say.
 struct PackHistoryRows: View {
     @EnvironmentObject var model: AppModel
+    @State private var showsPattern = false
 
     var body: some View {
         let bleeds = model.packBleeds
         let mood = model.moodByPackDay(.mood)
         let showsMood = !(mood?.points.isEmpty ?? true)
-        if !bleeds.isEmpty || showsMood {
+        let pattern = model.breakWeekPatternLine
+        if !bleeds.isEmpty || showsMood || pattern != nil {
             RowCard {
+                if let pattern {
+                    MetricRow(title: "Your \(model.breaksPhrase)", note: pattern,
+                              systemImage: "calendar.badge.exclamationmark", accent: .pink) { showsPattern = true }
+                    if showsMood || !bleeds.isEmpty { RowDivider() }
+                }
                 if let mood, showsMood {
                     MetricRow(title: "Mood by pack day", note: moodNote(mood),
                               systemImage: "face.smiling", accent: .orange) {
@@ -26,6 +33,14 @@ struct PackHistoryRows: View {
                         BleedsByPackView()
                     }
                 }
+            }
+            .bottomSheet(isPresented: $showsPattern, title: "Your \(model.breaksPhrase)") {
+                Text(pattern ?? "")
+                    .font(.cardTitle).fixedSize(horizontal: false, vertical: true)
+                Text("From your last \(BreakWeekPattern.packsNeeded) packs: what you logged on break days compared with active-pill days. Headaches, pelvic pain and mood changes in the break are common on the pill, from the drop in hormones.")
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
+                Text("A shorter break (24 + 4 packs) or skipping the break helps many people, so it\u{2019}s something concrete to raise at your pill visit.")
+                    .font(.bodyText).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -121,4 +121,33 @@ final class PillHistoryTests: XCTestCase {
         let split = one.split(activeDays: 21)
         XCTAssertEqual(split.breakDays, 2)
     }
+
+    // MARK: Break-week pattern (H-A4)
+
+    private func packDay(_ pack: Int, _ day: Int) -> Date { packs.date(pack: pack, day: day, calendar: cal) }
+
+    func testBreakWeekHeadachesStandOut() {
+        var symptoms: [Date: Set<String>] = [:]
+        for pack in [-3, -2, -1] {
+            symptoms[packDay(pack, 22)] = ["Headache"]
+            symptoms[packDay(pack, 23)] = ["Headache", "Cramps"]
+        }
+        symptoms[packDay(-2, 5)] = ["Headache"]
+        // Bloating once in a break: not a pattern.
+        symptoms[packDay(-1, 25)] = ["Headache", "Bloating"]
+        var mood: [Date: Double] = [:]
+        for pack in [-3, -2, -1] {
+            for d in 1...28 { mood[packDay(pack, d)] = d > 21 ? 2 : 4 }
+        }
+        let found = BreakWeekPattern.find(symptoms: symptoms, scores: [.init(name: "lower mood", byDay: mood, higherIsWorse: false)],
+                                          packs: [-3, -2, -1], in: packs, cal: cal)
+        XCTAssertEqual(found, ["Headache", "Cramps", "lower mood"])
+    }
+
+    func testNothingBeforeThreePacksOrWithoutABreak() {
+        XCTAssertNil(BreakWeekPattern.find(symptoms: [:], scores: [], packs: [-2, -1], in: packs, cal: cal))
+        let continuous = PackCalendar(start: date(2026, 10, 11), activeDays: 28, packLength: 28)
+        XCTAssertNil(BreakWeekPattern.find(symptoms: [:], scores: [], packs: [-3, -2, -1], in: continuous, cal: cal))
+        XCTAssertEqual(BreakWeekPattern.find(symptoms: [:], scores: [], packs: [-3, -2, -1], in: packs, cal: cal), [])
+    }
 }
