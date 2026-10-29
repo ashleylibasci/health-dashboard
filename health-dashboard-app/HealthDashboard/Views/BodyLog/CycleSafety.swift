@@ -246,7 +246,15 @@ struct MethodSafetyRows: View {
         if missed != nil || !rest.isEmpty {
             RowCard {
                 if let missed {
-                    articleRow(missed)
+                    if method == .combinedPill {
+                        // Two taps to one answer (H-A2); the rules are one tap further.
+                        MetricRow(title: missed.article.title, note: "Two taps to what to do now",
+                                  systemImage: missed.systemImage, accent: missed.accent) {
+                            MissedPillHelper()
+                        }
+                    } else {
+                        articleRow(missed)
+                    }
                     if !rest.isEmpty { RowDivider() }
                 }
                 if rest.count == 1, let only = rest.first {
