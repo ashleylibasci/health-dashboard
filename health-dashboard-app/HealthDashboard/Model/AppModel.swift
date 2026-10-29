@@ -51,6 +51,9 @@ final class AppModel: ObservableObject {
     /// Apple's Medications has a reminder schedule for her pill, so this app
     /// sends only the repeat (never two reminders at once).
     @Published var healthPillHasSchedule = false
+    /// Moods from Apple's State of Mind log by app day, 1–5 (F2,
+    /// `MoodHealth`). Her own taps here win on the same day.
+    @Published var healthMoodByDay: [Date: Int] = [:]
 
     /// Where Apple Health stands, for the accuracy and settings screens.
     enum HealthConnection: Equatable {
@@ -944,6 +947,7 @@ final class AppModel: ObservableObject {
             await updateHealthConnection()
             await updateNudges()
             await updatePill()
+            await updateHealthMood()
         }
     }
 
@@ -1403,7 +1407,8 @@ final class AppModel: ObservableObject {
             waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
             todayWaterIDs: todaysWater.map(\.id),
-            stressHighAt: stressHighNow))
+            stressHighAt: stressHighNow,
+            moodToday: Dictionary(uniqueKeysWithValues: moodToday.map { ($0.key.rawValue, $0.value) })))
     }
 
     func handle(_ message: WatchMessage) {
@@ -1429,6 +1434,12 @@ final class AppModel: ObservableObject {
             Task {
                 if prefersSampleData { pushToWatch() } else { await syncWithHealth() }
             }
+        case let .loggedMood(entryID, scale, value, at):
+            if let scale = MoodScale(rawValue: scale) { logMood(scale, value, at: at, id: entryID) }
+            pushToWatch()
+        case let .undoMood(entryID):
+            removeMood(entryID)
+            pushToWatch()
         case let .alarmArmed(end, offOnWatch):
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: Self.watchReportsKey)

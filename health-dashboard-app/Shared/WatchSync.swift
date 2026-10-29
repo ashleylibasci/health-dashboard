@@ -76,6 +76,10 @@ struct WatchSnapshot: Codable, Equatable {
     /// or the last), so the Watch can offer a one-minute breather. nil
     /// otherwise, and from older phone builds.
     var stressHighAt: Date? = nil
+    /// Today's mood, anxiety and irritability taps (F2), by
+    /// `AppData.MoodRating.Scale` raw value. nil from older phone builds,
+    /// which can't take them from the Watch (the dots stay hidden).
+    var moodToday: [String: Int]? = nil
 
     struct Zone: Codable, Equatable {
         var title: String
@@ -108,6 +112,10 @@ enum WatchMessage: Codable {
     case loggedWater(entryID: UUID, ml: Double, at: Date)
     /// Undo on the Watch, a few seconds after logging water.
     case undoWater(entryID: UUID)
+    /// One tap on a mood dot (F2): `scale` is a `MoodRating.Scale` raw value.
+    case loggedMood(entryID: UUID, scale: String, value: Int, at: Date)
+    /// Undo on the Watch: tapping the same dot again.
+    case undoMood(entryID: UUID)
     case woke(at: Date, fromLightSleep: Bool)
     /// The Watch's smart alarm state: the end of the window it has turned on (nil
     /// when it isn't on), and whether she switched it off on the Watch.

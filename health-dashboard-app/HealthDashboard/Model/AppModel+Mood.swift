@@ -2,12 +2,14 @@ import Foundation
 import HealthCore
 
 /// Mood, anxiety and irritability, 1–5 each (B1): what she taps on the Log
-/// tab, and mood by pack day on the combined pill.
+/// tab or the Watch (F2), Apple's State of Mind log for mood on days she
+/// didn't tap, and mood by pack day on the combined pill.
 extension AppModel {
     typealias MoodScale = AppData.MoodRating.Scale
 
     /// Each rating's app day (a tap at 1am counts for the evening before)
-    /// → the latest value that day.
+    /// → the latest value that day. Mood also takes Apple's State of Mind
+    /// on days without a tap here (F2).
     func moodByDay(_ scale: MoodScale) -> [Date: Int] {
         var out: [Date: (at: Date, value: Int)] = [:]
         for r in store.data.moodRatings where r.scale == scale {
@@ -15,7 +17,15 @@ extension AppModel {
             if let have = out[day], have.at > r.date { continue }
             out[day] = (r.date, r.value)
         }
-        return out.mapValues(\.value)
+        let mine = out.mapValues(\.value)
+        guard scale == .mood else { return mine }
+        return healthMoodByDay.merging(mine) { _, own in own }
+    }
+
+    /// Reads State of Mind from Apple Health (not on example data).
+    func updateHealthMood() async {
+        guard !DemoMode.isOn, !prefersSampleData, let moods = await MoodHealth.moods(health.store, days: 200) else { return }
+        if healthMoodByDay != moods { healthMoodByDay = moods }
     }
 
     /// Today's rating on each scale she's tapped.
