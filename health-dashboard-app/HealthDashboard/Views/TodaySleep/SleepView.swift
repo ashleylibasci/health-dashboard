@@ -190,6 +190,75 @@ struct SleepView: View {
         }
     }
 
+    /// Morning daylight against 20 minutes before 11am (H-C5), with a
+    /// small ring of progress inside.
+    @ViewBuilder
+    private var morningLightRow: some View {
+        if model.showsMorningLight {
+            let got = model.morningDaylightToday, goal = AppModel.morningLightGoal
+            RowDivider()
+            ExpandRow(title: "Morning light", summary: model.morningLightSummary,
+                      systemImage: "sun.max.fill", accent: .yellow) {
+                HStack(spacing: Space.m) {
+                    Ring(value: Double(got) / Double(goal), accent: .yellow, lineWidth: 6,
+                         label: "\(got)", size: 48)
+                        .accessibilityHidden(true)
+                    Text("20 minutes outside before 11am helps you fall asleep earlier. Morning light moves your body clock earlier, and college schedules pull it later.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// "Learning you · 2 of 7 ready", while anything still learns (D-L1).
+    @ViewBuilder
+    private var learningRow: some View {
+        let items = model.learningItems
+        let ready = items.filter(\.isReady).count
+        if ready < items.count {
+            RowDivider()
+            MetricRow(title: "Learning you",
+                      note: model.usingSampleData ? "Example numbers for now" : "\(ready) of \(items.count) ready",
+                      verdict: model.usingSampleData ? RowVerdict(text: "Example", accent: .yellow) : nil,
+                      systemImage: "sparkles", accent: .purple) {
+                LearningView()
+            }
+        }
+    }
+
+    /// Two or three nights before an early exam (or during exam-week mode):
+    /// "Bed 20 minutes earlier tonight gives you a cushion" (H-C3).
+    @ViewBuilder
+    private var cushionRow: some View {
+        if let exam = model.cushionExam {
+            let day = exam.date.formatted(.dateTime.weekday(.wide))
+            RowDivider()
+            ExpandRow(title: "A cushion before \(exam.title)",
+                      summary: "Bed \(AppModel.cushionMinutes) min earlier tonight for a cushion",
+                      systemImage: "moon.zzz.fill", accent: .indigo) {
+                Text("\(exam.title) on \(day) means a short night before it. Going to bed about \(AppModel.cushionMinutes) minutes earlier on the two or three nights before softens the hit. It won\u{2019}t make up for the short night; it just gives you a cushion.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// "A 20-min nap before 3:10pm won't hurt tonight" (H-C2), from her
+    /// wake time and tonight's bedtime; after the cutoff, that it's passed.
+    @ViewBuilder
+    private var napRow: some View {
+        if model.showsNapWindow, let cutoff = model.napCutoff {
+            let open = model.now < cutoff
+            RowDivider()
+            ExpandRow(title: "Nap window",
+                      summary: open ? "\(AppModel.napMinutes)-min nap before \(Clock.format(cutoff)) won\u{2019}t hurt tonight"
+                                    : "Past \(Clock.format(cutoff)), a nap pushes bedtime later",
+                      systemImage: "powersleep", accent: open ? .indigo : .coral) {
+                Text("Short naps early in the afternoon help you stay alert. Long naps, or naps late in the day, make it harder to fall asleep at \(Clock.format(model.tonightBedtime)). Keep it to \(AppModel.napMinutes) minutes, start it before \(Clock.format(cutoff)), and set an alarm.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var rows: some View {
         let debt = model.sleepDebt
         return RowCard {
@@ -199,9 +268,10 @@ struct SleepView: View {
                 }
                 RowDivider()
             }
-            MetricRow(title: "Week & month", note: "Every night, averages",
-                      value: model.sleepRegularityScore.map { "\($0)" },
-                      verdict: model.sleepRegularityScore.map { _ in RowVerdict(text: "Regularity", accent: .purple) },
+            // How regular this week was, in one word; how far her times
+            // moved is one tap down (H-C1).
+            MetricRow(title: "Week & month", note: "Every night, how regular",
+                      verdict: model.weekSteadiness.map { RowVerdict(text: $0.word, accent: $0.accent) },
                       systemImage: "chart.bar.fill", accent: .purple) {
                 SleepHistoryView()
             }
@@ -214,6 +284,9 @@ struct SleepView: View {
                 SleepNeedView()
             }
             weekendRow
+            morningLightRow
+            napRow
+            cushionRow
             if model.daysUntilFallBack <= 28 {
                 RowDivider()
                 MetricRow(title: "Clocks go back \(model.nextFallBack.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))",
@@ -222,6 +295,7 @@ struct SleepView: View {
                     TimeChangeView()
                 }
             }
+            learningRow
             RowDivider(hasIcon: false)
             LearnMoreRow("Learn more about trouble sleeping", article: .troubleSleeping, accent: .purple)
                 .padding(.horizontal, Space.l)

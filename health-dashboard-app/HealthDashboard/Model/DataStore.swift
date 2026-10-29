@@ -161,6 +161,8 @@ struct AppData: Codable {
     var flowLog: [FlowEntry] = []
     var symptomLog: [SymptomEntry] = []
     var moodLog: [MoodEntry] = []
+    /// Sleep and exam features: bedtime nudge, tomorrow's list, after-exam check-ins.
+    var sleepExtras = SleepExtrasData()
 
     init() {}
 
@@ -221,6 +223,7 @@ struct AppData: Codable {
         flowLog = get(.flowLog, d.flowLog)
         symptomLog = get(.symptomLog, d.symptomLog)
         moodLog = get(.moodLog, d.moodLog)
+        sleepExtras = get(.sleepExtras, d.sleepExtras)
     }
 
     /// Entries from today's app day only (since the rollover, 4:00am or

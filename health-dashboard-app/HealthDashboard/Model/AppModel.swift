@@ -126,6 +126,8 @@ final class AppModel: ObservableObject {
     @Published var hrvDeltaPct = SampleData.hrvDeltaPct
     @Published var restingHRDelta = SampleData.restingHRDelta
     @Published var daylightToday = SampleData.daylightToday
+    /// Daylight minutes today before 11am (the morning light target, H-C5).
+    @Published var morningDaylightToday = SampleData.morningDaylightToday
     @Published var stepsToday = SampleData.stepsToday
     @Published var cycleDay: Int?
     @Published var cycleLength = SampleData.cycleLength
@@ -548,6 +550,7 @@ final class AppModel: ObservableObject {
         hrv = SampleData.hrv; restingHR = SampleData.restingHR
         hrvDeltaPct = SampleData.hrvDeltaPct; restingHRDelta = SampleData.restingHRDelta
         daylightToday = SampleData.daylightToday; stepsToday = SampleData.stepsToday
+        morningDaylightToday = SampleData.morningDaylightToday
         daylightByDay = [:]
         workNights = SampleData.workNights; freeNights = SampleData.freeNights
         stressSamples = SampleData.stressSamples
@@ -790,6 +793,7 @@ final class AppModel: ObservableObject {
         let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
         let daylight = (try? await health.dailySum(.timeInDaylight, unit: .minute(), days: 9)) ?? [:]
         let steps = (try? await health.dailySum(.stepCount, unit: .count(), days: 2)) ?? [:]
+        let daylightHourly = (try? await health.hourlyToday(.timeInDaylight, unit: .minute(), sum: true)) ?? [:]
         // Stress, sickness signals, fitness and calories. Each is optional:
         // a missing permission or type just leaves "no data".
         let hrHourly = (try? await health.hourlyToday(.heartRate, unit: .bpm, sum: false)) ?? [:]
@@ -828,6 +832,7 @@ final class AppModel: ObservableObject {
 
         daylightByDay = daylight
         daylightToday = Int(daylight[today] ?? 0)
+        morningDaylightToday = Self.morningDaylight(daylightHourly)
         stepsToday = Int(steps[today] ?? 0)
         healthPeriodStarts = periods
         recomputeCycle()
@@ -916,6 +921,8 @@ final class AppModel: ObservableObject {
         if let o = store.data.alarmOverride, AppDay.date(o.end, relativeTo: o.wakeDay) <= .now {
             store.data.alarmOverride = nil   // that morning has passed
         }
+        clearOldBrainDump()
+        applyExamCrunch()
         pushToWatch()
         Task {
             await updateHealthConnection()
@@ -1247,6 +1254,7 @@ final class AppModel: ObservableObject {
             await Nudges.sickAlertIfNeeded(signal.confidence, cyclePhaseUnknown: signal.cyclePhaseUnknown)
         }
         await updateAlarmNudge()
+        await updateBedtimeNudge()
     }
 
     // MARK: Smart alarm on the Watch

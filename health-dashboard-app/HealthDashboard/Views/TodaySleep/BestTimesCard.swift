@@ -15,7 +15,7 @@ struct BestTimesCard: View {
         let p = Palette(scheme: scheme)
         let best = model.bestTimes
         let plan = model.tonightPlan
-        let status = BestTimesText.status(best)
+        let status = BestTimesText.status(best, isExample: model.usingSampleData)
         NavigationLink {
             WakePlanView()
         } label: {
@@ -75,7 +75,10 @@ struct BestTimesCard: View {
 @MainActor
 enum BestTimesText {
     /// The chip: how sure the window is, or that there's no clear pattern.
-    static func status(_ r: SleepTiming.Result) -> SummaryStatus {
+    /// On example data it says so instead of counting nights next to
+    /// example bars (design flaw 6).
+    static func status(_ r: SleepTiming.Result, isExample: Bool) -> SummaryStatus {
+        if isExample { return SummaryStatus(text: "Example", accent: .yellow) }
         switch r.confidence {
         case .fair: return SummaryStatus(text: "Fairly sure", accent: .mint)
         case .early: return SummaryStatus(text: "Early read", accent: .yellow)

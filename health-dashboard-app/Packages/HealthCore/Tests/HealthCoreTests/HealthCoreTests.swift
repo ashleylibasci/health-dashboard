@@ -6,8 +6,8 @@ final class ClockTests: XCTestCase {
         XCTAssertEqual(Clock.format(502), "8:22am")
         XCTAssertEqual(Clock.format(-5), "11:55pm")
         XCTAssertEqual(Clock.format(30), "12:30am")
-        XCTAssertEqual(Clock.duration(460), "7h 40m")
-        XCTAssertEqual(Clock.duration(35), "35 min")
+        XCTAssertEqual(Clock.duration(460), "7h\u{00A0}40m")
+        XCTAssertEqual(Clock.duration(35), "35\u{00A0}min")
         XCTAssertEqual(TimeRange(860, 970).label, "2:20–4:10pm")
         XCTAssertEqual(TimeRange(630, 770).label, "10:30am–12:50pm")
     }

@@ -218,6 +218,12 @@ struct EnergyView: View {
                       value: "\(tomorrow.score)",
                       verdict: gain > 0 ? RowVerdict(text: "Up \(gain)", accent: .mint) : nil,
                       systemImage: "chart.line.uptrend.xyaxis", accent: .mint) { EnergyView(day: .tomorrow) }
+            // Does the score match how she felt? (H-E3)
+            RowDivider()
+            ExpandRow(title: "Does it match how you feel?", summary: model.scoreMatchSummary(model.energyMatch),
+                      systemImage: "person.fill.questionmark", accent: .mint) {
+                Text(model.scoreMatchDetail("energy score")).fixedSize(horizontal: false, vertical: true)
+            }
             RowDivider()
             MetricRow(title: "Make the most of today",
                       note: model.hidesEffortTargets ? "Daylight, best nap and sleep debt" : "Daylight, best nap, sleep debt and effort",

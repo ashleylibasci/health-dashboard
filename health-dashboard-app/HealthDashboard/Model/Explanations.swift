@@ -89,7 +89,7 @@ enum Topic: String, CaseIterable, Identifiable {
             meaning: "Short wake-ups during the night. Most you won't remember.",
             forYou: "A few are completely normal. Lots of them can come from alcohol, caffeine, a warm room or stress.")
         case .regularity: Explanation(id: id, title: "Sleep regularity",
-            meaning: "How consistent your bedtime and wake time are from night to night, from 0 to 100.",
+            meaning: "How consistent your bedtime and wake time are from night to night: steady, shifting or all over the place.",
             forYou: "Regular sleep times help your body clock know when to make you sleepy and alert. Keeping weekends within an hour of weekdays helps most.")
         case .weekendShift: Explanation(id: id, title: "Weekend shift",
             meaning: "How much later you sleep and wake on free days than on school nights.",

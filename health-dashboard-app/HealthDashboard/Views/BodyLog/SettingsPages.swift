@@ -208,6 +208,10 @@ struct SleepSettingsView: View {
                 SleepScheduleControl()
             }
             Card(density: .compact) {
+                SettingToggleRow(title: "Bedtime nudge", detail: bedtimeNudgeDetail,
+                                 systemImage: "moon.haze.fill", accent: .purple, isOn: bedtimeNudgeBinding)
+            }
+            Card(density: .compact) {
                 // The switch itself is on the Sleep tab, next to the alarm it
                 // controls (Whitfield F2).
                 TabLinkRow(title: "Smart alarm", subtitle: smartAlarmSubtitle,
@@ -225,6 +229,26 @@ struct SleepSettingsView: View {
                 }
             }
         }
+    }
+
+    /// "Lights low, screens down" 45 minutes before tonight's bedtime
+    /// (H-C4). Turning it on asks for notification permission.
+    private var bedtimeNudgeBinding: Binding<Bool> {
+        Binding(get: { store.data.sleepExtras.bedtimeNudge },
+                set: { on in
+                    store.data.sleepExtras.bedtimeNudge = on
+                    Task {
+                        if on { await Nudges.requestPermission() }
+                        await model.updateBedtimeNudge()
+                    }
+                })
+    }
+
+    private var bedtimeNudgeDetail: String {
+        let at = Clock.format(model.tonightBedtime - BedtimeNudge.lead)
+        return store.data.sleepExtras.bedtimeNudge
+            ? "Tonight at \(at): \u{201C}Lights low, screens down\u{201D}, \(BedtimeNudge.lead) minutes before bed"
+            : "A gentle buzz \(BedtimeNudge.lead) minutes before bed (\(at) tonight): \u{201C}Lights low, screens down\u{201D}"
     }
 
     /// "On · 8:00–8:25am · never after 8:30am".

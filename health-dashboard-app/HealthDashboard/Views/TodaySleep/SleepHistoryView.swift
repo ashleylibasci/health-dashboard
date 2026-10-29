@@ -112,7 +112,7 @@ struct SleepHistoryView: View {
                         selection: $selectedDay.snapping { raw in
                             nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
                         },
-                        barWidth: range == .week ? 22 : 6)
+                        barWidth: range == .week ? 22 : 6, days: range.days)
                 .frame(height: 200)
                 .motion(.dataSwap, value: rangeRaw)
             ScrubHint(each: "night")
@@ -134,15 +134,15 @@ struct SleepHistoryView: View {
     private var averagesCard: some View {
         let bed = Clock.circularMean(nights.map(\.bedtime))
         let wake = Clock.circularMean(nights.map(\.wake))
-        let regularity = model.regularity(of: nights)
+        let steadiness = model.steadiness(of: nights)
         return Card {
             Text("Your averages").font(.cardTitle)
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     AverageTile(title: "Asleep", value: Clock.duration(averageAsleep),
                                 note: vsNeed(averageAsleep), explanation: Topic.sleepNeed.explanation)
-                    AverageTile(title: "Regularity", value: regularity.map { "\($0)" } ?? "\u{2014}",
-                                note: regularity.map { $0 >= 75 ? "steady" : $0 >= 55 ? "a bit uneven" : "uneven" } ?? "needs 5 nights",
+                    AverageTile(title: "Regularity", value: steadiness?.word ?? "\u{2014}",
+                                note: steadiness.map { "Moved \(Clock.duration($0.moved)) a night" } ?? "needs 5 nights",
                                 explanation: Topic.regularity.explanation)
                 }
                 GridRow {
@@ -183,7 +183,21 @@ struct HistoryBars: View {
     let selected: Date?
     @Binding var selection: Date?
     let barWidth: CGFloat
+    /// The days the x axis spans, ending today: exactly 7 bars' worth of
+    /// labels on a week, never an extra empty day (design flaw 5).
+    var days: Int = 7
     @Environment(\.colorScheme) private var scheme
+
+    private var domain: ClosedRange<Date> {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
+        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
+        return start...end
+    }
+
+    private var dayStarts: [Date] {
+        (0..<days).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: domain.lowerBound) }
+    }
 
     private func day(_ night: NightRecord) -> Date { Calendar.current.startOfDay(for: night.wakeDay) }
 
@@ -233,7 +247,7 @@ struct HistoryBars: View {
         }
         .chartScrub($selection, snapped: selected, steps: nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
-        .chartXScale(range: .plotDimension(startPadding: 4, endPadding: 8))
+        .chartXScale(domain: domain, range: .plotDimension(startPadding: 4, endPadding: 8))
         .chartYAxis {
             AxisMarks(position: .leading, values: [0.0, 4.0, 6.0, 8.0, 10.0]) { value in
                 AxisGridLine()
@@ -243,8 +257,15 @@ struct HistoryBars: View {
             }
         }
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 7)) { _ in
-                AxisValueLabel(format: .dateTime.weekday(.narrow))
+            if days <= 7 {
+                // One label per day in the domain, not one for its end too.
+                AxisMarks(values: dayStarts) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: 7)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+                }
             }
         }
         .accessibilityLabel(summary)
@@ -272,7 +293,8 @@ private struct AverageTile: View {
                 InfoButton(explanation: explanation).padding(.vertical, -14).padding(.horizontal, -8)
                     .accessibilityHidden(true)
             }
-            Text(value).font(.numberM).minimumScaleFactor(0.7).lineLimit(1)
+            // "All over the place" shrinks to fit rather than wrapping.
+            Text(value).font(.numberM).minimumScaleFactor(0.5).lineLimit(1)
             Text(note).font(.secondary).fontWeight(.semibold).foregroundStyle(Accent.purple.ink(scheme))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)

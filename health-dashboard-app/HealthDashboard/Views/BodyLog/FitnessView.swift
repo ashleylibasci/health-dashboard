@@ -37,6 +37,7 @@ struct FitnessView: View {
                 if !hidesTargets {
                     if points.count >= 2 { historyCard }
                     RowCard {
+                        freshnessRow
                         ExpandRow(title: "How you compare", summary: age == 0 ? "Add your age to compare" : "With women your age",
                                   systemImage: "person.2.fill", accent: .mint) {
                             if age > 0 {
@@ -64,6 +65,24 @@ struct FitnessView: View {
                               line: "Your Apple Watch estimates it during outdoor walks, runs or hikes of 20 minutes or more. It usually appears after a few of those.",
                               accent: .mint, info: info)
             }
+        }
+    }
+
+    // MARK: Freshness
+
+    /// "Last fitness estimate · 6 weeks ago", with what updates it (H-E5).
+    @ViewBuilder
+    private var freshnessRow: some View {
+        if let age = model.vo2MaxAgeText {
+            let stale = model.vo2MaxIsStale
+            let when = age.prefix(1).uppercased() + age.dropFirst()
+            ExpandRow(title: "Last fitness estimate",
+                      summary: stale ? "\(when) \u{00B7} an outdoor walk updates it" : when,
+                      systemImage: "clock.arrow.circlepath", accent: stale ? .yellow : .mint) {
+                Text("Your Watch only estimates VO\u{2082} max on outdoor walks, runs and hikes. A 20-minute brisk outdoor walk with your Watch updates it, and your fitness age with it.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            RowDivider()
         }
     }
 

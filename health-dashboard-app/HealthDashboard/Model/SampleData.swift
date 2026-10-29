@@ -87,6 +87,8 @@ enum SampleData {
     static let hrvDeltaPct = -6.0, restingHRDelta = 2.0
     static let hrv = baselineHRV * (1 + hrvDeltaPct / 100), restingHR = 70.0
     static let daylightToday = 18, stepsToday = 7820
+    /// Of today's daylight, the minutes before 11am.
+    static let morningDaylightToday = 12
     static let caffeineToday = [CaffeineDose(time: 580, mg: 130)]
     static let cycleDay = 22, cycleLength = 29
     static let workNights = [Chronotype.Night(onset: 34, wake: 490)]
@@ -102,9 +104,11 @@ enum SampleData {
     static let respiratoryRateDelta: Double? = 0.2
     static let wristTempDelta: Double? = 0.3
     static let vo2Max: Double? = 38.2
+    /// Yearly estimates, the latest 6 weeks old (so the freshness tip shows).
     static func vo2MaxHistory() -> [(date: Date, value: Double)] {
         let now = Date()
-        return [(48, 41.0), (36, 40.2), (24, 39.4), (12, 38.8), (0, 38.2)].map { (calendar.date(byAdding: .month, value: -$0.0, to: now)!, $0.1) }
+        let yearly = [(48, 41.0), (36, 40.2), (24, 39.4), (12, 38.8)].map { (calendar.date(byAdding: .month, value: -$0.0, to: now)!, $0.1) }
+        return yearly + [(calendar.date(byAdding: .day, value: -42, to: now)!, 38.2)]
     }
     static let activeCalories = 420.0
     static let restingCalories = 1470.0
