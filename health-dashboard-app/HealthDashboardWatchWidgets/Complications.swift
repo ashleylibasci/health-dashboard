@@ -27,7 +27,8 @@ struct ComplicationEntry: TimelineEntry {
 
 /// When each complication rises in the Smart Stack (D-W4): Recovery for
 /// two hours after she wakes, Pill from just before her pill time until
-/// it's taken, Caffeine & water in the 90 minutes before the cutoff and
+/// it's taken (and, as the break-week card, gently through the break and
+/// from the morning of a new pack day), Caffeine & water in the 90 minutes before the cutoff and
 /// whenever water falls a bottle behind pace, Bedtime from 90 minutes
 /// before bed. Cycle has no moment of its own.
 enum ComplicationKind {
@@ -48,8 +49,21 @@ enum ComplicationKind {
         case .cycle:
             return []
         case .pill:
-            guard let p = s.pill(at: now), p.isPillDay, p.taken == nil else { return [] }
-            return [Window(from: p.pillTime.addingTimeInterval(-15 * 60), until: p.pillTime.addingTimeInterval(3 * 3600), score: 90)]
+            guard let p = s.pill(at: now) else { return [] }
+            // The pill day runs from 12 hours before the pill time.
+            let dayStart = p.pillTime.addingTimeInterval(-12 * 3600)
+            if !p.isPillDay {
+                // H-F3: "Break week, day 3 · new pack Sun", low and steady.
+                return [Window(from: dayStart, until: dayStart.addingTimeInterval(24 * 3600), score: 30)]
+            }
+            guard p.taken == nil else { return [] }
+            var all = [Window(from: p.pillTime.addingTimeInterval(-15 * 60), until: p.pillTime.addingTimeInterval(3 * 3600), score: 90)]
+            if p.isNewPack {
+                // H-F3: "Start new pack today" from 7am, so she has it with her.
+                let morning = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: p.day) ?? dayStart
+                all.append(Window(from: max(morning, dayStart), until: p.pillTime.addingTimeInterval(-15 * 60), score: 70))
+            }
+            return all
         case .caffeine:
             var all: [Window] = []
             if let cutoff = s.caffeineCutoff(at: now) {
@@ -366,39 +380,51 @@ private struct PillComplicationView: View {
         }
     }
 
+    /// The Smart Stack card (H-F3) in the break and on a new pack's
+    /// first day: "Break week, day 3" / "New pack Sun", then "Start new
+    /// pack today" / "Pill 1 at 9pm".
     private func headline(_ pill: WidgetSnapshot.PillState?) -> String {
         guard let pill else { return dash }
         if let taken = pill.taken { return "Taken \(time(taken))" }
-        if !pill.isPillDay { return pill.breakName }
-        return pill.isNewPack ? "New pack \u{00B7} pill 1" : "Pill \(pill.packDay) of \(pill.packLength)"
+        if let day = pill.breakDay { return "\(pill.breakName), day \(day)" }
+        return pill.isNewPack ? "Start new pack today" : "Pill \(pill.packDay) of \(pill.packLength)"
     }
 
     private func detail(_ pill: WidgetSnapshot.PillState?) -> String {
         guard let pill else { return "Combined pill only" }
         if pill.taken != nil { return "Pill \(pill.packDay) of \(pill.packLength)" }
-        if !pill.isPillDay { return "No pill today" }
+        if !pill.isPillDay { return newPack(pill) }
+        if pill.isNewPack { return "Pill 1 at \(Clock.format(pill.time))" }
         return "\(Clock.format(pill.time)) \u{00B7} tap to mark taken"
+    }
+
+    /// "New pack Sun", or "New pack tomorrow" on the last break day.
+    private func newPack(_ pill: WidgetSnapshot.PillState) -> String {
+        guard let start = pill.newPackDay else { return "No pill today" }
+        if Calendar.current.dateComponents([.day], from: pill.day, to: start).day == 1 { return "New pack tomorrow" }
+        return "New pack \(start.formatted(.dateTime.weekday(.abbreviated)))"
     }
 
     private func cornerLabel(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
         if let missing = missingLine(s, now: entry.date), pill == nil { return missing }
         guard let pill else { return "Pill" }
         if let taken = pill.taken { return "Taken \(time(taken))" }
-        if !pill.isPillDay { return pill.breakName }
+        if let day = pill.breakDay { return "\(pill.breakName), day \(day)" }
         return "Pill \(pill.packDay) \u{00B7} \(Clock.format(pill.time))"
     }
 
     private func inline(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
         guard let pill else { return missingLine(s, now: entry.date) ?? "Pill" }
         if pill.taken != nil { return "Pill \(pill.packDay) taken" }
-        if !pill.isPillDay { return pill.breakName }
+        if let day = pill.breakDay { return "\(pill.breakName), day \(day) \u{00B7} \(newPack(pill).lowercased())" }
         return "Pill \(pill.packDay) \u{00B7} \(Clock.format(pill.time))"
     }
 
     private func spoken(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
         guard let pill else { return "Pill: \(missingLine(s, now: entry.date)?.lowercased() ?? "combined pill only")" }
         if let taken = pill.taken { return "Pill \(pill.packDay) taken at \(time(taken))" }
-        if !pill.isPillDay { return "\(pill.breakName), no pill today" }
+        if let day = pill.breakDay { return "\(pill.breakName), day \(day). \(newPack(pill))." }
+        if pill.isNewPack { return "Start new pack today. Pill 1 at \(Clock.format(pill.time)). Tap to mark taken." }
         return "Pill \(pill.packDay), take at \(Clock.format(pill.time)). Tap to mark taken."
     }
 }

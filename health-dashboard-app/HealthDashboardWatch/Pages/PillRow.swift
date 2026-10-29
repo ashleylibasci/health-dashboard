@@ -115,7 +115,7 @@ struct WatchPillRow: View {
     }
 
     private var title: String {
-        if !pill.isPillDay { return pill.breakName }
+        if let day = pill.breakDay { return "\(pill.breakName), day \(day)" }
         return pill.isNewPack ? "New pack \u{00B7} pill 1" : "Pill \(pill.packDay) of \(pill.packLength)"
     }
 
