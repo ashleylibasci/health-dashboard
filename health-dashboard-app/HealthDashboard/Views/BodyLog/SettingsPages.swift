@@ -186,6 +186,7 @@ struct CycleSettingsView: View {
                     PackSetupControl()
                 }
             }
+            if store.birthControl == .combinedPill { PillSettingsCard() }
         }
     }
 }

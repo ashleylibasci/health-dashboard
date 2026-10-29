@@ -192,30 +192,43 @@ struct BirthControlMedicinesCard: View {
 
 // MARK: - Safety rows
 
-/// Her method's safety reading as one card of rows, each opening its
-/// Health guide article: missed or late, being sick, medicines, eating
-/// enough for training, what isn't shown, when to get bleeding checked.
-/// Only the rows that apply to her method.
+/// Her method's safety reading, each row opening its Health guide article.
+/// "Missed or late?" stays in view (the one she needs at 11pm); the rest
+/// (being sick, medicines, eating enough for training, what isn't shown,
+/// when to get bleeding checked) fold into one "Pill safety and info" row
+/// that lists them (F22). Only the rows that apply to her method.
 struct MethodSafetyRows: View {
     let method: BirthControl
 
     /// One row and the article it opens.
-    private struct Row: Identifiable {
+    fileprivate struct Row: Identifiable {
         var id: String { article.id }
         var article: GuideArticle
         var systemImage: String
         var accent: Accent
+        /// A word or two for the folded row's note ("being sick").
+        var short: String
+    }
+
+    private var missed: Row? {
+        GuideArticle.missedDose(for: method).map { Row(article: $0, systemImage: "exclamationmark.circle.fill", accent: .yellow, short: "") }
     }
 
     private var rows: [Row] {
         [
-            GuideArticle.missedDose(for: method).map { Row(article: $0, systemImage: "exclamationmark.circle.fill", accent: .yellow) },
-            GuideArticle.sickOnMethod(for: method).map { Row(article: $0, systemImage: "cross.case.fill", accent: .pink) },
-            GuideArticle.medicines(for: method).map { Row(article: $0, systemImage: "pills.fill", accent: .indigo) },
-            GuideArticle.eatingEnough(for: method).map { Row(article: $0, systemImage: "fork.knife", accent: .mint) },
-            GuideArticle.notShown(for: method).map { Row(article: $0, systemImage: "nosign", accent: .purple) },
-            GuideArticle.bleedingCheck(for: method).map { Row(article: $0, systemImage: "drop.fill", accent: .coral) },
+            GuideArticle.sickOnMethod(for: method).map { Row(article: $0, systemImage: "cross.case.fill", accent: .pink, short: "being sick") },
+            GuideArticle.medicines(for: method).map { Row(article: $0, systemImage: "pills.fill", accent: .indigo, short: "medicines") },
+            GuideArticle.eatingEnough(for: method).map { Row(article: $0, systemImage: "fork.knife", accent: .mint, short: "eating enough") },
+            GuideArticle.notShown(for: method).map { Row(article: $0, systemImage: "nosign", accent: .purple, short: "what isn\u{2019}t shown") },
+            GuideArticle.bleedingCheck(for: method).map { Row(article: $0, systemImage: "drop.fill", accent: .coral, short: "bleeding checks") },
         ].compactMap { $0 }
+    }
+
+    /// "Being sick, medicines and more".
+    private func foldedNote(_ rest: [Row]) -> String {
+        let named = rest.prefix(2).map(\.short).joined(separator: ", ")
+        let text = rest.count > 2 ? named + " and more" : rest.map(\.short).joined(separator: " and ")
+        return text.prefix(1).uppercased() + text.dropFirst()
     }
 
     /// "Pill safety and info", "Ring safety and info"…
@@ -229,17 +242,46 @@ struct MethodSafetyRows: View {
     }
 
     var body: some View {
-        let shown = rows
-        if !shown.isEmpty {
-            VStack(alignment: .leading, spacing: Space.m) {
-                SectionHeading(heading)
-                RowCard {
-                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, row in
-                        if i > 0 { RowDivider() }
-                        MetricRow(title: row.article.title, note: row.article.summary,
-                                  systemImage: row.systemImage, accent: row.accent) {
-                            GuideArticleView(article: row.article)
-                        }
+        let rest = rows
+        if missed != nil || !rest.isEmpty {
+            RowCard {
+                if let missed {
+                    articleRow(missed)
+                    if !rest.isEmpty { RowDivider() }
+                }
+                if rest.count == 1, let only = rest.first {
+                    articleRow(only)
+                } else if !rest.isEmpty {
+                    MetricRow(title: heading, note: foldedNote(rest),
+                              systemImage: "checkmark.shield.fill", accent: .indigo) {
+                        MethodSafetyPage(title: heading, rows: rest)
+                    }
+                }
+            }
+        }
+    }
+
+    private func articleRow(_ row: Row) -> some View {
+        MetricRow(title: row.article.title, note: row.article.summary,
+                  systemImage: row.systemImage, accent: row.accent) {
+            GuideArticleView(article: row.article)
+        }
+    }
+}
+
+/// The folded safety rows, one per article.
+private struct MethodSafetyPage: View {
+    let title: String
+    let rows: [MethodSafetyRows.Row]
+
+    var body: some View {
+        Screen(title: title, accent: .indigo) {
+            RowCard {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
+                    if i > 0 { RowDivider() }
+                    MetricRow(title: row.article.title, note: row.article.summary,
+                              systemImage: row.systemImage, accent: row.accent) {
+                        GuideArticleView(article: row.article)
                     }
                 }
             }

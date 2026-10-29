@@ -25,7 +25,7 @@
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Health Dashboard looks for exams on your calendar (events with exam, midterm, final, quiz or test in the title) so it can plan your sleep around them. It never changes your calendar, and events stay on your phone.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve. Everything stays on your phone.</string>
+	<string>Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve, and, if you turn it on, the pill doses you log so a pill you've taken gets no reminder. Everything stays on your phone.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Saves the caffeine and water you log to Apple Health.</string>
 	<key>UILaunchScreen</key>

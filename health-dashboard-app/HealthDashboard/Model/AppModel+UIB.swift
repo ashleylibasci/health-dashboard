@@ -68,6 +68,19 @@ extension AppModel {
         return pos.summary(unit: unit)
     }
 
+    /// What changes next in her pack, short enough for a row subtitle
+    /// (F20): "Break week from Nov 1", "New pack from Nov 8". Nil when the
+    /// pack day isn't known.
+    var packNextShort: String? {
+        guard packMethod != nil, let p = packState else { return nil }
+        let style: Date.FormatStyle = .dateTime.month(.abbreviated).day()
+        if p.hasBreak, !p.isBreak, !packSkippingBreak, let b = nextBreakStart {
+            return "\(packBreakName) from \(b.formatted(style))"
+        }
+        guard let next = nextPackStart else { return nil }
+        return "\(p.isBreak ? "New" : "Next") pack from \(next.formatted(style))"
+    }
+
     /// The pack day a date falls on (for "you logged bleeding on pill 12").
     func packDay(on date: Date) -> Int? {
         guard let today = packDay else { return nil }

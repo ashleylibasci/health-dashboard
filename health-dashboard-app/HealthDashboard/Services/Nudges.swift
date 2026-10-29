@@ -172,6 +172,19 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .list])
     }
 
+    /// The pill reminder's Taken button (D-N2), with when she tapped it.
+    /// Set at launch; iOS starts the app in the background to run it.
+    var onPillTaken: ((Date) -> Void)?
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let tapped = Date.now
+        DispatchQueue.main.async {
+            if response.actionIdentifier == PillReminders.takenAction { self.onPillTaken?(tapped) }
+            completionHandler()
+        }
+    }
+
     /// Call once at launch.
     static func install() {
         UNUserNotificationCenter.current().delegate = shared

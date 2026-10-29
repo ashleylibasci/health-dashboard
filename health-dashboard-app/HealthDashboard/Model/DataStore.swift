@@ -99,6 +99,24 @@ struct AppData: Codable {
     /// A pack check she answered "not now" to: the new-pack start or bleed
     /// date it was about, so the same prompt doesn't come back.
     var packCheckDismissed: Date?
+    /// Combined pill: when she tapped Taken (H-A1). Each counts for the pill
+    /// day whose pill time is nearest (`PillDay`).
+    var pillsTaken: [Date] = []
+    /// A reminder at `pillTime` on pill days, repeated once if not taken.
+    var pillReminder = false
+    /// Her pill time, minutes after midnight (default 9pm).
+    var pillTime: Minutes = 21 * 60
+    /// Also count doses logged in Apple Health (Apple's Medications, or any
+    /// app that saves doses there). iOS 26 and later.
+    var pillReadsHealth = false
+    /// The time zone her pill time belongs to (H-A11): the reminders stay
+    /// at her home time when she travels. Set the first time they're
+    /// scheduled.
+    var pillHomeTimeZone: String?
+    /// Packs she had when she last counted, counting the one she was on
+    /// (H-A6), and pill 1 of that pack. Nil until she sets it.
+    var refillPacks: Int?
+    var refillCountedFrom: Date?
     /// The day she last changed birth control (or started or stopped one).
     /// Her usual cycle length counts only cycles since then (Okafor M).
     var methodChangedDate: Date?
@@ -166,6 +184,13 @@ struct AppData: Codable {
         packActiveDays = min(max(get(.packActiveDays, d.packActiveDays), 1), 28)
         packLength = min(max(get(.packLength, d.packLength), packActiveDays), 35)
         packCheckDismissed = get(.packCheckDismissed, d.packCheckDismissed)
+        pillsTaken = get(.pillsTaken, d.pillsTaken)
+        pillReminder = get(.pillReminder, d.pillReminder)
+        pillTime = min(max(get(.pillTime, d.pillTime), 0), 1439)
+        pillReadsHealth = get(.pillReadsHealth, d.pillReadsHealth)
+        pillHomeTimeZone = get(.pillHomeTimeZone, d.pillHomeTimeZone)
+        refillPacks = get(.refillPacks, d.refillPacks)
+        refillCountedFrom = get(.refillCountedFrom, d.refillCountedFrom)
         methodChangedDate = get(.methodChangedDate, d.methodChangedDate)
         sleepNeedAdjustment = get(.sleepNeedAdjustment, d.sleepNeedAdjustment)
         upBy = get(.upBy, d.upBy)

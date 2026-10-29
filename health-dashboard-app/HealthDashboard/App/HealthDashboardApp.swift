@@ -17,6 +17,8 @@ struct HealthDashboardApp: App {
         DemoMode.applySetup(store: store, model: model)
         // Apple Health wakes the app with new data (also when it's closed).
         BackgroundHealth.shared.start(model)
+        // Pill doses logged in Apple Health cancel that pill's reminders.
+        PillHealth.startWatching(model)
         // Lattes from Siri or the widget: straight into the log when the
         // intent runs in this process, otherwise on the next activation.
         PendingDrinks.onAdded = { model.importPendingDrinks() }
@@ -29,6 +31,8 @@ struct HealthDashboardApp: App {
         WatchSync.shared.activate()
         // Sick alerts and nudges show as banners while the app is open too.
         NotificationPresenter.install()
+        // "Taken" on a pill reminder, even with the app closed.
+        NotificationPresenter.shared.onPillTaken = { at in MainActor.assumeIsolated { model.markPillTaken(at: at) } }
     }
 
     var body: some Scene {
@@ -60,7 +64,9 @@ struct HealthDashboardApp: App {
 /// screen switches tabs through `openTab` rather than pushing a copy.
 struct RootTabView: View {
     @Environment(\.colorScheme) private var scheme
-    @State private var tab: AppTab = .today
+    @State private var tab: AppTab = DemoMode.open == nil ? .today : .body
+    /// `-demoOpen` (Debug): the screen pushed on Body at launch.
+    @State private var demoOpen = false
 
     var body: some View {
         TabView(selection: $tab) {
@@ -70,7 +76,17 @@ struct RootTabView: View {
             NavigationStack { SleepView().toolbar(.hidden, for: .navigationBar) }
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(AppTab.sleep)
-            NavigationStack { BodyView().toolbar(.hidden, for: .navigationBar) }
+            NavigationStack {
+                BodyView().toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(isPresented: $demoOpen) {
+                        if DemoMode.open == "cycleSettings" { CycleSettingsView() } else { CycleView() }
+                    }
+                    .task {
+                        guard DemoMode.open != nil, !demoOpen else { return }
+                        try? await Task.sleep(for: .milliseconds(500))
+                        demoOpen = true
+                    }
+            }
                 .tabItem { Label("Body", systemImage: "heart") }
                 .tag(AppTab.body)
             NavigationStack { LogView().toolbar(.hidden, for: .navigationBar) }

@@ -30,8 +30,18 @@ enum DemoMode {
         .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     static let isOn = args.contains("-demo") || sick || cycle != nil
     static let resetData = args.contains("-resetData")
+    /// `-demoPillNotice`: today's pill reminder 10 seconds after launch, to
+    /// see the notification and its Taken button.
+    static let pillNotice = args.contains("-demoPillNotice")
+    /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
+    /// zone 3 hours from the phone's, as if she'd travelled.
+    static let away = args.contains("-demoAway")
+    /// `-demoOpen cycle|cycleSettings`: opens on that screen (Body tab), for
+    /// screenshots.
+    static let open = value(after: "-demoOpen")
     #else
-    static let isOn = false, sick = false, resetData = false
+    static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false
+    static let open: String? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif
@@ -61,6 +71,19 @@ enum DemoMode {
             data.packActiveDays = 21
             data.packLength = 28
             data.packStartDate = cal.date(byAdding: .day, value: -17, to: today)
+            // Pills 1–17 marked taken at about 9pm, except pill 11, and the
+            // 9pm reminder on (H-A1).
+            data.pillReminder = true
+            // On her last pack (H-A6).
+            data.refillPacks = 1
+            data.refillCountedFrom = data.packStartDate
+            // -demoAway: her pill time is set back home, 3 hours from here (H-A11).
+            if away {
+                data.pillHomeTimeZone = TimeZone.current.identifier == "America/New_York" ? "America/Los_Angeles" : "America/New_York"
+            }
+            data.pillsTaken = (1...17).filter { $0 != 11 }.compactMap { day in
+                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - 18, to: today) ?? today)
+            }
         case "hormonalIUD":
             data.cycleSetup = .hormonal
             data.birthControl = BirthControl.hormonalIUD.rawValue
