@@ -77,7 +77,7 @@ struct FitnessView: View {
             let stale = model.vo2MaxIsStale
             let when = age.prefix(1).uppercased() + age.dropFirst()
             ExpandRow(title: "Last fitness estimate",
-                      summary: stale ? "\(when) \u{00B7} a brisk outdoor walk updates it" : when,
+                      summary: stale ? "\(when) \u{00B7} an outdoor walk updates it" : when,
                       systemImage: "clock.arrow.circlepath", accent: stale ? .yellow : .mint) {
                 Text("Your Watch only estimates VO\u{2082} max on outdoor walks, runs and hikes. A 20-minute brisk outdoor walk with your Watch updates it, and your fitness age with it.")
                     .fixedSize(horizontal: false, vertical: true)
