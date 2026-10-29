@@ -2,8 +2,8 @@ import WidgetKit
 import SwiftUI
 import HealthCore
 
-/// Watch-face complications: recovery, cycle, caffeine & water, and tonight's
-/// bedtime with the smart alarm. They show the numbers the iPhone last sent
+/// Watch-face complications: recovery, cycle, today's pill, caffeine & water,
+/// and tonight's bedtime with the smart alarm. They show the numbers the iPhone last sent
 /// (`WidgetSnapshot`), say "Example" for example data, never show yesterday's
 /// numbers as today's, and open the matching Watch page when tapped.
 @main
@@ -11,6 +11,7 @@ struct HealthNextComplications: WidgetBundle {
     var body: some Widget {
         RecoveryComplication()
         CycleComplication()
+        PillComplication()
         CaffeineComplication()
         BedtimeComplication()
     }
@@ -50,6 +51,9 @@ struct ComplicationProvider: TimelineProvider {
         if let s = snap {
             dates.append(s.appDayStart.addingTimeInterval(24 * 3600))
             dates.append(s.updated.addingTimeInterval(6 * 3600))
+            // The next pill day (12 hours after the pill time): the pill
+            // complication moves on to the next pill.
+            if let p = s.pill(at: now) { dates.append(p.pillTime.addingTimeInterval(12 * 3600)) }
             if bedtime, let bed = s.bedtime(at: now) {
                 relevantFrom = bed.addingTimeInterval(-90 * 60)
                 relevantUntil = bed.addingTimeInterval(60 * 60)
@@ -243,6 +247,115 @@ private struct CycleComplicationView: View {
             }
             .accessibilityElement(children: .combine)
         }
+    }
+}
+
+// MARK: - Pill
+
+struct PillComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchPill", provider: ComplicationProvider()) { entry in
+            PillComplicationView(entry: entry)
+                .containerBackground(.clear, for: .widget)
+                // One tap marks an untaken pill taken (with Undo on the
+                // Recovery page); otherwise it just opens Recovery.
+                .widgetURL(entry.snapshot?.pill(at: entry.date).map { $0.isPillDay && $0.taken == nil } == true
+                           ? URL(string: "healthnext://pill")! : page(0))
+        }
+        .configurationDisplayName("Pill")
+        .description("Today's pill: tap to mark it taken. Pink on a new pack day.")
+        .supportedFamilies(families)
+    }
+}
+
+/// "18", or a tick once it's taken; pink on a new pack's first day.
+private struct PillComplicationView: View {
+    let entry: ComplicationEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        let s = entry.snapshot
+        let pill = s?.pill(at: entry.date)
+        let tint = pill?.isNewPack == true && pill?.taken == nil ? Accent.pink.fill(.dark) : Color.white
+        switch family {
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: -2) {
+                    center(pill, font: numberFont)
+                        .foregroundStyle(tint)
+                        .widgetAccentable()
+                    Text(pill?.isPillDay == false ? "Break" : "Pill").font(.system(size: 10, weight: .semibold))
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spoken(pill, s))
+        case .accessoryCorner:
+            center(pill, font: .system(.title2, design: .rounded, weight: .bold).monospacedDigit())
+                .foregroundStyle(tint)
+                .widgetAccentable()
+                .widgetLabel(cornerLabel(pill, s))
+                .accessibilityLabel(spoken(pill, s))
+        case .accessoryInline:
+            Text(inline(pill, s))
+        default:
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title("Pill", s)).font(.caption2.weight(.semibold))
+                    .foregroundStyle(Accent.pink.ink(.dark))
+                    .widgetAccentable()
+                Text(headline(pill)).font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                Text(missingLine(s, now: entry.date) ?? detail(pill)).font(.caption2).lineLimit(1)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// The number, a tick once taken, or a dash.
+    @ViewBuilder
+    private func center(_ pill: WidgetSnapshot.PillState?, font: Font) -> some View {
+        if let pill, pill.taken != nil {
+            Image(systemName: "checkmark").font(font)
+        } else if let pill, pill.isPillDay {
+            Text("\(pill.packDay)").font(font)
+        } else {
+            Text(dash).font(font)
+        }
+    }
+
+    private func headline(_ pill: WidgetSnapshot.PillState?) -> String {
+        guard let pill else { return dash }
+        if let taken = pill.taken { return "Taken \(time(taken))" }
+        if !pill.isPillDay { return pill.breakName }
+        return pill.isNewPack ? "New pack \u{00B7} pill 1" : "Pill \(pill.packDay) of \(pill.packLength)"
+    }
+
+    private func detail(_ pill: WidgetSnapshot.PillState?) -> String {
+        guard let pill else { return "Combined pill only" }
+        if pill.taken != nil { return "Pill \(pill.packDay) of \(pill.packLength)" }
+        if !pill.isPillDay { return "No pill today" }
+        return "\(Clock.format(pill.time)) \u{00B7} tap to mark taken"
+    }
+
+    private func cornerLabel(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
+        if let missing = missingLine(s, now: entry.date), pill == nil { return missing }
+        guard let pill else { return "Pill" }
+        if let taken = pill.taken { return "Taken \(time(taken))" }
+        if !pill.isPillDay { return pill.breakName }
+        return "Pill \(pill.packDay) \u{00B7} \(Clock.format(pill.time))"
+    }
+
+    private func inline(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
+        guard let pill else { return missingLine(s, now: entry.date) ?? "Pill" }
+        if pill.taken != nil { return "Pill \(pill.packDay) taken" }
+        if !pill.isPillDay { return pill.breakName }
+        return "Pill \(pill.packDay) \u{00B7} \(Clock.format(pill.time))"
+    }
+
+    private func spoken(_ pill: WidgetSnapshot.PillState?, _ s: WidgetSnapshot?) -> String {
+        guard let pill else { return "Pill: \(missingLine(s, now: entry.date)?.lowercased() ?? "combined pill only")" }
+        if let taken = pill.taken { return "Pill \(pill.packDay) taken at \(time(taken))" }
+        if !pill.isPillDay { return "\(pill.breakName), no pill today" }
+        return "Pill \(pill.packDay), take at \(Clock.format(pill.time)). Tap to mark taken."
     }
 }
 

@@ -121,9 +121,15 @@ struct WatchPagesView: View {
             }
             .tabViewStyle(.verticalPage)
         }
-        // A tapped complication opens its page (healthnext://page/2).
+        // A tapped complication opens its page (healthnext://page/2); the
+        // pill complication (healthnext://pill) marks today's pill taken
+        // and shows it on Recovery, with Undo.
         .onOpenURL { url in
             if url.host == "page", let n = Int(url.lastPathComponent), (0...3).contains(n) { page = n }
+            if url.host == "pill" {
+                page = 0
+                Task { await WatchPillLog.shared.markTakenFromComplication(sync) }
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {

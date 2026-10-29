@@ -114,6 +114,11 @@ enum WatchMessage: Codable {
     /// Lets the phone remind her to open the Watch app when tomorrow's alarm
     /// still needs turning on.
     case alarmArmed(end: Date?, offOnWatch: Bool)
+    /// Today's pill marked taken on the Watch (its Taken button or the pill
+    /// complication), at the tap time.
+    case pillTaken(at: Date)
+    /// Undo on the Watch, a few seconds after: the dose tapped at that time.
+    case undoPill(at: Date)
 
     /// "Latte", for an error message about this message.
     var drinkName: String? {
@@ -290,6 +295,18 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     #if os(iOS)
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
     nonisolated func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
+    #endif
+
+    #if os(watchOS)
+    /// Watch side: today's pill taken (or not) here, shown on the Recovery
+    /// page and the pill complication before the phone confirms it.
+    func setPillTaken(_ date: Date?, now: Date = .now) {
+        guard var w = widget, var pill = w.pill(at: now) else { return }
+        pill.taken = date
+        w.pill = pill
+        w.save()
+        widget = w
+    }
     #endif
 
     private func receive(context: [String: Any]) {

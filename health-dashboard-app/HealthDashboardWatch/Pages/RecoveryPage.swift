@@ -2,7 +2,8 @@ import SwiftUI
 import HealthCore
 
 /// Today's recovery score as a ring, with the phone's one-line verdict, a
-/// way through to Energy, and where she is in her cycle.
+/// way through to Energy, and where she is in her cycle (today's pill with
+/// its Taken button, on the combined pill).
 struct RecoveryPage: View {
     /// Moves to the Energy page.
     var openEnergy: () -> Void = {}
@@ -87,11 +88,14 @@ struct RecoveryPage: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    /// "Pack day 18 · Active pill", from the phone's widget numbers (today's
-    /// only). Nothing when she isn't tracking a cycle.
+    /// Today's pill on the combined pill; otherwise "Day 12 · Follicular",
+    /// from the phone's widget numbers (today's only). Nothing when she
+    /// isn't tracking a cycle.
     @ViewBuilder
     private func cycleRow(now: Date) -> some View {
-        if let line = sync.widget?.cycleLine(at: now) {
+        if let pill = sync.widget?.pill(at: now) {
+            WatchPillRow(pill: pill)
+        } else if let line = sync.widget?.cycleLine(at: now) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "drop.fill")
                     .font(.footnote)

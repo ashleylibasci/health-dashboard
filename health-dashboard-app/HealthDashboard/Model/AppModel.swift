@@ -1451,6 +1451,10 @@ final class AppModel: ObservableObject {
             Task { await updateAlarmNudge() }
             // "Watch alarm on" on the bedtime Live Activity.
             updateBedtimeActivity()
+        case let .pillTaken(at):
+            markPillTaken(at: at)
+        case let .undoPill(at):
+            unmarkPillTaken(on: pillDay(for: at))
         }
     }
 }
