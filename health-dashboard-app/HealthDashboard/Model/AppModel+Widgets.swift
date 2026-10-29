@@ -35,7 +35,11 @@ extension AppModel {
             bedtime: AppDay.date(tonightBedtime, relativeTo: nextWakeDay),
             bedtimeStreak: onTime,
             quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) },
-            caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) }
+            caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) },
+            pill: pillToday.map {
+                .init(day: $0.day, packDay: $0.packDay, activeDays: pillPack?.activeDays ?? $0.packLength,
+                      packLength: $0.packLength, time: pillTimeHere, taken: $0.taken, breakName: packBreakName)
+            }
         ).save()
     }
 
