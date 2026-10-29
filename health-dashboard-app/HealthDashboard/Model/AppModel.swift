@@ -376,10 +376,13 @@ final class AppModel: ObservableObject {
     var recoveryUsualIsPersonal: Bool { personalRecoveryUsual != nil }
     var energyUsualIsPersonal: Bool { personalEnergyUsual != nil }
 
-    /// A natural cycle's own shift today is allowed for (`cycleHeartShift`).
+    /// A natural cycle's own shift today is allowed for (`cycleHeartShift`),
+    /// and on the pill her own break-week shift (`packHeartAllowanceToday`).
     var recovery: Int {
-        Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct, restingHRDelta: restingHRDelta,
-                       sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15), cycle: cycleHeartShift)
+        let pack = packHeartAllowanceToday
+        return Recovery.score(usual: Double(Self.recoveryAnchor), hrvDeltaPct: hrvDeltaPct - (pack?.hrvPct ?? 0),
+                              restingHRDelta: restingHRDelta - (pack?.restingHR ?? 0),
+                              sleepShortfall: max(0, sleepNeed.minutes - lastNight.asleep - 15), cycle: cycleHeartShift)
     }
     /// The label for today's shown recovery (`recoveryShown`); "" when there
     /// is no number.
@@ -527,6 +530,7 @@ final class AppModel: ObservableObject {
     private func applySampleData() {
         usingSampleData = true
         nights = SampleData.nights()
+        if DemoMode.pillHistory { nights = DemoMode.pillHistoryNights(nights) }
         realNightDays = []
         sessions = []
         mornings = SampleData.mornings()

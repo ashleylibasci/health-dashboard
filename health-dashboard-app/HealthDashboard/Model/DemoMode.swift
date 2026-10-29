@@ -53,10 +53,14 @@ enum DemoMode {
     static let fuel = args.contains("-demoFuel")
     static let pillHistory = args.contains("-demoPillHistory")
     static let pillEvent = value(after: "-demoPillEvent")
+    /// `-demoPackDay <n>`: with `-demoCycle pill`, today is pill n (18 by
+    /// default), for break-day previews.
+    static let packDay = min(max(Int(value(after: "-demoPackDay") ?? "") ?? 18, 2), 28)
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let pillHistory = false
     static let pillEvent: String? = nil
+    static let packDay = 18
     static let open: String? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
@@ -86,7 +90,7 @@ enum DemoMode {
             // method change on its own resets the pack (normalizePack).
             data.packActiveDays = 21
             data.packLength = 28
-            data.packStartDate = cal.date(byAdding: .day, value: -17, to: today)
+            data.packStartDate = cal.date(byAdding: .day, value: -(packDay - 1), to: today)
             // Pills 1–17 marked taken at about 9pm, except pill 11, and the
             // 9pm reminder on (H-A1).
             data.pillReminder = true
@@ -97,8 +101,8 @@ enum DemoMode {
             if away {
                 data.pillHomeTimeZone = TimeZone.current.identifier == "America/New_York" ? "America/Los_Angeles" : "America/New_York"
             }
-            data.pillsTaken = (1...17).filter { $0 != 11 }.compactMap { day in
-                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - 18, to: today) ?? today)
+            data.pillsTaken = (1...min(packDay - 1, 21)).filter { $0 != 11 }.compactMap { day in
+                cal.date(byAdding: .minute, value: 21 * 60 - 7 + day % 5, to: cal.date(byAdding: .day, value: day - packDay, to: today) ?? today)
             }
         case "hormonalIUD":
             data.cycleSetup = .hormonal
@@ -230,6 +234,27 @@ enum DemoMode {
             return [AppData.MoodRating(date: date, scale: .mood, value: inBreak ? 2 + (i % 2) : 3 + (i % 4 == 0 ? 0 : 1)),
                     AppData.MoodRating(date: date, scale: .anxiety, value: inBreak ? 3 : 2 + (i % 5 == 0 ? 1 : 0)),
                     AppData.MoodRating(date: date, scale: .irritability, value: inBreak ? 3 + wobble : 1 + wobble)]
+        }
+    }
+
+    /// `-demoPillHistory`: the example nights reach back four packs, with
+    /// resting heart rate about 1.3 beats higher on break days (E2). The
+    /// demo pack started `packDay` − 1 days ago.
+    static func pillHistoryNights(_ nights: [NightRecord], today: Date = .now, calendar cal: Calendar = .current) -> [NightRecord] {
+        let day0 = cal.startOfDay(for: today)
+        let older = nights.prefix(49).compactMap { n -> NightRecord? in
+            guard let day = cal.date(byAdding: .day, value: -71, to: n.wakeDay) else { return nil }
+            var copy = n
+            copy.wakeDay = day
+            return copy
+        }
+        guard let packStart = cal.date(byAdding: .day, value: -(packDay - 1), to: day0) else { return nights }
+        let packs = PackCalendar(start: packStart, activeDays: 21, packLength: 28)
+        return (older + nights).map { n in
+            guard packs.isBreak(day: packs.position(of: n.wakeDay, calendar: cal).day) else { return n }
+            var copy = n
+            copy.outcome.restingHRDelta = (n.outcome.restingHRDelta ?? 0) + 1.3
+            return copy
         }
     }
 
