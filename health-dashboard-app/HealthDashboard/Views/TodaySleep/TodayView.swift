@@ -35,6 +35,7 @@ struct TodayView: View {
             }
             alertSlot
             recoveryCard
+            pillRow
             tonightCard
             glanceHeader
             tiles
@@ -386,6 +387,17 @@ struct TodayView: View {
                                spoken: "\(Clock.duration(gap)) more than your need", tone: .neutral)
         }
         return .none(text: "on target")
+    }
+
+    // MARK: Pill
+
+    /// Today's pill under the hero, with one-tap Taken (D-T2). Only on a
+    /// pack she's set (combined pill).
+    @ViewBuilder
+    private var pillRow: some View {
+        if model.pillToday != nil {
+            RowCard { PillTodayRow() }
+        }
     }
 
     // MARK: Tonight
