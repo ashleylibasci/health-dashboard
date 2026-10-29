@@ -1182,6 +1182,7 @@ final class AppModel: ObservableObject {
             || old.sleepNeedAdjustment != new.sleepNeedAdjustment || old.phoneBackupAlarm != new.phoneBackupAlarm
         let watchRelevant = planRelevant || old.savedDrinks != new.savedDrinks
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
+            || old.moodRatings != new.moodRatings
         // (alarmOverride is written by pushToWatch itself, which then sends.)
         if watchRelevant {
             pushToWatch()
