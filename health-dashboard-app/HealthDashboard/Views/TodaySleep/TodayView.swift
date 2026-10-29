@@ -15,6 +15,7 @@ struct TodayView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openTab) private var openTab
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The smart alarm toggled from the Tonight card, kept for Undo.
     private struct AlarmUndo: Equatable {
@@ -31,6 +32,11 @@ struct TodayView: View {
     /// The part of the day Today is laid out for. Set when the app opens,
     /// never while she's looking at it.
     @State private var moment: Moment?
+    /// The app day the morning reveal last played (D-M2).
+    @AppStorage("todayRevealDay") private var revealDay = ""
+    /// True while the recovery ring waits, empty, for the reveal.
+    @State private var revealing = false
+    @State private var revealed = 0
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -65,10 +71,14 @@ struct TodayView: View {
         }
         .onAppear {
             if moment == nil { moment = momentNow }
+            revealIfFirstOpen()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { moment = momentNow }
+            guard phase == .active else { return }
+            moment = momentNow
+            revealIfFirstOpen()
         }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: revealed)
         .navigationDestination(item: $opened) { alert in
             switch alert {
             case .sick: SickView()
@@ -273,6 +283,23 @@ struct TodayView: View {
         return first.prefix(1).uppercased() + first.dropFirst() + ". " + plan
     }
 
+    // MARK: Morning reveal
+
+    /// The first open of the morning after a recorded night: the ring
+    /// fills and the number counts up, with one soft tap (D-M2). Once per
+    /// app day; with Reduce Motion the ring fades in instead.
+    private func revealIfFirstOpen() {
+        let day = model.appDayDate.formatted(.iso8601.year().month().day())
+        guard shownMoment == .morning, model.lastNightIsFresh, recoveryValue != nil, revealDay != day else { return }
+        revealDay = day
+        revealing = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.4) : .easeOut(duration: 0.9)) { revealing = false }
+            revealed += 1
+        }
+    }
+
     private var recoveryExplanation: Explanation {
         let base = Topic.recovery.explanation
         return Explanation(id: "recovery-today", title: base.title, meaning: base.meaning,
@@ -293,7 +320,10 @@ struct TodayView: View {
                     RecoveryView()
                 } label: {
                     AdaptiveStack(spacing: Space.l) {
-                        Ring(value: Double(value) / 100, accent: .indigo, label: "\(value)", caption: "Recovery", size: 104)
+                        let empty = revealing && !reduceMotion
+                        Ring(value: empty ? 0 : Double(value) / 100, accent: .indigo, label: empty ? "0" : "\(value)",
+                             caption: "Recovery", size: 104, accessibilityText: "Recovery: \(value)")
+                            .opacity(revealing && reduceMotion ? 0 : 1)
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text(model.recoveryLabel(for: value)).font(.heading)
                                 .fixedSize(horizontal: false, vertical: true)
