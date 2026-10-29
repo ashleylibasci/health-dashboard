@@ -48,11 +48,12 @@ extension AppModel {
     /// that night met her sleep need, with how many "went well" in each.
     var reflectionSplit: ReflectionSplit {
         let cal = Calendar.current
+        let need = sleepNeed.minutes
         var s = ReflectionSplit(fullWell: 0, full: 0, shortWell: 0, short: 0)
         for r in store.data.sleepExtras.examReflections {
             guard let night = nights.first(where: { cal.isDate($0.wakeDay, inSameDayAs: r.examDay) }) else { continue }
             let well = r.felt == .well ? 1 : 0
-            if metNeed(night) { s.full += 1; s.fullWell += well } else { s.short += 1; s.shortWell += well }
+            if SleepNeedEstimator.metNeed(asleep: night.asleepMinutes, need: need) { s.full += 1; s.fullWell += well } else { s.short += 1; s.shortWell += well }
         }
         return s
     }
@@ -96,7 +97,7 @@ struct ExamReflectionRows: View {
         guard rated >= AppModel.reflectionsNeeded, s.full > 0, s.short > 0 else {
             return "\(rated) of \(AppModel.reflectionsNeeded) exams rated"
         }
-        return "Went well: \(s.fullWell) of \(s.full) after a full night, \(s.shortWell) of \(s.short) after a short one"
+        return "Went well \(s.fullWell) of \(s.full) full nights, \(s.shortWell) of \(s.short) short"
     }
 
     private func detail(_ rated: Int) -> String {
