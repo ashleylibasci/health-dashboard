@@ -9,8 +9,8 @@ extension AppModel {
     struct SleepSteadiness: Hashable {
         enum Level { case steady, shifting, allOver }
         var level: Level
-        /// The larger of how far her time falling asleep and her wake time
-        /// moved across the nights (latest minus earliest), in minutes.
+        /// How far her sleep times moved from one night to the next, on
+        /// average (falling asleep and waking up together), in minutes.
         var moved: Int
 
         var word: String {
@@ -34,8 +34,11 @@ extension AppModel {
     /// history tile already used). Nil with fewer than 5 nights.
     func steadiness(of nights: [NightRecord]) -> SleepSteadiness? {
         guard let score = regularity(of: nights) else { return nil }
-        let onsets = nights.map(\.sleepOnset), wakes = nights.map(\.wake)
-        let moved = max((onsets.max() ?? 0) - (onsets.min() ?? 0), (wakes.max() ?? 0) - (wakes.min() ?? 0))
+        let ordered = nights.sorted { $0.wakeDay < $1.wakeDay }
+        let steps = zip(ordered, ordered.dropFirst()).map { a, b in
+            Double(abs(b.sleepOnset - a.sleepOnset) + abs(b.wake - a.wake)) / 2
+        }
+        let moved = Int((steps.mean ?? 0).rounded())
         let level: SleepSteadiness.Level = score >= 75 ? .steady : score >= 55 ? .shifting : .allOver
         return SleepSteadiness(level: level, moved: moved)
     }

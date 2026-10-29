@@ -142,7 +142,7 @@ struct SleepHistoryView: View {
                     AverageTile(title: "Asleep", value: Clock.duration(averageAsleep),
                                 note: vsNeed(averageAsleep), explanation: Topic.sleepNeed.explanation)
                     AverageTile(title: "Regularity", value: steadiness?.word ?? "\u{2014}",
-                                note: steadiness.map { "Times moved \(Clock.duration($0.moved))" } ?? "needs 5 nights",
+                                note: steadiness.map { "Moved \(Clock.duration($0.moved)) a night" } ?? "needs 5 nights",
                                 explanation: Topic.regularity.explanation)
                 }
                 GridRow {
