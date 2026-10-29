@@ -22,6 +22,8 @@ struct HealthDashboardApp: App {
         // Lattes from Siri or the widget: straight into the log when the
         // intent runs in this process, otherwise on the next activation.
         PendingDrinks.onAdded = { model.importPendingDrinks() }
+        // Water, pills and stress tapped on a widget, the same way.
+        PendingLogs.onAdded = { model.importPendingLogs() }
         // Wired here rather than in a view, so Watch messages that arrive when
         // iOS wakes the app in the background are still handled.
         WatchSync.shared.onMessage = { model.handle($0) }

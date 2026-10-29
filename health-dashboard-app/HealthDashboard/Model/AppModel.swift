@@ -601,6 +601,7 @@ final class AppModel: ObservableObject {
         AppDay.rolloverMinutes = AppDay.rollover(forBedtime: store.data.bedtime)
         recordTimeZone()
         importPendingDrinks()
+        importPendingLogs()
         Task { await CalendarImport.shared.check(model: self) }
         guard store.data.onboarded else {
             pushToWatch()
@@ -1099,11 +1100,13 @@ final class AppModel: ObservableObject {
 
     /// `id`: the entry's own id, e.g. one the Watch made, so it's never
     /// added twice and can be undone from the Watch.
-    func addWater(ml: Double, at date: Date = .now, id: UUID = UUID()) {
+    /// `saveToHealth`: false when it's in Apple Health already (a widget saved it).
+    func addWater(ml: Double, at date: Date = .now, id: UUID = UUID(), saveToHealth: Bool = true) {
         guard !store.data.waterLog.contains(where: { $0.id == id }) else { return }
         var entry = AppData.WaterEntry(date: AppDay.pastTime(date), ml: ml)
         entry.id = id
         store.data.waterLog.append(entry)
+        guard saveToHealth else { return }
         writeHealth { try await $0.saveWater(ml: entry.ml, at: entry.date, id: entry.id) }
     }
 
@@ -1181,7 +1184,8 @@ final class AppModel: ObservableObject {
             pushToWatch()
         } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
                     || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
-                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions {
+                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions
+                    || old.moodLog != new.moodLog {
             // Widgets show today's water, caffeine and cycle (and hide the
             // water goal with an eating-disorder history).
             Task { @MainActor in self.publishWidgetSnapshot() }

@@ -88,6 +88,7 @@ targets:
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
       - Shared/LogLatteIntent.swift
+      - Shared/WidgetIntents.swift
     dependencies:
       - package: HealthCore   # Clock.format, so widget times read like the app's
     entitlements:

@@ -50,11 +50,20 @@ struct WidgetSnapshot: Codable, Equatable {
     /// widget and the Watch. nil when she isn't on the combined pill, and
     /// from older app builds.
     var pill: PillState? = nil
+    /// Her latest stress rating (the Stress widget lights it up while it's
+    /// from today). nil from older app builds.
+    var stress: StressTap? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
         var name: String
         var mg: Int
+    }
+
+    struct StressTap: Codable, Equatable {
+        /// 1 (very calm) – 5 (very stressed).
+        var level: Int
+        var date: Date
     }
 
     /// Where she is in the pack on one pill day, and whether that day's
@@ -133,6 +142,14 @@ struct WidgetSnapshot: Codable, Equatable {
     func cycleNumber(at date: Date) -> Int? { isCurrent(at: date) ? cycleNumber : nil }
     func bedtime(at date: Date) -> Date? { isCurrent(at: date) ? bedtime : nil }
     func caffeineCutoff(at date: Date) -> Date? { isCurrent(at: date) ? caffeineCutoff : nil }
+
+    /// Today's stress rating: logged since the app day that holds `date`
+    /// began (the day rolls over every 24 hours from `appDayStart`).
+    func stress(at date: Date) -> Int? {
+        guard let stress, stress.date <= date else { return nil }
+        let days = (date.timeIntervalSince(appDayStart) / (24 * 3600)).rounded(.down)
+        return stress.date >= appDayStart.addingTimeInterval(days * 24 * 3600) ? stress.level : nil
+    }
 
     /// The pill day `date` falls in. A later day than the saved one moves on
     /// through the pack, not yet taken; nil more than a week on (the pack
