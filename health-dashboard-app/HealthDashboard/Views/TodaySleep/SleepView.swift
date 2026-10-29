@@ -250,8 +250,8 @@ struct SleepView: View {
             let open = model.now < cutoff
             RowDivider()
             ExpandRow(title: "Nap window",
-                      summary: open ? "A \(AppModel.napMinutes)-min nap before \(Clock.format(cutoff)) won\u{2019}t hurt tonight"
-                                    : "Past \(Clock.format(cutoff)), a nap would push bedtime later",
+                      summary: open ? "\(AppModel.napMinutes)-min nap before \(Clock.format(cutoff)) won\u{2019}t hurt tonight"
+                                    : "Past \(Clock.format(cutoff)), a nap pushes bedtime later",
                       systemImage: "powersleep", accent: open ? .indigo : .coral) {
                 Text("Short naps early in the afternoon help you stay alert. Long naps, or naps late in the day, make it harder to fall asleep at \(Clock.format(model.tonightBedtime)). Keep it to \(AppModel.napMinutes) minutes, start it before \(Clock.format(cutoff)), and set an alarm.")
                     .fixedSize(horizontal: false, vertical: true)
