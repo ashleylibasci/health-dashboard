@@ -25,48 +25,92 @@ struct ComplicationEntry: TimelineEntry {
     var relevance: TimelineEntryRelevance? = nil
 }
 
+/// When each complication rises in the Smart Stack (D-W4): Recovery for
+/// two hours after she wakes, Pill from just before her pill time until
+/// it's taken, Caffeine & water in the 90 minutes before the cutoff and
+/// whenever water falls a bottle behind pace, Bedtime from 90 minutes
+/// before bed. Cycle has no moment of its own.
+enum ComplicationKind {
+    case recovery, cycle, pill, caffeine, bedtime
+
+    /// A stretch of time it's relevant, and how strongly (0–100).
+    struct Window {
+        var from: Date
+        var until: Date
+        var score: Float
+    }
+
+    func windows(_ s: WidgetSnapshot, now: Date) -> [Window] {
+        switch self {
+        case .recovery:
+            guard let wake = s.wake, s.recovery(at: now) != nil else { return [] }
+            return [Window(from: wake, until: wake.addingTimeInterval(2 * 3600), score: 50)]
+        case .cycle:
+            return []
+        case .pill:
+            guard let p = s.pill(at: now), p.isPillDay, p.taken == nil else { return [] }
+            return [Window(from: p.pillTime.addingTimeInterval(-15 * 60), until: p.pillTime.addingTimeInterval(3 * 3600), score: 90)]
+        case .caffeine:
+            var all: [Window] = []
+            if let cutoff = s.caffeineCutoff(at: now) {
+                all.append(Window(from: cutoff.addingTimeInterval(-90 * 60), until: cutoff, score: 60))
+            }
+            if let behind = waterBehind(s, now: now) { all.append(behind) }
+            return all
+        case .bedtime:
+            guard let bed = s.bedtime(at: now) else { return [] }
+            return [Window(from: bed.addingTimeInterval(-90 * 60), until: bed.addingTimeInterval(60 * 60), score: 80)]
+        }
+    }
+
+    /// Water a bottle or more behind an even pace from waking to an hour
+    /// before bed. Never with the goal hidden (eating-disorder history).
+    private func waterBehind(_ s: WidgetSnapshot, now: Date) -> Window? {
+        guard s.showsWaterGoal, s.bottleML > 0, let wake = s.wake, let bed = s.bedtime(at: now) else { return nil }
+        let end = bed.addingTimeInterval(-3600)
+        guard end > wake else { return nil }
+        // The moment the pace reaches today's water plus a bottle.
+        let share = (s.waterML(at: now) + s.bottleML) / s.waterGoalML
+        guard share < 1 else { return nil }
+        let behindFrom = wake.addingTimeInterval(end.timeIntervalSince(wake) * share)
+        guard behindFrom < end else { return nil }
+        return Window(from: behindFrom, until: end, score: 40)
+    }
+}
+
 struct ComplicationProvider: TimelineProvider {
-    /// The Bedtime complication: rises in the Smart Stack from 90 minutes
-    /// before bed, and knows the alarm's state.
-    var bedtime = false
+    let kind: ComplicationKind
 
     func placeholder(in context: Context) -> ComplicationEntry { ComplicationEntry(date: .now, snapshot: .example) }
 
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
         completion(ComplicationEntry(date: .now, snapshot: context.isPreview ? (WidgetSnapshot.load() ?? .example) : WidgetSnapshot.load(),
-                                     alarm: bedtime ? WatchAlarmState.load() : nil))
+                                     alarm: kind == .bedtime ? WatchAlarmState.load() : nil))
     }
 
     /// Now; when the numbers turn six hours old (greyed, with their time);
     /// the app-day rollover (caffeine back to 0, recovery and the cycle day
-    /// to "—"); and for Bedtime, the stretch before bed. New numbers from the
-    /// phone reload the timeline themselves.
+    /// to "—"); the next pill day; and the edges of its Smart Stack
+    /// windows. New numbers from the phone reload the timeline themselves.
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
         let snap = WidgetSnapshot.load()
-        let alarm = bedtime ? WatchAlarmState.load() : nil
+        let alarm = kind == .bedtime ? WatchAlarmState.load() : nil
         let now = Date.now
         var dates: [Date] = [now]
-        var relevantFrom: Date?
-        var relevantUntil: Date?
+        var windows: [ComplicationKind.Window] = []
         if let s = snap {
             dates.append(s.appDayStart.addingTimeInterval(24 * 3600))
             dates.append(s.updated.addingTimeInterval(6 * 3600))
             // The next pill day (12 hours after the pill time): the pill
             // complication moves on to the next pill.
             if let p = s.pill(at: now) { dates.append(p.pillTime.addingTimeInterval(12 * 3600)) }
-            if bedtime, let bed = s.bedtime(at: now) {
-                relevantFrom = bed.addingTimeInterval(-90 * 60)
-                relevantUntil = bed.addingTimeInterval(60 * 60)
-                dates += [relevantFrom!, relevantUntil!]
-            }
+            windows = kind.windows(s, now: now)
+            dates += windows.flatMap { [$0.from, $0.until] }
         }
         let entries = Set(dates.filter { $0 >= now }).sorted().map { date -> ComplicationEntry in
-            var relevance: TimelineEntryRelevance?
-            if let from = relevantFrom, let until = relevantUntil {
-                relevance = date >= from && date < until
-                    ? TimelineEntryRelevance(score: 80, duration: until.timeIntervalSince(date))
-                    : TimelineEntryRelevance(score: 0)
-            }
+            let current = windows.filter { $0.from <= date && date < $0.until }.max { $0.score < $1.score }
+            let relevance = current.map { TimelineEntryRelevance(score: $0.score, duration: $0.until.timeIntervalSince(date)) }
+                ?? TimelineEntryRelevance(score: 0)
             return ComplicationEntry(date: date, snapshot: snap, alarm: alarm, relevance: relevance)
         }
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(30 * 60))))
@@ -114,7 +158,7 @@ extension View {
 
 struct RecoveryComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchRecovery", provider: ComplicationProvider()) { entry in
+        StaticConfiguration(kind: "WatchRecovery", provider: ComplicationProvider(kind: .recovery)) { entry in
             RecoveryComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 .widgetURL(page(0))
@@ -194,7 +238,7 @@ private struct RecoveryComplicationView: View {
 
 struct CycleComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchCycle", provider: ComplicationProvider()) { entry in
+        StaticConfiguration(kind: "WatchCycle", provider: ComplicationProvider(kind: .cycle)) { entry in
             CycleComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 // The Recovery page carries the cycle line.
@@ -254,7 +298,7 @@ private struct CycleComplicationView: View {
 
 struct PillComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchPill", provider: ComplicationProvider()) { entry in
+        StaticConfiguration(kind: "WatchPill", provider: ComplicationProvider(kind: .pill)) { entry in
             PillComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 // One tap marks an untaken pill taken (with Undo on the
@@ -363,7 +407,7 @@ private struct PillComplicationView: View {
 
 struct CaffeineComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchCaffeine", provider: ComplicationProvider()) { entry in
+        StaticConfiguration(kind: "WatchCaffeine", provider: ComplicationProvider(kind: .caffeine)) { entry in
             CaffeineComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 .widgetURL(page(3))
@@ -443,7 +487,7 @@ private struct CaffeineComplicationView: View {
 
 struct BedtimeComplication: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "WatchBedtime", provider: ComplicationProvider(bedtime: true)) { entry in
+        StaticConfiguration(kind: "WatchBedtime", provider: ComplicationProvider(kind: .bedtime)) { entry in
             BedtimeComplicationView(entry: entry)
                 .containerBackground(.clear, for: .widget)
                 .widgetURL(page(2))

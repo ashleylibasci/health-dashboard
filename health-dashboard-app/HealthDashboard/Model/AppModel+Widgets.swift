@@ -41,7 +41,8 @@ extension AppModel {
                       packLength: $0.packLength, time: pillTimeHere, taken: $0.taken, breakName: packBreakName)
             },
             stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) },
-            smartAlarmOn: store.data.smartAlarmEnabled
+            smartAlarmOn: store.data.smartAlarmEnabled,
+            wake: lastNightIsFresh ? AppDay.date(lastNight.wake, relativeTo: appDayDate) : nil
         ).save()
     }
 

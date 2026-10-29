@@ -56,6 +56,9 @@ struct WidgetSnapshot: Codable, Equatable {
     /// The smart alarm is on in the app (the Control Center switch). nil
     /// from older app builds.
     var smartAlarmOn: Bool? = nil
+    /// When she woke today (from last night's sleep), for the Watch's Smart
+    /// Stack timing. nil without a fresh night, and from older app builds.
+    var wake: Date? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
