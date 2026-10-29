@@ -821,7 +821,7 @@ struct TodayView: View {
 
     private var waterTile: some View {
         WaterTile(todayML: model.waterTodayML, goalML: store.data.waterGoalML,
-                  bottleML: store.data.bottleSizeML, paceML: model.waterPace(at: model.now),
+                  bottleML: store.data.bottleSizeML, paceML: model.waterPace(at: clock),
                   showsGoal: !model.hidesEffortTargets) {
             withMotion(.log) { model.addWater() }
         }
