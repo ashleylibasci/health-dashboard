@@ -82,6 +82,7 @@ struct RootTabView: View {
                         switch DemoMode.open {
                         case "cycleSettings": CycleSettingsView()
                         case "visitSummary": VisitSummaryView()
+                        case "recovery": RecoveryView()
                         default: CycleView()
                         }
                     }
