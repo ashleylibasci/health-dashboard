@@ -35,8 +35,35 @@ extension AppModel {
             bedtime: AppDay.date(tonightBedtime, relativeTo: nextWakeDay),
             bedtimeStreak: onTime,
             quickDrink: latte.map { .init(id: $0.id, name: $0.name, mg: $0.caffeineMg) },
-            caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) }
+            caffeineCutoff: caffeineCutoffShown.map { AppDay.date($0, relativeTo: appDayDate) },
+            pill: pillToday.map {
+                .init(day: $0.day, packDay: $0.packDay, activeDays: pillPack?.activeDays ?? $0.packLength,
+                      packLength: $0.packLength, time: pillTimeHere, taken: $0.taken, breakName: packBreakName)
+            },
+            stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) },
+            smartAlarmOn: store.data.smartAlarmEnabled,
+            wake: lastNightIsFresh ? AppDay.date(lastNight.wake, relativeTo: appDayDate) : nil
         ).save()
+    }
+
+    /// Water, pills and stress tapped on a widget (and the smart alarm
+    /// switched in Control Center) while the app wasn't running: add them
+    /// to the log. Water keeps the id it was saved to
+    /// Apple Health with, so nothing is counted or saved twice.
+    func importPendingLogs() {
+        for p in PendingLogs.takeAll() {
+            switch p.kind {
+            case let .water(ml, saved):
+                addWater(ml: ml, at: p.date, id: p.id, saveToHealth: !saved)
+            case .pill:
+                markPillTaken(at: p.date)
+            case let .stress(level):
+                store.data.moodLog.append(AppData.MoodEntry(date: p.date, stress: level))
+            case let .smartAlarm(on):
+                // Moves the Watch alarm too (`storeDidChange`).
+                store.data.smartAlarmEnabled = on
+            }
+        }
     }
 
     /// The iPhone backup alarm at the smart alarm's latest time, or none.

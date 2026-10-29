@@ -121,10 +121,18 @@ struct WatchPagesView: View {
             }
             .tabViewStyle(.verticalPage)
         }
-        // A tapped complication opens its page (healthnext://page/2).
-        .onOpenURL { url in
-            if url.host == "page", let n = Int(url.lastPathComponent), (0...3).contains(n) { page = n }
+        // A tapped complication opens its page (healthnext://page/2); the
+        // pill complication (healthnext://pill) marks today's pill taken
+        // and shows it on Recovery, with Undo.
+        .onOpenURL { open($0) }
+        #if DEBUG
+        // `-openURL healthnext://pill`: as if that complication was tapped,
+        // for simulator screenshots.
+        .task {
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-openURL"), i + 1 < args.count, let url = URL(string: args[i + 1]) { open(url) }
         }
+        #endif
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background:
@@ -139,6 +147,14 @@ struct WatchPagesView: View {
             default:
                 break
             }
+        }
+    }
+
+    private func open(_ url: URL) {
+        if url.host == "page", let n = Int(url.lastPathComponent), (0...3).contains(n) { page = n }
+        if url.host == "pill" {
+            page = 0
+            Task { await WatchPillLog.shared.markTakenFromComplication(sync) }
         }
     }
 

@@ -4,15 +4,23 @@ import HealthCore
 
 /// Home Screen and Lock Screen widgets. They show the last numbers the app
 /// saved (`WidgetSnapshot`): recovery, cycle, today's caffeine and water, and
-/// the bedtime streak. Example data is always labelled, and yesterday's
-/// numbers never show as today's.
+/// the bedtime streak, with buttons to log a latte, a bottle, today's pill
+/// and a stress rating without opening the app. Example data is always
+/// labelled, and yesterday's numbers never show as today's.
 @main
 struct HealthDashboardWidgets: WidgetBundle {
     var body: some Widget {
         RecoveryWidget()
         CycleWidget()
         TodayWidget()
+        StressWidget()
         StreakWidget()
+        BedtimeLiveActivity()
+        if #available(iOS 18.0, *) {
+            LogLatteControl()
+            LogBottleControl()
+            SmartAlarmControl()
+        }
     }
 }
 
@@ -349,19 +357,52 @@ private struct CycleWidgetView: View {
                                 .contentTransition(.numericText(value: Double(n)))
                         }
                     }
+                    let pill = s.pill(at: now)
                     Text(line)
                         .font(.system(size: 13))
                         .foregroundStyle(p.secondary)
-                        .lineLimit(3)
+                        .lineLimit(pill == nil ? 3 : 2)
                         .minimumScaleFactor(0.8)
                     Spacer(minLength: 0)
-                    AsOf(snapshot: s, now: now)
+                    if let pill, pill.isPillDay {
+                        PillButton(pill: pill)
+                    } else {
+                        AsOf(snapshot: s, now: now)
+                    }
                 }
                 .foregroundStyle(p.primary)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .contain)
             }
         } else {
             OpenAppPrompt()
+        }
+    }
+}
+
+/// Today's pill: a "Taken" button, or "Taken 9:02pm" with a tick once
+/// it's taken (here, in the app, on the Watch or in Apple Health).
+private struct PillButton: View {
+    let pill: WidgetSnapshot.PillState
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if let taken = pill.taken {
+            Label("Taken \(time(taken))", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Accent.mint.ink(scheme))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityLabel("Pill \(pill.packDay) taken at \(time(taken))")
+        } else {
+            Button(intent: PillTakenIntent()) {
+                Label("Taken", systemImage: "checkmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+            }
+            .tint(Accent.pink.fill(scheme))
+            .accessibilityLabel("Mark pill \(pill.packDay) taken")
         }
     }
 }
@@ -375,7 +416,7 @@ struct TodayWidget: Widget {
                 .containerBackground(for: .widget) { WidgetBackground(accent: .yellow) }
         }
         .configurationDisplayName("Caffeine & water")
-        .description("Today's caffeine, your cutoff and water in ounces, with a button to log your latte.")
+        .description("Today's caffeine, your cutoff and water in ounces, with buttons to log your latte and a bottle of water.")
         .supportedFamilies([.systemSmall, .accessoryRectangular])
     }
 }
@@ -436,23 +477,115 @@ private struct TodayWidgetView: View {
                         .foregroundStyle(Accent.blue.ink(scheme))
                         .contentTransition(.numericText(value: water))
                     Spacer(minLength: 0)
-                    if let drink = s.quickDrink {
-                        // Logs it right here, no need to open the app.
-                        Button(intent: LogLatteIntent()) {
-                            Label(pastCutoff ? "\(drink.name) \u{00B7} past cutoff" : "\(drink.name) \(drink.mg) mg", systemImage: "plus")
-                                .font(.system(size: 12, weight: .bold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                                .frame(maxWidth: .infinity)
+                    // Logs right here, no need to open the app.
+                    HStack(spacing: 6) {
+                        if let drink = s.quickDrink {
+                            Button(intent: LogLatteIntent()) {
+                                Label(pastCutoff ? "Past cutoff" : drink.name, systemImage: "plus")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .tint(pastCutoff ? Accent.coral.fill(scheme) : Accent.yellow.fill(scheme))
+                            .layoutPriority(1)
+                            .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams" + (pastCutoff ? ", past your cutoff" : ""))
                         }
-                        .tint(pastCutoff ? Accent.coral.fill(scheme) : Accent.yellow.fill(scheme))
-                        .accessibilityLabel("Log a \(drink.name.lowercased()), \(drink.mg) milligrams" + (pastCutoff ? ", past your cutoff" : ""))
+                        if s.bottleML > 0 {
+                            Button(intent: LogBottleIntent()) {
+                                HStack(spacing: 1) {
+                                    Image(systemName: "plus").font(.system(size: 9, weight: .heavy))
+                                    Image(systemName: "waterbottle.fill").font(.system(size: 12, weight: .bold))
+                                }
+                                .fixedSize()
+                            }
+                            .tint(Accent.blue.fill(scheme))
+                            .accessibilityLabel("Log a bottle of water, \(ounces(s.bottleML))")
+                        }
                     }
                 }
                 .foregroundStyle(p.primary)
             }
         } else {
             OpenAppPrompt()
+        }
+    }
+}
+
+// MARK: - Stress
+
+struct StressWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "Stress", provider: SnapshotProvider()) { entry in
+            StressWidgetView(entry: entry)
+                .containerBackground(for: .widget) { WidgetBackground(accent: .orange) }
+        }
+        .configurationDisplayName("Stress check-in")
+        .description("Tap how stressed you feel, 1 to 5, without opening the app.")
+        .supportedFamilies([.systemMedium])
+    }
+}
+
+/// "How stressed do you feel?" with 1–5 buttons; today's rating stays lit.
+private struct StressWidgetView: View {
+    let entry: SnapshotEntry
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if let s = entry.snapshot {
+            let p = Palette(scheme: scheme)
+            let logged = s.stress(at: entry.date)
+            VStack(alignment: .leading, spacing: 8) {
+                WidgetHeader(title: "Stress", accent: .orange, snapshot: s)
+                Text(logged.map { "Today: \($0), \(Self.word($0))" } ?? "How stressed do you feel?")
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                HStack(spacing: 6) {
+                    ForEach(1...5, id: \.self) { level in
+                        button(level, selected: level == logged)
+                    }
+                }
+                HStack {
+                    Text("Very calm")
+                    Spacer()
+                    Text("Very stressed")
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(p.tertiary)
+                .accessibilityHidden(true)
+            }
+            .foregroundStyle(p.primary)
+        } else {
+            OpenAppPrompt()
+        }
+    }
+
+    private func button(_ level: Int, selected: Bool) -> some View {
+        let p = Palette(scheme: scheme)
+        // Orange, the stress colour; the deep ink in light mode so the
+        // white number on it stays readable.
+        let fill = scheme == .dark ? Accent.orange.fill(.dark) : Accent.orange.ink(.light)
+        return Button(intent: LogStressIntent(level: level)) {
+            Text("\(level)")
+                .font(.system(size: 20, weight: .bold, design: .rounded).monospacedDigit())
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .foregroundStyle(selected ? (scheme == .dark ? Color(hex: 0x1A0E00) : .white) : p.primary)
+                .background(selected ? fill : p.chip, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(level), \(Self.word(level))")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// The same words as the Log tab.
+    static func word(_ level: Int) -> String {
+        switch level {
+        case 1: return "very calm"
+        case 2: return "calm"
+        case 3: return "a bit stressed"
+        case 4: return "stressed"
+        default: return "very stressed"
         }
     }
 }

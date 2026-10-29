@@ -611,6 +611,7 @@ final class AppModel: ObservableObject {
         AppDay.rolloverMinutes = AppDay.rollover(forBedtime: store.data.bedtime)
         recordTimeZone()
         importPendingDrinks()
+        importPendingLogs()
         Task { await CalendarImport.shared.check(model: self) }
         guard store.data.onboarded else {
             pushToWatch()
@@ -1111,11 +1112,13 @@ final class AppModel: ObservableObject {
 
     /// `id`: the entry's own id, e.g. one the Watch made, so it's never
     /// added twice and can be undone from the Watch.
-    func addWater(ml: Double, at date: Date = .now, id: UUID = UUID()) {
+    /// `saveToHealth`: false when it's in Apple Health already (a widget saved it).
+    func addWater(ml: Double, at date: Date = .now, id: UUID = UUID(), saveToHealth: Bool = true) {
         guard !store.data.waterLog.contains(where: { $0.id == id }) else { return }
         var entry = AppData.WaterEntry(date: AppDay.pastTime(date), ml: ml)
         entry.id = id
         store.data.waterLog.append(entry)
+        guard saveToHealth else { return }
         writeHealth { try await $0.saveWater(ml: entry.ml, at: entry.date, id: entry.id) }
     }
 
@@ -1187,12 +1190,15 @@ final class AppModel: ObservableObject {
         let watchRelevant = planRelevant || old.savedDrinks != new.savedDrinks
             || old.birthControl != new.birthControl || old.cycleSetup != new.cycleSetup
             || old.moodRatings != new.moodRatings
+            // Today's pill on the widgets and the Watch.
+            || old.pillsTaken != new.pillsTaken || old.pillTime != new.pillTime
         // (alarmOverride is written by pushToWatch itself, which then sends.)
         if watchRelevant {
             pushToWatch()
         } else if old.waterLog != new.waterLog || old.drinkLog != new.drinkLog || old.flowLog != new.flowLog
                     || old.packStartDate != new.packStartDate || old.bottleSizeML != new.bottleSizeML
-                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions {
+                    || old.waterGoalML != new.waterGoalML || old.hotDay != new.hotDay || old.conditions != new.conditions
+                    || old.moodLog != new.moodLog {
             // Widgets show today's water, caffeine and cycle (and hide the
             // water goal with an eating-disorder history).
             Task { @MainActor in self.publishWidgetSnapshot() }
@@ -1315,6 +1321,13 @@ final class AppModel: ObservableObject {
         return nil
     }
 
+    /// The Watch says the next alarm is on (it reported the same latest time).
+    var watchAlarmIsOn: Bool {
+        guard let next = nextAlarmWindow,
+              let armed = UserDefaults.standard.object(forKey: Self.armedEndKey) as? Double else { return false }
+        return abs(Date(timeIntervalSinceReferenceDate: armed).timeIntervalSince(next.end)) < 120
+    }
+
     /// The Watch can only turn the alarm on while its app is open, at most 36
     /// hours ahead. When the next alarm isn't on (the Watch says so, or
     /// it follows a skipped weekend), a phone notification the evening
@@ -1363,6 +1376,7 @@ final class AppModel: ObservableObject {
         // iPhone backup alarm follows the same window.
         publishWidgetSnapshot()
         updatePhoneBackupAlarm()
+        updateBedtimeActivity()
         let cal = Calendar.current
         if let alarm {
             let day = wakeDay.map { cal.startOfDay(for: $0) } ?? Self.wakeDay(forWindowEnding: alarm.end)
@@ -1420,7 +1434,9 @@ final class AppModel: ObservableObject {
             bottleML: store.data.bottleSizeML,
             todayWaterIDs: todaysWater.map(\.id),
             stressHighAt: stressHighNow,
-            moodToday: Dictionary(uniqueKeysWithValues: moodToday.map { ($0.key.rawValue, $0.value) })))
+            moodToday: Dictionary(uniqueKeysWithValues: moodToday.map { ($0.key.rawValue, $0.value) }),
+            morningLightMinutes: showsMorningLight ? morningDaylightToday : nil,
+            morningLightGoal: Self.morningLightGoal))
     }
 
     func handle(_ message: WatchMessage) {
@@ -1462,6 +1478,12 @@ final class AppModel: ObservableObject {
                 defaults.removeObject(forKey: Self.armedEndKey)
             }
             Task { await updateAlarmNudge() }
+            // "Watch alarm on" on the bedtime Live Activity.
+            updateBedtimeActivity()
+        case let .pillTaken(at):
+            markPillTaken(at: at)
+        case let .undoPill(at):
+            unmarkPillTaken(on: pillDay(for: at))
         }
     }
 }

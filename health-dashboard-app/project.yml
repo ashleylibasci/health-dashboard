@@ -38,6 +38,7 @@ targets:
       path: HealthDashboard/Resources/Info.plist
       properties:
         CFBundleDisplayName: Health Dashboard
+        NSSupportsLiveActivities: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSHealthShareUsageDescription: "Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve, and, if you turn it on, the pill doses you log so a pill you've taken gets no reminder. Everything stays on your phone."
@@ -88,6 +89,8 @@ targets:
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
       - Shared/LogLatteIntent.swift
+      - Shared/WidgetIntents.swift
+      - Shared/BedtimeActivity.swift
     dependencies:
       - package: HealthCore   # Clock.format, so widget times read like the app's
     entitlements:
@@ -100,7 +103,7 @@ targets:
       path: HealthDashboardWidgets/Info.plist
       properties:
         CFBundleDisplayName: Health Dashboard
-        NSHealthUpdateUsageDescription: "Saves the latte you log from the widget to Apple Health."
+        NSHealthUpdateUsageDescription: "Saves the latte and water you log from the widgets to Apple Health."
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

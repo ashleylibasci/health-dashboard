@@ -126,7 +126,11 @@ extension AppModel {
     func updatePill(readHealth: Bool = true) async {
         if readHealth, store.data.pillReadsHealth, !DemoMode.isOn,
            let doses = await PillHealth.doses(health.store, days: 60) {
-            if healthPillDoses != doses.taken { healthPillDoses = doses.taken }
+            if healthPillDoses != doses.taken {
+                healthPillDoses = doses.taken
+                // A dose from Apple Health ticks the widgets and the Watch too.
+                pushToWatch()
+            }
             if healthPillHasSchedule != doses.hasSchedule { healthPillHasSchedule = doses.hasSchedule }
         }
         await updatePillReminders()

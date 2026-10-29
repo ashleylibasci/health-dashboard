@@ -26,6 +26,8 @@ import HealthCore
 ///   check-ins, for the pill-history screens and the visit summary.
 /// - `-demoPillEvent vomiting|spotting` (with `-demoCycle pill`): that
 ///   logged today, for the pill callouts.
+/// - `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
+///   Activity right away, with that Watch alarm state.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -68,6 +70,9 @@ enum DemoMode {
     /// `-demoPackDay <n>`: with `-demoCycle pill`, today is pill n (18 by
     /// default), for break-day previews.
     static let packDay = min(max(Int(value(after: "-demoPackDay") ?? "") ?? 18, 2), 28)
+    /// `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
+    /// Activity straight away, with that Watch alarm state.
+    static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let pillHistory = false
@@ -75,6 +80,7 @@ enum DemoMode {
     static let packDay = 18
     static let open: String? = nil
     static let clock: Minutes? = nil
+    static let bedtimeActivity: String? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif

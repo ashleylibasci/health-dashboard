@@ -21,10 +21,8 @@ struct EnergyPage: View {
                         VStack(alignment: .leading, spacing: 8) {
                             nowRow
                             if snapshot.lastNightMissing == true {
-                                Text("No sleep recorded last night, so this runs from your last recorded wake-up.")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(WatchStyle.secondaryText)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                MoreLine(line: "No sleep recorded last night",
+                                         detail: "No sleep recorded last night, so this runs from your last recorded wake-up.")
                             }
                             EnergySparkline(curve: snapshot.energyCurve, start: snapshot.energyCurveStart,
                                             zones: snapshot.energyZones ?? [], now: now)

@@ -28,6 +28,8 @@
 	<string>Reads your sleep, heart rate, HRV, daylight, steps, wrist temperature and cycle data to learn your sleep need, best wake time and energy curve, and, if you turn it on, the pill doses you log so a pill you've taken gets no reminder. Everything stays on your phone.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Saves the caffeine and water you log to Apple Health.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

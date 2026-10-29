@@ -80,6 +80,11 @@ struct WatchSnapshot: Codable, Equatable {
     /// `AppData.MoodRating.Scale` raw value. nil from older phone builds,
     /// which can't take them from the Watch (the dots stay hidden).
     var moodToday: [String: Int]? = nil
+    /// Minutes in daylight before 11am today (H-C5), for the Watch's morning
+    /// light ring (H-F4); nil before she's up, after midnight, without a
+    /// fresh night, and from older phone builds.
+    var morningLightMinutes: Int? = nil
+    var morningLightGoal: Int? = nil
 
     struct Zone: Codable, Equatable {
         var title: String
@@ -122,6 +127,11 @@ enum WatchMessage: Codable {
     /// Lets the phone remind her to open the Watch app when tomorrow's alarm
     /// still needs turning on.
     case alarmArmed(end: Date?, offOnWatch: Bool)
+    /// Today's pill marked taken on the Watch (its Taken button or the pill
+    /// complication), at the tap time.
+    case pillTaken(at: Date)
+    /// Undo on the Watch, a few seconds after: the dose tapped at that time.
+    case undoPill(at: Date)
 
     /// "Latte", for an error message about this message.
     var drinkName: String? {
@@ -298,6 +308,18 @@ final class WatchSync: NSObject, ObservableObject, WCSessionDelegate {
     #if os(iOS)
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
     nonisolated func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
+    #endif
+
+    #if os(watchOS)
+    /// Watch side: today's pill taken (or not) here, shown on the Recovery
+    /// page and the pill complication before the phone confirms it.
+    func setPillTaken(_ date: Date?, now: Date = .now) {
+        guard var w = widget, var pill = w.pill(at: now) else { return }
+        pill.taken = date
+        w.pill = pill
+        w.save()
+        widget = w
+    }
     #endif
 
     private func receive(context: [String: Any]) {

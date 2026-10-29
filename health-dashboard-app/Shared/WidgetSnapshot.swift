@@ -1,4 +1,5 @@
 import Foundation
+import HealthCore
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
@@ -45,11 +46,57 @@ struct WidgetSnapshot: Codable, Equatable {
     /// Today's caffeine cutoff; nil when it falls before she's up (then
     /// `caffeineNote` says "One small drink early") and from older app builds.
     var caffeineCutoff: Date? = nil
+    /// Today's combined pill (H-A1), for the Taken buttons on the Cycle
+    /// widget and the Watch. nil when she isn't on the combined pill, and
+    /// from older app builds.
+    var pill: PillState? = nil
+    /// Her latest stress rating (the Stress widget lights it up while it's
+    /// from today). nil from older app builds.
+    var stress: StressTap? = nil
+    /// The smart alarm is on in the app (the Control Center switch). nil
+    /// from older app builds.
+    var smartAlarmOn: Bool? = nil
+    /// When she woke today (from last night's sleep), for the Watch's Smart
+    /// Stack timing. nil without a fresh night, and from older app builds.
+    var wake: Date? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
         var name: String
         var mg: Int
+    }
+
+    struct StressTap: Codable, Equatable {
+        /// 1 (very calm) – 5 (very stressed).
+        var level: Int
+        var date: Date
+    }
+
+    /// Where she is in the pack on one pill day, and whether that day's
+    /// pill is taken.
+    struct PillState: Codable, Equatable {
+        /// Midnight of the pill day (`PillDay`: a dose up to 12 hours either
+        /// side of the pill time counts for it).
+        var day: Date
+        var packDay: Int
+        var activeDays: Int
+        var packLength: Int
+        /// Her pill time on this phone's clock.
+        var time: Minutes
+        var taken: Date?
+        /// "Break week" or "Break days" (a 4-day break).
+        var breakName: String = "Break week"
+
+        var isPillDay: Bool { packDay <= activeDays }
+        var isNewPack: Bool { packDay == 1 }
+        /// Day 1, 2… of the break; nil on pill days.
+        var breakDay: Int? { isPillDay ? nil : packDay - activeDays }
+        /// Midnight of the next pack's first pill day.
+        var newPackDay: Date? {
+            Calendar.current.date(byAdding: .day, value: packLength - packDay + 1, to: day)
+        }
+        /// Today's pill time as a date.
+        var pillTime: Date { day.addingTimeInterval(TimeInterval(time * 60)) }
     }
 
     /// The older Health Dashboard app's group (a free developer team can't
@@ -84,6 +131,9 @@ struct WidgetSnapshot: Codable, Equatable {
         #if canImport(WidgetKit)
         if old != data { WidgetCenter.shared.reloadAllTimelines() }
         #endif
+        #if os(iOS)
+        if old != data, #available(iOS 18.0, *) { ControlCenter.shared.reloadAllControls() }
+        #endif
     }
 
     /// Today's totals, or 0 once the app day they belong to has ended.
@@ -101,6 +151,29 @@ struct WidgetSnapshot: Codable, Equatable {
     func cycleNumber(at date: Date) -> Int? { isCurrent(at: date) ? cycleNumber : nil }
     func bedtime(at date: Date) -> Date? { isCurrent(at: date) ? bedtime : nil }
     func caffeineCutoff(at date: Date) -> Date? { isCurrent(at: date) ? caffeineCutoff : nil }
+
+    /// Today's stress rating: logged since the app day that holds `date`
+    /// began (the day rolls over every 24 hours from `appDayStart`).
+    func stress(at date: Date) -> Int? {
+        guard let stress, stress.date <= date else { return nil }
+        let days = (date.timeIntervalSince(appDayStart) / (24 * 3600)).rounded(.down)
+        return stress.date >= appDayStart.addingTimeInterval(days * 24 * 3600) ? stress.level : nil
+    }
+
+    /// The pill day `date` falls in. A later day than the saved one moves on
+    /// through the pack, not yet taken; nil more than a week on (the pack
+    /// may have changed since).
+    func pill(at date: Date, calendar: Calendar = .current) -> PillState? {
+        guard var p = pill else { return nil }
+        let day = PillDay.day(for: date, pillTime: p.time, calendar: calendar)
+        let ahead = calendar.dateComponents([.day], from: p.day, to: day).day ?? 0
+        guard ahead > 0 else { return p }
+        guard ahead <= 7 else { return nil }
+        p.day = day
+        p.packDay = (p.packDay - 1 + ahead) % p.packLength + 1
+        p.taken = nil
+        return p
+    }
     /// Six hours or more since the app last read Apple Health.
     func isStale(at date: Date) -> Bool { date.timeIntervalSince(updated) >= 6 * 3600 || !isCurrent(at: date) }
 
@@ -110,7 +183,9 @@ struct WidgetSnapshot: Codable, Equatable {
         cycleLine: "Pack day 18 \u{00B7} Active pill", cycleNumber: 18, cycleNumberLabel: "Pill",
         appDayStart: Calendar.current.startOfDay(for: .now), caffeineMg: 130, caffeineNote: "One small drink early",
         waterML: 1060, waterGoalML: 1893, bottleML: 710, bedtime: nil, bedtimeStreak: 4,
-        quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130))
+        quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130),
+        pill: PillState(day: Calendar.current.startOfDay(for: .now), packDay: 18, activeDays: 21, packLength: 28,
+                        time: 21 * 60, taken: nil))
 }
 
 /// The Watch's smart alarm, for the Bedtime complication. Written to the App
