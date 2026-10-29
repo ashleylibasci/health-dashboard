@@ -287,8 +287,19 @@ struct TodayView: View {
     /// HRV, resting heart rate and sleep in their own colours (indigo, pink,
     /// purple), with the change in secondary text and a ▲/▼ that's coral
     /// only when it needs attention (Tanaka F2, Valtonen F4). Each opens
-    /// its own screen; Sleep switches to the Sleep tab.
+    /// its own screen; Sleep switches to the Sleep tab. At accessibility
+    /// text sizes the dials stacked into a screen of rings, so they're
+    /// rows there (F10).
+    @ViewBuilder
     private var gauges: some View {
+        if typeSize.isAccessibilitySize {
+            gaugeRows
+        } else {
+            dials
+        }
+    }
+
+    private var dials: some View {
         let heart = model.hasHeartData
         let fresh = model.lastNightIsFresh
         return AdaptiveStack(spacing: Space.s, alignment: .top) {
@@ -319,6 +330,31 @@ struct TodayView: View {
             .buttonStyle(.pressable)
             .accessibilityHint("Opens the Sleep tab")
         }
+    }
+
+    private var gaugeRows: some View {
+        let heart = model.hasHeartData
+        let fresh = model.lastNightIsFresh
+        let hrv = heart ? hrvChange : .none(text: "No reading")
+        let resting = heart ? restingHRChange : .none(text: "No reading")
+        let sleep = sleepChange
+        return VStack(spacing: 0) {
+            MetricRow(title: "HRV", note: hrv.sentence, value: heart ? "\(Int(model.hrv.rounded())) ms" : nil,
+                      trend: hrv.rowTrend, systemImage: "waveform.path.ecg", accent: .indigo) {
+                HeartMetricView(metric: .hrv)
+            }
+            RowDivider()
+            MetricRow(title: "Resting HR", note: resting.sentence, value: heart ? "\(Int(model.restingHR.rounded())) bpm" : nil,
+                      trend: resting.rowTrend, systemImage: "heart.fill", accent: .pink) {
+                HeartMetricView(metric: .restingHR)
+            }
+            RowDivider()
+            MetricRow(title: "Sleep", note: sleep.sentence, value: fresh ? Clock.duration(model.lastNight.asleep) : nil,
+                      trend: sleep.rowTrend, systemImage: "bed.double.fill", accent: .purple) {
+                openTab(.sleep)
+            }
+        }
+        .padding(.horizontal, -Space.l)
     }
 
     private var hrvChange: GaugeChange {
@@ -774,6 +810,13 @@ private struct GaugeChange {
 
     static func none(text: String) -> GaugeChange {
         GaugeChange(up: nil, text: text, spoken: text, tone: .neutral)
+    }
+
+    /// The row note at accessibility sizes: "6% below your usual".
+    var sentence: String { spoken.prefix(1).uppercased() + spoken.dropFirst() }
+
+    var rowTrend: RowTrend? {
+        up.map { RowTrend(up: $0, tone: tone == .worse ? .worse : tone == .better ? .better : .neutral) }
     }
 }
 
