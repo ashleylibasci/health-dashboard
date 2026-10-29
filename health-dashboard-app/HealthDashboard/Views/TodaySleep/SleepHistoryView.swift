@@ -195,6 +195,10 @@ struct HistoryBars: View {
         return start...end
     }
 
+    private var dayStarts: [Date] {
+        (0..<days).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: domain.lowerBound) }
+    }
+
     private func day(_ night: NightRecord) -> Date { Calendar.current.startOfDay(for: night.wakeDay) }
 
     private var summary: String {
@@ -254,7 +258,8 @@ struct HistoryBars: View {
         }
         .chartXAxis {
             if days <= 7 {
-                AxisMarks(values: .stride(by: .day)) { _ in
+                // One label per day in the domain, not one for its end too.
+                AxisMarks(values: dayStarts) { _ in
                     AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
                 }
             } else {
