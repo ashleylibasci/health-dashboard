@@ -33,4 +33,39 @@ extension AppModel {
         let sameMonth = Calendar.current.isDate(start, equalTo: end, toGranularity: .month)
         return "\(start.formatted(style))\u{2013}\(sameMonth ? end.formatted(.dateTime.day()) : end.formatted(style))"
     }
+
+    // MARK: Bleeds by pack (H-A10)
+
+    /// Her logged flow as `PackBleeds` levels (no-flow days left out).
+    var packFlows: [(date: Date, level: PackBleeds.Level)] {
+        store.data.flowLog.compactMap { entry -> (date: Date, level: PackBleeds.Level)? in
+            let level: PackBleeds.Level? = switch entry.flow {
+            case .none: nil
+            case .spotting: .spotting
+            case .light: .light
+            case .medium: .medium
+            case .heavy: .heavy
+            }
+            return level.map { (entry.date, $0) }
+        }
+    }
+
+    /// The last six finished packs' bleeds, newest first. Empty until she's
+    /// logged any flow in one.
+    var packBleeds: [PackBleeds.Pack] {
+        guard let cal = packCalendar else { return [] }
+        let all = PackBleeds.summarize(packFlows, packs: finishedPacks.suffix(6), in: cal)
+        guard all.contains(where: { $0.bleedDays > 0 || $0.activeDays > 0 }) else { return [] }
+        return all.reversed()
+    }
+
+    static func flowWord(_ level: PackBleeds.Level?) -> String {
+        switch level {
+        case .spotting?: "spotting"
+        case .light?: "light"
+        case .medium?: "medium"
+        case .heavy?: "heavy"
+        case nil: "none logged"
+        }
+    }
 }

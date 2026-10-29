@@ -78,4 +78,28 @@ final class PillHistoryTests: XCTestCase {
         XCTAssertEqual(MissedPill.span(from: 27, through: 2, packLength: 28), [27, 28, 1, 2])
         XCTAssertEqual(MissedPill.span(from: 5, through: 5, packLength: 28), [5])
     }
+
+    // MARK: Bleeds by pack (H-A10)
+
+    func testWithdrawalBleedRunsIntoTheNextPack() {
+        // Pack −1 runs Sep 13 – Oct 10; its break is Oct 4–10.
+        let flows: [(date: Date, level: PackBleeds.Level)] = [
+            (date(2026, 10, 8), .light), (date(2026, 10, 9), .heavy), (date(2026, 10, 10), .medium),
+            (date(2026, 10, 11), .spotting),
+            // Breakthrough spotting on pill 9 of pack −1.
+            (date(2026, 9, 21), .spotting),
+        ]
+        let out = PackBleeds.summarize(flows, packs: [-1], in: packs, cal: cal)
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out[0].bleedDays, 4)
+        XCTAssertEqual(out[0].heaviest, .heavy)
+        XCTAssertEqual(out[0].days[29], .spotting)
+        XCTAssertEqual(out[0].activeDays, 1)
+    }
+
+    func testPackWithNothingLogged() {
+        let out = PackBleeds.summarize([], packs: [-2, -1], in: packs, cal: cal)
+        XCTAssertEqual(out.map(\.bleedDays), [0, 0])
+        XCTAssertNil(out[0].heaviest)
+    }
 }
