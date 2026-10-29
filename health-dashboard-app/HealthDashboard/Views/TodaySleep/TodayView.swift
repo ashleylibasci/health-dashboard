@@ -206,21 +206,27 @@ struct TodayView: View {
         return "Compared with a typical day (\(model.recoveryUsual)) until your Watch learns your usual\(learning)."
     }
 
-    /// One line under the label: "Below your usual of 78" (Valtonen F1), or
-    /// until then "Lower than a typical day · learning your usual (3 of 7
-    /// days)" (F8).
-    private var recoveryLine: String {
-        guard let value = recoveryValue else { return "" }
-        let usual = model.recoveryUsual
-        if model.recoveryUsualIsPersonal {
-            let what = "your usual of \(usual)"
-            if value <= usual - 5 { return "Below \(what)" }
-            if value >= usual + 5 { return "Above \(what)" }
-            return "Around \(what)"
+    /// The day in one plain sentence under the label (D-T4), joined from
+    /// what Today already knows: "Short night, pill day 18. Bed by
+    /// 11:50pm." How the score compares with her usual is in the ⓘ.
+    private var daySentence: String {
+        var facts: [String] = []
+        if !model.lastNightIsFresh {
+            facts.append("no sleep recorded")
+        } else if model.lastNight.asleep - model.sleepNeed.minutes < -15 {
+            facts.append("short night")
+        } else {
+            facts.append("full night")
         }
-        let compared = value <= usual - 5 ? "Lower than a typical day"
-            : value >= usual + 5 ? "Higher than a typical day" : "About a typical day"
-        return learningUsual.map { "\(compared) \u{00B7} learning your usual (\($0))" } ?? compared
+        if let pill = model.pillToday {
+            facts.append(!pill.isPillDay ? model.packBreakName.lowercased()
+                         : pill.isNewPack ? "new pack today" : "pill day \(pill.packDay)")
+        }
+        if nextExam?.daysUntil == 0 { facts.append("exam today") }
+        let first = facts.joined(separator: ", ")
+        let bed = 1440 + model.tonightBedtime
+        let plan = clock < bed ? "Bed by \(Clock.format(bed))." : "Past your \(Clock.format(bed)) bedtime."
+        return first.prefix(1).uppercased() + first.dropFirst() + ". " + plan
     }
 
     private var recoveryExplanation: Explanation {
@@ -247,7 +253,7 @@ struct TodayView: View {
                         VStack(alignment: .leading, spacing: Space.xs) {
                             Text(model.recoveryLabel(for: value)).font(.heading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text(recoveryLine)
+                            Text(daySentence)
                                 .font(.secondary)
                                 .foregroundStyle(p.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
