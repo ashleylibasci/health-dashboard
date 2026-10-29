@@ -162,7 +162,7 @@ struct TodayView: View {
     /// The longer note: what the score is compared with, and what moved it.
     /// Behind the card's ⓘ (Whitfield F6), not on the card.
     private var recoveryNote: String {
-        var note = model.recoveryUsualNote
+        var note = recoveryUsualNote
         if model.recoveryIsExample {
             note += " Example: it uses example heart readings until your Watch has learned your usual."
         } else if !model.hasHeartData {
@@ -183,14 +183,39 @@ struct TodayView: View {
         return note
     }
 
-    /// One line under the label: "Below your usual of 78" (Valtonen F1).
+    /// How far she is toward her own usual, or nil on pure example data
+    /// (the banner already says so). Her usual needs 14 nights of sleep
+    /// before the app leaves example data, then 7 days of heart readings.
+    private var learningUsual: String? {
+        if model.usingSampleData {
+            return model.realNightCount > 0 ? "\(min(model.realNightCount, AppModel.nightsNeeded - 1)) of \(AppModel.nightsNeeded) nights" : nil
+        }
+        return "\(min(model.recoveryDaysLearned, 6)) of 7 days"
+    }
+
+    /// Until she has her own usual: "a typical day", never "the starting
+    /// point" (F8).
+    private var recoveryUsualNote: String {
+        guard !model.recoveryUsualIsPersonal else { return model.recoveryUsualNote }
+        let learning = learningUsual.map { " (\($0) so far)" } ?? ""
+        return "Compared with a typical day (\(model.recoveryUsual)) until your Watch learns your usual\(learning)."
+    }
+
+    /// One line under the label: "Below your usual of 78" (Valtonen F1), or
+    /// until then "Lower than a typical day · learning your usual (3 of 7
+    /// days)" (F8).
     private var recoveryLine: String {
         guard let value = recoveryValue else { return "" }
         let usual = model.recoveryUsual
-        let what = model.recoveryUsualIsPersonal ? "your usual of \(usual)" : "the starting point of \(usual)"
-        if value <= usual - 5 { return "Below \(what)" }
-        if value >= usual + 5 { return "Above \(what)" }
-        return "Around \(what)"
+        if model.recoveryUsualIsPersonal {
+            let what = "your usual of \(usual)"
+            if value <= usual - 5 { return "Below \(what)" }
+            if value >= usual + 5 { return "Above \(what)" }
+            return "Around \(what)"
+        }
+        let compared = value <= usual - 5 ? "Lower than a typical day"
+            : value >= usual + 5 ? "Higher than a typical day" : "About a typical day"
+        return learningUsual.map { "\(compared) \u{00B7} learning your usual (\($0))" } ?? compared
     }
 
     private var recoveryExplanation: Explanation {
