@@ -23,6 +23,7 @@ struct RecoveryPage: View {
                     } else {
                         score.staleStyle(snapshot.isStale(now: now))
                         energyButton.staleStyle(snapshot.isStale(now: now))
+                        morningLight(now: now).staleStyle(snapshot.isStale(now: now))
                     }
                     DownshiftOffer(snapshot: snapshot, now: now)
                     cycleRow(now: now)
@@ -88,6 +89,41 @@ struct RecoveryPage: View {
         .accessibilityAddTraits(.isButton)
     }
 
+    /// Morning daylight against her 20 minutes before 11am (H-F4), the
+    /// same as the phone's Sleep tab, until 11am.
+    @ViewBuilder
+    private func morningLight(now: Date) -> some View {
+        if let got = snapshot.morningLightMinutes, let goal = snapshot.morningLightGoal, goal > 0, isMorning(now) {
+            let done = got >= goal
+            HStack(spacing: 10) {
+                DaylightRing(fraction: Double(got) / Double(goal), done: done)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(done ? "Morning light done" : "\(got) of \(goal) min")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text("outside before 11am")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(WatchStyle.secondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .padding(.horizontal, 4)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Morning light: \(got) of \(goal) minutes outside before 11am")
+        }
+    }
+
+    /// Before 11am. Debug builds: `-demoMorning` shows the ring at any
+    /// hour, for simulator screenshots.
+    private func isMorning(_ now: Date) -> Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-demoMorning") { return true }
+        #endif
+        return Calendar.current.component(.hour, from: now) < 11
+    }
+
     /// Today's pill on the combined pill; otherwise "Day 12 · Follicular",
     /// from the phone's widget numbers (today's only). Nothing when she
     /// isn't tracking a cycle.
@@ -110,6 +146,29 @@ struct RecoveryPage: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Cycle: \(line)")
         }
+    }
+}
+
+/// A small yellow ring of morning daylight, with a sun (a tick once done).
+private struct DaylightRing: View {
+    let fraction: Double
+    let done: Bool
+    @Environment(\.isLuminanceReduced) private var luminanceReduced
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Accent.yellow.fill(.dark).opacity(0.2), lineWidth: 5)
+            Circle()
+                .trim(from: 0, to: min(max(fraction, 0), 1))
+                .stroke(Accent.yellow.fill(.dark), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .opacity(luminanceReduced ? 0.6 : 1)
+            Image(systemName: done ? "checkmark" : "sun.max.fill")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Accent.yellow.ink(.dark))
+        }
+        .frame(width: 34, height: 34)
+        .animation(.spring(response: 0.6, dampingFraction: 0.85), value: fraction)
     }
 }
 

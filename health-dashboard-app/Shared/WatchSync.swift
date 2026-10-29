@@ -76,6 +76,11 @@ struct WatchSnapshot: Codable, Equatable {
     /// or the last), so the Watch can offer a one-minute breather. nil
     /// otherwise, and from older phone builds.
     var stressHighAt: Date? = nil
+    /// Minutes in daylight before 11am today (H-C5), for the Watch's morning
+    /// light ring (H-F4); nil before she's up, after midnight, without a
+    /// fresh night, and from older phone builds.
+    var morningLightMinutes: Int? = nil
+    var morningLightGoal: Int? = nil
 
     struct Zone: Codable, Equatable {
         var title: String

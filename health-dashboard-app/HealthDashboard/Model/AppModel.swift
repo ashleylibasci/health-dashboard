@@ -1413,7 +1413,9 @@ final class AppModel: ObservableObject {
             waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
             todayWaterIDs: todaysWater.map(\.id),
-            stressHighAt: stressHighNow))
+            stressHighAt: stressHighNow,
+            morningLightMinutes: showsMorningLight ? morningDaylightToday : nil,
+            morningLightGoal: Self.morningLightGoal))
     }
 
     func handle(_ message: WatchMessage) {
