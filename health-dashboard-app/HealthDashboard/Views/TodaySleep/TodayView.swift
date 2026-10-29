@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Charts
 import HealthCore
 
 /// The home screen, summary first: at most one line that needs her, then
@@ -647,7 +648,7 @@ struct TodayView: View {
                 sleepTile
                 caffeineTile
                 waterTile
-                stressTile
+                fourthTile
             }
         } else {
             Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
@@ -657,10 +658,31 @@ struct TodayView: View {
                 }
                 GridRow {
                     waterTile
-                    stressTile
+                    fourthTile
                 }
             }
         }
+    }
+
+    /// Stress in the morning; from noon, energy now takes its slot (D-T3):
+    /// the most "right now" number, otherwise two taps deep on Body.
+    @ViewBuilder
+    private var fourthTile: some View {
+        if clock >= 12 * 60 {
+            energyTile
+        } else {
+            stressTile
+        }
+    }
+
+    private var energyTile: some View {
+        NavigationLink {
+            EnergyView()
+        } label: {
+            EnergyNowTile(energy: model.energyToday, now: clock, moment: model.energyMoment(at: clock, in: model.energyToday))
+        }
+        .buttonStyle(.pressable)
+        .accessibilityHint("Opens your energy curve for today")
     }
 
     /// Switches to the Sleep tab instead of pushing a second Sleep screen
@@ -776,6 +798,77 @@ private struct WaterTile: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .tileSurface()
+    }
+}
+
+/// Energy now as a tile (D-T3): the curve's level now, a 56pt curve of the
+/// day with a "now" dot, and where she is ("Afternoon dip till 6:07pm").
+/// The same "now" as the readout on Energy.
+private struct EnergyNowTile: View {
+    var energy: EnergyDay
+    var now: Minutes
+    var moment: AppModel.EnergyMoment
+    @Environment(\.colorScheme) private var scheme
+
+    private var start: Minutes { energy.curve.first?.time ?? 420 }
+    private var end: Minutes { max(energy.curve.last?.time ?? 1560, start + 60) }
+    private var nowTime: Minutes { min(max(now, start), end) }
+
+    /// "Afternoon dip till 6:07pm" inside a zone, otherwise the moment's
+    /// own name ("Climbing out of the dip").
+    private var whereNow: String {
+        guard let zone = AppModel.zone(at: moment.time, in: energy) else { return moment.title }
+        return "\(AppModel.zoneTitle(zone)) till\u{00A0}\(Clock.format(zone.range.end))"
+    }
+
+    var body: some View {
+        let p = Palette(scheme: scheme)
+        let line = Accent.mint.fill(scheme)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                Text("Energy now").font(.bodyEmphasis)
+                Spacer(minLength: 0)
+                Image(systemName: "bolt.fill")
+                    .font(.scaled(size: 15, weight: .semibold))
+                    .foregroundStyle(Accent.mint.ink(scheme))
+                    .accessibilityHidden(true)
+            }
+            Text("\(moment.level)")
+                .font(.numberL)
+                .lineLimit(1)
+            Chart {
+                ForEach(energy.curve, id: \.time) { point in
+                    AreaMark(x: .value("Time", point.time), y: .value("Energy", point.level))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(LinearGradient(colors: [line.opacity(0.3), line.opacity(0.02)],
+                                                        startPoint: .top, endPoint: .bottom))
+                }
+                ForEach(energy.curve, id: \.time) { point in
+                    LineMark(x: .value("Time", point.time), y: .value("Energy", point.level))
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(line)
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                }
+                if let level = energy.level(at: nowTime) {
+                    PointMark(x: .value("Now", nowTime), y: .value("Energy", level))
+                        .symbolSize(60)
+                        .foregroundStyle(p.primary)
+                }
+            }
+            .chartXScale(domain: start...end)
+            .chartYScale(domain: -8.0...112.0)
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 56)
+            .accessibilityHidden(true)
+            Text(whereNow).font(.secondary).foregroundStyle(p.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Space.l)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .tileSurface()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Energy now: \(moment.level) of 100, \(whereNow)")
     }
 }
 
