@@ -261,6 +261,8 @@ struct LogView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .motionTransition(.reveal, edge: .top)
                 }
+                // Three more one-tap scales (B1).
+                MoodScalesToggle(toast: $toast)
             }
             .motion(.reveal, value: model.feltStressedToday)
         }

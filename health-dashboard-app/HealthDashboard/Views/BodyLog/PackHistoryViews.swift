@@ -9,14 +9,37 @@ struct PackHistoryRows: View {
 
     var body: some View {
         let bleeds = model.packBleeds
-        if !bleeds.isEmpty {
+        let mood = model.moodByPackDay(.mood)
+        let showsMood = !(mood?.points.isEmpty ?? true)
+        if !bleeds.isEmpty || showsMood {
             RowCard {
-                MetricRow(title: "Bleeds by pack", note: bleedNote(bleeds),
-                          systemImage: "drop.fill", accent: .pink) {
-                    BleedsByPackView()
+                if let mood, showsMood {
+                    MetricRow(title: "Mood by pack day", note: moodNote(mood),
+                              systemImage: "face.smiling", accent: .orange) {
+                        MoodByPackDayView()
+                    }
+                }
+                if !bleeds.isEmpty {
+                    if showsMood { RowDivider() }
+                    MetricRow(title: "Bleeds by pack", note: bleedNote(bleeds),
+                              systemImage: "drop.fill", accent: .pink) {
+                        BleedsByPackView()
+                    }
                 }
             }
         }
+    }
+
+    /// "Lower in your break week" once there are two packs, else how far along.
+    private func moodNote(_ mood: MoodByPackDay) -> String {
+        guard mood.isReady, let pack = model.pillPack else {
+            return "Fills in after \(MoodByPackDay.packsNeeded) packs \u{00B7} \(mood.packsCovered) so far"
+        }
+        let split = mood.split(activeDays: pack.activeDays)
+        guard pack.hasBreak, let a = split.active, let b = split.breakDays else { return "Your mood across the pack" }
+        if a - b >= MoodPattern.meaningfulShift { return "Lower in your \(model.packBreakName.lowercased())" }
+        if b - a >= MoodPattern.meaningfulShift { return "Higher in your \(model.packBreakName.lowercased())" }
+        return "About the same all pack"
     }
 
     /// "Last one: 4 days, heaviest medium".

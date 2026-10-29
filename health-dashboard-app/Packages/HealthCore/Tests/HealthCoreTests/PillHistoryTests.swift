@@ -102,4 +102,23 @@ final class PillHistoryTests: XCTestCase {
         XCTAssertEqual(out.map(\.bleedDays), [0, 0])
         XCTAssertNil(out[0].heaviest)
     }
+
+    // MARK: Mood by pack day (H-B1)
+
+    func testMoodByPackDayNeedsTwoPacks() {
+        var ratings: [Date: Int] = [:]
+        // Pack −1 (Sep 13 – Oct 10): 4 on active days, 2 in the break.
+        for i in 0..<28 { ratings[cal.date(byAdding: .day, value: i, to: date(2026, 9, 13))!] = i >= 21 ? 2 : 4 }
+        var one = MoodByPackDay.make(ratings, in: packs, cal: cal)
+        XCTAssertEqual(one.packsCovered, 1)
+        XCTAssertFalse(one.isReady)
+        // And 12 days of pack 0.
+        for i in 0..<12 { ratings[cal.date(byAdding: .day, value: i, to: date(2026, 10, 11))!] = 3 }
+        one = MoodByPackDay.make(ratings, in: packs, cal: cal)
+        XCTAssertTrue(one.isReady)
+        XCTAssertEqual(one.averages[1], 3.5)
+        XCTAssertEqual(one.averages[23], 2)
+        let split = one.split(activeDays: 21)
+        XCTAssertEqual(split.breakDays, 2)
+    }
 }

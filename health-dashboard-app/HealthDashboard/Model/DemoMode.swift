@@ -176,7 +176,8 @@ enum DemoMode {
     /// this pill since the first). Pill 2 of the oldest-but-one pack, pill
     /// 9 of the last and pill 15 of the one before were missed. Bleeds in
     /// every break, getting lighter; spotting early on; headaches and
-    /// cramps mostly in break weeks; morning check-ins a little lower then.
+    /// cramps mostly in break weeks; morning check-ins and mood a little
+    /// lower then.
     @MainActor
     private static func seedPillHistory(_ data: inout AppData, today: Date, calendar cal: Calendar) {
         guard let start = data.packStartDate else { return }
@@ -219,6 +220,16 @@ enum DemoMode {
             let packDay = i % 28 + 1
             let awake = packDay > 21 ? 2 + (i % 3 == 0 ? 1 : 0) : 3 + (i % 2)
             return AppData.CheckIn(date: date, awake: awake, tags: [])
+        }
+        // Mood, anxiety and irritability most evenings (B1): lower mood and
+        // more irritable in break weeks.
+        data.moodRatings = (0..<days).flatMap { i -> [AppData.MoodRating] in
+            guard i % 6 != 4, let date = cal.date(byAdding: .minute, value: i * 1440 + 21 * 60 + 20, to: firstDay) else { return [] }
+            let inBreak = i % 28 >= 21
+            let wobble = i % 3 == 0 ? 1 : 0
+            return [AppData.MoodRating(date: date, scale: .mood, value: inBreak ? 2 + (i % 2) : 3 + (i % 4 == 0 ? 0 : 1)),
+                    AppData.MoodRating(date: date, scale: .anxiety, value: inBreak ? 3 : 2 + (i % 5 == 0 ? 1 : 0)),
+                    AppData.MoodRating(date: date, scale: .irritability, value: inBreak ? 3 + wobble : 1 + wobble)]
         }
     }
 
