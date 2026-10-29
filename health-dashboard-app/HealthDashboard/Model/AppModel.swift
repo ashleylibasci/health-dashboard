@@ -1205,10 +1205,12 @@ final class AppModel: ObservableObject {
         let newMethod = new.cycleSetup == .hormonal ? new.birthControl : nil
         if oldMethod != newMethod {
             let startChangedToo = old.packStartDate != new.packStartDate
+            // A save that sets the change date itself (example data) keeps it.
+            let dateSetToo = old.methodChangedDate != new.methodChangedDate
             Task { @MainActor in
                 self.normalizePack(keepStart: startChangedToo)
                 // Cycles before the change don't set her natural length.
-                self.store.data.methodChangedDate = Calendar.current.startOfDay(for: .now)
+                if !dateSetToo { self.store.data.methodChangedDate = Calendar.current.startOfDay(for: .now) }
                 self.recomputeCycle()
             }
         }
