@@ -9,13 +9,15 @@ struct BrainDumpRow: View {
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     @FocusState private var focused: Bool
+    /// Edited here and saved when she's done typing (saving every
+    /// keystroke would redo the whole app's numbers each time).
+    @State private var draft = ""
 
-    private var text: Binding<String> {
-        Binding(get: { store.data.sleepExtras.brainDump?.text ?? "" },
-                set: { new in
-                    let trimmed = new.trimmingCharacters(in: .whitespacesAndNewlines)
-                    store.data.sleepExtras.brainDump = trimmed.isEmpty ? nil : .init(date: .now, text: new)
-                })
+    private func save() {
+        let saved = store.data.sleepExtras.brainDump?.text ?? ""
+        guard draft != saved else { return }
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        store.data.sleepExtras.brainDump = trimmed.isEmpty ? nil : .init(date: .now, text: draft)
     }
 
     private var summary: String {
@@ -29,8 +31,11 @@ struct BrainDumpRow: View {
         ExpandRow(title: "Tomorrow\u{2019}s list", summary: summary, systemImage: "list.bullet.clipboard", accent: .indigo) {
             Text("Writing down what\u{2019}s on for tomorrow helps you fall asleep faster. One thing per line.")
                 .fixedSize(horizontal: false, vertical: true)
-            TextEditor(text: text)
+            TextEditor(text: $draft)
                 .focused($focused)
+                .onAppear { draft = store.data.sleepExtras.brainDump?.text ?? "" }
+                .onChange(of: focused) { if !focused { save() } }
+                .onDisappear { save() }
                 .font(.bodyText)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 110)
