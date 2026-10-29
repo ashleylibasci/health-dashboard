@@ -473,6 +473,16 @@ struct DataSettingsView: View {
                 MetricRow(title: "Getting accurate numbers", note: "Watch fit, settings and small habits",
                           systemImage: "checklist", accent: .mint) { AccuracyTipsView() }
             }
+            if store.data.cycleSetup != .notTracking {
+                Card {
+                    // G3: her history survives a reinstall.
+                    SettingToggleRow(title: "Save bleeding and symptoms to Apple Health",
+                                     detail: "Flow, spotting, symptoms and your birth-control method, so they\u{2019}re kept if you reinstall and Apple\u{2019}s Cycle Tracking sees them too. Turning it off leaves what\u{2019}s saved in Health.",
+                                     systemImage: "heart.text.square.fill", accent: .pink,
+                                     isOn: Binding(get: { store.data.savesCycleToHealth },
+                                                   set: { on in Task { await model.setSavesCycleToHealth(on) } }))
+                }
+            }
             Card {
                 HStack(alignment: .top, spacing: 12) {
                     SettingsIcon(systemImage: "lock.fill", accent: .mint)

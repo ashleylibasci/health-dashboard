@@ -1198,6 +1198,11 @@ final class AppModel: ObservableObject {
         // A logged or edited bleed moves the cycle day straight away.
         if old.flowLog != new.flowLog { recomputeCycle() }
 
+        if new.savesCycleToHealth, !old.savesCycleToHealth || old.flowLog != new.flowLog || old.symptomLog != new.symptomLog
+            || old.birthControl != new.birthControl || old.methodChangedDate != new.methodChangedDate {
+            Task { await syncCycleToHealth() }
+        }
+
         if Self.pillRelevantChange(old, new) { Task { await updatePill(readHealth: old.pillReadsHealth != new.pillReadsHealth) } }
 
         // A new method: the old pack type and start don't carry over.

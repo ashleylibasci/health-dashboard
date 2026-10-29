@@ -192,6 +192,10 @@ struct AppData: Codable {
     var moodLog: [MoodEntry] = []
     /// Mood, anxiety and irritability taps (B1), here and on the Watch.
     var moodRatings: [MoodRating] = []
+    /// Save bleeding, symptoms and her method to Apple Health (G3).
+    var savesCycleToHealth = false
+    /// Sync identifiers of what's been saved there (`CycleHealthWrite`).
+    var cycleHealthSaved: Set<String> = []
     /// Sleep and exam features: bedtime nudge, tomorrow's list, after-exam check-ins.
     var sleepExtras = SleepExtrasData()
     /// The time zone she was in each day (midnight → identifier), the last
@@ -259,6 +263,8 @@ struct AppData: Codable {
         symptomLog = get(.symptomLog, d.symptomLog)
         moodLog = get(.moodLog, d.moodLog)
         moodRatings = get(.moodRatings, d.moodRatings)
+        savesCycleToHealth = get(.savesCycleToHealth, d.savesCycleToHealth)
+        cycleHealthSaved = get(.cycleHealthSaved, d.cycleHealthSaved)
         sleepExtras = get(.sleepExtras, d.sleepExtras)
         timeZoneByDay = get(.timeZoneByDay, d.timeZoneByDay)
     }
