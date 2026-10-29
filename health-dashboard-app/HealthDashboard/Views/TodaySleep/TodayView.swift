@@ -64,9 +64,12 @@ struct TodayView: View {
 
     /// By the real clock: "Good evening" at 9pm, "Still up" at 1am.
     private var greeting: String {
-        let part = model.greetingPart
+        let part = DemoMode.clock.map { AppModel.greetingPart(hour: $0 / 60 % 24) } ?? model.greetingPart
         return name.isEmpty ? part : "\(part), \(name)"
     }
+
+    /// Now, in app-day minutes (`model.now`), or the `-demoClock` time.
+    private var clock: Minutes { DemoMode.clock ?? model.now }
 
     // MARK: Exam chip
 

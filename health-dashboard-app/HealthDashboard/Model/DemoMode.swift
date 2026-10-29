@@ -15,6 +15,7 @@ import HealthCore
 /// - `-demoConditions "PCOS,PMDD"`: health conditions, by their names in
 ///   Settings.
 /// - `-resetData`: starts from a fresh install (setup, no logs).
+/// - `-demoClock 14:30`: Today as if it were that time (see `clock`).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -39,9 +40,20 @@ enum DemoMode {
     /// `-demoOpen cycle|cycleSettings`: opens on that screen (Body tab), for
     /// screenshots.
     static let open = value(after: "-demoOpen")
+    /// `-demoClock 14:30`: Today greets, orders its cards and reads energy
+    /// now as if it were that time (screenshots of the morning, afternoon
+    /// and evening). Other screens keep the real clock. In app-day
+    /// minutes, so `00:30` is 1470.
+    static let clock: Minutes? = value(after: "-demoClock").flatMap { text in
+        let parts = text.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2, (0..<24).contains(parts[0]), (0..<60).contains(parts[1]) else { return nil }
+        let minutes = parts[0] * 60 + parts[1]
+        return minutes < AppDay.rolloverMinutes ? minutes + 1440 : minutes
+    }
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false
     static let open: String? = nil
+    static let clock: Minutes? = nil
     static let cycle: String? = nil
     static let conditions: [String] = []
     #endif

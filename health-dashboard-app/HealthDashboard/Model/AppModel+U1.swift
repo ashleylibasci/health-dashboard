@@ -12,8 +12,10 @@ extension AppModel {
     var isAfterMidnight: Bool { AppDay.isBeforeRollover() }
 
     /// The greeting by the real clock (never "Good morning" at 1am).
-    var greetingPart: String {
-        switch Calendar.current.component(.hour, from: .now) {
+    var greetingPart: String { Self.greetingPart(hour: Calendar.current.component(.hour, from: .now)) }
+
+    static func greetingPart(hour: Int) -> String {
+        switch hour {
         case 4..<12: return "Good morning"
         case 12..<17: return "Good afternoon"
         case 17..<24: return "Good evening"
