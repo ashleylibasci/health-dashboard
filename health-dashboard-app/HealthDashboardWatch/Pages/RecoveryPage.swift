@@ -30,6 +30,7 @@ struct RecoveryPage: View {
                 }
             }
         }
+        .onChange(of: sync.widget) { WatchPillLog.shared.reconcile(sync) }
     }
 
     /// No score today (no heart readings and no recorded night).

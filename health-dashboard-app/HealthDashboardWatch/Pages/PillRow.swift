@@ -13,6 +13,9 @@ final class WatchPillLog: ObservableObject {
     /// Taken here a moment ago: the row offers Undo until this clears.
     @Published private(set) var undoable: Date?
     private var undoTask: Task<Void, Never>?
+    /// Taken here and sent a moment ago: a phone update that crosses it on
+    /// the way doesn't untick it.
+    private var sent: Date?
 
     /// Marks today's pill taken, unless it isn't a pill day or it's taken.
     func markTaken(_ sync: WatchSync, now: Date = .now) {
@@ -26,6 +29,7 @@ final class WatchPillLog: ObservableObject {
             sync.setPillTaken(now)
             undoable = now
         }
+        sent = now
         AccessibilityNotification.Announcement("Pill \(pill.packDay) taken. Tap Undo to undo.").post()
         undoTask?.cancel()
         undoTask = Task {
@@ -36,12 +40,23 @@ final class WatchPillLog: ObservableObject {
     }
 
     /// The pill complication's tap: on a cold launch the connection to the
-    /// phone takes a moment to come up, so wait for it (up to 3 seconds).
+    /// phone takes a moment to come up, so wait for it (up to 10 seconds).
     func markTakenFromComplication(_ sync: WatchSync) async {
-        for _ in 0..<15 where WCSession.default.activationState != .activated {
+        for _ in 0..<50 where WCSession.default.activationState != .activated {
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
         markTaken(sync)
+    }
+
+    /// New numbers from the phone: a pill taken here stays ticked while the
+    /// phone catches up (for 10 minutes; after that the phone's word stands).
+    func reconcile(_ sync: WatchSync, now: Date = .now) {
+        guard let sent, let pill = sync.widget?.pill(at: now) else { return }
+        if now.timeIntervalSince(sent) > 600 || PillDay.day(for: sent, pillTime: pill.time) != pill.day {
+            self.sent = nil
+        } else if pill.taken == nil {
+            sync.setPillTaken(sent)
+        }
     }
 
     func undo(_ sync: WatchSync) {
@@ -56,6 +71,7 @@ final class WatchPillLog: ObservableObject {
             sync.setPillTaken(nil)
             undoable = nil
         }
+        sent = nil
         AccessibilityNotification.Announcement("Pill not taken").post()
     }
 }
@@ -124,6 +140,7 @@ struct WatchPillRow: View {
         if !pill.isPillDay {
             return pill.newPackDay.map { "New pack \($0.formatted(.dateTime.weekday(.abbreviated)))" } ?? "No pill today"
         }
-        return "Take at \(Clock.format(pill.time))"
+        // As on the phone's pill row: "Due at" once the time has passed.
+        return "\(Date() >= pill.pillTime ? "Due at" : "Take at") \(Clock.format(pill.time))"
     }
 }
