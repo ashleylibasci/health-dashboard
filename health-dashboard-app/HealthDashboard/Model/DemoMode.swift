@@ -46,7 +46,7 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings|visitSummary`: opens on that screen
+    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery`: opens on that screen
     /// (Body tab), for screenshots. The pill-visit summary also saves its
     /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")
@@ -243,12 +243,12 @@ enum DemoMode {
     }
 
     /// `-demoPillHistory`: the example nights reach back four packs, with
-    /// resting heart rate about 1.3 beats higher on break days (E2). The
+    /// resting heart rate about 2 beats higher on break days (E2). The
     /// demo pack started `packDay` − 1 days ago.
     static func pillHistoryNights(_ nights: [NightRecord], today: Date = .now, calendar cal: Calendar = .current) -> [NightRecord] {
         let day0 = cal.startOfDay(for: today)
         let older = nights.prefix(49).compactMap { n -> NightRecord? in
-            guard let day = cal.date(byAdding: .day, value: -71, to: n.wakeDay) else { return nil }
+            guard let day = cal.date(byAdding: .day, value: -49, to: n.wakeDay) else { return nil }
             var copy = n
             copy.wakeDay = day
             return copy
@@ -258,7 +258,7 @@ enum DemoMode {
         return (older + nights).map { n in
             guard packs.isBreak(day: packs.position(of: n.wakeDay, calendar: cal).day) else { return n }
             var copy = n
-            copy.outcome.restingHRDelta = (n.outcome.restingHRDelta ?? 0) + 1.3
+            copy.outcome.restingHRDelta = (n.outcome.restingHRDelta ?? 0) + 2
             return copy
         }
     }
