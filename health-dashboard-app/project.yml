@@ -103,7 +103,7 @@ targets:
       path: HealthDashboardWidgets/Info.plist
       properties:
         CFBundleDisplayName: Health Dashboard
-        NSHealthUpdateUsageDescription: "Saves the latte you log from the widget to Apple Health."
+        NSHealthUpdateUsageDescription: "Saves the latte and water you log from the widgets to Apple Health."
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

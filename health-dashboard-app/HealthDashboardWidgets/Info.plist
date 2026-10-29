@@ -26,6 +26,6 @@
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Saves the latte you log from the widget to Apple Health.</string>
+	<string>Saves the latte and water you log from the widgets to Apple Health.</string>
 </dict>
 </plist>
