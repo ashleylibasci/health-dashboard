@@ -1381,7 +1381,8 @@ final class AppModel: ObservableObject {
             // No goal on the Watch under eating-disorder history: total only.
             waterGoalML: hidesActivityNumbers ? nil : waterGoalTodayML,
             bottleML: store.data.bottleSizeML,
-            todayWaterIDs: todaysWater.map(\.id)))
+            todayWaterIDs: todaysWater.map(\.id),
+            stressHighAt: stressHighNow))
     }
 
     func handle(_ message: WatchMessage) {

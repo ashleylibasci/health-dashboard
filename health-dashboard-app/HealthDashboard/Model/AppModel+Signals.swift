@@ -43,6 +43,19 @@ extension AppModel {
                                still: example ? nil : stressStillBaseline, luteal: inLutealPhase, activeKcal: stressActiveKcal)
     }
 
+    /// The start of this hour or the last one when that hour was still
+    /// (not active, asleep or cooling down) and its stress read "High":
+    /// the Watch offers a one-minute breather then (F5). Never on example
+    /// data.
+    var stressHighNow: Date? {
+        guard heartIsReal || !usingSampleData else { return nil }
+        let cal = Calendar.current
+        let nowHour = cal.component(.hour, from: .now)
+        guard let latest = stressToday.hours.last(where: { $0.level != nil }), latest.hour >= nowHour - 1,
+              let level = latest.level, StressModel.label(for: level) == .high else { return nil }
+        return cal.date(bySettingHour: latest.hour, minute: 0, second: 0, of: .now)
+    }
+
     /// She logged a 4 or 5 ("stressed" or more) today.
     var feltStressedToday: Bool { (stressLoggedToday ?? 0) >= 4 }
 
