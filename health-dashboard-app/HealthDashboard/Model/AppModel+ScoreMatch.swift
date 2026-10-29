@@ -50,8 +50,23 @@ extension AppModel {
     }
 
     /// The day's energy score against her check-in: 5 or more points above
-    /// her usual is above, 5 or more below is below (recovery's narrowest band).
+    /// her usual is above, 5 or more below is below (recovery's narrowest
+    /// band). Scoring 30 past days is slow, so it's kept until the nights,
+    /// her need setting or her usual change.
     var energyMatch: ScoreMatch {
+        var h = Hasher()
+        h.combine(nights)
+        h.combine(store.data.sleepNeedAdjustment)
+        h.combine(energyUsual)
+        h.combine(appDayDate)
+        let key = h.finalize()
+        if let cached = ScoreMatchCache.shared.energy, cached.key == key { return cached.match }
+        let match = computeEnergyMatch()
+        ScoreMatchCache.shared.energy = (key, match)
+        return match
+    }
+
+    private func computeEnergyMatch() -> ScoreMatch {
         let k = Int(Recovery.band(spread: nil))
         let days = checkedInNights
         let matched = days.filter { n in
@@ -75,4 +90,11 @@ extension AppModel {
     func scoreMatchDetail(_ score: String) -> String {
         "Each morning you check in, we put your \(score) and how awake you felt into one of three groups: better than usual, about usual or worse. A day matches when both land in the same group. It\u{2019}s a way to see whether the number works for you; it never changes the number. From the last \(Self.scoreMatchDays) days."
     }
+}
+
+/// The last energy match, with the inputs it was worked out from.
+@MainActor
+private final class ScoreMatchCache {
+    static let shared = ScoreMatchCache()
+    var energy: (key: Int, match: AppModel.ScoreMatch)?
 }
