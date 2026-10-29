@@ -441,6 +441,8 @@ struct DataSettingsView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var confirmDelete = false
     @State private var confirmSample = false
+    /// The logs as CSV, written when the page opens (G4).
+    @State private var csvFile: URL?
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -511,12 +513,37 @@ struct DataSettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                if let csvFile {
+                    // G4: the logs as one spreadsheet.
+                    Divider().overlay(p.cardBorder)
+                    ShareLink(item: csvFile) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "tablecells")
+                                .font(.scaled(size: 15, weight: .semibold))
+                                .frame(width: 36, height: 36)
+                                .background(Accent.indigo.tint(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Export logs as a spreadsheet").font(.scaled(size: 15, weight: .semibold))
+                                Text("Sleep, caffeine, water, alcohol, check-ins and mood, as CSV")
+                                    .font(.scaled(size: 13)).secondaryText()
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                        }
+                        .foregroundStyle(Accent.indigo.ink(scheme))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
                 Divider().overlay(p.cardBorder)
                 SettingsActionRow(title: "Delete all data", systemImage: "trash", accent: .pink, role: .destructive) {
                     confirmDelete = true
                 }
             }
         }
+        .task { csvFile = model.writeLogsCSV() }
         .confirmationDialog("Show example data?", isPresented: $confirmSample, titleVisibility: .visible) {
             Button("Show example data") { model.loadSample() }
             Button("Cancel", role: .cancel) {}
