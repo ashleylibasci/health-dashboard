@@ -38,12 +38,13 @@ struct TonightPage: View {
             .accessibilityElement(children: .combine)
             // The phone's plan: best wake time and the sleep it expects (older
             // phone builds only send the alarm window, so fall back to its end).
+            // "Up at", the same words and time as Today's Tonight card (F31).
             if let wake = snapshot.plannedWake ?? snapshot.upBy ?? snapshot.alarmWindowEnd {
                 let wakeMinutes = Clock.minutesOfDay(wake)
                 HStack(spacing: 10) {
                     SleepDial(bedMinutes: bedMinutes, wakeMinutes: wakeMinutes, asleepMinutes: snapshot.plannedAsleepMinutes)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(snapshot.plannedWake == nil ? "Up by" : "Wake")
+                        Text("Up at")
                             .font(WatchStyle.label)
                             .foregroundStyle(Accent.orange.ink(.dark))
                         Text(Clock.format(wakeMinutes))
