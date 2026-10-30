@@ -84,7 +84,7 @@ final class InsightsPreview: XCTestCase {
         openCheckIn()
         tap("Patterns")
         shot("D-P2-patterns")
-        tap("Studying late")
+        tap("Exam weeks")
         shot("D-P2-pattern-open")
         scroll(to: "Still counting")
         shot("D-P2-still-counting")
@@ -98,16 +98,19 @@ final class InsightsPreview: XCTestCase {
         sleep(1)
         tap("Learning you")
         tap("Patterns")
-        tap("Studying late")
+        shot("D-P2-patterns")
+        tap("Exam weeks")
         shot("D-P2-pattern-open")
         scroll(to: "Still counting")
-        tap("Workouts")
+        tap("Parties")
         shot("D-P2-still-counting")
     }
 
     func testP2PatternsLight() {
-        launch([], appearance: "light")
-        openCheckIn()
+        launch(["-demoOpen", "recovery"], appearance: "light")
+        app.tabBars.buttons["Sleep"].tap()
+        sleep(1)
+        tap("Learning you")
         tap("Patterns")
         shot("D-P2-patterns-light")
     }
@@ -206,6 +209,12 @@ final class InsightsPreview: XCTestCase {
         shot("\(name)-2-buttons")
     }
 
+    /// Closes a notification left open by `shootNotification`.
+    private func closeNotification() {
+        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        sleep(1)
+    }
+
     func testN1MorningNote() {
         launch(["-demoMorningNote"])
         allowNotificationsIfAsked()
@@ -222,6 +231,7 @@ final class InsightsPreview: XCTestCase {
         launch(["-demoBedtimeNudge"])
         allowNotificationsIfAsked()
         shootNotification(containing: "Lights low", "D-N2-bedtime-nudge")
+        closeNotification()
     }
 
     /// Starts on Body (with `-demoOpen`), so Today's live bedtime countdown
@@ -245,5 +255,19 @@ final class InsightsPreview: XCTestCase {
         openSettingsFromBody()
         tap("Notifications")
         shot("D-N4-3-by-moment-light")
+    }
+
+    // MARK: Today idles
+
+    /// In the half hour before bed Today shows "Bed in 20 min". It must
+    /// still go idle, or every XCUITest step there waits ~15 minutes.
+    func testTodayIdlesBeforeBed() {
+        launch(["-demoClock", "23:20"])
+        let start = Date()
+        app.tabBars.buttons["Sleep"].tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertLessThan(Date().timeIntervalSince(start), 30, "Today didn't go idle")
+        scroll(to: "Bed in")
+        shot("today-idle-before-bed")
     }
 }

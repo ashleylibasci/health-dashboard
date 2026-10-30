@@ -517,8 +517,12 @@ struct TodayView: View {
                             Text("Bed by \(Clock.format(model.tonightBedtime))")
                                 .font(typeSize.isAccessibilitySize ? .cardTitle : .heading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text(tonightLine(wake: wake)).font(.bodyEmphasis)
-                                .foregroundStyle(p.secondary)
+                            // "Bed in 20 min" counts down on the minute, and
+                            // only then: the screen stays idle in between.
+                            TimelineView(.everyMinute) { _ in
+                                Text(tonightLine(wake: wake)).font(.bodyEmphasis)
+                                    .foregroundStyle(p.secondary)
+                            }
                         }
                         Spacer(minLength: Space.s)
                         Image(systemName: "chevron.right")
