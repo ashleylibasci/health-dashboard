@@ -59,17 +59,17 @@ extension GuideArticle {
         keywords: ["half-life", "pill", "ring", "patch", "estrogen", "cutoff"],
         methods: [.combinedPill, .ring, .patch])
 
-    /// The bedtime ⓘ's "why 35 mg", word for word.
+    /// The bedtime ⓘ's "why 50 mg", word for word.
     static let caffeineAtBedtime = GuideArticle(
         id: "caffeineAtBedtime",
         title: "Caffeine at bedtime",
-        summary: "Why the goal is under 35 mg left when you go to bed.",
+        summary: "Why the goal is under \(Int(CaffeineModel.bedtimeLimitMg)) mg left when you go to bed.",
         body: [
             .paragraph(Topic.caffeineLeft.explanation.meaning),
             .paragraph(Topic.caffeineLeft.explanation.forYou),
             .paragraph(Topic.caffeineLeft.explanation.howWeGotIt ?? ""),
         ],
-        keywords: ["35 mg", "deep sleep", "cutoff", "Gardiner"])
+        keywords: ["\(Int(CaffeineModel.bedtimeLimitMg)) mg", "morning coffee", "deep sleep", "cutoff", "Gardiner"])
 
     /// The Water goal card's guidance and cautions, word for word.
     static let waterGoal = GuideArticle(

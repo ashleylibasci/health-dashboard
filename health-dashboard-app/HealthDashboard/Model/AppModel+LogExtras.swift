@@ -33,16 +33,25 @@ extension AppModel {
     var bedtimeTonight: Minutes { 1440 + tonightBedtime }
 
     /// Dose-aware: today's drinks, at their real sizes and times, leave
-    /// `CaffeineModel.bedtimeLimitMg` or more in your body at bedtime.
+    /// `CaffeineModel.bedtimeLimitMg` or more in your body at bedtime. Her
+    /// morning coffee (up to 200 mg in the first 3 hours) never counts.
     var caffeineTooMuchAtBedtime: Bool {
-        CaffeineModel.tooMuchAtBedtime(doses: caffeineDoses, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
+        CaffeineModel.tooMuchAtBedtime(doses: caffeineDoses, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours, wake: caffeineWakeTime)
+    }
+
+    /// Caffeine at bedtime that counts against the goal: all of it except
+    /// her morning allowance. Goal checks use this; the mg shown is
+    /// `caffeineAtBedtime`, all of it.
+    var caffeineCountedAtBedtime: Int {
+        Int(CaffeineModel.countedAtBedtime(doses: caffeineDoses, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours,
+                                           wake: caffeineWakeTime).rounded())
     }
 
     /// Whether a drink of `mg` at `t` (app-day minutes) would leave too much at bedtime,
     /// on top of what's already been had today.
     func wouldBeTooMuchAtBedtime(mg: Int, at t: Minutes) -> Bool {
         CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: t, mg: mg), to: caffeineDoses,
-                                     bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
+                                     bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours, wake: caffeineWakeTime)
     }
 
     /// The latest time today a drink of `mg` still clears enough by bedtime,
@@ -51,7 +60,7 @@ extension AppModel {
     /// (it's never earlier than now, or than her wake time).
     func latestTimeForCaffeine(mg: Int) -> Minutes? {
         CaffeineModel.latestTime(forMg: mg, bedtime: bedtimeTonight, existing: caffeineDoses, halfLifeHours: caffeineHalfLifeHours,
-                                 notBefore: max(now, lastNightIsFresh ? lastNight.wake : 0))
+                                 notBefore: max(now, lastNightIsFresh ? lastNight.wake : 0), wake: caffeineWakeTime)
     }
 
     /// The wake time the caffeine cutoff is compared with: last night's wake
@@ -73,7 +82,7 @@ extension AppModel {
     /// The biggest drink (mg, in 5s) she could have at her wake time and
     /// still be under `CaffeineModel.bedtimeLimitMg` at bedtime.
     var caffeineLargestDoseAtWake: Int {
-        CaffeineModel.largestDose(at: caffeineWakeTime, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours)
+        CaffeineModel.largestDose(at: caffeineWakeTime, bedtime: bedtimeTonight, halfLifeHours: caffeineHalfLifeHours, wake: caffeineWakeTime)
     }
 
     /// Caffeine left at tonight's bedtime from one drink of `mg` at `t`

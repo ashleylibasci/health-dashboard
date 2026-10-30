@@ -61,7 +61,7 @@ struct WatchSnapshot: Codable, Equatable {
     var upBy: Date? = nil
     var tonightNeedMinutes: Int? = nil
     var plannedAsleepMinutes: Int? = nil
-    /// Today's caffeine leaves too much at bedtime (35 mg or more): the only time the
+    /// Today's caffeine leaves too much at bedtime (50 mg or more, not counting her morning coffee): the only time the
     /// Watch shows a warning (nil from older phone builds).
     var caffeineTooMuchAtBedtime: Bool? = nil
     /// Water for the "+ Bottle" tile: today's total, her goal and bottle

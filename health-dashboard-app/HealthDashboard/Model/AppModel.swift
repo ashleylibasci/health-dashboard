@@ -499,9 +499,10 @@ final class AppModel: ObservableObject {
 
     /// For the reference coffee every caffeine line names (12 oz drip, 140 mg),
     /// so the cutoff and the copy describe the same drink (round 3, H10).
+    /// Never before the morning allowance ends (3 hours after waking).
     var caffeineCutoff: Minutes {
         CaffeineModel.cutoff(bedtime: 1440 + tonightBedtime, halfLifeHours: caffeineHalfLifeHours,
-                             mg: Double(Self.referenceCoffee.caffeineMg))
+                             mg: Double(Self.referenceCoffee.caffeineMg), wake: caffeineWakeTime)
     }
     var caffeineMgToday: Int { caffeineDoses.map(\.mg).reduce(0, +) }
     var caffeineAtBedtime: Int {

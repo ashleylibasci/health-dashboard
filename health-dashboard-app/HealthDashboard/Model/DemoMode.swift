@@ -20,6 +20,8 @@ import HealthCore
 ///   with an after-exam check-in).
 /// - `-demoFuel` (with `-demoCycle`): caffeine, alcohol and water logs, a
 ///   big night last night and a hard training day today.
+/// - `-demoMorningCoffee` (with `-demoCycle`): a 12 oz drip coffee logged
+///   at 8:30 this morning, for the caffeine screens' morning rule.
 /// - `-demoClock 14:30`: Today as if it were that time (see `clock`).
 /// - `-demoPillHistory` (with `-demoCycle pill`): four earlier packs of
 ///   pills (three missed), withdrawal bleeds, spotting, symptoms and
@@ -78,6 +80,7 @@ enum DemoMode {
     static let open = value(after: "-demoOpen")
     static let exams = args.contains("-demoExams")
     static let fuel = args.contains("-demoFuel")
+    static let morningCoffee = args.contains("-demoMorningCoffee")
     /// `-demoHelloCard`: Today shows the day-3 hello card (D-T7) today,
     /// with every row, whatever day this is.
     static let helloCard = args.contains("-demoHelloCard")
@@ -126,7 +129,7 @@ enum DemoMode {
     static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
     static let tiles: String? = nil
-    static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
+    static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false, morningCoffee = false
     static let pillHistory = false, helloCard = false, reading = false
     static let pillEvent: String? = nil
     static let packDay = 18
@@ -195,6 +198,10 @@ enum DemoMode {
         }
         if exams { addExams(to: &data, today: today, calendar: cal) }
         if fuel { seedFuelLogs(&data, today: today, calendar: cal) }
+        if morningCoffee, let at = cal.date(byAdding: .minute, value: 8 * 60 + 30, to: today) {
+            let drip = AppModel.referenceCoffee
+            data.drinkLog.append(AppData.LoggedDrink(drinkID: drip.id, name: drip.name, mg: drip.caffeineMg, date: at))
+        }
         if patterns { seedPatterns(&data, today: today, calendar: cal) }
         if let tiles { data.insights.glanceTiles = tiles.split(separator: ",").map(String.init) }
         if cycle == "pill", pillHistory { seedPillHistory(&data, today: today, calendar: cal) }

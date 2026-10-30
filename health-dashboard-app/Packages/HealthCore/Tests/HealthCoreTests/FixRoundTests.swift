@@ -106,9 +106,9 @@ final class CaffeineFixTests: XCTestCase {
     }
 
     func testDoseAwareBedtimeCheck() {
-        XCTAssertTrue(CaffeineModel.tooMuchAtBedtime(doses: [CaffeineDose(time: 900, mg: 160)], bedtime: 1470))
+        XCTAssertTrue(CaffeineModel.tooMuchAtBedtime(doses: [CaffeineDose(time: 900, mg: 200)], bedtime: 1470))
         XCTAssertFalse(CaffeineModel.tooMuchAtBedtime(doses: [CaffeineDose(time: 840, mg: 64)], bedtime: 1470))
-        XCTAssertTrue(CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: 840, mg: 64), to: [CaffeineDose(time: 840, mg: 64)],
+        XCTAssertTrue(CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: 900, mg: 64), to: [CaffeineDose(time: 900, mg: 64)],
                                                    bedtime: 1470, halfLifeHours: CaffeineModel.estrogenHalfLifeHours))
 
         let limit = CaffeineModel.bedtimeLimitMg
@@ -120,6 +120,27 @@ final class CaffeineFixTests: XCTestCase {
         XCTAssertLessThan(try! XCTUnwrap(CaffeineModel.latestTime(forMg: 160, bedtime: 1470, halfLifeHours: CaffeineModel.estrogenHalfLifeHours)), latest)
         // Already over the allowance: nothing more fits.
         XCTAssertNil(CaffeineModel.latestTime(forMg: 64, bedtime: 1470, existing: [CaffeineDose(time: 1200, mg: 200)]))
+    }
+
+    /// Ashley, Oct 30: a normal coffee in the first 3 hours after waking is
+    /// never flagged or shrunk, even on the pill with a short day.
+    func testMorningCoffeeIsNeverFlagged() {
+        let pill = CaffeineModel.estrogenHalfLifeHours
+        let wake = 480, bedtime = 1320   // 8am to 10pm: 14 hours
+        let coffee = CaffeineDose(time: 500, mg: 200)   // a big coffee-shop coffee
+        // On its own it leaves over 50 mg by 10pm…
+        XCTAssertGreaterThan(CaffeineModel.amount(at: bedtime, doses: [coffee], halfLifeHours: pill), CaffeineModel.bedtimeLimitMg)
+        // …but with her wake time it isn't flagged, and still isn't without it.
+        XCTAssertFalse(CaffeineModel.tooMuchAtBedtime(doses: [coffee], bedtime: bedtime, halfLifeHours: pill, wake: wake))
+        XCTAssertTrue(CaffeineModel.tooMuchAtBedtime(doses: [coffee], bedtime: bedtime, halfLifeHours: pill))
+        XCTAssertFalse(CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: 600, mg: 60), to: [coffee], bedtime: bedtime, halfLifeHours: pill, wake: wake))
+        // The cutoff for the 140 mg reference coffee is never before 3 hours after waking.
+        XCTAssertEqual(CaffeineModel.cutoff(bedtime: bedtime, halfLifeHours: pill, mg: 140, wake: wake), 660)
+        XCTAssertGreaterThanOrEqual(CaffeineModel.largestDose(at: wake, bedtime: bedtime, halfLifeHours: pill, wake: wake), 200)
+        XCTAssertEqual(CaffeineModel.latestTime(forMg: 140, bedtime: bedtime, halfLifeHours: pill, notBefore: wake, wake: wake), 660)
+        // Past 200 mg in the morning, or in the afternoon, it counts again.
+        XCTAssertTrue(CaffeineModel.tooMuchAtBedtime(doses: [coffee, CaffeineDose(time: 560, mg: 200)], bedtime: bedtime, halfLifeHours: pill, wake: wake))
+        XCTAssertTrue(CaffeineModel.wouldBeTooMuch(adding: CaffeineDose(time: 900, mg: 140), to: [coffee], bedtime: bedtime, halfLifeHours: pill, wake: wake))
     }
 
     func testLateWakeWindowIsNeverInverted() {

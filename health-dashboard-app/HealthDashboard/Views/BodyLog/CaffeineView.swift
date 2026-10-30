@@ -77,7 +77,7 @@ struct CaffeineView: View {
     /// The biggest drink that still fits now (mg, in 5s).
     private var roomNow: Int {
         CaffeineModel.largestDose(at: model.now, bedtime: model.bedtimeTonight, existing: model.caffeineDoses,
-                                  halfLifeHours: model.caffeineHalfLifeHours)
+                                  halfLifeHours: model.caffeineHalfLifeHours, wake: model.caffeineWakeTime)
     }
 
     private var pairs: [StatPair] {
@@ -257,7 +257,10 @@ struct CaffeineBodyView: View {
             SampleDataBanner()
             chartCard(points)
             RowCard {
-                ExpandRow(title: "At bedtime", summary: "About \(model.caffeineAtBedtime) mg \u{00B7} goal under \(bedtimeGoal) mg",
+                ExpandRow(title: "At bedtime",
+                          summary: model.caffeineAtBedtime >= bedtimeGoal && model.caffeineCountedAtBedtime < bedtimeGoal
+                              ? "About \(model.caffeineAtBedtime) mg \u{00B7} under the goal without your morning coffee"
+                              : "About \(model.caffeineAtBedtime) mg \u{00B7} goal under \(bedtimeGoal) mg",
                           systemImage: "moon.zzz.fill", accent: .yellow) {
                     Text(bedtimeNote)
                 }
@@ -273,7 +276,7 @@ struct CaffeineBodyView: View {
             }
             Card(density: .compact) {
                 HowWeGotThisLink(title: "Caffeine in your body",
-                                 method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 7 (one and a half times as long) on the combined pill, which slows how fast the liver clears it, from one small study; the ring and patch probably do the same. The app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below \(bedtimeGoal) mg by your bedtime, rounded down to the half hour. When that time comes before you\u{2019}re even up, there\u{2019}s no cutoff to show; instead the app works out the biggest single drink you could have soon after waking. Bigger drinks need to be earlier: the summary on the Caffeine screen checks your usual drink\u{2019}s real size.")
+                                 method: "Caffeine takes about 45 minutes to be fully absorbed, then about \(Int(model.caffeineHalfLifeHours)) hours for half of it to leave your body. That's 5 hours for most people (somewhere between 3 and 7), and about 7 (one and a half times as long) on the combined pill, which slows how fast the liver clears it, from one small study; the ring and patch probably do the same. The app uses the one that fits your birth control setting. We add up every drink you logged at the time you had it; drinks after midnight count toward the evening before, until \(Clock.format(AppDay.rolloverMinutes)). Your cutoff is the latest time a 12 oz drip coffee (140 mg) would drop below \(bedtimeGoal) mg by your bedtime, rounded down to the half hour. Your morning coffee or tea (up to \(CaffeineModel.lowerGuideMg) mg in the first \(Int(CaffeineModel.morningHours)) hours after you wake) never counts against you, so the cutoff is never earlier than that. Bigger drinks need to be earlier: the summary on the Caffeine screen checks your usual drink\u{2019}s real size.")
             }
         }
     }
@@ -313,7 +316,9 @@ struct CaffeineBodyView: View {
         var detail = AppModel.caffeineMeaning(mg: p.mg)
         if abs(p.time - bedtime) <= 10 {
             title += " \u{00B7} your bedtime"
-            detail += p.mg < Double(bedtimeGoal) ? " Under the \(bedtimeGoal) mg goal, so it shouldn't get in the way of deep sleep." : " Over \(bedtimeGoal) mg at bedtime makes sleep lighter, even if you fall asleep fine."
+            detail += p.mg < Double(bedtimeGoal) ? " Under the \(bedtimeGoal) mg goal, so it shouldn't get in the way of deep sleep."
+                : model.caffeineCountedAtBedtime < bedtimeGoal ? " Under the \(bedtimeGoal) mg goal, not counting your morning coffee."
+                : " Over \(bedtimeGoal) mg at bedtime can make sleep a little lighter, even if you fall asleep fine."
         } else if let cutoff, abs(p.time - cutoff) <= 10 {
             title += " \u{00B7} your cutoff"
             detail += " Caffeine after this is still in you at bedtime."
@@ -354,6 +359,7 @@ struct CaffeineBodyView: View {
 
     private var bedtimeNote: String {
         if model.caffeineAtBedtime < bedtimeGoal { return "Under the \(bedtimeGoal) mg goal. Good for deep sleep." }
+        if model.caffeineCountedAtBedtime < bedtimeGoal { return "Under the \(bedtimeGoal) mg goal, not counting your morning coffee." }
         if let cutoff = model.caffeineCutoffShown {
             return "Above the \(bedtimeGoal) mg goal. Next time, finish caffeine by \(Clock.format(cutoff))."
         }
@@ -482,7 +488,7 @@ struct CaffeineTimingView: View {
         if t >= timing.cutoff {
             let inDip = d.dip?.contains(t) == true ? " You're in your afternoon dip, so try daylight or a short break instead." : ""
             return (title, d.noWindow ? "Too late for a typical drink" : "After your cutoff",
-                    "Caffeine now would still be in your body at bedtime and make your sleep lighter.\(inDip)")
+                    "Caffeine now would still be in your body at bedtime, which can make sleep a little lighter.\(inDip)")
         }
         if let dip = d.dip, dip.contains(t) {
             return (title, "Afternoon dip", "Your natural energy low. Caffeine is still OK before your cutoff; daylight or a short break works too.")

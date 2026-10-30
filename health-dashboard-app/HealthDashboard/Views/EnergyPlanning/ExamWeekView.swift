@@ -169,7 +169,7 @@ struct ExamWeekView: View {
         } else {
             // The cutoff for a typical drink falls before she's up: no clock time.
             caffeineLine = model.caffeineNoCutoffShort + ", soon after you wake. "
-                + (model.caffeineLastsLonger ? "On your birth control, caffeine lasts \(model.caffeineLongerPhrase), so even a morning coffee leaves some at bedtime." : "Even a morning coffee leaves some at bedtime.")
+                + (model.caffeineLastsLonger ? "On your birth control, caffeine lasts \(model.caffeineLongerPhrase)." : "")
         }
         let heartLine = "Your resting heart rate may read a little high until after the \(exam.kind.lowercased()). Stress alone can do that. If you also feel unwell, rest."
         return (sleepLine, caffeineLine, heartLine)

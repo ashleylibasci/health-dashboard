@@ -433,18 +433,18 @@ struct ExamModeView: View {
 
     /// The exam-day coffee checked against that night's bedtime (Shah F1):
     /// the biggest drink at the coffee time that still clears, and a plain
-    /// word when any coffee then will cost some sleep.
+    /// plain word when a bigger one may make that night's sleep lighter.
     private func examCoffeeNote(_ d: ExamDayPlan) -> String {
         let bed = 1440 + store.data.bedtime
-        let largest = CaffeineModel.largestDose(at: d.caffeineBy, bedtime: bed, halfLifeHours: model.caffeineHalfLifeHours)
+        let largest = CaffeineModel.largestDose(at: d.caffeineBy, bedtime: bed, halfLifeHours: model.caffeineHalfLifeHours, wake: d.wake)
         let longer = model.caffeineLastsLonger ? " On your birth control caffeine lasts \(model.caffeineLongerPhrase)." : ""
         if largest >= 150 {
             return "Up to about \(largest) mg then still clears by bedtime."
         }
         if largest >= 25 {
-            return "Up to about \(largest) mg then clears by bedtime; a bigger one will cost some sleep tonight. Before an exam that can be worth it." + longer
+            return "Up to about \(largest) mg then clears by bedtime; a bigger one may make tonight\u{2019}s sleep a little lighter. Before an exam that can be worth it." + longer
         }
-        return "Even a small coffee then will cost some sleep tonight. Before an exam that can be worth it; keep it to one regular cup." + longer
+        return "Coffee then may make tonight\u{2019}s sleep a little lighter. Before an exam that can be worth it; keep it to one regular cup." + longer
     }
 
     private func dayDate(_ exam: UpcomingExam, _ offset: Int) -> Date {

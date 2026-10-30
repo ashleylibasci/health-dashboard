@@ -98,13 +98,50 @@ public enum CaffeineModel {
     /// The daily amount to stay under when you could be pregnant or are
     /// trying (ACOG), and the most in one go that's generally fine (EFSA).
     public static let lowerGuideMg = 200
-    /// Under this much at bedtime barely affects sleep. A meta-analysis of
-    /// sleep studies found a coffee (107 mg) needs about 8.8 hours before bed
-    /// and a 217 mg pre-workout about 13.2 hours to avoid losing sleep
-    /// (Gardiner et al. 2023); on this model both leave about 33–37 mg then.
-    /// (It was 25 mg, a guess stricter than the studies, which on the pill
-    /// left no time of day for a coffee.)
-    public static let bedtimeLimitMg = 35.0
+    /// The caffeine left at bedtime that the app treats as worth a mention.
+    /// A meta-analysis of sleep studies found a coffee (107 mg) needs about
+    /// 8.8 hours before bed and a 217 mg pre-workout about 13.2 hours to
+    /// avoid any measurable sleep loss (Gardiner et al. 2023); on this model
+    /// both leave about 33–37 mg then. That is where the effect reaches
+    /// zero, not where it starts to matter: 400 mg six hours before bed
+    /// (about 180 mg left) cost about an hour (Drake et al. 2013). With the
+    /// zero-effect line the pill's longer half-life flagged a 12 oz coffee
+    /// on waking for anyone awake under 15 hours, so the line is 50 mg
+    /// (Ashley, Oct 30, 2026; it was 25, then 35).
+    public static let bedtimeLimitMg = 50.0
+
+    /// A normal amount of caffeine (up to `lowerGuideMg`) in the first
+    /// `morningHours` after she wakes is never flagged or shrunk, whatever
+    /// her bedtime (Ashley, Oct 30, 2026). It still counts toward the mg
+    /// shown at bedtime; it just never triggers a warning or a smaller
+    /// suggestion.
+    public static let morningHours = 3.0
+    static var morningMinutes: Minutes { Minutes(morningHours * 60) }
+
+    /// Whether `t` falls in the morning allowance after waking at `wake`.
+    public static func isMorning(_ t: Minutes, wake: Minutes) -> Bool { t <= wake + morningMinutes }
+
+    /// The morning allowance (mg) left after these doses.
+    static func morningRoom(_ doses: [CaffeineDose], wake: Minutes?) -> Int {
+        guard let wake else { return 0 }
+        return max(0, lowerGuideMg - doses.filter { isMorning($0.time, wake: wake) }.map(\.mg).reduce(0, +))
+    }
+
+    /// Caffeine at bedtime that counts against `bedtimeLimitMg`: everything
+    /// except the morning allowance (the first `lowerGuideMg` had within
+    /// `morningHours` of `wake`). Without a wake time, all of it.
+    public static func countedAtBedtime(doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, wake: Minutes? = nil) -> Double {
+        guard let wake else { return atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours) }
+        var allowance = lowerGuideMg
+        var counted: [CaffeineDose] = []
+        for d in doses.sorted(by: { $0.time < $1.time }) {
+            guard isMorning(d.time, wake: wake), allowance > 0 else { counted.append(d); continue }
+            let free = min(d.mg, allowance)
+            allowance -= free
+            if d.mg > free { counted.append(CaffeineDose(time: d.time, mg: d.mg - free)) }
+        }
+        return atBedtime(doses: counted, bedtime: bedtime, halfLifeHours: halfLifeHours)
+    }
 
     /// Absorption starts the moment a drink is logged (a few minutes' worth
     /// at once), so a drink just logged never reads as 0 mg.
@@ -120,9 +157,12 @@ public enum CaffeineModel {
 
     /// Latest time for one drink of `mg` (100 by default) so under
     /// `bedtimeLimitMg` is left at bedtime, rounded down to the half hour.
-    public static func cutoff(bedtime: Minutes, halfLifeHours: Double = 5, mg: Double = 100) -> Minutes {
+    /// With `wake`, never before the end of the morning allowance for a
+    /// normal drink (up to `lowerGuideMg`).
+    public static func cutoff(bedtime: Minutes, halfLifeHours: Double = 5, mg: Double = 100, wake: Minutes? = nil) -> Minutes {
         let hours = halfLifeHours * log2(max(mg, bedtimeLimitMg) / bedtimeLimitMg) + 0.5
-        let raw = bedtime - Int(hours * 60)
+        var raw = bedtime - Int(hours * 60)
+        if let wake, mg <= Double(lowerGuideMg) { raw = max(raw, wake + morningMinutes) }
         return raw - ((raw % 30) + 30) % 30
     }
 
@@ -132,15 +172,18 @@ public enum CaffeineModel {
     }
 
     /// Dose-aware: whether these doses (sizes and times as logged) leave
-    /// `limitMg` or more in the body at bedtime.
-    public static func tooMuchAtBedtime(doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Bool {
-        atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours) >= limitMg
+    /// `limitMg` or more in the body at bedtime, not counting the morning
+    /// allowance when `wake` is given.
+    public static func tooMuchAtBedtime(doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg,
+                                        wake: Minutes? = nil) -> Bool {
+        countedAtBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours, wake: wake) >= limitMg
     }
 
     /// Whether adding `dose` to what's already been had would leave `limitMg`
     /// or more at bedtime ("this energy drink now would be too much").
-    public static func wouldBeTooMuch(adding dose: CaffeineDose, to doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Bool {
-        tooMuchAtBedtime(doses: doses + [dose], bedtime: bedtime, halfLifeHours: halfLifeHours, limitMg: limitMg)
+    public static func wouldBeTooMuch(adding dose: CaffeineDose, to doses: [CaffeineDose], bedtime: Minutes, halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg,
+                                      wake: Minutes? = nil) -> Bool {
+        tooMuchAtBedtime(doses: doses + [dose], bedtime: bedtime, halfLifeHours: halfLifeHours, limitMg: limitMg, wake: wake)
     }
 
     /// The latest time (to the minute) a drink of `mg` can be had so that,
@@ -148,13 +191,18 @@ public enum CaffeineModel {
     /// is left then. Nil when there is no such time: what's already been had
     /// uses the whole allowance, or the latest time is before `notBefore`
     /// (pass now, or the wake time when planning a day). Never a time that
-    /// has already gone by.
+    /// has already gone by. With `wake`, a drink that fits the morning
+    /// allowance can always be had until the allowance ends.
     public static func latestTime(forMg mg: Int, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5,
-                                  limitMg: Double = bedtimeLimitMg, notBefore: Minutes? = nil) -> Minutes? {
-        let already = atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours)
+                                  limitMg: Double = bedtimeLimitMg, notBefore: Minutes? = nil, wake: Minutes? = nil) -> Minutes? {
+        let already = countedAtBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours, wake: wake)
         let room = limitMg - already
-        guard room > 0 else { return nil }
-        let latest: Minutes
+        let morningEnd = wake.flatMap { mg <= morningRoom(doses, wake: $0) ? $0 + morningMinutes : nil }
+        guard room > 0 else {
+            if let morningEnd, notBefore.map({ morningEnd >= $0 }) ?? true { return morningEnd }
+            return nil
+        }
+        var latest: Minutes
         if Double(mg) < room {
             latest = bedtime
         } else {
@@ -162,19 +210,23 @@ public enum CaffeineModel {
             let dt = absorption / 2 + 60 * halfLifeHours * log2(Double(mg) / room)
             latest = bedtime - Int(dt.rounded(.up))
         }
+        if let morningEnd { latest = max(latest, morningEnd) }
         if let notBefore, latest < notBefore { return nil }
         return latest
     }
 
     /// The biggest drink (mg, rounded down to 5) that could be had at `t`
     /// and still leave under `limitMg` at bedtime, with what's already been
-    /// had. 0 when nothing fits.
-    public static func largestDose(at t: Minutes, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg) -> Int {
-        let room = limitMg - atBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours)
-        guard room > 0, bedtime > t else { return 0 }
+    /// had. 0 when nothing fits. With `wake`, in the morning it's at least
+    /// what's left of the morning allowance.
+    public static func largestDose(at t: Minutes, bedtime: Minutes, existing doses: [CaffeineDose] = [], halfLifeHours: Double = 5, limitMg: Double = bedtimeLimitMg,
+                                   wake: Minutes? = nil) -> Int {
+        let free = wake.map { isMorning(t, wake: $0) ? morningRoom(doses, wake: $0) : 0 } ?? 0
+        let room = limitMg - countedAtBedtime(doses: doses, bedtime: bedtime, halfLifeHours: halfLifeHours, wake: wake)
+        guard room > 0, bedtime > t else { return free - free % 5 }
         let perMg = amount(at: bedtime, doses: [CaffeineDose(time: t, mg: 1)], halfLifeHours: halfLifeHours)
-        guard perMg > 0 else { return 0 }
-        let mg = Int((room / perMg).rounded(.down)) - 1
+        guard perMg > 0 else { return free - free % 5 }
+        let mg = free + Int((room / perMg).rounded(.down)) - 1
         return max(0, mg - mg % 5)
     }
 

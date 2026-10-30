@@ -211,7 +211,7 @@ struct LogPage: View {
 
     private func cutoffText(now: Date) -> String {
         if showsWarning(now) {
-            return "Some of today\u{2019}s caffeine will still be in you at bedtime. It may make sleep lighter."
+            return "Some of today\u{2019}s caffeine will still be in you at bedtime. It may make sleep a little lighter."
         }
         if snapshot.isFromEarlierDay(now: now) {
             return "Open Health Dashboard on your iPhone for today\u{2019}s cutoff."

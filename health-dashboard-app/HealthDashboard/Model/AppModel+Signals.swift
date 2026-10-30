@@ -286,7 +286,7 @@ extension AppModel {
             out.append(.init(title: "Your heart was busy at rest", detail: "Your heart rate has been up while you were sitting still. Stress can do that, and so can caffeine, heat, a meal or getting sick\(heartCycleCause).", weight: 4, topic: .stress))
         }
         if caffeineTooMuchAtBedtime {
-            out.append(.init(title: "Caffeine that will still be around at bedtime", detail: "What you've had today leaves \(caffeineAtBedtime) mg at bedtime. It lightens sleep even when you can fall asleep.", weight: 3, topic: .caffeineCutoff))
+            out.append(.init(title: "Caffeine that will still be around at bedtime", detail: "What you've had today leaves \(caffeineAtBedtime) mg at bedtime. That can make sleep a little lighter, even if you fall asleep fine.", weight: 3, topic: .caffeineCutoff))
         }
         // Daylight for this app day (after midnight that's still yesterday's
         // count, not the new day's 0), and only once she's been up a while.

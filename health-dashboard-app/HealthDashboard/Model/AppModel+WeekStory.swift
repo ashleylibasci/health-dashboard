@@ -58,7 +58,7 @@ extension AppModel {
             }
             let cutoff = Clock.format(cutoffTime)
             return WeekGoal(title: "Last caffeine before \(cutoff)",
-                            detail: "On \(day) your last drink was at \(Clock.format(last)). Caffeine after \(cutoff) is still in your system at bedtime and makes sleep lighter.")
+                            detail: "On \(day) your last drink was at \(Clock.format(last)). Caffeine after \(cutoff) is still in your system at bedtime, which can make sleep a little lighter.")
         }
         if !w.wokeFromLightSleep {
             return WeekGoal(title: "Try the smart alarm on your Watch",

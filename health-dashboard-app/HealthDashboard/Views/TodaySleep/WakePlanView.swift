@@ -406,7 +406,7 @@ struct WakePlanView: View {
         WindDownRow(systemImage: "cup.and.saucer.fill", accent: .yellow, title: "Last caffeine", value: lastCaffeineText,
                     note: model.caffeineCutoffShown == nil
                         ? model.caffeineEarlyOnlyText
-                        : "Caffeine still in your body at bedtime makes sleep lighter, even if you fall asleep fine.",
+                        : "A lot of caffeine still in your body at bedtime can make sleep a little lighter. Your morning coffee is fine.",
                     topic: .caffeineCutoff)
         WindDownRow(systemImage: "lightbulb.fill", accent: .orange, title: "Dim lights, screens down", value: Clock.format(dimFrom),
                     note: "About 2 hours before you usually fall asleep. Bright light holds back your body's sleep signal.", topic: .windDown)
