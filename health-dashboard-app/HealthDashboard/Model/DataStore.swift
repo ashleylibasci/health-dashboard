@@ -198,6 +198,8 @@ struct AppData: Codable {
     var cycleHealthSaved: Set<String> = []
     /// Sleep and exam features: bedtime nudge, after-exam check-ins.
     var sleepExtras = SleepExtrasData()
+    /// At a glance tiles and other insights settings (D-P4).
+    var insights = InsightsData()
     /// The time zone she was in each day (midnight → identifier), the last
     /// 60 days, so travel days stay out of her baselines (E1).
     var timeZoneByDay: [Date: String] = [:]
@@ -266,6 +268,7 @@ struct AppData: Codable {
         savesCycleToHealth = get(.savesCycleToHealth, d.savesCycleToHealth)
         cycleHealthSaved = get(.cycleHealthSaved, d.cycleHealthSaved)
         sleepExtras = get(.sleepExtras, d.sleepExtras)
+        insights = get(.insights, d.insights)
         timeZoneByDay = get(.timeZoneByDay, d.timeZoneByDay)
     }
 

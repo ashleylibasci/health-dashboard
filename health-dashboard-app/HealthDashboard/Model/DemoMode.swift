@@ -33,6 +33,8 @@ import HealthCore
 ///   exam weeks, so Patterns has something to find (D-P2).
 /// - `-demoWeekStory`: as if it were Sunday evening, so "Your week" on
 ///   Today is marked new (D-P1).
+/// - `-demoTiles pill,energy,caffeine,water`: those At a glance tiles
+///   pinned, in that order (D-P4).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -80,8 +82,10 @@ enum DemoMode {
     static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     static let patterns = args.contains("-demoPatterns")
     static let weekStoryOut = args.contains("-demoWeekStory")
+    static let tiles = value(after: "-demoTiles")
     #else
     static let patterns = false, weekStoryOut = false
+    static let tiles: String? = nil
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let pillHistory = false
     static let pillEvent: String? = nil
@@ -152,6 +156,7 @@ enum DemoMode {
         if exams { addExams(to: &data, today: today, calendar: cal) }
         if fuel { seedFuelLogs(&data, today: today, calendar: cal) }
         if patterns { seedPatterns(&data, today: today, calendar: cal) }
+        if let tiles { data.insights.glanceTiles = tiles.split(separator: ",").map(String.init) }
         if cycle == "pill", pillHistory { seedPillHistory(&data, today: today, calendar: cal) }
         if cycle == "pill", let pillEvent { seedPillEvent(pillEvent, &data, today: today, calendar: cal) }
         data.onboarded = true

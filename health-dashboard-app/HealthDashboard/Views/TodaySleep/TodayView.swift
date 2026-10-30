@@ -37,6 +37,8 @@ struct TodayView: View {
     /// True while the recovery ring waits, empty, for the reveal.
     @State private var revealing = false
     @State private var revealed = 0
+    /// The At a glance editor is open (D-P4).
+    @State private var editingTiles = false
     /// The Sunday whose week story she last opened (D-P1).
     @AppStorage("weekStorySeen") private var weekStorySeen = ""
 
@@ -483,7 +485,8 @@ struct TodayView: View {
     /// pack she's set (combined pill).
     @ViewBuilder
     private var pillRow: some View {
-        if model.pillToday != nil {
+        // Not twice: a pinned Pill tile takes its place (D-P4).
+        if model.pillToday != nil, model.pinnedGlanceTiles?.contains(.pill) != true {
             RowCard { PillTodayRow() }
         }
     }
@@ -747,45 +750,100 @@ struct TodayView: View {
         model.sleepDebt >= 15 ? Clock.duration(model.sleepDebt) : "None"
     }
 
+    /// Her pinned tiles in her order (D-P4), or the automatic four. A long
+    /// press on any tile opens the editor.
+    private var tiles: some View {
+        Group {
+            if let pinned = model.pinnedGlanceTiles {
+                pinnedTiles(pinned)
+            } else {
+                automaticTiles
+            }
+        }
+        .sheet(isPresented: $editingTiles) {
+            GlanceTilesEditor()
+                .environmentObject(model)
+                .environmentObject(store)
+        }
+    }
+
+    /// Two columns in her order (the last one alone if odd), or one at
+    /// accessibility text sizes.
+    @ViewBuilder
+    private func pinnedTiles(_ pinned: [GlanceTile]) -> some View {
+        if typeSize.isAccessibilitySize {
+            VStack(spacing: Space.m) {
+                ForEach(pinned) { tile($0) }
+            }
+        } else {
+            Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
+                ForEach(Array(stride(from: 0, to: pinned.count, by: 2)), id: \.self) { i in
+                    GridRow {
+                        tile(pinned[i])
+                        if i + 1 < pinned.count {
+                            tile(pinned[i + 1])
+                        } else {
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tile(_ kind: GlanceTile) -> some View {
+        Group {
+            switch kind {
+            case .sleepDebt: sleepTile
+            case .caffeine: caffeineTile
+            case .water: waterTile
+            case .stress: stressTile
+            case .energy: energyTile
+            case .pill: pillTile
+            }
+        }
+        .tileEditMenu { editingTiles = true }
+    }
+
     /// Two columns, or one at accessibility text sizes so titles and
     /// values aren't cut off. In the afternoon energy now and caffeine
     /// come first.
     @ViewBuilder
-    private var tiles: some View {
+    private var automaticTiles: some View {
         let afternoon = shownMoment == .afternoon
         if typeSize.isAccessibilitySize {
             VStack(spacing: Space.m) {
                 if afternoon {
-                    fourthTile
-                    caffeineTile
-                    waterTile
-                    sleepTile
+                    tile(fourth)
+                    tile(.caffeine)
+                    tile(.water)
+                    tile(.sleepDebt)
                 } else {
-                    sleepTile
-                    caffeineTile
-                    waterTile
-                    fourthTile
+                    tile(.sleepDebt)
+                    tile(.caffeine)
+                    tile(.water)
+                    tile(fourth)
                 }
             }
         } else {
             Grid(horizontalSpacing: Space.m, verticalSpacing: Space.m) {
                 if afternoon {
                     GridRow {
-                        fourthTile
-                        caffeineTile
+                        tile(fourth)
+                        tile(.caffeine)
                     }
                     GridRow {
-                        waterTile
-                        sleepTile
+                        tile(.water)
+                        tile(.sleepDebt)
                     }
                 } else {
                     GridRow {
-                        sleepTile
-                        caffeineTile
+                        tile(.sleepDebt)
+                        tile(.caffeine)
                     }
                     GridRow {
-                        waterTile
-                        fourthTile
+                        tile(.water)
+                        tile(fourth)
                     }
                 }
             }
@@ -794,14 +852,7 @@ struct TodayView: View {
 
     /// Stress in the morning; from noon, energy now takes its slot (D-T3):
     /// the most "right now" number, otherwise two taps deep on Body.
-    @ViewBuilder
-    private var fourthTile: some View {
-        if clock >= 12 * 60 {
-            energyTile
-        } else {
-            stressTile
-        }
-    }
+    private var fourth: GlanceTile { clock >= 12 * 60 ? .energy : .stress }
 
     private var energyTile: some View {
         NavigationLink {
@@ -851,6 +902,24 @@ struct TodayView: View {
                        accent: .orange, systemImage: "waveform.path")
         }
         .buttonStyle(.pressable)
+    }
+
+    /// Today's pill (D-P4): pack day and whether it's taken; opens Cycle.
+    private var pillTile: some View {
+        let pill = model.pillToday
+        let value = pill.map { $0.isPillDay ? "\($0.packDay) of \($0.packLength)" : "Break" } ?? "\u{2013}"
+        let note: String = {
+            guard let pill else { return "" }
+            if let taken = pill.taken { return "Taken \(Clock.format(Clock.minutesOfDay(taken)))" }
+            return pill.isPillDay ? "Not taken yet" : "No pill today"
+        }()
+        return NavigationLink {
+            CycleView()
+        } label: {
+            MetricTile(title: "Pill", value: value, note: note, accent: .pink, systemImage: "pills.fill")
+        }
+        .buttonStyle(.pressable)
+        .accessibilityHint("Opens your cycle and pack")
     }
 }
 
@@ -1117,6 +1186,15 @@ private struct MiniGauge: View {
         case .worse: Accent.coral.ink(scheme)
         case .better: Accent.mint.ink(scheme)
         case .neutral: p.tertiary
+        }
+    }
+}
+
+private extension View {
+    /// Long-press a tile → Edit tiles (D-P4).
+    func tileEditMenu(_ edit: @escaping () -> Void) -> some View {
+        contextMenu {
+            Button("Edit tiles", systemImage: "square.grid.2x2", action: edit)
         }
     }
 }
