@@ -44,6 +44,9 @@ import HealthCore
 /// - `-demoEveningDim`: the evening dim at full, whatever the time (D-M6).
 /// - `-demoSkyPhase sunrise|day|sunset|night`: the Sky theme, held at that
 ///   phase.
+/// - `-demoZoom recovery|tonight|water|caffeine`: that Today card grows
+///   into its screen 3 seconds after launch and shrinks back 6 seconds
+///   later (D-M1). Add `-UIAnimationDragCoefficient 6` to slow it down.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -102,7 +105,9 @@ enum DemoMode {
     static let bedtimeNudge = args.contains("-demoBedtimeNudge")
     static let eveningDim = args.contains("-demoEveningDim")
     static let skyPhase = value(after: "-demoSkyPhase").flatMap(SkyPhase.init(rawValue:))
+    static let zoom = value(after: "-demoZoom")
     #else
+    static let zoom: String? = nil
     static let skyPhase: SkyPhase? = nil
     static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
