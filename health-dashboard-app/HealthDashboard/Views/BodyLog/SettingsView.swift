@@ -124,9 +124,12 @@ struct SettingsView: View {
         return on.joined(separator: ", ") + ", quick-log drinks"
     }
 
+    /// The moments that are on (D-N4): "Morning, bedtime", or "Off".
     private var notificationsNote: String {
-        let on = [store.data.sickAlerts, store.data.peakDipNudges].filter { $0 }.count
-        return on == 0 ? "Off" : "\(on) of 2 on"
+        let d = store.data
+        let on = [("morning", d.insights.morningNote), ("daytime", d.peakDipNudges || d.sickAlerts),
+                  ("bedtime", d.sleepExtras.bedtimeNudge)].filter(\.1).map(\.0).joined(separator: ", ")
+        return on.isEmpty ? "Off" : on.prefix(1).uppercased() + on.dropFirst()
     }
 
     static func setupName(_ setup: AppData.CycleSetup) -> String {

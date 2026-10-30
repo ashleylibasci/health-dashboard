@@ -5,8 +5,11 @@ import SwiftUI
 /// shades. Light inks pass 4.5:1 on white and on their own tint; light
 /// fills pass 3:1 on white, so a thin chart line or ring arc stays visible.
 /// Purple sits at hue 304° (OKLCH) so it no longer reads as a second indigo.
+/// Berry (alcohol, D-P5) is a deep magenta at hue 340–351°: in OKLab it is
+/// further from pink (ΔE 15.7 light, 13.7 dark) than pink is from coral
+/// (9.4, 11.2), and stays so with deuteranopia and protanopia simulated.
 enum Accent: CaseIterable {
-    case indigo, purple, coral, pink, mint, yellow, blue, orange
+    case indigo, purple, coral, pink, mint, yellow, blue, orange, berry
 
     /// Text, thin strokes and icons.
     func ink(_ scheme: ColorScheme) -> Color {
@@ -19,6 +22,7 @@ enum Accent: CaseIterable {
         case (.yellow, .dark): Color(hex: 0xFFD666)
         case (.blue, .dark): Color(hex: 0x6FB8FF)
         case (.orange, .dark): Color(hex: 0xFFB866)
+        case (.berry, .dark): Color(hex: 0xE08CC8)
         case (.indigo, _): Color(hex: 0x3E4CC9)
         case (.purple, _): Color(hex: 0x7440C0)
         case (.coral, _): Color(hex: 0xA84B24)
@@ -27,6 +31,7 @@ enum Accent: CaseIterable {
         case (.yellow, _): Color(hex: 0x7A5600)
         case (.blue, _): Color(hex: 0x1A5CA8)
         case (.orange, _): Color(hex: 0xA85A00)
+        case (.berry, _): Color(hex: 0x7A1A4E)
         }
     }
 
@@ -41,6 +46,7 @@ enum Accent: CaseIterable {
         case (.yellow, .dark): Color(hex: 0xFFD666)
         case (.blue, .dark): Color(hex: 0x6FB8FF)
         case (.orange, .dark): Color(hex: 0xFFA94D)
+        case (.berry, .dark): Color(hex: 0xC455A4)
         case (.indigo, _): Color(hex: 0x5B6BE8)
         case (.purple, _): Color(hex: 0x8A4FD6)
         case (.coral, _): Color(hex: 0xD9653F)
@@ -49,6 +55,7 @@ enum Accent: CaseIterable {
         case (.yellow, _): Color(hex: 0xB88A00)
         case (.blue, _): Color(hex: 0x2F86DB)
         case (.orange, _): Color(hex: 0xD2700A)
+        case (.berry, _): Color(hex: 0x9A2A68)
         }
     }
 
@@ -71,6 +78,7 @@ enum Accent: CaseIterable {
         case .yellow: return Color(hex: 0x7A5600)
         case .blue: return Color(hex: 0x1A5CA8)
         case .orange: return Color(hex: 0x8A4A00)
+        case .berry: return Color(hex: 0x6E1846)
         }
     }
 

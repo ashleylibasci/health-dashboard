@@ -1240,7 +1240,7 @@ final class AppModel: ObservableObject {
         }
 
         let turnedOn = (new.peakDipNudges && !old.peakDipNudges) || (new.sickAlerts && !old.sickAlerts)
-        let finishedSetup = new.onboarded && !old.onboarded && (new.peakDipNudges || new.sickAlerts)
+        let finishedSetup = new.onboarded && !old.onboarded && (new.peakDipNudges || new.sickAlerts || new.insights.morningNote)
         if turnedOn || finishedSetup {
             Task {
                 await Nudges.requestPermission()
@@ -1293,6 +1293,7 @@ final class AppModel: ObservableObject {
         }
         await updateAlarmNudge()
         await updateBedtimeNudge()
+        await updateMorningNote()
     }
 
     // MARK: Smart alarm on the Watch

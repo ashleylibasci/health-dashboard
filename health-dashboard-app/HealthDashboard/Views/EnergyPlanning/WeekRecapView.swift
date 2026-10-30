@@ -20,14 +20,6 @@ struct WeekRecapView: View {
     /// The one "met her need" rule used everywhere (within 15 minutes).
     private func met(_ asleep: Int, _ need: Int) -> Bool { SleepNeedEstimator.metNeed(asleep: asleep, need: need) }
 
-    /// Caffeine that day was more than the night could clear: after her
-    /// cutoff, or (when the cutoff falls before she's up) more than one small
-    /// early drink.
-    private func caffeineTooLate(_ d: DaySummary) -> Bool {
-        if let cutoff = model.caffeineCutoffShown { return (d.lastCaffeine ?? 0) > cutoff }
-        return d.caffeineMg > model.caffeineLargestDoseAtWake
-    }
-
     var body: some View {
         Screen(title: "Your week", accent: .indigo) {
             SampleDataBanner()
@@ -213,7 +205,7 @@ struct WeekRecapView: View {
             RecapDayFact(label: "Woke in", value: d.wokeFromLightSleep ? "Light sleep" : "Deep sleep",
                     sub: d.wokeFromLightSleep ? "at a cycle end" : "mid-cycle", ok: d.wokeFromLightSleep),
             RecapDayFact(label: "Daylight", value: "\(d.daylightMinutes) min", sub: "aim for 20+", ok: d.daylightMinutes >= 20),
-            RecapDayFact(label: "Caffeine", value: "\(d.caffeineMg) mg", sub: caffeineSub, ok: !caffeineTooLate(d)),
+            RecapDayFact(label: "Caffeine", value: "\(d.caffeineMg) mg", sub: caffeineSub, ok: !model.caffeineTooLate(d)),
         ]
     }
 
@@ -234,7 +226,7 @@ struct WeekRecapView: View {
         if met(d.asleep, need) { good.append("a full night") } else { bad.append("\(Clock.duration(need - d.asleep)) short of your need") }
         if d.wokeFromLightSleep { good.append("a light-sleep wake") } else { bad.append("an alarm that hit deep sleep") }
         if d.daylightMinutes >= 20 { good.append("\(d.daylightMinutes) min of daylight") } else { bad.append("only \(d.daylightMinutes) min of daylight") }
-        if let last = d.lastCaffeine, caffeineTooLate(d) {
+        if let last = d.lastCaffeine, model.caffeineTooLate(d) {
             bad.append(model.caffeineCutoffShown == nil ? "\(d.caffeineMg) mg of caffeine" : "caffeine at \(Clock.format(last))")
         }
         if d.bedtime >= lateBedtime { bad.append("a \(Clock.format(d.bedtime)) bedtime") }
@@ -300,43 +292,8 @@ struct WeekRecapView: View {
 
     // MARK: Goal
 
-    private struct Goal {
-        var title: String
-        var detail: String
-    }
-
-    private func goal(_ recap: WeekRecap, need: Int) -> Goal {
-        let w = recap.worst
-        let night = weekday(dayBefore(w.date), .wide)
-        let day = weekday(w.date, .wide)
-        if w.bedtime >= lateBedtime {
-            let target = max(store.data.bedtime, ((w.bedtime - 60) / 30) * 30)
-            return Goal(title: "Keep \(night) bedtime before \(Clock.format(target))",
-                        detail: "Last \(night) night it was \(Clock.format(w.bedtime)). In bed by \(Clock.format(target)), you get more of your sleep need before your alarm, and more of the deep sleep that comes early in the night.")
-        }
-        if let last = w.lastCaffeine, caffeineTooLate(w) {
-            guard let cutoffTime = model.caffeineCutoffShown else {
-                return Goal(title: model.caffeineNoCutoffShort,
-                            detail: "On \(day) you had \(w.caffeineMg) mg. " + model.caffeineEarlyOnlyText)
-            }
-            let cutoff = Clock.format(cutoffTime)
-            return Goal(title: "Last caffeine before \(cutoff)",
-                        detail: "On \(day) your last drink was at \(Clock.format(last)). Caffeine after \(cutoff) is still in your system at bedtime and makes sleep lighter.")
-        }
-        if !w.wokeFromLightSleep {
-            return Goal(title: "Try the smart alarm on your Watch",
-                        detail: "On \(day) you woke from deep sleep. The smart alarm wakes you when you start stirring in the 25 minutes before your latest wake time, which can feel a bit easier.")
-        }
-        if w.asleep < need - 30 {
-            return Goal(title: "Get \(Clock.duration(need)) on \(night) night",
-                        detail: "Last \(night) night you slept \(Clock.duration(w.asleep)), \(Clock.duration(need - w.asleep)) short of your need.")
-        }
-        return Goal(title: "20 minutes of daylight before noon",
-                    detail: "Your days averaged \(recap.averageDaylight) min. Morning light is the strongest signal your body clock gets.")
-    }
-
     private func goalRow(_ recap: WeekRecap, need: Int) -> some View {
-        let g = goal(recap, need: need)
+        let g = model.weekGoal(recap, need: need)
         let current = store.data.weeklyGoal
         let isOn = current == g.title
         let worstLabel = "Last \(weekday(recap.worst.date, .abbreviated))"

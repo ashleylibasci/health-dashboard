@@ -53,7 +53,7 @@ struct PourTile: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(Self.drinksText(pour.standardDrinks))
                     .font(.small).fontWeight(.semibold)
-                    .foregroundStyle(Accent.purple.ink(scheme))
+                    .foregroundStyle(Accent.berry.ink(scheme))
             }
             Group {
                 if ax {
@@ -73,8 +73,8 @@ struct PourTile: View {
             .frame(maxWidth: .infinity, minHeight: ax ? Sizes.minTap : 96)
             .padding(.vertical, Space.s)
             .padding(.horizontal, Space.xs)
-            .background(selected ? Accent.purple.fill(scheme).opacity(0.22) : p.chip, in: shape)
-            .overlay(shape.strokeBorder(selected ? Accent.purple.fill(scheme) : p.cardBorder, lineWidth: selected ? 2 : 1))
+            .background(selected ? Accent.berry.fill(scheme).opacity(0.22) : p.chip, in: shape)
+            .overlay(shape.strokeBorder(selected ? Accent.berry.fill(scheme) : p.cardBorder, lineWidth: selected ? 2 : 1))
             .motion(.select, value: selected)
         }
         .buttonStyle(.pressable)
@@ -91,7 +91,7 @@ struct PourPicture: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        let ink = Accent.purple.fill(scheme)
+        let ink = Accent.berry.fill(scheme)
         Group {
             switch picture {
             case .glass:
@@ -124,7 +124,7 @@ struct PourPicture: View {
 
     private func can(height: CGFloat) -> some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 3).fill(Accent.purple.fill(scheme))
+            RoundedRectangle(cornerRadius: 3).fill(Accent.berry.fill(scheme))
             RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.55)).frame(height: 2).padding(.top, 3).padding(.horizontal, 2)
         }
         .frame(width: 16, height: height)

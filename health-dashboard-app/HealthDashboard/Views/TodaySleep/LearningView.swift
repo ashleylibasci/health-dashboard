@@ -82,6 +82,11 @@ struct LearningView: View {
                     LearningRow(item: item)
                 }
             }
+            RowCard {
+                let found = model.patternFactors.filter { $0.sentence != nil }.count
+                MetricRow(title: "Patterns", note: found == 0 ? "Nothing clear yet" : "\(found) found in your nights",
+                          systemImage: "sparkle.magnifyingglass", accent: .indigo) { PatternsView() }
+            }
         }
     }
 

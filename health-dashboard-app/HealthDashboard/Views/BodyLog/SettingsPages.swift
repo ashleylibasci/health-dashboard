@@ -321,7 +321,7 @@ struct TrackingSettingsView: View {
                     .disabled(model.caloriesHiddenByCondition)
                 Divider().overlay(p.cardBorder)
                 SettingToggleRow(title: "Alcohol tracking", detail: "How alcohol affects sleep and recovery. Off hides alcohol on the Log tab.",
-                                 systemImage: "wineglass.fill", accent: .purple, isOn: $store.data.drinksTracking)
+                                 systemImage: "wineglass.fill", accent: .berry, isOn: $store.data.drinksTracking)
                 Divider().overlay(p.cardBorder)
                 LinkRow(title: "Quick-log drinks",
                         subtitle: store.data.savedDrinks.isEmpty ? "None saved yet" : store.data.savedDrinks.map(\.name).joined(separator: ", "),
@@ -335,30 +335,76 @@ struct TrackingSettingsView: View {
 
 // MARK: - Notifications
 
-/// The app's two alerts. Their only switches are here.
+/// Notifications by moment, not by feature (D-N4): Morning, Daytime and
+/// Bedtime, one switch each, saying what that moment sends. The pill
+/// reminder keeps its own switch with the pack (one row here points to
+/// it), so no moment switch can silence it.
 struct NotificationSettingsView: View {
+    @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     /// Notifications are switched off for the app in iOS Settings while a
-    /// nudge or alert toggle is on.
+    /// moment is on.
     @State private var notificationsBlocked = false
 
     var body: some View {
         Screen(title: "Notifications", accent: .coral) {
             Card(density: .compact) {
-                SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when several overnight signals say you may be getting sick.",
-                                 systemImage: "thermometer.medium", accent: .coral, isOn: $store.data.sickAlerts)
+                SettingToggleRow(title: "Morning",
+                                 detail: "One note about 45 minutes after you wake: your recovery, pill day and tonight's bedtime, with Log latte and +1 bottle.",
+                                 systemImage: "sun.max.fill", accent: .orange, isOn: morning)
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
-                SettingToggleRow(title: "Peak and dip alerts", detail: "A notification 15 minutes before your focus peak and afternoon dip, once your own sleep is in.",
-                                 systemImage: "bolt.fill", accent: .mint, isOn: $store.data.peakDipNudges)
+                SettingToggleRow(title: "Daytime",
+                                 detail: "15 minutes before your focus peak and afternoon dip, and a sick alert (at most once a day) when several overnight signals are off.",
+                                 systemImage: "bolt.fill", accent: .mint, isOn: daytime)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
+                SettingToggleRow(title: "Bedtime",
+                                 detail: "\u{201C}Lights low, screens down\u{201D} \(BedtimeNudge.lead) minutes before bed, with Turn on Watch alarm when it's off.",
+                                 systemImage: "moon.haze.fill", accent: .purple, isOn: bedtime)
                 if notificationsBlocked {
                     blockedNote
                 }
             }
+            if store.birthControl == .combinedPill {
+                RowCard {
+                    MetricRow(title: "Pill reminder", note: pillNote, systemImage: "pills.fill", accent: .pink) {
+                        CycleSettingsView()
+                    }
+                }
+            }
         }
         .task { await checkNotifications() }
-        .onChange(of: store.data.peakDipNudges) { _, on in toggleChanged(on) }
-        .onChange(of: store.data.sickAlerts) { _, on in toggleChanged(on) }
+    }
+
+    // MARK: Switches
+
+    private var morning: Binding<Bool> {
+        Binding(get: { store.data.insights.morningNote }, set: { on in
+            store.data.insights.morningNote = on
+            changed(on) { await model.updateMorningNote() }
+        })
+    }
+
+    /// Peak and dip alerts and the sick alert together. Either on counts as on.
+    private var daytime: Binding<Bool> {
+        Binding(get: { store.data.peakDipNudges || store.data.sickAlerts }, set: { on in
+            store.data.peakDipNudges = on
+            store.data.sickAlerts = on
+            changed(on) {}
+        })
+    }
+
+    /// The bedtime nudge (H-C4), also in Sleep & alarm.
+    private var bedtime: Binding<Bool> {
+        Binding(get: { store.data.sleepExtras.bedtimeNudge }, set: { on in
+            store.data.sleepExtras.bedtimeNudge = on
+            changed(on) { await model.updateBedtimeNudge() }
+        })
+    }
+
+    /// "On · 9pm, set with your pack"
+    private var pillNote: String {
+        store.data.pillReminder ? "On \u{00B7} \(Clock.format(store.data.pillTime)), set with your pack" : "Off \u{00B7} set with your pack"
     }
 
     private var blockedNote: some View {
@@ -379,17 +425,19 @@ struct NotificationSettingsView: View {
         .padding(.vertical, 4)
     }
 
-    /// Turning a nudge or alert on asks for notification permission (the
-    /// system prompt only shows the first time).
-    private func toggleChanged(_ on: Bool) {
+    /// Turning a moment on asks for notification permission (the system
+    /// prompt only shows the first time), then reschedules.
+    private func changed(_ on: Bool, reschedule: @escaping () async -> Void) {
         Task {
             if on { await Nudges.requestPermission() }
+            await reschedule()
             await checkNotifications()
         }
     }
 
     private func checkNotifications() async {
-        let wanted = store.data.peakDipNudges || store.data.sickAlerts
+        let wanted = store.data.insights.morningNote || store.data.peakDipNudges || store.data.sickAlerts
+            || store.data.sleepExtras.bedtimeNudge
         notificationsBlocked = wanted ? !(await Nudges.isAllowed()) : false
     }
 }

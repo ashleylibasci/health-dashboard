@@ -30,6 +30,17 @@ import HealthCore
 ///   Activity right away, with that Watch alarm state.
 /// - `-demoHelloCard`: the day-3 hello card on Today, whatever day it is.
 /// - `-demoReading`: setup's last step finds a month of nights and HRV.
+/// - `-demoPatterns` (with `-demoCycle`): two months of morning check-ins
+///   with tags (late study, parties, workouts, a sick week) and three past
+///   exam weeks, so Patterns has something to find (D-P2).
+/// - `-demoWeekStory`: as if it were Sunday evening, so "Your week" on
+///   Today is marked new (D-P1).
+/// - `-demoTiles pill,energy,caffeine,water`: those At a glance tiles
+///   pinned, in that order (D-P4).
+/// - `-demoMorningNote`: the morning note 10 seconds after launch, from
+///   the example numbers, with its Log latte and +1 bottle buttons (D-N1).
+/// - `-demoBedtimeNudge`: the bedtime nudge 10 seconds after launch, with
+///   its Turn on Watch alarm button (D-N2).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -81,7 +92,15 @@ enum DemoMode {
     /// `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
     /// Activity straight away, with that Watch alarm state.
     static let bedtimeActivity = value(after: "-demoBedtimeActivity")
+    static let patterns = args.contains("-demoPatterns")
+    static let weekStoryOut = args.contains("-demoWeekStory")
+    static let tiles = value(after: "-demoTiles")
+    static let morningNote = args.contains("-demoMorningNote")
+    static let bedtimeNudge = args.contains("-demoBedtimeNudge")
     #else
+    static let morningNote = false, bedtimeNudge = false
+    static let patterns = false, weekStoryOut = false
+    static let tiles: String? = nil
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let pillHistory = false, helloCard = false, reading = false
     static let pillEvent: String? = nil
@@ -151,6 +170,8 @@ enum DemoMode {
         }
         if exams { addExams(to: &data, today: today, calendar: cal) }
         if fuel { seedFuelLogs(&data, today: today, calendar: cal) }
+        if patterns { seedPatterns(&data, today: today, calendar: cal) }
+        if let tiles { data.insights.glanceTiles = tiles.split(separator: ",").map(String.init) }
         if cycle == "pill", pillHistory { seedPillHistory(&data, today: today, calendar: cal) }
         if cycle == "pill", let pillEvent { seedPillEvent(pillEvent, &data, today: today, calendar: cal) }
         data.onboarded = true
@@ -201,6 +222,28 @@ enum DemoMode {
         }
         data.waterLog = [AppData.WaterEntry(date: at(0, 10 * 60), ml: data.bottleSizeML)]
         data.symptomLog = data.flowLog.filter { $0.flow == .heavy }.map { AppData.SymptomEntry(date: $0.date, symptoms: ["Fatigue"]) }
+    }
+
+    /// `-demoPatterns`: a check-in most mornings of the last 60 days, with
+    /// late study every sixth, a party every seventh, a workout every third
+    /// and five sick mornings a month ago; and three past exams (unless
+    /// `-demoExams` set some).
+    private static func seedPatterns(_ data: inout AppData, today: Date, calendar cal: Calendar) {
+        data.checkIns = (1...60).compactMap { back -> AppData.CheckIn? in
+            guard back % 7 != 5, let day = cal.date(byAdding: .day, value: -back, to: today),
+                  let date = cal.date(byAdding: .minute, value: 8 * 60 + 20, to: day) else { return nil }
+            var tags: [String] = []
+            if back % 6 == 2 { tags.append(DayTag.lateStudy.rawValue) }
+            if back % 7 == 6 { tags.append(DayTag.party.rawValue) }
+            if back % 3 == 0 { tags.append(DayTag.workout.rawValue) }
+            if (30...35).contains(back) { tags.append(DayTag.sick.rawValue) }
+            return AppData.CheckIn(date: date, awake: 3 + back % 2, tags: tags)
+        }
+        if data.exams.isEmpty {
+            data.exams = [(-9, "STAT 400"), (-23, "ECON 201"), (-44, "BIOL 210")].compactMap { offset, title in
+                cal.date(byAdding: .day, value: offset, to: today).map { AppData.Exam(title: title, kind: "Midterm", date: $0, start: 600) }
+            }
+        }
     }
 
     /// `-demoPillHistory`: four packs before the current one (21 + 7, on

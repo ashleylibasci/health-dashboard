@@ -111,9 +111,12 @@ struct AppData: Codable {
     var birthControl: String?
     var conditions: [String] = []
     var showCalories = false
-    var sickAlerts = true
+    /// Off for new installs (D-N1: the morning note is the one nudge on
+    /// unless she turns others on). A save keeps what it has.
+    var sickAlerts = false
     var drinksTracking = true
-    var peakDipNudges = true
+    /// Off for new installs, as `sickAlerts`.
+    var peakDipNudges = false
     var ageYears: Int?
 
     /// Pill, ring or patch: the day she took pill 1 (or put in the ring /
@@ -198,6 +201,8 @@ struct AppData: Codable {
     var cycleHealthSaved: Set<String> = []
     /// Sleep and exam features: bedtime nudge, after-exam check-ins.
     var sleepExtras = SleepExtrasData()
+    /// At a glance tiles and other insights settings (D-P4).
+    var insights = InsightsData()
     /// The time zone she was in each day (midnight → identifier), the last
     /// 60 days, so travel days stay out of her baselines (E1).
     var timeZoneByDay: [Date: String] = [:]
@@ -215,10 +220,12 @@ struct AppData: Codable {
         birthControl = get(.birthControl, d.birthControl)
         conditions = get(.conditions, d.conditions)
         showCalories = get(.showCalories, d.showCalories)
-        sickAlerts = get(.sickAlerts, d.sickAlerts)
+        // Saves from before D-N1 had these on by default; one without the
+        // key keeps that.
+        sickAlerts = get(.sickAlerts, true)
         drinksTracking = get(.drinksTracking, d.drinksTracking)
         // `friendStreaks` from older saves is ignored.
-        peakDipNudges = get(.peakDipNudges, d.peakDipNudges)
+        peakDipNudges = get(.peakDipNudges, true)
         ageYears = get(.ageYears, d.ageYears)
         packStartDate = get(.packStartDate, d.packStartDate)
         packActiveDays = min(max(get(.packActiveDays, d.packActiveDays), 1), 28)
@@ -266,6 +273,7 @@ struct AppData: Codable {
         savesCycleToHealth = get(.savesCycleToHealth, d.savesCycleToHealth)
         cycleHealthSaved = get(.cycleHealthSaved, d.cycleHealthSaved)
         sleepExtras = get(.sleepExtras, d.sleepExtras)
+        insights = get(.insights, d.insights)
         timeZoneByDay = get(.timeZoneByDay, d.timeZoneByDay)
     }
 
