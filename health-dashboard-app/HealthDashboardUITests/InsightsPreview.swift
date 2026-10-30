@@ -234,25 +234,23 @@ final class InsightsPreview: XCTestCase {
         closeNotification()
     }
 
-    /// Starts on Body (with `-demoOpen`), so Today's live bedtime countdown
-    /// never keeps the app from idling in the hour before bed.
-    private func openSettingsFromBody() {
-        let back = app.navigationBars.buttons.firstMatch
-        if back.waitForExistence(timeout: 5) { back.tap() }
+    /// Settings from the Sleep tab's header.
+    private func openSettingsFromSleep() {
+        app.tabBars.buttons["Sleep"].tap()
         sleep(1)
         app.buttons["Settings and profile"].firstMatch.tap()
         sleep(1)
     }
 
     func testN4NotificationSettings() {
-        launch(["-demoOpen", "recovery"])
-        openSettingsFromBody()
+        launch([])
+        openSettingsFromSleep()
         scroll(to: "Notifications")
         shot("D-N4-1-settings-row")
         tap("Notifications")
         shot("D-N4-2-by-moment")
-        launch(["-demoOpen", "recovery"], appearance: "light")
-        openSettingsFromBody()
+        launch([], appearance: "light")
+        openSettingsFromSleep()
         tap("Notifications")
         shot("D-N4-3-by-moment-light")
     }
