@@ -122,10 +122,12 @@ struct BreakWeekMarks: ChartContent {
 }
 
 /// The key under a trend chart, for what isn't labelled on the plot:
-/// "Break week" for the shaded bands.
+/// "Break week" for the shaded bands, and on a comparison which line is
+/// which ("HRV (left)", "Resting HR (right)").
 struct ChartKey: View {
     struct Item: Hashable {
-        enum Mark: Hashable { case band }
+        /// A shaded band, the main line, or the faint compared line.
+        enum Mark: Hashable { case band, line(Accent), faintLine(Accent) }
         var label: String
         var mark: Mark
     }
@@ -147,12 +149,18 @@ struct ChartKey: View {
                 .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .strokeBorder(Accent.pink.fill(scheme).opacity(0.5)))
                 .frame(width: 14, height: 12)
+        case .line(let accent):
+            Capsule().fill(accent.ink(scheme)).frame(width: 14, height: 3)
+        case .faintLine(let accent):
+            Capsule().fill(accent.ink(scheme).opacity(0.55)).frame(width: 14, height: 2)
         }
     }
 
     private func spoken(_ item: Item) -> String {
         switch item.mark {
         case .band: "Shaded: \(item.label.lowercased())"
+        case .line: "Solid line: \(item.label)"
+        case .faintLine: "Faint line: \(item.label)"
         }
     }
 
