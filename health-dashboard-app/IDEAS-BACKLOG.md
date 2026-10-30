@@ -89,3 +89,10 @@ Effort: S about a day, M a few days, L a week or more. Value 1–5 for Ashley.
 - **D-A1 Rows instead of dials at the largest text** · effort S · value 4/5. At accessibility sizes, the three dials under recovery become MetricRows. Today drops from about 4 screens to about 2.5. *Why:* at the largest text size, Today is mostly stacked rings.
 - **D-A2 Quiet icons** · effort S · value 3/5. Hide decorative SF Symbols from VoiceOver everywhere (see flaws 11–12), and give each chart a one-sentence summary label. *Why:* VoiceOver currently reads "Search Document", "Waveform" and "love".
 
+
+## Built, previewed and dropped (Oct 29, 2026)
+
+Ashley saw these working and chose not to keep them. Each one's code is in git history (reverted, not lost) if she changes her mind.
+
+- **H-B4 Bedtime brain dump.** A "Tomorrow's list" box in tonight's sleep plan, cleared after a week. Commits d8b3d18 and 9e6ec91.
+- **H-D4 Drink size up or down.** A Size choice (small, regular, large, extra large, matching short, tall, grande, venti) on the caffeine card, scaling the mg. Commit d05931e.
