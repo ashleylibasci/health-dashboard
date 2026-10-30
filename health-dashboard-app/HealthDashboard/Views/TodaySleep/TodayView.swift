@@ -37,6 +37,8 @@ struct TodayView: View {
     /// True while the recovery ring waits, empty, for the reveal.
     @State private var revealing = false
     @State private var revealed = 0
+    /// The Sunday whose week story she last opened (D-P1).
+    @AppStorage("weekStorySeen") private var weekStorySeen = ""
 
     var body: some View {
         Screen(accent: .indigo) {
@@ -681,18 +683,30 @@ struct TodayView: View {
     private var glanceHeader: some View {
         // Last night's sleep and today's drinks, water and stress: not a
         // week (round 3). The week is behind "Your week".
+        // The week as five cards (D-P1), marked new on Sunday evening
+        // until she's opened it.
         SectionHeading(text: "At a glance") {
             NavigationLink {
-                WeekRecapView()
+                WeekStoryView()
+                    .onAppear { if model.weekStoryIsOut { weekStorySeen = model.weekStoryKey } }
             } label: {
-                Text("Your week")
-                    .font(.bodyEmphasis)
-                    .foregroundStyle(Accent.indigo.ink(scheme))
-                    .textLinkHitArea()
+                HStack(spacing: Space.xs) {
+                    if weekStoryIsNew {
+                        Circle().fill(Accent.indigo.fill(scheme)).frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                    }
+                    Text("Your week")
+                }
+                .font(.bodyEmphasis)
+                .foregroundStyle(Accent.indigo.ink(scheme))
+                .textLinkHitArea()
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(weekStoryIsNew ? "Your week, new" : "Your week")
         }
     }
+
+    private var weekStoryIsNew: Bool { model.weekStoryIsOut && weekStorySeen != model.weekStoryKey }
 
     // MARK: Tiles
 

@@ -31,6 +31,8 @@ import HealthCore
 /// - `-demoPatterns` (with `-demoCycle`): two months of morning check-ins
 ///   with tags (late study, parties, workouts, a sick week) and three past
 ///   exam weeks, so Patterns has something to find (D-P2).
+/// - `-demoWeekStory`: as if it were Sunday evening, so "Your week" on
+///   Today is marked new (D-P1).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -77,8 +79,9 @@ enum DemoMode {
     /// Activity straight away, with that Watch alarm state.
     static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     static let patterns = args.contains("-demoPatterns")
+    static let weekStoryOut = args.contains("-demoWeekStory")
     #else
-    static let patterns = false
+    static let patterns = false, weekStoryOut = false
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
     static let pillHistory = false
     static let pillEvent: String? = nil
