@@ -64,6 +64,63 @@ final class MotionPreview: XCTestCase {
         sleep(1)
     }
 
+    // MARK: D-M3
+
+    /// Scrolls the Log tab to the water card while `-demoLog` logs a latte,
+    /// then bottles up to the goal; the frames come from a screen
+    /// recording made alongside.
+    func testM3Logging() {
+        launch(["-demoTab", "log", "-demoLog"])
+        app.swipeUp(velocity: .slow)
+        sleep(30)
+        shot("D-M3-end")
+    }
+
+    // MARK: D-M4
+
+    /// HRV's trend drawing in, then switching ranges; Energy's Score and
+    /// Energy left. Frames come from a screen recording made alongside.
+    func testM4Charts() {
+        launch(["-demoOpen", "hrv"])
+        sleep(2)
+        app.buttons["Week"].firstMatch.tap()
+        sleep(2)
+        app.buttons["6 months"].firstMatch.tap()
+        sleep(2)
+        shot("D-M4-hrv-6months")
+        launch(["-demoOpen", "energy"])
+        sleep(2)
+        app.buttons["Energy left"].firstMatch.tap()
+        sleep(2)
+        app.buttons["Score"].firstMatch.tap()
+        sleep(2)
+        shot("D-M4-energy-score")
+    }
+
+    // MARK: D-M5
+
+    /// The answer joining the title as Recovery's summary scrolls away,
+    /// and leaving when it comes back; HRV at the largest text size.
+    func testM5PinnedAnswer() {
+        launch(["-demoOpen", "recovery"])
+        shot("D-M5-1")
+        app.swipeUp(velocity: .slow)
+        sleep(1)
+        shot("D-M5-2")
+        app.swipeUp(velocity: .slow)
+        sleep(1)
+        shot("D-M5-3")
+        app.swipeDown(velocity: .fast)
+        app.swipeDown(velocity: .fast)
+        sleep(1)
+        shot("D-M5-4")
+        launch(["-demoOpen", "hrv"], textSize: "UICTContentSizeCategoryAccessibilityXXXL")
+        app.swipeUp(velocity: .slow)
+        app.swipeUp(velocity: .slow)
+        sleep(1)
+        shot("D-M5-5-AX5")
+    }
+
     // MARK: D-M6
 
     func testM6EveningDim() {
