@@ -203,6 +203,9 @@ struct ChartReadout: View {
     /// Every note this readout can show while scrubbing (the one shown is
     /// added). The note area is as tall as the longest.
     var detailSlots: [String] = []
+    /// The qualifier's colour when it names a second measure ("· 71 bpm"
+    /// in resting HR pink, D-G4); nil uses `accent`.
+    var qualifierAccent: Accent? = nil
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -242,7 +245,7 @@ struct ChartReadout: View {
                 if let qualifier = parts.qualifier {
                     Text(qualifier)
                         .font(.secondary).fontWeight(.semibold)
-                        .foregroundStyle(accent.ink(scheme))
+                        .foregroundStyle((qualifierAccent ?? accent).ink(scheme))
                         .lineLimit(ax ? nil : 1)
                         .minimumScaleFactor(ax ? 1 : 0.8)
                 }

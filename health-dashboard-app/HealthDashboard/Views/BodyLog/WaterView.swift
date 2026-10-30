@@ -220,6 +220,14 @@ struct WaterDayView: View {
         }
     }
 
+    /// Where she is against a steady pace in a few words, for the chart's
+    /// one-sentence VoiceOver summary (D-A2); `status` has it in full.
+    private var paceWords: String {
+        let have = model.waterTodayML
+        if have >= goalML { return "goal reached" }
+        return model.waterPace(at: model.now) - have <= bottleML * 0.25 ? "on track for this time of day" : "behind a steady pace for this time of day"
+    }
+
     /// Where she is against a steady pace, in full (the chart's readout).
     private var status: String {
         let have = model.waterTodayML
@@ -301,7 +309,7 @@ struct WaterDayView: View {
                 .frame(height: 180)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(hidesGoal ? "Water today: \(LogFormat.oz(model.waterTodayML)) so far."
-                                    : "Water today: \(LogFormat.oz(model.waterTodayML)) so far of a \(LogFormat.oz(goalML)) goal. \(status)")
+                                    : "Water today: \(LogFormat.oz(model.waterTodayML)) so far of a \(LogFormat.oz(goalML)) goal, \(paceWords).")
                 .accessibilityChartDescriptor(ClockChartDescriptor(
                     title: "Water today", seriesName: "Water so far", yTitle: "Ounces",
                     points: run.map { ($0.time, $0.ml / LogFormat.mlPerOunce) },

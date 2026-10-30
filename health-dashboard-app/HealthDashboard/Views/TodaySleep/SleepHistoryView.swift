@@ -2,16 +2,23 @@ import SwiftUI
 import Charts
 import HealthCore
 
-/// Every night of the last week or month against her sleep need, plus averages.
+/// Every night of the last week or month, or each week of the last six
+/// months (D-G2), against her sleep need, with her break weeks shaded
+/// (D-G3), plus averages.
 struct SleepHistoryView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
-    @AppStorage("sleepHistory.range") private var rangeRaw = HistoryRange.week.rawValue
+    @AppStorage("sleepHistory.range") private var range: TrendRange = .week
+    /// The nights before the loaded ones, read when she picks 6M.
+    @State private var older: [NightRecord] = []
     @State private var selectedDay: Date? = nil
 
-    private var range: HistoryRange { HistoryRange(rawValue: rangeRaw) ?? .week }
-    private var nights: [NightRecord] { model.sleepHistoryNights(days: range.days) }
+    private var nights: [NightRecord] { model.trendNights(range, older: older) }
+    /// On 6M: each week's average time asleep.
+    private var weeks: [WeeklyAverage] {
+        WeeklyAverage.by(nights, date: \.wakeDay, value: { Double($0.asleepMinutes) })
+    }
     private var need: Int { model.sleepNeed.minutes }
 
     /// During the first 14 nights the history mixes example nights with hers.
@@ -29,11 +36,12 @@ struct SleepHistoryView: View {
     var body: some View {
         Screen(title: "Sleep history", accent: .purple) {
             SampleDataBanner()
-            AdaptiveSegmentedPicker("Range", selection: $rangeRaw, options: HistoryRange.allCases.map(\.rawValue), accent: .purple) { raw in
-                HistoryRange.allCases.first { $0.rawValue == raw }?.title ?? raw
-            }
-            .padding(.top, 4)
-            .onChange(of: rangeRaw) { selectedDay = nil }
+            TrendRangePicker(range: $range, accent: .purple)
+                .padding(.top, 4)
+                .onChange(of: range) { selectedDay = nil }
+                .task(id: range) {
+                    if range == .sixMonths { older = await model.olderTrendNights() }
+                }
             if nights.isEmpty {
                 EmptyStateCard("No nights yet. Wear your Watch to bed and they show up here.",
                                actionTitle: "Set up your Watch for sleep", systemImage: "moon.zzz.fill", accent: .purple) {
@@ -49,14 +57,27 @@ struct SleepHistoryView: View {
     // MARK: Chart
 
     private var selectedNight: NightRecord? {
-        guard let selectedDay else { return nil }
+        guard let selectedDay, !range.isWeekly else { return nil }
         return nights.min { abs($0.wakeDay.timeIntervalSince(selectedDay)) < abs($1.wakeDay.timeIntervalSince(selectedDay)) }
+    }
+
+    private var selectedWeek: WeeklyAverage? {
+        guard let selectedDay, range.isWeekly else { return nil }
+        return weeks.min { abs($0.week.timeIntervalSince(selectedDay)) < abs($1.week.timeIntervalSince(selectedDay)) }
+    }
+
+    /// "4 of 6 nights reached your need", for a week on 6M.
+    private func weekDetail(_ week: WeeklyAverage) -> String {
+        let cal = Calendar.current
+        let inWeek = nights.filter { cal.isDate($0.wakeDay, equalTo: week.week, toGranularity: .weekOfYear) }
+        return "\(inWeek.filter { model.metNeed($0) }.count) of \(inWeek.count) nights reached your need"
     }
 
     private func dateText(_ day: Date) -> String {
         // The night before the wake day.
         let night = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
-        return "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        let text = "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        return model.isBreakDay(day) ? "\(text) \u{00B7} \(model.packBreakName)" : text
     }
 
     private func vsNeed(_ asleep: Int) -> String {
@@ -75,8 +96,14 @@ struct SleepHistoryView: View {
 
     @ViewBuilder
     private var readout: some View {
-        let slots = [summaryDetail] + nights.map(nightDetail)
-        if let night = selectedNight {
+        let slots = [summaryDetail] + (range.isWeekly ? weeks.map(weekDetail) : nights.map(nightDetail))
+        if let week = selectedWeek {
+            ChartReadout(title: "Week of \(week.week.formatted(.dateTime.month(.abbreviated).day())) \u{00B7} average asleep",
+                         value: Clock.duration(Int(week.value.rounded())),
+                         detail: weekDetail(week),
+                         accent: SleepNeedEstimator.metNeed(asleep: Int(week.value.rounded()), need: need) ? .purple : .coral,
+                         onClear: { selectedDay = nil }, detailSlots: slots)
+        } else if let night = selectedNight {
             let source = model.usingSampleData ? (isExample(night) ? "Example night \u{00B7} " : "Your night \u{00B7} ") : ""
             ChartReadout(title: source + dateText(night.wakeDay) + " \u{00B7} asleep",
                          value: Clock.duration(night.asleepMinutes),
@@ -85,7 +112,7 @@ struct SleepHistoryView: View {
                          onClear: { selectedDay = nil }, detailSlots: slots)
         } else {
             let avg = averageAsleep
-            ChartReadout(title: "Last \(range.days) days \u{00B7} average",
+            ChartReadout(title: "\(range.title) \u{00B7} average",
                          value: Clock.duration(avg),
                          detail: summaryDetail,
                          accent: .purple, detailSlots: slots)
@@ -95,7 +122,8 @@ struct SleepHistoryView: View {
     private var metCount: Int { nights.filter { model.metNeed($0) }.count }
 
     private var chartCard: some View {
-        Card {
+        let breaks = model.breakSpans(in: range.domain())
+        return Card {
             HStack(alignment: .firstTextBaseline) {
                 Text("Time asleep").font(.cardTitle)
                 Spacer()
@@ -105,16 +133,21 @@ struct SleepHistoryView: View {
                 }
             }
             readout
-            HistoryBars(nights: nights, need: need, metDays: metDays, exampleDays: exampleDays,
-                        selected: selectedNight?.wakeDay,
+            HistoryBars(nights: nights, need: need, metDays: metDays, exampleDays: range.isWeekly ? [] : exampleDays,
+                        selected: range.isWeekly ? selectedWeek?.week : selectedNight?.wakeDay,
                         selection: $selectedDay.snapping { raw in
-                            nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
+                            range.isWeekly
+                                ? weeks.min { abs($0.week.timeIntervalSince(raw)) < abs($1.week.timeIntervalSince(raw)) }?.week
+                                : nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
                         },
-                        barWidth: range == .week ? 22 : 6, days: range.days)
+                        barWidth: range == .week ? 22 : 6, range: range, breaks: breaks)
                 .frame(height: 200)
-                .motion(.dataSwap, value: rangeRaw)
-            ScrubHint(each: "night")
-            if mixesExamples {
+                .motion(.dataSwap, value: range)
+            if !breaks.isEmpty {
+                ChartKey(items: [.init(label: model.packBreakName, mark: .band)])
+            }
+            ScrubHint(each: range.step)
+            if mixesExamples && !range.isWeekly {
                 Text("Faded bars are example nights. Solid bars are your own nights from Apple Health.")
                     .font(.secondary)
                     .secondaryText()
@@ -162,15 +195,8 @@ struct SleepHistoryView: View {
 
 // MARK: - Pieces
 
-private enum HistoryRange: String, CaseIterable, Identifiable {
-    case week, month
-    var id: String { rawValue }
-    var title: String { self == .week ? "Week" : "Month" }
-    var days: Int { self == .week ? 7 : 30 }
-}
-
-/// Time asleep per night as bars against the dashed need line (the
-/// Sleep tab's last 7 nights and this screen).
+/// Time asleep per night (or, on 6M, each week's average) as bars against
+/// the dashed need line (the Sleep tab's last 7 nights and this screen).
 struct HistoryBars: View {
     let nights: [NightRecord]
     let need: Int
@@ -181,32 +207,45 @@ struct HistoryBars: View {
     let selected: Date?
     @Binding var selection: Date?
     let barWidth: CGFloat
-    /// The days the x axis spans, ending today: exactly 7 bars' worth of
+    /// The span the x axis covers, ending today: exactly 7 bars' worth of
     /// labels on a week, never an extra empty day (design flaw 5).
-    var days: Int = 7
+    var range: TrendRange = .week
+    /// Her break weeks, shaded behind the bars (D-G3).
+    var breaks: [ClosedRange<Date>] = []
     @Environment(\.colorScheme) private var scheme
 
-    private var domain: ClosedRange<Date> {
-        let cal = Calendar.current
-        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: .now)) ?? .now
-        let start = cal.date(byAdding: .day, value: -days, to: end) ?? end
-        return start...end
-    }
+    private var domain: ClosedRange<Date> { range.domain() }
 
     private var dayStarts: [Date] {
-        (0..<days).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: domain.lowerBound) }
+        (0..<7).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: domain.lowerBound) }
+    }
+
+    private var weeks: [WeeklyAverage] {
+        WeeklyAverage.by(nights, date: \.wakeDay, value: { Double($0.asleepMinutes) })
+    }
+
+    /// A week's bar: purple when its average met her need (the one
+    /// threshold, `SleepNeedEstimator.metNeed`), coral when it didn't.
+    private func color(_ week: WeeklyAverage) -> Color {
+        let base = SleepNeedEstimator.metNeed(asleep: Int(week.value.rounded()), need: need)
+            ? Accent.purple.fill(scheme) : Accent.coral.fill(scheme)
+        guard let selected else { return base }
+        return Calendar.current.isDate(week.week, inSameDayAs: selected) ? base : base.opacity(0.35)
     }
 
     private func day(_ night: NightRecord) -> Date { Calendar.current.startOfDay(for: night.wakeDay) }
 
+    /// One sentence for VoiceOver (D-A2); each bar is in the audio graph.
     private var summary: String {
-        let short = nights.filter { !metDays.contains(day($0)) }.count
-        var text = "Time asleep for \(nights.count) nights. \(short) were under your need of \(Clock.duration(need))."
-        let examples = nights.filter { exampleDays.contains(day($0)) }.count
-        if examples > 0 {
-            text += " \(examples) of the nights are examples, \(nights.count - examples) are yours."
+        let shaded = breaks.isEmpty ? "" : ", break weeks shaded"
+        if range.isWeekly {
+            let short = weeks.filter { !SleepNeedEstimator.metNeed(asleep: Int($0.value.rounded()), need: need) }.count
+            return "Average time asleep for each of \(weeks.count) weeks: \(short) averaged under your need of \(Clock.duration(need))\(shaded)."
         }
-        return text
+        let short = nights.filter { !metDays.contains(day($0)) }.count
+        let examples = nights.filter { exampleDays.contains(day($0)) }.count
+        let mix = examples > 0 ? ", \(examples) of them examples and \(nights.count - examples) yours" : ""
+        return "Time asleep for \(nights.count) nights\(mix): \(short) under your need of \(Clock.duration(need))\(shaded)."
     }
 
     private func color(_ night: NightRecord) -> Color {
@@ -226,24 +265,35 @@ struct HistoryBars: View {
     @ChartContentBuilder
     private var selectionRule: some ChartContent {
         if let selected {
-            RuleMark(x: .value("Night", selected, unit: .day))
+            RuleMark(x: .value("Night", selected, unit: range.unit))
                 .foregroundStyle(Palette(scheme: scheme).primary.opacity(0.25))
         }
     }
 
     var body: some View {
         Chart {
+            BreakWeekMarks(spans: breaks, scheme: scheme, height: 0...11)
             selectionRule
-            ForEach(nights, id: \.wakeDay) { night in
-                BarMark(x: .value("Night", night.wakeDay, unit: .day),
-                        y: .value("Hours", Double(night.asleepMinutes) / 60),
-                        width: .fixed(barWidth))
-                    .foregroundStyle(color(night))
-                    .cornerRadius(4)
+            if range.isWeekly {
+                ForEach(weeks, id: \.week) { week in
+                    BarMark(x: .value("Week", week.week, unit: .weekOfYear),
+                            y: .value("Hours", week.value / 60),
+                            width: .fixed(barWidth))
+                        .foregroundStyle(color(week))
+                        .cornerRadius(3)
+                }
+            } else {
+                ForEach(nights, id: \.wakeDay) { night in
+                    BarMark(x: .value("Night", night.wakeDay, unit: .day),
+                            y: .value("Hours", Double(night.asleepMinutes) / 60),
+                            width: .fixed(barWidth))
+                        .foregroundStyle(color(night))
+                        .cornerRadius(4)
+                }
             }
             needLine
         }
-        .chartScrub($selection, snapped: selected, steps: nights.map(\.wakeDay).sorted())
+        .chartScrub($selection, snapped: selected, steps: range.isWeekly ? weeks.map(\.week) : nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
         .chartXScale(domain: domain, range: .plotDimension(startPadding: 4, endPadding: 8))
         .chartYAxis {
@@ -255,22 +305,32 @@ struct HistoryBars: View {
             }
         }
         .chartXAxis {
-            if days <= 7 {
+            switch range {
+            case .week:
                 // One label per day in the domain, not one for its end too.
                 AxisMarks(values: dayStarts) { _ in
                     AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
                 }
-            } else {
+            case .month:
                 AxisMarks(values: .automatic(desiredCount: 7)) { _ in
                     AxisValueLabel(format: .dateTime.weekday(.narrow))
+                }
+            case .sixMonths:
+                AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
                 }
             }
         }
         .accessibilityLabel(summary)
-        .accessibilityChartDescriptor(DateChartDescriptor(
-            title: "Time asleep, last \(nights.count) nights", seriesName: "Time asleep", yTitle: "Time asleep",
-            points: nights.map { ($0.wakeDay, Double($0.asleepMinutes)) },
-            yLabel: { Clock.duration(Int($0.rounded())) }, isContinuous: false))
+        .accessibilityChartDescriptor(range.isWeekly
+            ? DateChartDescriptor(
+                title: "Average time asleep by week, last 6 months", seriesName: "Time asleep", yTitle: "Time asleep",
+                points: weeks.map { ($0.week, $0.value) },
+                yLabel: { Clock.duration(Int($0.rounded())) }, isContinuous: false)
+            : DateChartDescriptor(
+                title: "Time asleep, last \(nights.count) nights", seriesName: "Time asleep", yTitle: "Time asleep",
+                points: nights.map { ($0.wakeDay, Double($0.asleepMinutes)) },
+                yLabel: { Clock.duration(Int($0.rounded())) }, isContinuous: false))
     }
 }
 

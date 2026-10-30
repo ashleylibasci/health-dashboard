@@ -363,8 +363,8 @@ struct CaffeineBodyView: View {
     private func chartSummary(_ points: [CaffeinePoint]) -> String {
         let peak = points.max { $0.mg < $1.mg }
         let peakText = peak.map { "peaks near \(Int($0.mg.rounded())) mg at \(Clock.format($0.time))" } ?? "stays at zero"
-        let cutoffText = model.caffeineCutoffShown.map { "Cutoff \(Clock.format($0))." } ?? "Cutoff: early only, right after you wake."
-        return "Caffeine in your body today \(peakText) and falls to about \(model.caffeineAtBedtime) mg by your \(Clock.format(bedtime)) bedtime. \(cutoffText) Goal under \(bedtimeGoal) mg."
+        let cutoffText = model.caffeineCutoffShown.map { "cutoff \(Clock.format($0))" } ?? "cutoff early only, right after you wake"
+        return "Caffeine in your body today \(peakText) and falls to about \(model.caffeineAtBedtime) mg by your \(Clock.format(bedtime)) bedtime, goal under \(bedtimeGoal) mg, \(cutoffText)."
     }
 }
 

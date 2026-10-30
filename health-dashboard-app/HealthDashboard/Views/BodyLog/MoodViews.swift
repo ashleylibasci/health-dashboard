@@ -216,6 +216,7 @@ struct MoodByPackDayView: View {
             } }
             .chartScrub($selected.snapping { raw in Self.nearestDay(raw, in: pack) }, snapped: selected, steps: days.map(Double.init))
             .frame(height: 190)
+            .accessibilityLabel(chartSummary(data, pack: pack))
             .accessibilityChartDescriptor(ValueChartDescriptor(
                 title: "\(AppModel.moodTitle(scale)) by pack day", seriesName: "Average", xTitle: "Pack day", yTitle: "Rating",
                 points: days.compactMap { d in data.averages[d].map { (Double(d), $0) } },
@@ -226,6 +227,16 @@ struct MoodByPackDayView: View {
             }
             ScrubHint(each: "pack day")
         }
+    }
+
+    /// One sentence for VoiceOver (D-A2); each pack day is a step on the chart.
+    private func chartSummary(_ data: MoodByPackDay, pack: PillPack) -> String {
+        let name = AppModel.moodTitle(scale)
+        guard let lo = data.averages.min(by: { $0.value < $1.value }), let hi = data.averages.max(by: { $0.value < $1.value }) else {
+            return "\(name) by pack day: no ratings yet."
+        }
+        let shaded = pack.hasBreak ? ", \(model.packBreakName.lowercased()) shaded" : ""
+        return "\(name) by pack day, 1 to 5, averaged over your packs\(shaded): lowest \(String(format: "%.1f", lo.value)) on day \(lo.key), highest \(String(format: "%.1f", hi.value)) on day \(hi.key)."
     }
 
     private static func nearestDay(_ raw: Double, in pack: PillPack) -> Double { Double(min(max(Int(raw.rounded()), 1), pack.packLength)) }

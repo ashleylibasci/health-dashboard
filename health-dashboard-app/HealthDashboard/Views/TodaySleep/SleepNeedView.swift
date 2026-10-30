@@ -570,11 +570,11 @@ private struct DoseResponseChart: View {
     }
 
     private var summary: String {
-        var text = "\(metric.label) the next day against hours slept, \(points.count) nights."
+        var text = "\(metric.label) the next day against hours slept, \(points.count) nights"
         if let fit {
-            text += " It improves with more sleep up to about \(Clock.duration(Int(fit.knee))), then levels off."
+            text += ": it improves with more sleep up to about \(Clock.duration(Int(fit.knee))), then levels off"
         }
-        return text
+        return text + "."
     }
 
     @ChartContentBuilder
@@ -708,7 +708,7 @@ private struct NeedRangeBar: View {
             .frame(height: 16)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("The range of the clues is \(Clock.duration(range.start)) to \(Clock.duration(range.end)). Most adults need between 7 and 9 hours.")
+        .accessibilityLabel("The clues range from \(Clock.duration(range.start)) to \(Clock.duration(range.end)); most adults need between 7 and 9 hours.")
     }
 }
 

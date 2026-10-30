@@ -205,7 +205,15 @@ struct FitnessView: View {
         .accessibilityChartDescriptor(DateChartDescriptor(
             title: "VO2 max history", seriesName: "VO2 max", yTitle: "VO2 max",
             points: points.map { ($0.date, $0.value) }, yLabel: { String(format: "%.1f", $0) }))
-        .accessibilityLabel("VO2 max history: " + points.map { "\($0.date.formatted(.dateTime.month(.abbreviated).year())) \(String(format: "%.1f", $0.value))" }.joined(separator: ", "))
+        .accessibilityLabel(summary)
+    }
+
+    /// One sentence for VoiceOver (D-A2); each reading is in the audio graph.
+    private var summary: String {
+        let values = points.map(\.value)
+        guard let first = points.first, let lo = values.min(), let hi = values.max(), let last = values.last else { return "VO2 max history: none yet." }
+        let since = first.date.formatted(.dateTime.month(.abbreviated).year())
+        return "VO2 max since \(since): from \(String(format: "%.1f", lo)) to \(String(format: "%.1f", hi)), latest \(String(format: "%.1f", last))."
     }
 
     // MARK: Tips and age

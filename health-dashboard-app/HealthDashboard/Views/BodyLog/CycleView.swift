@@ -782,9 +782,9 @@ private struct PillGrid: View {
         .frame(height: CGFloat(rows) * rowHeight + CGFloat(rows - 1) * spacing)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel((activeDays < packLength
-                            ? "Pack: day \(day) of \(packLength). Days 1 to \(activeDays) active, then the break\(skipped ? ", skipped this time" : "")."
-                            : "Pack: day \(day) of \(packLength), all active.")
-                            + (marks.taken.isEmpty ? "" : " \(marks.taken.count) marked taken\(marks.notLogged.isEmpty ? "" : ", \(marks.notLogged.count) not")."))
+                            ? "Pack: day \(day) of \(packLength), days 1 to \(activeDays) active, then the break\(skipped ? ", skipped this time" : "")"
+                            : "Pack: day \(day) of \(packLength), all active")
+                            + (marks.taken.isEmpty ? "." : "; \(marks.taken.count) marked taken\(marks.notLogged.isEmpty ? "" : ", \(marks.notLogged.count) not")."))
         .accessibilityAdjustableAction { direction in
             let current = selected ?? day
             switch direction {
@@ -1223,9 +1223,15 @@ private struct IrregularSection: View {
             points: chartBars.map { ($0.label, Double($0.days)) }, yLabel: { "\(Int($0.rounded())) days" }))
     }
 
+    /// One sentence for VoiceOver (D-A2); each cycle is in the audio graph.
     private var cycleChartSummary: String {
-        var parts = bars.map { "started \($0.label), \($0.days) days" }
-        if let c = currentBar { parts.append("this cycle so far, \(c.days) days") }
-        return "Cycle lengths: " + parts.joined(separator: "; ")
+        let lengths = bars.map(\.days)
+        var parts: [String] = []
+        if let lo = lengths.min(), let hi = lengths.max() {
+            let span = lo == hi ? "\(lo) days" : "\(lo) to \(hi) days"
+            parts.append(lengths.count == 1 ? "your last cycle was \(span)" : "your last \(lengths.count) cycles were \(span)")
+        }
+        if let c = currentBar { parts.append("this cycle is \(c.days) days so far") }
+        return "Cycle lengths: " + (parts.isEmpty ? "none yet" : parts.joined(separator: ", and ")) + "."
     }
 }

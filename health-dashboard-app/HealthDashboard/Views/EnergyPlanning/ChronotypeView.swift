@@ -176,7 +176,7 @@ private struct WeekendShiftView: View {
                         SleepWindowsChart(work: work, free: free, selected: selection,
                                           selection: $selection.snapping { Int((Double($0) / 5).rounded()) * 5 })
                             .frame(height: 110)
-                            .accessibilityLabel("School nights asleep \(work.label.replacingOccurrences(of: "\u{2013}", with: " to ")), free nights asleep \(free.label.replacingOccurrences(of: "\u{2013}", with: " to ")). A \(Clock.duration(sjl)) gap in the middle of your sleep.")
+                            .accessibilityLabel("School nights asleep \(work.label.replacingOccurrences(of: "\u{2013}", with: " to ")), free nights asleep \(free.label.replacingOccurrences(of: "\u{2013}", with: " to ")), a \(Clock.duration(sjl)) gap in the middle of your sleep.")
                         ScrubHint(each: "hour of the night")
                         windowRow(accent: .indigo, name: "School nights", range: work.label,
                                   middle: "middle \(Clock.format(c.midSleepWork))")
@@ -378,7 +378,7 @@ private struct ChronotypeSpectrum: View {
             ScrubHint(each: "type")
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Body clock spectrum from very early to very late. Your body clock time (free-day sleep middle, minus catch-up sleep) is \(Clock.format(msfsc)), a \(category.rawValue.lowercased()).")
+        .accessibilityLabel("Body clock spectrum from very early to very late: yours (free-day sleep middle, minus catch-up sleep) is \(Clock.format(msfsc)), a \(category.rawValue.lowercased()).")
     }
 }
 
