@@ -16,6 +16,7 @@ struct Screen<Content: View>: View {
     var searches = false
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
@@ -36,8 +37,14 @@ struct Screen<Content: View>: View {
         .modifier(SearchScrollBehavior(enabled: searches))
         .background(alignment: .top) {
             ZStack(alignment: .top) {
-                p.background
-                p.glow(accent).frame(height: 460)
+                if let look {
+                    LinearGradient(gradient: look.background, startPoint: .top, endPoint: .bottom)
+                } else {
+                    p.background
+                }
+                if look?.glow ?? true {
+                    p.glow(accent).frame(height: 460)
+                }
             }
             .ignoresSafeArea()
         }
@@ -80,6 +87,7 @@ struct Card<Content: View>: View {
     var padding: CGFloat = Space.l
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -87,9 +95,10 @@ struct Card<Content: View>: View {
         VStack(alignment: .leading, spacing: Space.m) { content }
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(accent.map { $0.tint(scheme) } ?? p.card, in: shape)
+            .background(accent.map { $0.tint(scheme) } ?? look?.card ?? p.card, in: shape)
+            .background(accent != nil && look?.tintsOnCard == true ? look?.card ?? .clear : .clear, in: shape)
             // Tinted cards carry their colour without a border.
-            .overlay(shape.strokeBorder(accent == nil ? p.cardBorder : .clear))
+            .overlay(shape.strokeBorder(accent == nil ? look?.cardBorder ?? p.cardBorder : .clear))
             .shadow(color: scheme == .light && accent == nil ? Color(hex: 0x141428, alpha: 0.06) : .clear, radius: 1, y: 1)
     }
 }
@@ -272,12 +281,13 @@ extension View {
 
 private struct TileSurface: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
     func body(content: Content) -> some View {
         let p = Palette(scheme: scheme)
         let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
         content
-            .background(p.card, in: shape)
-            .overlay(shape.strokeBorder(p.cardBorder))
+            .background(look?.card ?? p.card, in: shape)
+            .overlay(shape.strokeBorder(look?.cardBorder ?? p.cardBorder))
             .shadow(color: scheme == .light ? Color(hex: 0x141428, alpha: 0.06) : .clear, radius: 1, y: 1)
     }
 }
