@@ -103,6 +103,23 @@ struct CheckInView: View {
                 tagButton(tag)
             }
         }
+        // D-P3: optional context for Patterns.
+        HStack(spacing: 0) {
+            Text("Anything going on?")
+                .font(.scaled(size: 17, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
+            InfoButton(title: "Anything going on?",
+                       meaning: "Optional tags for the things your Watch can't see: an exam today, studying late, a workout yesterday, a party last night or feeling sick.",
+                       forYou: "Tag the mornings they apply to. Once you have enough, Patterns compares those nights with your others and shows any clear difference in your sleep, HRV or resting heart rate.")
+                .padding(.vertical, -12)
+        }
+        .padding(.top, 4)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: min(Font.scaledSize(140), 280)), spacing: 8)],
+                  alignment: .leading, spacing: 8) {
+            ForEach(DayTag.allCases) { tag in
+                tagButton(tag.rawValue, label: tag.label)
+            }
+        }
         if level > 0 {
             Card(accent: .orange) {
                 HStack(alignment: .top, spacing: 10) {
@@ -219,7 +236,7 @@ struct CheckInView: View {
     private func save() {
         guard level > 0 else { return }
         if store.checkIn(on: .now) == nil { savedCount += 1 } else { selectCount += 1 }
-        model.saveCheckIn(awake: level, tags: tagOptions.filter { tags.contains($0) })
+        model.saveCheckIn(awake: level, tags: (tagOptions + DayTag.allCases.map(\.rawValue)).filter { tags.contains($0) })
     }
 
     // MARK: Controls
@@ -247,14 +264,14 @@ struct CheckInView: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
-    private func tagButton(_ tag: String) -> some View {
+    private func tagButton(_ tag: String, label: String? = nil) -> some View {
         let p = Palette(scheme: scheme)
         let on = tags.contains(tag)
         return Button {
             if on { tags.remove(tag) } else { tags.insert(tag) }
             if level > 0 { save() } else { selectCount += 1 }
         } label: {
-            Text(tag)
+            Text(label ?? tag)
                 .font(.scaled(size: 14, weight: .semibold))
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
