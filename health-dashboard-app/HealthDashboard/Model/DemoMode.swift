@@ -42,6 +42,8 @@ import HealthCore
 /// - `-demoBedtimeNudge`: the bedtime nudge 10 seconds after launch, with
 ///   its Turn on Watch alarm button (D-N2).
 /// - `-demoEveningDim`: the evening dim at full, whatever the time (D-M6).
+/// - `-demoSkyPhase sunrise|day|sunset|night`: the Sky theme, held at that
+///   phase.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -63,7 +65,7 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory`:
+    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory|appearance`:
     /// opens on that screen (Body tab), for screenshots. The pill-visit summary also saves its
     /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")
@@ -99,7 +101,9 @@ enum DemoMode {
     static let morningNote = args.contains("-demoMorningNote")
     static let bedtimeNudge = args.contains("-demoBedtimeNudge")
     static let eveningDim = args.contains("-demoEveningDim")
+    static let skyPhase = value(after: "-demoSkyPhase").flatMap(SkyPhase.init(rawValue:))
     #else
+    static let skyPhase: SkyPhase? = nil
     static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
     static let tiles: String? = nil

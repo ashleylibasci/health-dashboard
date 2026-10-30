@@ -5,9 +5,9 @@ import HealthCore
 struct HealthDashboardApp: App {
     @StateObject private var store: DataStore
     @StateObject private var model: AppModel
-    /// The evening dim (D-M6).
+    /// The evening dim (D-M6) and the Sky theme.
     @StateObject private var ambient: AmbientLook
-    /// "dark" (default), "light" or "system".
+    /// "dark" (default), "light", "system" or "sky".
     @AppStorage("appearance") private var appearance = "dark"
     @AppStorage("eveningDim") private var eveningDim = true
     @Environment(\.scenePhase) private var scenePhase
@@ -58,7 +58,7 @@ struct HealthDashboardApp: App {
             .environmentObject(model)
             .environment(\.hidesEffortTargets, store.data.conditions.contains("Eating-disorder history"))
             .modifier(AmbientSurface(ambient: ambient))
-            .preferredColorScheme(appearance == "light" ? .light : appearance == "system" ? nil : .dark)
+            .preferredColorScheme(ambient.skyScheme ?? (appearance == "light" ? .light : appearance == "system" ? nil : .dark))
             .onChange(of: scenePhase, initial: true) { _, phase in
                 // The clock's surfaces tick only while the app is in front.
                 guard phase == .active else { return ambient.stop() }
@@ -67,6 +67,7 @@ struct HealthDashboardApp: App {
                 Task { await model.becameActive() }
             }
             .onChange(of: eveningDim) { ambient.update() }
+            .onChange(of: appearance) { ambient.update() }
         }
     }
 }
@@ -104,6 +105,7 @@ struct RootTabView: View {
                         case "hrv": HeartMetricView(metric: .hrv)
                         case "restingHR": HeartMetricView(metric: .restingHR)
                         case "sleepHistory": SleepHistoryView()
+                        case "appearance": AppearanceSettingsView()
                         default: CycleView()
                         }
                     }

@@ -189,7 +189,7 @@ enum AppSearch {
             screen(.notifications, "Notifications", "Settings", "bell.fill", .coral, ["alerts", "reminders", "nudges", "sick alerts"], setting: true),
             screen(.widgetsWatch, "Widgets & Watch", "Settings", "applewatch", .indigo, ["widget", "complication", "Lock Screen", "Home Screen", "Watch face"], setting: true),
             screen(.healthData, "Apple Health & data", "Settings", "heart.fill", .pink, ["Apple Health", "permissions", "export", "delete", "example data", "CSV"], setting: true),
-            screen(.appearance, "Appearance", "Settings \u{00B7} dark or light", "circle.lefthalf.filled", .purple, ["dark mode", "light mode", "theme"], setting: true),
+            screen(.appearance, "Appearance", "Settings \u{00B7} dark, light or sky", "circle.lefthalf.filled", .purple, ["dark mode", "light mode", "theme", "sky", "sunset", "evening dim"], setting: true),
         ]
         for section in HealthGuide.sections {
             for article in section.articles(for: store.birthControl) {
