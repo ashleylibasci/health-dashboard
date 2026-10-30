@@ -5,8 +5,11 @@ import HealthCore
 struct HealthDashboardApp: App {
     @StateObject private var store: DataStore
     @StateObject private var model: AppModel
+    /// The evening dim (D-M6).
+    @StateObject private var ambient: AmbientLook
     /// "dark" (default), "light" or "system".
     @AppStorage("appearance") private var appearance = "dark"
+    @AppStorage("eveningDim") private var eveningDim = true
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -14,6 +17,7 @@ struct HealthDashboardApp: App {
         let model = AppModel(store: store)
         _store = StateObject(wrappedValue: store)
         _model = StateObject(wrappedValue: model)
+        _ambient = StateObject(wrappedValue: AmbientLook(model: model))
         DemoMode.applySetup(store: store, model: model)
         // The day-3 hello card counts its days from here (D-T7).
         HelloCard.recordFirstLaunch()
@@ -53,12 +57,16 @@ struct HealthDashboardApp: App {
             .environmentObject(store)
             .environmentObject(model)
             .environment(\.hidesEffortTargets, store.data.conditions.contains("Eating-disorder history"))
+            .modifier(AmbientSurface(ambient: ambient))
             .preferredColorScheme(appearance == "light" ? .light : appearance == "system" ? nil : .dark)
             .onChange(of: scenePhase, initial: true) { _, phase in
+                // The clock's surfaces tick only while the app is in front.
+                guard phase == .active else { return ambient.stop() }
+                ambient.start()
                 // Every time the app comes forward: today's numbers, then the Watch.
-                guard phase == .active else { return }
                 Task { await model.becameActive() }
             }
+            .onChange(of: eveningDim) { ambient.update() }
         }
     }
 }

@@ -41,6 +41,7 @@ import HealthCore
 ///   the example numbers, with its Log latte and +1 bottle buttons (D-N1).
 /// - `-demoBedtimeNudge`: the bedtime nudge 10 seconds after launch, with
 ///   its Turn on Watch alarm button (D-N2).
+/// - `-demoEveningDim`: the evening dim at full, whatever the time (D-M6).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -97,8 +98,9 @@ enum DemoMode {
     static let tiles = value(after: "-demoTiles")
     static let morningNote = args.contains("-demoMorningNote")
     static let bedtimeNudge = args.contains("-demoBedtimeNudge")
+    static let eveningDim = args.contains("-demoEveningDim")
     #else
-    static let morningNote = false, bedtimeNudge = false
+    static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
     static let tiles: String? = nil
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false

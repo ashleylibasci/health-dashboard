@@ -645,6 +645,9 @@ struct DataSettingsView: View {
 struct AppearanceSettingsView: View {
     /// "dark" (default), "light" or "system". Read by the app root.
     @AppStorage("appearance") private var appearance = "dark"
+    /// After her wind-down the backgrounds turn warmer and darker (D-M6).
+    @AppStorage("eveningDim") private var eveningDim = true
+    @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var scheme
 
     private struct Mode: Identifiable {
@@ -675,7 +678,18 @@ struct AppearanceSettingsView: View {
                 .font(.scaled(size: 13))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            Card(density: .compact) {
+                SettingToggleRow(title: "Evening dim", detail: eveningDimNote, systemImage: "moon.haze.fill",
+                                 accent: .purple, isOn: $eveningDim)
+            }
+            .padding(.top, Space.s)
         }
+    }
+
+    /// "From your wind-down at 9:45pm, …"
+    private var eveningDimNote: String {
+        let start = AmbientLook.windDownStart(model).map { " at \(Clock.format($0))" } ?? ""
+        return "From your wind-down\(start), the background turns a little warmer and darker. It follows the clock, not your numbers."
     }
 
     private func card(_ mode: Mode) -> some View {
