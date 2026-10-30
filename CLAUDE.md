@@ -20,7 +20,14 @@ Do all of these, in order, every time:
    xcrun devicectl device process launch --device 00008160-000D146A00434036 \
      com.ashleylibasci.healthdashboard
    ```
-   If the Watch shows up in `xcrun devicectl list devices`, launch `com.ashleylibasci.healthdashboard.watchkitapp` on it the same way. If not, say so and ask Ashley to open the app on the Watch.
+   If the Watch shows up in `xcrun devicectl list devices` (Ashley's Watch is `00008320-001CC9D63410000A`), install the Watch app on it directly, since installing through the phone doesn't reliably reach it, then launch it:
+   ```bash
+   xcrun devicectl device install app --device 00008320-001CC9D63410000A \
+     DerivedData/Build/Products/Release-iphoneos/HealthDashboard.app/Watch/HealthDashboardWatch.app
+   xcrun devicectl device process launch --device 00008320-001CC9D63410000A \
+     com.ashleylibasci.healthdashboard.watchkitapp
+   ```
+   If it isn't listed, say so and ask Ashley to connect it: phone plugged in and unlocked, Watch unlocked nearby, Xcode → Window → Devices and Simulators, then Trust on the Watch (Developer Mode is in Settings → Privacy & Security on the Watch).
 3. **Commit and push to GitHub** (`origin` → https://github.com/ashleylibasci/health-dashboard, branch `main`). This repo is public: never commit health data, exports, the zip or anything personal.
 
 If any step fails (phone locked or not connected, signing, a failing build), stop and tell Ashley which step failed and why; don't skip ahead to commit and push.
