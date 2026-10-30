@@ -192,7 +192,9 @@ struct Ring: View {
         return "\(caption): \(label)"
     }
 
-    private var ringSize: CGFloat { size * min(max(textScale, 1), 1.3) }
+    /// Grows a little with larger text, but not much: a big ring crowded
+    /// the card (Ashley, Oct 30).
+    private var ringSize: CGFloat { size * min(max(textScale, 1), 1.15) }
     private var stroke: CGFloat { lineWidth * ringSize / size }
     private var hole: CGFloat { max(ringSize - 2 * stroke, 1) }
     private var captionInside: Bool { !typeSize.isAccessibilitySize }
@@ -212,8 +214,9 @@ struct Ring: View {
                             style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .motion(.fill, value: value)
-                // A wide box that fits in the hole (the number is one line),
-                // so nothing sits on the stroke. The number shrinks to fit
+                // A box whose corners stay inside the hole, with a margin,
+                // so the caption never touches the stroke (Ashley, Oct 30:
+                // "RECOVERY" sat on the ring). The number shrinks to fit
                 // rather than being cut off with "…".
                 VStack(spacing: Space.xxs) {
                     Text(label)
@@ -229,7 +232,7 @@ struct Ring: View {
                             .minimumScaleFactor(0.4)
                     }
                 }
-                .frame(width: hole * 0.84, height: hole * 0.62)
+                .frame(width: hole * 0.72, height: hole * 0.56)
             }
             .frame(width: ringSize, height: ringSize)
             if let caption, !captionInside {

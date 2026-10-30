@@ -306,9 +306,17 @@ struct PullDownSearch<Content: View>: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let top = Self.statusBarBottom
         ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: 0) {
                 field
+                    // Tucked under the status bar it showed faintly behind
+                    // the clock; it fades out as it slides under and back in
+                    // as she pulls down.
+                    .visualEffect { content, geo in
+                        let y = geo.frame(in: .global).minY, h = max(geo.size.height, 1)
+                        return content.opacity(min(max(1 - (top - y) / (h * 0.5), 0), 1))
+                    }
                     .padding(.top, Space.s)
                     .padding(.bottom, Space.m)
                     .background {
@@ -336,6 +344,12 @@ struct PullDownSearch<Content: View>: View {
             case .tab: EmptyView()
             }
         }
+    }
+
+    /// The bottom of the status bar, where the tucked field starts to show.
+    private static var statusBarBottom: CGFloat {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return scene?.keyWindow?.safeAreaInsets.top ?? 54
     }
 
     /// Looks like a search field; tapping it opens search with the keyboard up.

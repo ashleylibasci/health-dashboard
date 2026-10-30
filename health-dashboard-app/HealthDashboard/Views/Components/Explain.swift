@@ -230,8 +230,8 @@ struct ChartReadout: View {
             Text(title)
                 .font(.secondary).fontWeight(.semibold)
                 .foregroundStyle(p.secondary)
-                .lineLimit(ax ? nil : 1)
-                .minimumScaleFactor(ax ? 1 : 0.8)
+                .lineLimit(ax ? nil : 2)
+                .minimumScaleFactor(ax ? 1 : 0.9)
             // The qualifier sits under the number at the accessibility
             // sizes instead of wrapping in a narrow column beside it.
             AdaptiveStack(spacing: ax ? 0 : Space.s, alignment: .firstTextBaseline) {

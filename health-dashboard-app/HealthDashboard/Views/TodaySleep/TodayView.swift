@@ -382,10 +382,15 @@ struct TodayView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             gauges
-            Divider().overlay(p.cardBorder)
-            LinkRow(title: "Why do I feel off?", subtitle: whyOffSubtitle,
-                    systemImage: "questionmark.bubble.fill", accent: .coral) {
-                WhyOffView()
+            // Only on a day that looks harder than usual; otherwise it read
+            // as telling her she felt off (Ashley, Oct 30). Search and
+            // Energy still lead to it.
+            if model.mayFeelOff {
+                Divider().overlay(p.cardBorder)
+                LinkRow(title: "Why do I feel off?", subtitle: whyOffSubtitle,
+                        systemImage: "questionmark.bubble.fill", accent: .coral) {
+                    WhyOffView()
+                }
             }
         }
     }
@@ -1208,16 +1213,16 @@ private struct MiniGauge: View {
             Text(title).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
                 .lineLimit(2).minimumScaleFactor(0.7)
                 .multilineTextAlignment(.center)
-            HStack(spacing: 3) {
-                if let up = change.up {
-                    Image(systemName: up ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                        .font(.scaled(size: 8, weight: .bold))
-                        .foregroundStyle(arrowColor(p))
-                }
-                Text(change.text).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary)
-                    .lineLimit(2).minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.center)
-            }
+            // The arrow is part of the text, so it stays beside the first
+            // word when "39 min short" wraps instead of floating by itself.
+            ((change.up.map { up in
+                Text(Image(systemName: up ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill"))
+                    .font(.scaled(size: 8, weight: .bold))
+                    .foregroundStyle(arrowColor(p)).baselineOffset(1) + Text("\u{2009}")
+            } ?? Text(""))
+            + Text(change.text).font(.scaled(size: 12, weight: .semibold)).foregroundStyle(p.secondary))
+                .lineLimit(2).minimumScaleFactor(0.7)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)

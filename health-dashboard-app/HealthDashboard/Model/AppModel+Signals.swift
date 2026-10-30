@@ -261,6 +261,15 @@ extension AppModel {
         var topic: Topic?
     }
 
+    /// Today looks harder than usual: recovery below her usual band ("Take it
+    /// steady" or "Go easy"), the sick check, or she logged a stressful day.
+    /// Today's "Why do I feel off?" row shows only then.
+    var mayFeelOff: Bool {
+        if sickCheckFlagged || feltStressedToday { return true }
+        guard let score = recoveryShown else { return false }
+        return [.steady, .easy].contains(recoveryLevel(for: score))
+    }
+
     /// The likeliest reasons today feels harder than usual, biggest first.
     var whyOffReasons: [OffReason] {
         var out: [OffReason] = []

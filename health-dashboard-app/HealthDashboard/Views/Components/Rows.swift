@@ -148,8 +148,9 @@ struct MetricRowLabel: View {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(title)
                     .font(.bodyEmphasis)
-                    .lineLimit(ax ? nil : 1)
-                    .minimumScaleFactor(ax ? 1 : 0.8)
+                    .lineLimit(ax ? nil : 2)
+                    .minimumScaleFactor(ax ? 1 : 0.9)
+                    .fixedSize(horizontal: false, vertical: true)
                 if ax { trailing(p, ax: true) }
                 if let note { noteLine(note, p, ax: ax) }
             }
@@ -198,8 +199,9 @@ struct MetricRowLabel: View {
             Text(note)
                 .font(.secondary)
                 .foregroundStyle(p.secondary)
-                .lineLimit(ax ? 2 : 1)
+                .lineLimit(ax ? nil : 2)
                 .minimumScaleFactor(ax ? 1 : 0.9)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -304,8 +306,9 @@ struct ExpandRow<Content: View>: View {
                 Text(title)
                     .font(.bodyEmphasis)
                     .foregroundStyle(p.primary)
-                    .lineLimit(ax ? nil : 1)
-                    .minimumScaleFactor(ax ? 1 : 0.8)
+                    .lineLimit(ax ? nil : 2)
+                    .minimumScaleFactor(ax ? 1 : 0.9)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let summary, !open {
                     Text(summary)
                         .font(.secondary)

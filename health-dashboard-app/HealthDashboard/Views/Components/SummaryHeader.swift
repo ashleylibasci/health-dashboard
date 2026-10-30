@@ -50,7 +50,7 @@ struct SummaryHeader<Footer: View>: View {
     }
 
     /// Numerals and times get the big display role; words don't.
-    private var valueIsNumber: Bool { value.contains { $0.isNumber } }
+    fileprivate var valueIsNumber: Bool { value.contains { $0.isNumber } }
 
     private var spoken: String {
         var parts = ["\(eyebrow): \(value)\(unit.map { " \($0)" } ?? "")"]
@@ -75,20 +75,21 @@ struct SummaryHeader<Footer: View>: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: Space.s) {
-                    AdaptiveStack(spacing: ax ? Space.xs : Space.s, alignment: .firstTextBaseline) {
-                        Text(value)
-                            .font(valueIsNumber ? .display : .heading)
-                            .lineLimit(ax ? 2 : 1)
-                            .minimumScaleFactor(0.6)
-                        if let unit {
-                            Text(unit)
-                                .font(.bodyEmphasis)
-                                .foregroundStyle(p.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                    // The status chip sits beside the number when both fit,
+                    // else under it, so the number and unit are never cut to
+                    // "1…" or "of 1…" (Ashley, Oct 30).
+                    ViewThatFits(in: .horizontal) {
+                        if !ax {
+                            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                                valueAndUnit(p, ax: ax)
+                                Spacer(minLength: Space.s)
+                                if let status { StatusChip(status: status).fixedSize() }
+                            }
                         }
-                        if !ax { Spacer(minLength: Space.s) }
-                        if let status { StatusChip(status: status) }
+                        VStack(alignment: .leading, spacing: Space.xs) {
+                            valueAndUnit(p, ax: ax)
+                            if let status { StatusChip(status: status) }
+                        }
                     }
                     // Joins the title in the bar once scrolled away (D-M5).
                     .pinsAnswer(pinnedAnswer)
@@ -112,6 +113,27 @@ struct SummaryHeader<Footer: View>: View {
                 .accessibilityLabel(spoken)
             }
             footer
+        }
+    }
+}
+
+extension SummaryHeader {
+    /// The number and its unit ("12:10am", "71 of 100"), on one line when
+    /// they fit; the unit goes under the number at the accessibility sizes.
+    @ViewBuilder
+    fileprivate func valueAndUnit(_ p: Palette, ax: Bool) -> some View {
+        AdaptiveStack(spacing: ax ? Space.xs : Space.s, alignment: .firstTextBaseline) {
+            Text(value)
+                .font(valueIsNumber ? .display : .heading)
+                .lineLimit(ax ? 2 : 1)
+                .minimumScaleFactor(0.6)
+            if let unit {
+                Text(unit)
+                    .font(.bodyEmphasis)
+                    .foregroundStyle(p.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
     }
 }

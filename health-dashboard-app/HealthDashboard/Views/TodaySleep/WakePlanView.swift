@@ -440,8 +440,9 @@ private struct ToggleRow: View {
                     Text(note)
                         .font(.secondary)
                         .foregroundStyle(Palette(scheme: scheme).secondary)
-                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
-                        .minimumScaleFactor(0.85)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                        .minimumScaleFactor(0.9)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
