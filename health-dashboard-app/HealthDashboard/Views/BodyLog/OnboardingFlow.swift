@@ -111,6 +111,7 @@ struct OnboardingFlow: View {
         if alerts != .on {
             d.sickAlerts = false
             d.peakDipNudges = false
+            d.insights.morningNote = false
         }
         d.onboarded = true
         withMotion(.commit) { store.data = d }
@@ -749,7 +750,7 @@ struct OnboardingFlow: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Alerts").font(.bodyEmphasis)
-                    Text("A heads-up 15 minutes before your focus peak and afternoon dip, and a note when several overnight signals say you may be getting sick (at most once a day).")
+                    Text("One morning note, about 45 minutes after you wake: your recovery, pill day and tonight's bedtime. Other alerts stay off until you turn them on in Settings.")
                         .font(.secondary).foregroundStyle(p.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
