@@ -1,8 +1,8 @@
 import SwiftUI
 import WatchConnectivity
 
-/// The day-3 hello card (D-T7): once, under Today's greeting on her third
-/// calendar day with the app, three things that are easy to miss because
+/// The day-3 hello card (D-T7): under Today's greeting from her third
+/// calendar day with the app until she closes it, three things that are easy to miss because
 /// they live in Settings or outside the app. "Got it" or × closes it for
 /// good.
 struct HelloCard: View {
@@ -37,7 +37,7 @@ struct HelloCard: View {
 
     private var shows: Bool {
         guard !closed else { return false }
-        return DemoMode.helloCard || (!done && dayNumber == 3)
+        return DemoMode.helloCard || (!done && (dayNumber ?? 0) >= 3)
     }
 
     /// Only while there's a Watch without the app on it.
@@ -70,7 +70,7 @@ struct HelloCard: View {
         let p = Palette(scheme: scheme)
         return RowCard(accent: .indigo) {
             HStack(spacing: Space.s) {
-                CapsLabel("Day 3 \u{00B7} a few things you might miss", color: Accent.indigo.ink(scheme))
+                CapsLabel("A few things you might miss", color: Accent.indigo.ink(scheme))
                 Spacer(minLength: Space.s)
                 Button(action: close) {
                     Image(systemName: "xmark")
