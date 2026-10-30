@@ -72,6 +72,9 @@ private struct PatternRow: View {
     var body: some View {
         ExpandRow(title: factor.title, summary: factor.sentence, summaryLines: 3,
                   systemImage: factor.systemImage, accent: factor.accent) {
+            if let sentence = factor.sentence {
+                Text(sentence).fixedSize(horizontal: false, vertical: true)
+            }
             if let p = factor.pattern, let a = p.comparison.withMean, let b = p.comparison.withoutMean {
                 let top = max(abs(a), abs(b), 1)
                 VStack(spacing: Space.s) {
