@@ -91,6 +91,7 @@ targets:
       - Shared/LogLatteIntent.swift
       - Shared/WidgetIntents.swift
       - Shared/BedtimeActivity.swift
+      - Shared/EnergySpark.swift
     dependencies:
       - package: HealthCore   # Clock.format, so widget times read like the app's
     entitlements:
@@ -120,6 +121,7 @@ targets:
       - HealthDashboardWatchWidgets
       - Shared/WidgetSnapshot.swift
       - Shared/Theme.swift
+      - Shared/EnergySpark.swift
     dependencies:
       - package: HealthCore   # Clock.format, so complication times read like the app's
     entitlements:
