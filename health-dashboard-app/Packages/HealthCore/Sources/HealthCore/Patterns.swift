@@ -6,6 +6,11 @@ import Foundation
 /// there are at least 20 nights with 5 on each side, and then only a
 /// difference bigger than her normal night-to-night wobble. The words say
 /// what happened ("your HRV averaged 9% lower"), never what caused it.
+///
+/// Things that happen mostly on weekends (parties, drinks) would otherwise
+/// be credited with the weekend's longer sleep, so those are compared
+/// within alarm mornings and within free mornings, as `lateNightEffect`
+/// does, and pooled only when both have enough nights (`pooled`).
 public struct PatternComparison: Hashable, Sendable {
     /// Nights before a pattern can show, and the fewest on each side
     /// (H-E4's numbers).
@@ -28,11 +33,16 @@ public struct PatternComparison: Hashable, Sendable {
     public var wobble: Double?
     /// The smallest difference worth a card for this measure.
     public var minimumSize: Double
+    /// Pooled from alarm and free mornings: each of the two had at least
+    /// `nightsPerSide` on each side. Always true for a plain comparison.
+    public var strataQualify = true
 
     public var nights: Int { withCount + withoutCount }
     public var enoughNights: Bool {
-        nights >= Self.nightsNeeded && withCount >= Self.nightsPerSide && withoutCount >= Self.nightsPerSide
+        strataQualify && nights >= Self.nightsNeeded && withCount >= Self.nightsPerSide && withoutCount >= Self.nightsPerSide
     }
+    /// At least `nightsPerSide` on each side.
+    var bothSides: Bool { withCount >= Self.nightsPerSide && withoutCount >= Self.nightsPerSide }
     /// Enough nights, a difference past the wobble, and big enough to matter.
     public var shows: Bool {
         guard enoughNights, let d = difference, let w = wobble else { return false }
@@ -52,6 +62,29 @@ public struct PatternComparison: Hashable, Sendable {
         }()
         return PatternComparison(withCount: a.count, withoutCount: b.count, withMean: ma, withoutMean: mb,
                                  difference: ma.flatMap { x in mb.map { x - $0 } }, wobble: wobble, minimumSize: minimumSize)
+    }
+
+    /// The alarm-morning and free-morning comparisons as one: each one's
+    /// averages weighted by its smaller side (as `HabitEffect.compare(within:)`
+    /// does), the wobble combined with the same weights. Shows nothing
+    /// (`strataQualify` false) unless both have `nightsPerSide` on each side.
+    public static func pooled(_ parts: [PatternComparison], minimumSize: Double) -> PatternComparison {
+        let qualify = parts.count == 2 && parts.allSatisfy(\.bothSides)
+        let usable = parts.filter { $0.withMean != nil && $0.withoutMean != nil && $0.wobble != nil }
+        let weights = usable.map { Double(min($0.withCount, $0.withoutCount)) }
+        let total = weights.reduce(0, +)
+        func weighted(_ f: (PatternComparison) -> Double) -> Double? {
+            total > 0 ? zip(usable, weights).map { f($0) * $1 }.reduce(0, +) / total : nil
+        }
+        let withMean = weighted { $0.withMean ?? 0 }, withoutMean = weighted { $0.withoutMean ?? 0 }
+        let wobble = total > 0
+            ? zip(usable, weights).map { pow(($0.wobble ?? 0) * $1, 2) }.reduce(0, +).squareRoot() / total
+            : nil
+        return PatternComparison(withCount: parts.map(\.withCount).reduce(0, +),
+                                 withoutCount: parts.map(\.withoutCount).reduce(0, +),
+                                 withMean: withMean, withoutMean: withoutMean,
+                                 difference: withMean.flatMap { x in withoutMean.map { x - $0 } },
+                                 wobble: wobble, minimumSize: minimumSize, strataQualify: qualify)
     }
 }
 
@@ -116,6 +149,9 @@ public enum PatternMetric: String, CaseIterable, Hashable, Sendable {
 public struct Pattern: Hashable, Sendable {
     public var metric: PatternMetric
     public var comparison: PatternComparison
+    /// Compared within alarm mornings and within free mornings: those two,
+    /// in that order. Nil for a plain comparison.
+    public var strata: [PatternComparison]? = nil
 
     /// "On nights after 2+ drinks, your HRV averaged 9% lower than on
     /// other nights." Nil until it shows.
@@ -128,12 +164,21 @@ public struct Pattern: Hashable, Sendable {
     /// nights where it's false (nil: not known, left out). Prefers one that
     /// shows; otherwise the one with the most nights, so "3 of 5 nights"
     /// counts honestly. Nil without metrics.
-    public static func find(_ nights: [NightRecord], metrics: [PatternMetric], flag: (NightRecord) -> Bool?) -> Pattern? {
+    ///
+    /// `withinAlarmMornings`: compare within alarm mornings and within free
+    /// mornings (`NightRecord.alarmUsed`) and pool the two (`pooled`), for
+    /// anything that could be mostly a weekend thing.
+    public static func find(_ nights: [NightRecord], metrics: [PatternMetric], withinAlarmMornings: Bool = false,
+                            flag: (NightRecord) -> Bool?) -> Pattern? {
         let known = nights.compactMap { n in flag(n).map { (n, $0) } }
+        func compare(_ m: PatternMetric, _ subset: [(NightRecord, Bool)]) -> PatternComparison {
+            .make(with: subset.filter(\.1).compactMap { m.value($0.0) },
+                  without: subset.filter { !$0.1 }.compactMap { m.value($0.0) }, minimumSize: m.minimumSize)
+        }
         let candidates = metrics.map { m -> Pattern in
-            let a = known.filter(\.1).compactMap { m.value($0.0) }
-            let b = known.filter { !$0.1 }.compactMap { m.value($0.0) }
-            return Pattern(metric: m, comparison: .make(with: a, without: b, minimumSize: m.minimumSize))
+            guard withinAlarmMornings else { return Pattern(metric: m, comparison: compare(m, known)) }
+            let strata = [compare(m, known.filter { $0.0.alarmUsed }), compare(m, known.filter { !$0.0.alarmUsed })]
+            return Pattern(metric: m, comparison: .pooled(strata, minimumSize: m.minimumSize), strata: strata)
         }
         if let best = candidates.filter(\.comparison.shows).max(by: { $0.comparison.strength < $1.comparison.strength }) {
             return best

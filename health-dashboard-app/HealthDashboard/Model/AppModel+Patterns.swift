@@ -80,13 +80,23 @@ struct PatternFactor: Identifiable, Hashable {
 
     var sentence: String? { pattern?.sentence(context: context) }
 
+    /// Compared within alarm mornings and within free mornings: anything
+    /// that can be mostly a weekend thing, so it isn't credited with the
+    /// weekend's longer sleep. Feeling sick isn't.
+    var withinAlarmMornings: Bool { kind != .sick }
+
     /// "3 of 5 tagged nights", "No clear difference yet".
     var progress: String {
         guard let c = pattern?.comparison else { return "Nothing to compare yet" }
+        if let strata = pattern?.strata, strata.count == 2, !c.strataQualify,
+           strata.contains(where: { $0.withCount < PatternComparison.nightsPerSide }) {
+            let need = PatternComparison.nightsPerSide
+            return "\(min(strata[0].withCount, need)) of \(need) on alarm mornings, \(min(strata[1].withCount, need)) of \(need) on free"
+        }
         if c.withCount < PatternComparison.nightsPerSide {
             return "\(c.withCount) of \(PatternComparison.nightsPerSide) \(flaggedNights)"
         }
-        if c.withoutCount < PatternComparison.nightsPerSide || c.nights < PatternComparison.nightsNeeded {
+        if c.withoutCount < PatternComparison.nightsPerSide || c.nights < PatternComparison.nightsNeeded || !c.strataQualify {
             return "\(min(c.nights, PatternComparison.nightsNeeded)) of \(PatternComparison.nightsNeeded) nights"
         }
         return "No clear difference yet"
@@ -100,7 +110,9 @@ extension AppModel {
         let nights = patternNights
         let kinds = PatternFactor.Kind.allCases.filter { $0 != .alcohol || store.data.drinksTracking }
         return kinds.map { kind in
-            PatternFactor(kind: kind, pattern: Pattern.find(nights, metrics: PatternFactor(kind: kind).metrics) { patternFlag(kind, $0) })
+            let factor = PatternFactor(kind: kind)
+            return PatternFactor(kind: kind, pattern: Pattern.find(nights, metrics: factor.metrics,
+                                                                   withinAlarmMornings: factor.withinAlarmMornings) { patternFlag(kind, $0) })
         }
         .sorted { ($0.sentence != nil ? 0 : 1) < ($1.sentence != nil ? 0 : 1) }
     }

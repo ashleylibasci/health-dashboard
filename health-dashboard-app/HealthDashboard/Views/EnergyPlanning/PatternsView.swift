@@ -54,6 +54,9 @@ struct PatternsView: View {
         if let c, c.enoughNights {
             return "You have enough \(f.flaggedNights) to compare, and so far they don't differ from your other nights by more than their usual wobble."
         }
+        if let strata = f.pattern?.strata, strata.count == 2, f.pattern?.comparison.strataQualify == false {
+            return "So weekends' longer sleep isn't counted for it, it's compared within alarm mornings and within free mornings, and each needs at least \(PatternComparison.nightsPerSide) \(f.flaggedNights) and \(PatternComparison.nightsPerSide) other nights. So far: \(strata[0].withCount) on alarm mornings, \(strata[1].withCount) on free mornings."
+        }
         let how = f.kind == .alcohol ? "Log alcohol on the Log tab." : f.kind == .examWeek ? "Add exams in your exam list, or tag \u{201C}Exam today\u{201D} in the check-in." : "Tag it in the morning check-in."
         return "A pattern needs at least \(PatternComparison.nightsPerSide) \(f.flaggedNights), \(PatternComparison.nightsPerSide) other nights and \(PatternComparison.nightsNeeded) in all. " + how
     }
@@ -62,7 +65,7 @@ struct PatternsView: View {
         id: "patterns", title: "Patterns",
         meaning: "Your nights with something (2+ drinks, an exam week, a tag from your morning check-in) next to your other nights, from your own Apple Watch data.",
         forYou: "It shows what happened, not why. A late night, a party and little sleep often come together, so one of them may not be the reason. Use it as a hint about yourself, not a rule.",
-        howWeGotIt: "From your last 90 nights. A pattern needs at least 20 nights, with at least 5 that had the thing and 5 that didn't. The difference between the two averages has to be more than twice its standard error (the wobble you'd see between two groups of your nights by chance) and at least 5% for HRV, 2 bpm for resting heart rate, 20 minutes of sleep or half a point in your morning check-in. A tag only counts on mornings you checked in. Exam weeks are the exam day and the 6 days before it.")
+        howWeGotIt: "From your last 90 nights. A pattern needs at least 20 nights, with at least 5 that had the thing and 5 that didn't. The difference between the two averages has to be more than twice its standard error (the wobble you'd see between two groups of your nights by chance) and at least 5% for HRV, 2 bpm for resting heart rate, 20 minutes of sleep or half a point in your morning check-in. A tag only counts on mornings you checked in. Exam weeks are the exam day and the 6 days before it. Drinks, exams, late study, parties and workouts are compared within alarm mornings and within free mornings, then combined, so a weekend's longer sleep isn't counted for them; that needs at least 5 nights with and 5 without on both kinds of morning.")
 }
 
 /// A found pattern: the sentence, then the two averages one tap down.

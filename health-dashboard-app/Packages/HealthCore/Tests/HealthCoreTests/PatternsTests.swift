@@ -68,4 +68,50 @@ final class PatternsTests: XCTestCase {
         // Time to fall asleep is capped at 3 hours, as in H-E4.
         XCTAssertEqual(PatternMetric.fallAsleep.value(night(0, latency: 400)), 180)
     }
+
+    // Weekend confound: free mornings sleep longer, parties fall on free
+    // mornings. Compared within alarm and free mornings, the parties don't
+    // get the weekend's longer sleep.
+    private func week(_ count: Int, party: (Int, Bool) -> Bool, effect: Int = 0) -> [(NightRecord, Bool)] {
+        (0..<count).map { i in
+            let free = i % 7 >= 5
+            let p = party(i, free)
+            var n = night(i, asleep: (free ? 520 : 430) + (i * 7) % 11 - 5 + (p ? effect : 0))
+            n.alarmUsed = !free
+            return (n, p)
+        }
+    }
+
+    func testPartiesOnWeekendsShowNoSleepPattern() {
+        // Every Saturday and Sunday is a party: no party on an alarm morning.
+        let data = week(70) { _, free in free }
+        let flags = Dictionary(uniqueKeysWithValues: data.map { ($0.0.wakeDay, $0.1) })
+        let plain = Pattern.find(data.map(\.0), metrics: [.asleep]) { flags[$0.wakeDay] }
+        XCTAssertNotNil(plain?.sentence(context: "x"))          // what the confound would have shown
+        let within = Pattern.find(data.map(\.0), metrics: [.asleep], withinAlarmMornings: true) { flags[$0.wakeDay] }
+        XCTAssertNil(within?.sentence(context: "x"))
+        XCTAssertEqual(within?.comparison.strataQualify, false)
+        XCTAssertEqual(within?.strata?.first?.withCount, 0)
+    }
+
+    func testMostlyWeekendPartiesWithoutEffectShowNothing() {
+        // Parties on most free mornings and some alarm mornings, no effect of
+        // their own: both strata qualify and the pooled difference is ~0.
+        let data = week(84) { i, free in free ? i % 7 == 5 || i % 14 == 6 : i % 7 == 4 }
+        let flags = Dictionary(uniqueKeysWithValues: data.map { ($0.0.wakeDay, $0.1) })
+        let plain = Pattern.find(data.map(\.0), metrics: [.asleep]) { flags[$0.wakeDay] }
+        XCTAssertNotNil(plain?.sentence(context: "x"))
+        let within = Pattern.find(data.map(\.0), metrics: [.asleep], withinAlarmMornings: true) { flags[$0.wakeDay] }
+        XCTAssertEqual(within?.comparison.strataQualify, true)
+        XCTAssertNil(within?.sentence(context: "x"))
+    }
+
+    func testPartiesOnBothKindsOfMorningsStillShowARealDifference() {
+        let data = week(84, party: { i, free in free ? i % 7 == 5 : i % 7 == 4 }, effect: -40)
+        let flags = Dictionary(uniqueKeysWithValues: data.map { ($0.0.wakeDay, $0.1) })
+        let within = Pattern.find(data.map(\.0), metrics: [.asleep], withinAlarmMornings: true) { flags[$0.wakeDay] }
+        XCTAssertEqual(within?.comparison.strataQualify, true)
+        XCTAssertEqual(within?.comparison.difference ?? 0, -40, accuracy: 4)
+        XCTAssertNotNil(within?.sentence(context: "On nights after a party"))
+    }
 }
