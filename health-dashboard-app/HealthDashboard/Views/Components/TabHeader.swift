@@ -61,7 +61,7 @@ struct GuideButton: View {
             HealthGuideView()
         } label: {
             Image(systemName: "book.closed.fill")
-                .font(.scaled(size: 16, weight: .semibold))
+                .font(HeaderCircle.iconFont(16))
                 .modifier(HeaderCircle())
         }
         .buttonStyle(.pressable)
@@ -72,6 +72,11 @@ struct GuideButton: View {
 /// The 40pt chip circle behind the tab header's buttons, in a 44pt target.
 private struct HeaderCircle: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+
+    /// Scaled with the text size, but never past what fits the circle.
+    static func iconFont(_ size: CGFloat) -> Font {
+        .system(size: min(Font.scaledSize(size), 22), weight: .semibold)
+    }
 
     func body(content: Content) -> some View {
         let p = Palette(scheme: scheme)
@@ -107,7 +112,7 @@ struct SettingsAvatar: View {
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                 } else {
-                    Image(systemName: "gearshape.fill").font(.scaled(size: 17, weight: .semibold))
+                    Image(systemName: "gearshape.fill").font(HeaderCircle.iconFont(17))
                 }
             }
             .modifier(HeaderCircle())
