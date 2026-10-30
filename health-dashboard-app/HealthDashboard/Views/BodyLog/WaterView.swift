@@ -667,6 +667,7 @@ private struct WaterDayChart: View {
         }
         // VoiceOver reads the chart's summary (chartScrub makes it one
         // element), so no mark-level hiding (Weber A8).
+        .drawsIn()
         .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 30 })
         .chartXScale(domain: start...end)
         // The last x label ("12am") ran past the plot's edge (Weber C11).

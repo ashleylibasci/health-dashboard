@@ -41,6 +41,16 @@ import HealthCore
 ///   the example numbers, with its Log latte and +1 bottle buttons (D-N1).
 /// - `-demoBedtimeNudge`: the bedtime nudge 10 seconds after launch, with
 ///   its Turn on Watch alarm button (D-N2).
+/// - `-demoEveningDim`: the evening dim at full, whatever the time (D-M6).
+/// - `-demoSkyPhase sunrise|day|sunset|night`: the Sky theme, held at that
+///   phase.
+/// - `-demoTab today|sleep|body|log`: opens on that tab.
+/// - `-demoLog`: on the Log tab, her first caffeine drink is logged 3
+///   seconds in, then a bottle of water every 2.5 seconds from 10 seconds
+///   in until the goal (D-M3).
+/// - `-demoZoom recovery|tonight|water|caffeine`: that Today card grows
+///   into its screen 3 seconds after launch and shrinks back 6 seconds
+///   later (D-M1). Add `-UIAnimationDragCoefficient 6` to slow it down.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -62,7 +72,7 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory`:
+    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory|appearance|energy`:
     /// opens on that screen (Body tab), for screenshots. The pill-visit summary also saves its
     /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")
@@ -97,8 +107,23 @@ enum DemoMode {
     static let tiles = value(after: "-demoTiles")
     static let morningNote = args.contains("-demoMorningNote")
     static let bedtimeNudge = args.contains("-demoBedtimeNudge")
+    static let eveningDim = args.contains("-demoEveningDim")
+    static let skyPhase = value(after: "-demoSkyPhase").flatMap(SkyPhase.init(rawValue:))
+    static let zoom = value(after: "-demoZoom")
+    static let tab: AppTab? = switch value(after: "-demoTab") {
+    case "sleep": .sleep
+    case "body": .body
+    case "log": .log
+    case "today": .today
+    default: nil
+    }
+    static let logs = args.contains("-demoLog")
     #else
-    static let morningNote = false, bedtimeNudge = false
+    static let zoom: String? = nil
+    static let tab: AppTab? = nil
+    static let logs = false
+    static let skyPhase: SkyPhase? = nil
+    static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
     static let tiles: String? = nil
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false

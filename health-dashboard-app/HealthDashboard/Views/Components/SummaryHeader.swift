@@ -43,6 +43,12 @@ struct SummaryHeader<Footer: View>: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// "7h 21m", "43 ms", or the verdict word.
+    private var pinnedAnswer: String {
+        guard valueIsNumber, let unit else { return value }
+        return "\(value) \(unit)"
+    }
+
     /// Numerals and times get the big display role; words don't.
     private var valueIsNumber: Bool { value.contains { $0.isNumber } }
 
@@ -84,6 +90,8 @@ struct SummaryHeader<Footer: View>: View {
                         if !ax { Spacer(minLength: Space.s) }
                         if let status { StatusChip(status: status) }
                     }
+                    // Joins the title in the bar once scrolled away (D-M5).
+                    .pinsAnswer(pinnedAnswer)
                     Text(line)
                         .font(.bodyText)
                         .foregroundStyle(p.secondary)

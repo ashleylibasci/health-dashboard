@@ -45,6 +45,7 @@ targets:
         NSHealthUpdateUsageDescription: "Saves the caffeine and water you log to Apple Health."
         NSCalendarsFullAccessUsageDescription: "Health Dashboard looks for exams on your calendar (events with exam, midterm, final, quiz or test in the title) so it can plan your sleep around them. It never changes your calendar, and events stay on your phone."
         NSAlarmKitUsageDescription: "Health Dashboard sets a backup alarm on your iPhone at your smart alarm's latest time, in case your Watch can't wake you."
+        NSLocationWhenInUseUsageDescription: "With the Sky theme, your rough location (city level) works out today's sunrise and sunset on your phone, so the app's colours follow the sun. It's never sent anywhere."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ashleylibasci.healthdashboard

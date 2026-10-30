@@ -641,11 +641,16 @@ struct DataSettingsView: View {
 
 // MARK: - Appearance
 
-/// Dark (the default), Light, or Match iPhone, as three small previews.
+/// Dark (the default), Light, Match iPhone or Sky, as four small previews.
 struct AppearanceSettingsView: View {
-    /// "dark" (default), "light" or "system". Read by the app root.
+    /// "dark" (default), "light", "system" or "sky". Read by the app root.
     @AppStorage("appearance") private var appearance = "dark"
+    /// After her wind-down the backgrounds turn warmer and darker (D-M6).
+    @AppStorage("eveningDim") private var eveningDim = true
+    @EnvironmentObject private var model: AppModel
+    @ObservedObject private var location = SkyLocation.shared
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private struct Mode: Identifiable {
         let id: String
@@ -657,16 +662,19 @@ struct AppearanceSettingsView: View {
         Mode(id: "dark", name: "Dark", note: "Dark is the default. It matches your Watch and is easier on your eyes at night."),
         Mode(id: "light", name: "Light", note: "Every screen keeps the same layout and colors for each metric, on a light background."),
         Mode(id: "system", name: "Match iPhone", note: "Follows your iPhone\u{2019}s Light or Dark setting, and switches with it if you set it to Automatic."),
+        Mode(id: "sky", name: "Sky", note: "Sky follows the sun where you are: dark at night, warm at sunrise and sunset, light in the day."),
     ]
 
-    /// "Dark", "Light" or "Match iPhone", for the Settings row.
+    /// "Dark", "Light", "Match iPhone" or "Sky", for the Settings row.
     static func name(_ id: String) -> String {
         (modes.first { $0.id == id } ?? modes[0]).name
     }
 
     var body: some View {
         Screen(title: "Appearance", accent: .purple) {
-            HStack(spacing: 10) {
+            // Two by two at accessibility text sizes, so the names fit.
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: typeSize.isAccessibilitySize ? 2 : 4)
+            LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(Self.modes) { mode in
                     card(mode)
                 }
@@ -675,20 +683,67 @@ struct AppearanceSettingsView: View {
                 .font(.scaled(size: 13))
                 .secondaryText()
                 .fixedSize(horizontal: false, vertical: true)
+            if sky {
+                Card(density: .compact) {
+                    SunRow(line: sunLine)
+                    Divider().overlay(Palette(scheme: scheme).cardBorder)
+                    SettingToggleRow(title: "Use my location", detail: locationNote, systemImage: "location.fill",
+                                     accent: .blue, isOn: $location.usesLocation)
+                }
+                .padding(.top, Space.s)
+            }
+            Card(density: .compact) {
+                SettingToggleRow(title: "Evening dim", detail: sky ? "Off while Sky is on; sunset does it" : eveningDimNote,
+                                 systemImage: "moon.haze.fill", accent: .purple, isOn: sky ? .constant(false) : $eveningDim)
+                    .disabled(sky)
+            }
+            .padding(.top, sky ? 0 : Space.s)
         }
+    }
+
+    private var sky: Bool { appearance == "sky" }
+
+    /// "Sunrise 7:30am · sunset 6:15pm".
+    private var sunLine: String {
+        switch AmbientLook.todaysSun() {
+        case .rises(let sunrise, let sunset):
+            return "Sunrise \(Clock.format(Clock.minutesOfDay(sunrise))) \u{00B7} sunset \(Clock.format(Clock.minutesOfDay(sunset)))"
+        case .alwaysUp: return "The sun stays up all day today"
+        case .alwaysDown: return "The sun doesn\u{2019}t rise today"
+        }
+    }
+
+    private var locationNote: String {
+        guard location.usesLocation else {
+            return "Off: the sun times come from your time zone, so they can be out by up to an hour"
+        }
+        if location.status == .denied || location.status == .restricted {
+            return "Location is off for this app in iOS Settings, so the sun times come from your time zone"
+        }
+        return "City level, stays on your phone"
+    }
+
+    /// "From your wind-down at 9:45pm, …"
+    private var eveningDimNote: String {
+        let start = AmbientLook.windDownStart(model).map { " at \(Clock.format($0))" } ?? ""
+        return "From your wind-down\(start), the background turns a little warmer and darker. It follows the clock, not your numbers."
     }
 
     private func card(_ mode: Mode) -> some View {
         let p = Palette(scheme: scheme)
         let on = appearance == mode.id
         let accent = Accent.indigo.ink(scheme)
-        return Button { appearance = mode.id } label: {
+        return Button {
+            appearance = mode.id
+            // Asked once, when she first picks Sky.
+            if mode.id == "sky" { SkyLocation.shared.refresh(asking: true) }
+        } label: {
             VStack(spacing: 8) {
                 AppearanceThumb(mode: mode.id)
                 Text(mode.name)
                     .font(.scaled(size: 13, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                 ZStack {
                     Circle().strokeBorder(on ? accent : p.tertiary, lineWidth: 2)
                     Circle().fill(on ? accent : Color.clear).frame(width: 10, height: 10)
@@ -696,7 +751,7 @@ struct AppearanceSettingsView: View {
                 .frame(width: 20, height: 20)
                 .accessibilityHidden(true)
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 4)
             .padding(.top, 10)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity)
@@ -709,6 +764,32 @@ struct AppearanceSettingsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(mode.name) appearance")
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// "Today's sun" on the Appearance page, laid out like `SettingToggleRow`.
+private struct SunRow: View {
+    var line: String
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sun.horizon.fill")
+                .font(.scaled(size: 15, weight: .semibold))
+                .foregroundStyle(Accent.orange.ink(scheme))
+                .frame(width: 36, height: 36)
+                .background(Accent.orange.tint(scheme), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Today\u{2019}s sun").font(.scaled(size: 15, weight: .bold))
+                Text(line).font(.scaled(size: 13)).secondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 44)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -726,6 +807,11 @@ private struct AppearanceThumb: View {
         case "system":
             return LinearGradient(stops: [.init(color: dark, location: 0.5), .init(color: light, location: 0.5)],
                                   startPoint: .leading, endPoint: .trailing)
+        case "sky":
+            // One day: night, sunrise, day, sunset (the mockup's day strip).
+            return LinearGradient(colors: [Color(hex: 0x1D2150), Color(hex: 0xF7B9A3), Color(hex: 0xD8EAFB),
+                                           Color(hex: 0xF2955F), Color(hex: 0x8C3F78)],
+                                  startPoint: .top, endPoint: .bottom)
         default:
             return LinearGradient(colors: [dark, dark], startPoint: .leading, endPoint: .trailing)
         }
@@ -735,6 +821,7 @@ private struct AppearanceThumb: View {
         switch mode {
         case "light": return .white
         case "system": return Color(hex: 0xA0A0B4, alpha: 0.45)
+        case "sky": return Color.white.opacity(0.4)
         default: return Color.white.opacity(0.18)
         }
     }

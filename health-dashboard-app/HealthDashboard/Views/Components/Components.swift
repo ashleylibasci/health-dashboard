@@ -16,7 +16,12 @@ struct Screen<Content: View>: View {
     var searches = false
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
     @EnvironmentObject private var model: AppModel
+    /// The summary's answer while it's scrolled under the bar (D-M5).
+    @State private var pinned: String?
+    /// The bottom of the navigation bar, in global coordinates.
+    @State private var barBottom: CGFloat = 0
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -34,10 +39,22 @@ struct Screen<Content: View>: View {
             }
         }
         .modifier(SearchScrollBehavior(enabled: searches))
+        // The scroll view's top edge, or (when it runs under the bar) its
+        // safe area: either way, the bar's bottom.
+        .onGeometryChange(for: CGFloat.self) { max($0.frame(in: .global).minY, $0.safeAreaInsets.top) } action: {
+            barBottom = $0
+        }
+        .environment(\.answerPin, title == nil ? nil : AnswerPin(line: barBottom) { pinned = $0 })
         .background(alignment: .top) {
             ZStack(alignment: .top) {
-                p.background
-                p.glow(accent).frame(height: 460)
+                if let look {
+                    LinearGradient(gradient: look.background, startPoint: .top, endPoint: .bottom)
+                } else {
+                    p.background
+                }
+                if look?.glow ?? true {
+                    p.glow(accent).frame(height: 460)
+                }
             }
             .ignoresSafeArea()
         }
@@ -45,6 +62,13 @@ struct Screen<Content: View>: View {
         .modifier(PullToRefresh(enabled: refreshes) { await model.becameActive() })
         .navigationTitle(title ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let title {
+                ToolbarItem(placement: .principal) {
+                    PinnedTitle(title: title, answer: pinned, accent: accent)
+                }
+            }
+        }
     }
 }
 
@@ -80,6 +104,7 @@ struct Card<Content: View>: View {
     var padding: CGFloat = Space.l
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -87,9 +112,10 @@ struct Card<Content: View>: View {
         VStack(alignment: .leading, spacing: Space.m) { content }
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(accent.map { $0.tint(scheme) } ?? p.card, in: shape)
+            .background(accent.map { $0.tint(scheme) } ?? look?.card ?? p.card, in: shape)
+            .background(accent != nil && look?.tintsOnCard == true ? look?.card ?? .clear : .clear, in: shape)
             // Tinted cards carry their colour without a border.
-            .overlay(shape.strokeBorder(accent == nil ? p.cardBorder : .clear))
+            .overlay(shape.strokeBorder(accent == nil ? look?.cardBorder ?? p.cardBorder : .clear))
             .shadow(color: scheme == .light && accent == nil ? Color(hex: 0x141428, alpha: 0.06) : .clear, radius: 1, y: 1)
     }
 }
@@ -272,12 +298,13 @@ extension View {
 
 private struct TileSurface: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.surfaceLook) private var look
     func body(content: Content) -> some View {
         let p = Palette(scheme: scheme)
         let shape = RoundedRectangle(cornerRadius: Radius.surface, style: .continuous)
         content
-            .background(p.card, in: shape)
-            .overlay(shape.strokeBorder(p.cardBorder))
+            .background(look?.card ?? p.card, in: shape)
+            .overlay(shape.strokeBorder(look?.cardBorder ?? p.cardBorder))
             .shadow(color: scheme == .light ? Color(hex: 0x141428, alpha: 0.06) : .clear, radius: 1, y: 1)
     }
 }

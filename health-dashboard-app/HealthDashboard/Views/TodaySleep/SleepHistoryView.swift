@@ -293,6 +293,7 @@ struct HistoryBars: View {
             }
             needLine
         }
+        .drawsIn()
         .chartScrub($selection, snapped: selected, steps: range.isWeekly ? weeks.map(\.week) : nights.map(\.wakeDay).sorted())
         .chartYScale(domain: 0.0...11.0)
         .chartXScale(domain: domain, range: .plotDimension(startPadding: 4, endPadding: 8))

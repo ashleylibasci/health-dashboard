@@ -41,6 +41,11 @@ struct TodayView: View {
     @State private var editingTiles = false
     /// The Sunday whose week story she last opened (D-P1).
     @AppStorage("weekStorySeen") private var weekStorySeen = ""
+    /// Cards grow into the screens they open (D-M1).
+    @Namespace private var zoom
+    /// `-demoZoom` (Debug): that card's screen open.
+    @State private var demoZoomed = false
+    @State private var demoZoomPlayed = false
 
     var body: some View {
         Screen(accent: .indigo, searches: true) {
@@ -100,6 +105,21 @@ struct TodayView: View {
         }
         .sensoryFeedback(.success, trigger: alarmTurnedOn)
         .sensoryFeedback(.impact(weight: .light), trigger: alarmUndone)
+        .navigationDestination(isPresented: $demoZoomed) {
+            switch DemoMode.zoom {
+            case "tonight": WakePlanView().zoomDestination("tonight", in: zoom)
+            case "water": WaterView().zoomDestination("water", in: zoom)
+            case "caffeine": CaffeineView().zoomDestination("caffeine", in: zoom)
+            default: RecoveryView().zoomDestination("recovery", in: zoom)
+            }
+        }
+        .onAppear {
+            // Grows open 3 s after launch and shrinks back 6 s later, once.
+            guard DemoMode.zoom != nil, !demoZoomPlayed else { return }
+            demoZoomPlayed = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { demoZoomed = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9) { demoZoomed = false }
+        }
     }
 
     // MARK: Header
@@ -324,7 +344,7 @@ struct TodayView: View {
             .padding(.bottom, -Space.s)
             if let value = recoveryValue {
                 NavigationLink {
-                    RecoveryView()
+                    RecoveryView().zoomDestination("recovery", in: zoom)
                 } label: {
                     AdaptiveStack(spacing: Space.l) {
                         let empty = revealing && !reduceMotion
@@ -352,6 +372,7 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
                 .accessibilityHint("Opens recovery details")
+                .zoomSource("recovery", in: zoom)
             } else {
                 Text("No recovery yet today").font(.heading)
                     .accessibilityAddTraits(.isHeader)
@@ -396,7 +417,7 @@ struct TodayView: View {
         let fresh = model.lastNightIsFresh
         return AdaptiveStack(spacing: Space.s, alignment: .top) {
             NavigationLink {
-                HeartMetricView(metric: .hrv)
+                HeartMetricView(metric: .hrv).zoomDestination("hrv", in: zoom)
             } label: {
                 MiniGauge(fraction: heart ? model.hrvGaugeFraction : 0, accent: .indigo,
                           value: heart ? "\(Int(model.hrv.rounded()))" : "\u{2014}", title: "HRV",
@@ -404,8 +425,9 @@ struct TodayView: View {
             }
             .buttonStyle(.pressable)
             .accessibilityHint("Opens HRV")
+            .zoomSource("hrv", in: zoom)
             NavigationLink {
-                HeartMetricView(metric: .restingHR)
+                HeartMetricView(metric: .restingHR).zoomDestination("restingHR", in: zoom)
             } label: {
                 MiniGauge(fraction: heart ? model.restingHRGaugeFraction : 0, accent: .pink,
                           value: heart ? "\(Int(model.restingHR.rounded()))" : "\u{2014}", title: "Resting HR",
@@ -413,6 +435,7 @@ struct TodayView: View {
             }
             .buttonStyle(.pressable)
             .accessibilityHint("Opens resting heart rate")
+            .zoomSource("restingHR", in: zoom)
             Button { openTab(.sleep) } label: {
                 MiniGauge(fraction: fresh ? Double(model.lastNight.asleep) / 540 : 0, accent: .purple,
                           // "7h 21m", as the Sleep screen says it (round 3).
@@ -504,7 +527,7 @@ struct TodayView: View {
         return Card {
             HStack(alignment: .top, spacing: 0) {
                 NavigationLink {
-                    WakePlanView()
+                    WakePlanView().zoomDestination("tonight", in: zoom)
                 } label: {
                     HStack(alignment: .top, spacing: Space.m) {
                         Image(systemName: "moon.stars.fill")
@@ -537,6 +560,7 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
                 .accessibilityHint("Opens your sleep plan")
+                .zoomSource("tonight", in: zoom)
                 InfoButton(explanation: tonightExplanation).padding(.vertical, -10).padding(.trailing, -12)
             }
             alarmChip(tonight)
@@ -861,12 +885,13 @@ struct TodayView: View {
 
     private var energyTile: some View {
         NavigationLink {
-            EnergyView()
+            EnergyView().zoomDestination("energy", in: zoom)
         } label: {
             EnergyNowTile(energy: model.energyToday, now: clock, moment: model.energyMoment(at: clock, in: model.energyToday))
         }
         .buttonStyle(.pressable)
         .accessibilityHint("Opens your energy curve for today")
+        .zoomSource("energy", in: zoom)
     }
 
     /// Switches to the Sleep tab instead of pushing a second Sleep screen
@@ -882,31 +907,33 @@ struct TodayView: View {
 
     private var caffeineTile: some View {
         NavigationLink {
-            CaffeineView()
+            CaffeineView().zoomDestination("caffeine", in: zoom)
         } label: {
             MetricTile(title: "Caffeine", value: caffeineValue, note: caffeineNote,
                        accent: .yellow, systemImage: "cup.and.saucer.fill")
         }
         .buttonStyle(.pressable)
         .accessibilityHint("Opens caffeine, where you can log coffee or tea and change the times")
+        .zoomSource("caffeine", in: zoom)
     }
 
     private var waterTile: some View {
         WaterTile(todayML: model.waterTodayML, goalML: model.waterGoalTodayML,
                   bottleML: store.data.bottleSizeML, paceML: model.waterPace(at: clock),
-                  showsGoal: !model.hidesEffortTargets) {
+                  showsGoal: !model.hidesEffortTargets, zoom: zoom) {
             withMotion(.log) { model.addWater() }
         }
     }
 
     private var stressTile: some View {
         NavigationLink {
-            StressView()
+            StressView().zoomDestination("stress", in: zoom)
         } label: {
             MetricTile(title: "Stress", value: stressValue, note: stressNote,
                        accent: .orange, systemImage: "waveform.path")
         }
         .buttonStyle(.pressable)
+        .zoomSource("stress", in: zoom)
     }
 
     /// Today's pill (D-P4): pack day and whether it's taken; opens Cycle.
@@ -919,12 +946,13 @@ struct TodayView: View {
             return pill.isPillDay ? "Not taken yet" : "No pill today"
         }()
         return NavigationLink {
-            CycleView()
+            CycleView().zoomDestination("pill", in: zoom)
         } label: {
             MetricTile(title: "Pill", value: value, note: note, accent: .pink, systemImage: "pills.fill")
         }
         .buttonStyle(.pressable)
         .accessibilityHint("Opens your cycle and pack")
+        .zoomSource("pill", in: zoom)
     }
 }
 
@@ -937,10 +965,13 @@ private struct WaterTile: View {
     var paceML: Double
     /// False with an eating-disorder history: the total only, no goal.
     var showsGoal: Bool
+    var zoom: Namespace.ID
     var add: () -> Void
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var added = 0
+    /// Times today's goal was reached here, for the sparkle (D-M3).
+    @State private var reached = 0
 
     /// The steady pace by now (F7): the bottles line said the amount
     /// again. Nothing once the goal is reached, before waking, or without a
@@ -958,7 +989,7 @@ private struct WaterTile: View {
         let p = Palette(scheme: scheme)
         ZStack(alignment: .topTrailing) {
             NavigationLink {
-                WaterView()
+                WaterView().zoomDestination("water", in: zoom)
             } label: {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     Text("Water").font(.bodyEmphasis)
@@ -967,6 +998,9 @@ private struct WaterTile: View {
                         .font(.numberL).minimumScaleFactor(0.6).lineLimit(1)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .motion(.fill, value: amount)
+                        .overlay(alignment: .topTrailing) {
+                            GoalSparkle(trigger: reached, accent: .blue).offset(x: 18, y: -10)
+                        }
                     if let paceNote {
                         Text(paceNote).font(.secondary).foregroundStyle(p.secondary)
                     }
@@ -1000,6 +1034,10 @@ private struct WaterTile: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .tileSurface()
+        .zoomSource("water", in: zoom)
+        .onChange(of: todayML) { old, new in
+            if showsGoal, old < goalML, new >= goalML { reached += 1 }
+        }
     }
 }
 
