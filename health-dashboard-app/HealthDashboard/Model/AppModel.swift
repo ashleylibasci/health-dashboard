@@ -944,7 +944,6 @@ final class AppModel: ObservableObject {
         if let o = store.data.alarmOverride, AppDay.date(o.end, relativeTo: o.wakeDay) <= .now {
             store.data.alarmOverride = nil   // that morning has passed
         }
-        clearOldBrainDump()
         applyExamCrunch()
         pushToWatch()
         Task {

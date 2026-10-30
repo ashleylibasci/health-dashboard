@@ -198,8 +198,6 @@ struct WakePlanView: View {
                 windDown
             }
             RowDivider()
-            BrainDumpRow()
-            RowDivider()
             ExpandRow(title: "Your times", summary: "Up by \(Clock.format(store.data.upBy)) \u{00B7} usual bed \(Clock.format(store.data.bedtime))",
                       systemImage: "clock.fill", accent: .purple) {
                 timesContent(latency: best.latency)

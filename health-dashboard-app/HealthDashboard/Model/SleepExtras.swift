@@ -1,16 +1,10 @@
 import Foundation
 
-/// What the sleep and exam features save (the bedtime nudge, tomorrow's
-/// list, after-exam check-ins, the exam crunch). Kept in one field of
+/// What the sleep and exam features save (the bedtime nudge, after-exam
+/// check-ins, the exam crunch). Kept in one field of
 /// `AppData` so it stays on the phone with everything else. Decoding is
 /// forgiving, like `AppData`'s.
 struct SleepExtrasData: Codable, Hashable {
-    /// A list she wrote before bed. Cleared a week after she wrote it.
-    struct BrainDump: Codable, Hashable {
-        var date: Date
-        var text: String
-    }
-
     /// How an exam went, from the two-tap check-in after it.
     struct ExamReflection: Codable, Hashable, Identifiable {
         enum Felt: Int, Codable, CaseIterable { case rough = 1, okay = 2, well = 3 }
@@ -24,7 +18,6 @@ struct SleepExtrasData: Codable, Hashable {
 
     /// "Lights low, screens down" 45 minutes before tonight's bedtime.
     var bedtimeNudge = false
-    var brainDump: BrainDump?
     var examReflections: [ExamReflection] = []
     /// Exams she skipped the check-in for, so it isn't asked again.
     var skippedReflections: Set<UUID> = []
@@ -39,7 +32,6 @@ struct SleepExtrasData: Codable, Hashable {
         let d = SleepExtrasData()
         func get<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T { (try? c.decodeIfPresent(T.self, forKey: key)) ?? fallback }
         bedtimeNudge = get(.bedtimeNudge, d.bedtimeNudge)
-        brainDump = get(.brainDump, d.brainDump)
         examReflections = get(.examReflections, d.examReflections)
         skippedReflections = get(.skippedReflections, d.skippedReflections)
         crunchTurnedOn = get(.crunchTurnedOn, d.crunchTurnedOn)
