@@ -15,6 +15,8 @@ struct HealthDashboardApp: App {
         _store = StateObject(wrappedValue: store)
         _model = StateObject(wrappedValue: model)
         DemoMode.applySetup(store: store, model: model)
+        // The day-3 hello card counts its days from here (D-T7).
+        HelloCard.recordFirstLaunch()
         // Apple Health wakes the app with new data (also when it's closed).
         BackgroundHealth.shared.start(model)
         // Pill doses logged in Apple Health cancel that pill's reminders.

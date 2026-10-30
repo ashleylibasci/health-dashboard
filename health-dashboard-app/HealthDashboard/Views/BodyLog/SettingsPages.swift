@@ -399,14 +399,14 @@ struct NotificationSettingsView: View {
 /// Where to find each place the app shows up outside itself (Whitfield F10),
 /// one row each, opened in place.
 struct WidgetsWatchSettingsView: View {
-    private struct HowTo: Identifiable {
+    struct HowTo: Identifiable {
         var id: String { title }
         let title: String
         let systemImage: String
         let steps: String
     }
 
-    private let howTos: [HowTo] = [
+    static let howTos: [HowTo] = [
         HowTo(title: "Home Screen widget", systemImage: "apps.iphone",
               steps: "Touch and hold an empty spot on your Home Screen, tap Edit, then Add Widget, and search for Health Dashboard. Pick Recovery, Cycle, Caffeine & water, or Bedtime streak."),
         HowTo(title: "Lock Screen widget", systemImage: "lock.iphone",
@@ -420,7 +420,7 @@ struct WidgetsWatchSettingsView: View {
     var body: some View {
         Screen(title: "Widgets & Watch", accent: .indigo) {
             RowCard {
-                ForEach(Array(howTos.enumerated()), id: \.element.id) { i, howTo in
+                ForEach(Array(Self.howTos.enumerated()), id: \.element.id) { i, howTo in
                     if i > 0 { RowDivider() }
                     ExpandRow(title: howTo.title, summary: "How to add it", systemImage: howTo.systemImage, accent: .indigo) {
                         Text(howTo.steps).fixedSize(horizontal: false, vertical: true)

@@ -41,6 +41,7 @@ struct TodayView: View {
     var body: some View {
         Screen(accent: .indigo, searches: true) {
             TabHeader(greeting)
+            HelloCard()
             SampleDataBanner(prominent: true)
             if showsExamChip {
                 examChip
