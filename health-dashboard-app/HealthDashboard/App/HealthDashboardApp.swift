@@ -65,7 +65,11 @@ struct HealthDashboardApp: App {
 /// (so the system bar is hidden there). A link to another tab's main
 /// screen switches tabs through `openTab` rather than pushing a copy.
 struct RootTabView: View {
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    /// What a quick log from the Log tab's long-press menu saved (D-S2).
+    @State private var quickLogToast: UndoToast?
     @State private var tab: AppTab = DemoMode.open == nil ? .today : .body
     /// `-demoOpen` (Debug): the screen pushed on Body at launch.
     @State private var demoOpen = false
@@ -73,9 +77,11 @@ struct RootTabView: View {
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack { TodayView().toolbar(.hidden, for: .navigationBar) }
+                .undoToast($quickLogToast)
                 .tabItem { Label("Today", systemImage: "house") }
                 .tag(AppTab.today)
             NavigationStack { SleepView().toolbar(.hidden, for: .navigationBar) }
+                .undoToast($quickLogToast)
                 .tabItem { Label("Sleep", systemImage: "moon") }
                 .tag(AppTab.sleep)
             NavigationStack {
@@ -94,12 +100,15 @@ struct RootTabView: View {
                         demoOpen = true
                     }
             }
+                .undoToast($quickLogToast)
                 .tabItem { Label("Body", systemImage: "heart") }
                 .tag(AppTab.body)
             NavigationStack { LogView().toolbar(.hidden, for: .navigationBar) }
+                .undoToast($quickLogToast)
                 .tabItem { Label("Log", systemImage: "plus") }
                 .tag(AppTab.log)
         }
+        .background { QuickLogMenu(model: model, store: store, toast: $quickLogToast) }
         .environment(\.openTab) { tab = $0 }
         // The app's chrome colour, not system blue.
         .tint(Accent.indigo.ink(scheme))
