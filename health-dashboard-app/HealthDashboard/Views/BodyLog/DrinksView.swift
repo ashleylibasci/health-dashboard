@@ -41,7 +41,7 @@ struct DrinksView: View {
     var body: some View {
         // One title, the nav title; "alcohol", since "drink" means caffeine
         // elsewhere in the app (Valtonen F8, Dubois 3).
-        Screen(title: "Alcohol and your sleep", accent: .purple) {
+        Screen(title: "Alcohol and your sleep", accent: .berry) {
             SampleDataBanner()
             AlcoholSafetyNote()
             if !model.showsAlcoholSafetyLine { MorningAfterCallout() }
@@ -50,7 +50,7 @@ struct DrinksView: View {
             nightsCard
             rows
             Card(density: .compact) {
-                LearnMoreRow("Learn more about alcohol", section: "alcohol", accent: .purple)
+                LearnMoreRow("Learn more about alcohol", section: "alcohol", accent: .berry)
             }
         }
         .sheet(item: $editing) { entry in
@@ -75,11 +75,11 @@ struct DrinksView: View {
         let need = HabitEffect.minimumNights
         return SummaryHeader(eyebrow: "Alcohol today", value: n == 0 ? "None" : AlcoholPour.format(n),
                              unit: n == 0 ? nil : (n == 1 ? "drink" : "drinks"),
-                             status: e.enoughData ? nil : SummaryStatus(text: "Not enough nights", accent: .purple),
+                             status: e.enoughData ? nil : SummaryStatus(text: "Not enough nights", accent: .berry),
                              line: e.enoughData ? effectSentence(parts: 2) : "No judgment, just what your own data shows the morning after.",
                              pairs: [StatPair(label: "After alcohol", value: e.enoughData ? "\(e.withCount) nights" : "\(e.withCount) of \(need) nights"),
                                      StatPair(label: "Other nights", value: e.enoughData ? "\(e.withoutCount)" : "\(e.withoutCount) of \(need)")],
-                             accent: .purple, info: Topic.alcohol.explanation)
+                             accent: .berry, info: Topic.alcohol.explanation)
     }
 
     // MARK: Log
@@ -100,11 +100,11 @@ struct DrinksView: View {
     }
 
     private var logCard: some View {
-        Card(accent: .purple) {
+        Card(accent: .berry) {
             HStack(spacing: Space.s) {
                 Text("Log alcohol").font(.cardTitle).accessibilityAddTraits(.isHeader)
                 Spacer(minLength: Space.s)
-                LogTimeMenu(time: $time, accent: .purple)
+                LogTimeMenu(time: $time, accent: .berry)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -122,7 +122,7 @@ struct DrinksView: View {
                     .accessibilityLabel(count == 1 ? "1 drink" : "\(count) drinks")
                 countButton("plus", label: "One more") { count = min(15, count + 1) }
             }
-            PrimaryButton(title: "Log \(pendingEntry.phrase)", accent: .purple, action: logDrinks)
+            PrimaryButton(title: "Log \(pendingEntry.phrase)", accent: .berry, action: logDrinks)
         }
     }
 
@@ -143,8 +143,8 @@ struct DrinksView: View {
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .foregroundStyle(on ? Color(hex: 0x14002E) : p.primary)
-                .background(on ? Accent.purple.fill(scheme) : p.chip, in: Capsule())
-                .overlay(Capsule().strokeBorder(on ? Accent.purple.fill(scheme) : p.cardBorder))
+                .background(on ? Accent.berry.fill(scheme) : p.chip, in: Capsule())
+                .overlay(Capsule().strokeBorder(on ? Accent.berry.fill(scheme) : p.cardBorder))
         }
         .buttonStyle(.pressable)
         .sensoryFeedback(.selection, trigger: on) { _, isOn in isOn }
@@ -155,9 +155,9 @@ struct DrinksView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.bodyEmphasis)
-                .foregroundStyle(Accent.purple.ink(scheme))
+                .foregroundStyle(Accent.berry.ink(scheme))
                 .frame(width: 44, height: 44)
-                .background(Accent.purple.fill(scheme).opacity(0.18), in: Circle())
+                .background(Accent.berry.fill(scheme).opacity(0.18), in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -299,10 +299,10 @@ struct DrinksView: View {
     }
 
     private var nightsCard: some View {
-        Card(accent: .purple) {
+        Card(accent: .berry) {
             Text("Your recent nights").font(.bodyEmphasis).accessibilityAddTraits(.isHeader)
             let r = nightsReadout(selectedPoint)
-            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .purple,
+            ChartReadout(title: r.title, value: r.value, detail: r.detail, accent: .berry,
                          onClear: selected == nil ? nil : { selected = nil },
                          detailSlots: [nightsReadout(nil).detail] + points.map { nightsReadout($0).detail })
             DrinkNightsChart(points: points, selected: selectedPoint?.index, selection: $selected)
@@ -323,7 +323,7 @@ struct DrinksView: View {
     }
 
     nonisolated static func drinkBar(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Accent.purple.fill(.dark) : Accent.purple.ink(.light)
+        scheme == .dark ? Accent.berry.fill(.dark) : Accent.berry.ink(.light)
     }
 
     private func legend(_ text: String, color: Color) -> some View {
@@ -346,17 +346,17 @@ struct DrinksView: View {
     private var rows: some View {
         RowCard {
             ExpandRow(title: "After alcohol", summary: effect.enoughData ? "Sleep, HRV, heart rate and mornings" : "Not enough nights yet",
-                      systemImage: "chart.bar.fill", accent: .purple) {
+                      systemImage: "chart.bar.fill", accent: .berry) {
                 effectDetail
             }
             RowDivider()
-            ExpandRow(title: "Logged alcohol", summary: recentSummary, systemImage: "list.bullet", accent: .purple) {
+            ExpandRow(title: "Logged alcohol", summary: recentSummary, systemImage: "list.bullet", accent: .berry) {
                 if recent.isEmpty {
                     Text("Nothing logged in the last two weeks.")
                 } else {
                     LogEntryList(items: recent, onTap: { editing = $0 },
                                  onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in
-                        LogEntryRow(systemImage: Self.symbol(for: entry.kind), accent: .purple,
+                        LogEntryRow(systemImage: Self.symbol(for: entry.kind), accent: .berry,
                                     title: entry.phrase, detail: Self.drinksPhrase(entry.standardDrinks),
                                     time: LogFormat.time(entry.date))
                     }
@@ -413,7 +413,7 @@ struct MorningAfterCallout: View {
         if let m = model.morningAfterClear {
             let time = Clock.format(Clock.minutesOfDay(m.time))
             CalloutBar(text: "Alcohol may not clear until about \(time). Don\u{2019}t drive before then.",
-                       systemImage: "car.fill", accent: .purple) { showsMore = true }
+                       systemImage: "car.fill", accent: .berry) { showsMore = true }
                 .bottomSheet(isPresented: $showsMore, title: "The morning after") {
                     Text("Last night\u{2019}s \(DrinksView.drinksPhrase(m.drinks)) may still be in your body until about \(time). A standard drink takes most women about \(Int(AlcoholClearance.hoursPerDrink)) hours to clear, counted from your first drink, and nothing speeds it up: not coffee, a shower or sleep.")
                         .font(.bodyText)
@@ -550,7 +550,7 @@ private struct AlcoholEntryEditor: View {
     }
 
     var body: some View {
-        LogEditSheet(title: "Edit alcohol", accent: .purple, date: entry.date, amount: Double(entry.count),
+        LogEditSheet(title: "Edit alcohol", accent: .berry, date: entry.date, amount: Double(entry.count),
                      unit: "drink", pluralUnit: "drinks", step: 1, range: 1...15, showsDate: true,
                      onSave: { date, n in save(date: date, count: Int(n.rounded())) },
                      onDelete: { store.data.alcoholLog.removeAll { $0.id == entry.id } }) {
@@ -568,7 +568,7 @@ private struct AlcoholEntryEditor: View {
                                     .padding(.horizontal, 14)
                                     .frame(minHeight: 44)
                                     .foregroundStyle(kind == k ? Color(hex: 0x14002E) : Palette(scheme: scheme).primary)
-                                    .background(kind == k ? Accent.purple.fill(scheme) : Palette(scheme: scheme).chip, in: Capsule())
+                                    .background(kind == k ? Accent.berry.fill(scheme) : Palette(scheme: scheme).chip, in: Capsule())
                             }
                             .buttonStyle(.plain)
                             .accessibilityAddTraits(kind == k ? .isSelected : [])

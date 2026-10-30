@@ -321,7 +321,7 @@ struct TrackingSettingsView: View {
                     .disabled(model.caloriesHiddenByCondition)
                 Divider().overlay(p.cardBorder)
                 SettingToggleRow(title: "Alcohol tracking", detail: "How alcohol affects sleep and recovery. Off hides alcohol on the Log tab.",
-                                 systemImage: "wineglass.fill", accent: .purple, isOn: $store.data.drinksTracking)
+                                 systemImage: "wineglass.fill", accent: .berry, isOn: $store.data.drinksTracking)
                 Divider().overlay(p.cardBorder)
                 LinkRow(title: "Quick-log drinks",
                         subtitle: store.data.savedDrinks.isEmpty ? "None saved yet" : store.data.savedDrinks.map(\.name).joined(separator: ", "),

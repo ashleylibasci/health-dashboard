@@ -351,11 +351,11 @@ struct LogView: View {
     private var alcoholSection: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             // What one drink is: in the ⓘ, not a paragraph on the card (Amara 21).
-            LogSectionHeader(title: "Alcohol", systemImage: "wineglass.fill", accent: .purple) {
+            LogSectionHeader(title: "Alcohol", systemImage: "wineglass.fill", accent: .berry) {
                 InfoButton(topic: .alcohol).padding(.vertical, -12)
                 HistoryLink { DrinksView() }
             }
-            Card(accent: .purple) {
+            Card(accent: .berry) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Tap what you had").font(.bodyEmphasis)
                     Spacer(minLength: Space.s)
@@ -371,8 +371,8 @@ struct LogView: View {
                                 .font(.scaled(size: 14, weight: .bold))
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: Sizes.minTap)
-                                .foregroundStyle(Accent.purple.onTint(scheme))
-                                .background(Accent.purple.fill(scheme).opacity(0.18), in: Capsule())
+                                .foregroundStyle(Accent.berry.onTint(scheme))
+                                .background(Accent.berry.fill(scheme).opacity(0.18), in: Capsule())
                         }
                         .buttonStyle(.pressable)
                         .accessibilityLabel("Log \(kind.lowercased()), now")

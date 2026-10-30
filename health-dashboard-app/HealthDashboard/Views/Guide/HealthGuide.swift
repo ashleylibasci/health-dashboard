@@ -28,7 +28,7 @@ enum HealthGuide {
                      articles: birthControl),
         GuideSection(id: "periods", title: "Periods and cycle care", systemImage: "drop.fill", accent: .pink,
                      articles: periods),
-        GuideSection(id: "alcohol", title: "Alcohol", systemImage: "wineglass.fill", accent: .purple,
+        GuideSection(id: "alcohol", title: "Alcohol", systemImage: "wineglass.fill", accent: .berry,
                      articles: alcohol),
         GuideSection(id: "caffeineWater", title: "Caffeine and water", systemImage: "cup.and.saucer.fill", accent: .yellow,
                      articles: caffeineWater),
