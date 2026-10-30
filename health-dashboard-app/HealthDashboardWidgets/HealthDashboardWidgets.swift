@@ -175,14 +175,17 @@ private struct WidgetBackground: View {
 
 // MARK: - Recovery
 
+/// Recovery by default; Edit Widget swaps in energy, sleep debt or water
+/// (D-W7). The kind stays "Recovery", so a widget she already has keeps
+/// showing recovery until she picks something else.
 struct RecoveryWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "Recovery", provider: SnapshotProvider()) { entry in
-            RecoveryView(entry: entry)
-                .containerBackground(for: .widget) { WidgetBackground(accent: .indigo) }
+        AppIntentConfiguration(kind: "Recovery", intent: PickNumberIntent.self, provider: PickedProvider()) { entry in
+            PickedNumberView(entry: entry)
+                .containerBackground(for: .widget) { WidgetBackground(accent: PickedNumberView.accent(entry.number)) }
         }
         .configurationDisplayName("Recovery")
-        .description("Today's recovery score and how much energy you have left.")
+        .description("Today's recovery score. Touch and hold, then Edit Widget, to show energy, sleep debt or water instead.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
@@ -297,6 +300,181 @@ private struct RecoveryView: View {
         if let e = s.energyLeft(at: now) { parts.append("energy left \(e) percent") }
         if s.isSample { parts.append("example data") }
         return parts.joined(separator: ", ")
+    }
+}
+
+// MARK: - Recovery widget's other numbers (D-W7)
+
+/// Recovery as before, or energy now, sleep debt or water in the same
+/// shapes: a title, the number, a curve or bar where there is one, and one
+/// line of meaning, worded as on Today.
+private struct PickedNumberView: View {
+    let entry: PickedEntry
+    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.colorScheme) private var scheme
+
+    static func accent(_ number: WidgetNumber) -> Accent {
+        switch number {
+        case .recovery: return .indigo
+        // Energy is mint everywhere.
+        case .energy: return .mint
+        case .sleepDebt: return .purple
+        case .water: return .blue
+        }
+    }
+
+    /// One number, ready for every size.
+    private struct Reading {
+        var title: String
+        var symbol: String
+        /// "57", "1h 35m", "36 oz"; a dash when there's nothing for today.
+        var value: String
+        /// The circular widget's number ("57", "1h35", "36").
+        var compact: String
+        /// "Afternoon dip till 6:07pm", "Over the last 2 weeks", "of 72 oz".
+        var line: String
+        /// The Lock Screen line ("57 · dip till 6:07pm", "1h 35m sleep debt").
+        var short: String
+        /// 0–1 for a ring or bar; nil when the number has no "full".
+        var fraction: Double?
+        var spoken: String
+    }
+
+    var body: some View {
+        if entry.number == .recovery || entry.snapshot == nil {
+            RecoveryView(entry: SnapshotEntry(date: entry.date, snapshot: entry.snapshot))
+        } else if let s = entry.snapshot {
+            let r = reading(s, now: entry.date)
+            let accent = Self.accent(entry.number)
+            switch family {
+            case .accessoryCircular:
+                if let fraction = r.fraction {
+                    Gauge(value: fraction) {
+                        Image(systemName: r.symbol)
+                    } currentValueLabel: {
+                        Text(r.compact).font(WidgetType.number).minimumScaleFactor(0.6)
+                    }
+                    .gaugeStyle(.accessoryCircular)
+                    .widgetAccentable()
+                    .accessibilityLabel(r.spoken)
+                } else {
+                    ZStack {
+                        AccessoryWidgetBackground()
+                        VStack(spacing: 0) {
+                            Image(systemName: r.symbol).font(.caption.weight(.semibold))
+                                .widgetAccentable()
+                            Text(r.compact).font(WidgetType.number).minimumScaleFactor(0.5).lineLimit(1)
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(r.spoken)
+                }
+            case .accessoryRectangular:
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(r.title)\(s.isSample ? " \u{00B7} Example" : "")").font(.caption2.weight(.semibold))
+                        .widgetAccentable()
+                    if entry.number == .energy, let curve = s.energy(at: entry.date) {
+                        EnergySpark(levels: curve.levels, now: curve.index(at: entry.date), line: .primary, dot: .primary,
+                                    lineWidth: 1.5, dotSize: 6)
+                            .widgetAccentable()
+                        Text(r.short).font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                    } else {
+                        Text(r.value).font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(r.line).font(.caption2).lineLimit(1)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(r.spoken)
+            case .accessoryInline:
+                Text(r.short)
+            default:
+                let p = Palette(scheme: scheme)
+                VStack(alignment: .leading, spacing: 4) {
+                    WidgetHeader(title: r.title, accent: accent, snapshot: s)
+                    Text(r.value)
+                        .font(WidgetType.hero)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .layoutPriority(1)
+                    visual(s, accent: accent)
+                    Text(r.line)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(p.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    if entry.number == .water, s.bottleML > 0 {
+                        Button(intent: LogBottleIntent()) {
+                            Label("Bottle", systemImage: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .tint(Accent.blue.fill(scheme))
+                        .accessibilityLabel("Log a bottle of water, \(ounces(s.bottleML))")
+                    }
+                }
+                .foregroundStyle(p.primary)
+                .accessibilityElement(children: .contain)
+            }
+        }
+    }
+
+    /// Energy's curve with the "now" dot, water's bar toward the goal, or
+    /// room to breathe.
+    @ViewBuilder
+    private func visual(_ s: WidgetSnapshot, accent: Accent) -> some View {
+        if entry.number == .energy, let curve = s.energy(at: entry.date) {
+            EnergySpark(levels: curve.levels, now: curve.index(at: entry.date), line: accent.fill(scheme),
+                        dot: Palette(scheme: scheme).primary, fill: renderingMode == .fullColor)
+                .widgetAccentable()
+                .frame(maxHeight: .infinity)
+        } else if entry.number == .water, s.showsWaterGoal {
+            Spacer(minLength: 0)
+            ProgressView(value: min(s.waterML(at: entry.date) / max(s.waterGoalML, 1), 1))
+                .tint(accent.fill(scheme))
+                .accessibilityHidden(true)
+        } else {
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func reading(_ s: WidgetSnapshot, now: Date) -> Reading {
+        let missing = s.isCurrent(at: now) ? "Open the app to update" : "Not updated today"
+        let example = s.isSample ? ", example data" : ""
+        switch entry.number {
+        case .energy:
+            let curve = s.energy(at: now)
+            let level = curve?.level(at: now)
+            let line = curve?.line(at: now) ?? missing
+            return Reading(title: "Energy", symbol: "bolt.fill", value: level.map(String.init) ?? dash,
+                           compact: level.map(String.init) ?? dash, line: line,
+                           short: level.map { "Energy \($0) \u{00B7} \(curve?.shortLine(at: now) ?? "")" } ?? "Energy: \(missing.lowercased())",
+                           fraction: level.map { Double($0) / 100 },
+                           spoken: (level.map { "Energy now \($0) of 100, \(line)" } ?? "Energy now: \(missing.lowercased())") + example)
+        case .sleepDebt:
+            // Under 15 minutes reads "None", as on Today.
+            let debt = s.sleepDebt(at: now)
+            let value = debt.map { $0 >= 15 ? Clock.duration($0) : "None" } ?? dash
+            let compact = debt.map { $0 >= 15 ? Clock.duration($0).replacingOccurrences(of: "\u{00A0}", with: "") : "0" } ?? dash
+            let line = debt == nil ? missing : "Over the last 2 weeks"
+            return Reading(title: "Sleep debt", symbol: "moon.zzz.fill", value: value, compact: compact, line: line,
+                           short: debt == nil ? "Sleep debt: \(missing.lowercased())" : "Sleep debt \(value.lowercased())",
+                           fraction: nil,
+                           spoken: (debt == nil ? "Sleep debt: \(missing.lowercased())" : "Sleep debt \(value) over the last 2 weeks") + example)
+        case .water, .recovery:
+            // No goal under eating-disorder history: the total only.
+            let ml = s.waterML(at: now)
+            let goal = s.showsWaterGoal ? s.waterGoalML : nil
+            let whole = Int((ml / 29.5735).rounded())
+            let total = "\(whole) oz"
+            return Reading(title: "Water", symbol: "waterbottle.fill", value: total, compact: "\(whole)",
+                           line: goal.map { "of \(ounces($0))" } ?? "Today",
+                           short: goal.map { "Water \(total) of \(ounces($0))" } ?? "Water \(total)",
+                           fraction: goal.map { min(ml / max($0, 1), 1) },
+                           spoken: "Water today \(total)" + (goal.map { " of \(ounces($0))" } ?? "") + example)
+        }
     }
 }
 

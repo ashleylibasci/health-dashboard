@@ -63,6 +63,9 @@ struct WidgetSnapshot: Codable, Equatable {
     /// the Energy widget and complication can move their "now" dot along
     /// it without the app running. nil from older app builds.
     var energy: EnergyCurve? = nil
+    /// Sleep debt over the last two weeks, in minutes, as on Today. nil
+    /// from older app builds.
+    var sleepDebt: Int? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
@@ -245,6 +248,7 @@ struct WidgetSnapshot: Codable, Equatable {
     func bedtime(at date: Date) -> Date? { isCurrent(at: date) ? bedtime : nil }
     func caffeineCutoff(at date: Date) -> Date? { isCurrent(at: date) ? caffeineCutoff : nil }
     func energy(at date: Date) -> EnergyCurve? { isCurrent(at: date) ? energy : nil }
+    func sleepDebt(at date: Date) -> Int? { isCurrent(at: date) ? sleepDebt : nil }
 
     /// Today's stress rating: logged since the app day that holds `date`
     /// began (the day rolls over every 24 hours from `appDayStart`).
@@ -280,7 +284,7 @@ struct WidgetSnapshot: Codable, Equatable {
         quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130),
         pill: PillState(day: Calendar.current.startOfDay(for: .now), packDay: 18, activeDays: 21, packLength: 28,
                         time: 21 * 60, taken: nil),
-        energy: .example(day: Calendar.current.startOfDay(for: .now)))
+        energy: .example(day: Calendar.current.startOfDay(for: .now)), sleepDebt: 95)
 }
 
 /// The Watch's smart alarm, for the Bedtime complication. Written to the App

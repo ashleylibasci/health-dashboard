@@ -43,7 +43,8 @@ extension AppModel {
             stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) },
             smartAlarmOn: store.data.smartAlarmEnabled,
             wake: lastNightIsFresh ? AppDay.date(lastNight.wake, relativeTo: appDayDate) : nil,
-            energy: widgetEnergyCurve
+            energy: widgetEnergyCurve,
+            sleepDebt: sleepDebt
         ).save()
     }
 
