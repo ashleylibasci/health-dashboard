@@ -8,6 +8,7 @@ struct CycleLogView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.openTab) private var openTab
 
     @State private var date = Date.now
     @State private var flow: AppData.Flow? = nil
@@ -192,9 +193,9 @@ struct CycleLogView: View {
         let items = recent
         SectionLabel(text: "Recent days").padding(.top, 6)
         if items.isEmpty {
-            Card {
-                Text("Nothing logged yet. Your days will show up here so you can edit or delete them.")
-                    .font(.bodyText).secondaryText()
+            EmptyStateCard("Nothing logged yet. Your days show up here to edit.",
+                           actionTitle: "Log today", systemImage: "drop.fill", accent: .pink) {
+                openTab(.log)
             }
         } else {
             Card(density: .compact) {

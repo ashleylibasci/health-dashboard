@@ -99,11 +99,10 @@ struct ExamListView: View {
                     .motionTransition(.reveal, edge: .top)
             }
             if upcoming.isEmpty {
-                Card {
-                    Text("No exams yet").font(.cardTitle)
-                    Text("Add one below and the exam week screen and exam mode plan around it.")
-                        .font(.bodyText).secondaryText()
-                        .fixedSize(horizontal: false, vertical: true)
+                // One line and its one button (D-L2).
+                EmptyStateCard("No exams yet. Exam week and exam mode plan around them.",
+                               actionTitle: "Add an exam", systemImage: "graduationcap.fill", accent: .yellow) {
+                    editing = ExamDraft(nil)
                 }
             } else {
                 Card(density: .compact) {
@@ -112,8 +111,8 @@ struct ExamListView: View {
                         if exam.id != upcoming.last?.id { Divider() }
                     }
                 }
+                PrimaryButton(title: "Add an exam", accent: .yellow) { editing = ExamDraft(nil) }
             }
-            PrimaryButton(title: "Add an exam", accent: .yellow) { editing = ExamDraft(nil) }
             if !calendarFirst {
                 CalendarImportCard()
             }

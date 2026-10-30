@@ -8,6 +8,7 @@ struct DrinksView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.openTab) private var openTab
 
     @State private var kind = "Wine"
     /// The pour's `AlcoholPour` id: a glass, a red cup… (D2).
@@ -353,6 +354,10 @@ struct DrinksView: View {
             ExpandRow(title: "Logged alcohol", summary: recentSummary, systemImage: "list.bullet", accent: .purple) {
                 if recent.isEmpty {
                     Text("Nothing logged in the last two weeks.")
+                    Button("Log a drink") { openTab(.log) }
+                        .font(.bodyEmphasis)
+                        .foregroundStyle(Accent.purple.ink(scheme))
+                        .frame(minHeight: Sizes.minTap)
                 } else {
                     LogEntryList(items: recent, onTap: { editing = $0 },
                                  onDelete: { entry in store.data.alcoholLog.removeAll { $0.id == entry.id } }) { entry in

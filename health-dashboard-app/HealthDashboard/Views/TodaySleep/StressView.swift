@@ -29,10 +29,13 @@ struct StressView: View {
                     }
                     RowDivider()
                 }
-                ExpandRow(title: "Last 7 days", summary: weekSummary, systemImage: "calendar", accent: .orange) {
-                    weekDots
+                // Seven empty dots say nothing; the rating above is the action (D-L2).
+                if model.moodWeek.contains(where: { $0.stress != nil }) {
+                    ExpandRow(title: "Last 7 days", summary: weekSummary, systemImage: "calendar", accent: .orange) {
+                        weekDots
+                    }
+                    RowDivider()
                 }
-                RowDivider()
                 ExpandRow(title: "What helps", summary: "Breathing, a walk, short work blocks",
                           systemImage: "leaf.fill", accent: .mint) {
                     tips
@@ -302,7 +305,7 @@ struct StressView: View {
 
     private var weekSummary: String {
         let logged = model.moodWeek.filter { $0.stress != nil }.count
-        return logged == 0 ? "Nothing logged yet" : "\(logged) of 7 days logged"
+        return "\(logged) of 7 days logged"
     }
 
     private var weekDots: some View {

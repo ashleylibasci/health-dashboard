@@ -35,11 +35,9 @@ struct SleepHistoryView: View {
             .padding(.top, 4)
             .onChange(of: rangeRaw) { selectedDay = nil }
             if nights.isEmpty {
-                Card {
-                    Text("No nights yet").font(.cardTitle)
-                    Text("Wear your Watch to bed and your nights will show up here.")
-                        .font(.bodyText)
-                        .secondaryText()
+                EmptyStateCard("No nights yet. Wear your Watch to bed and they show up here.",
+                               actionTitle: "Set up your Watch for sleep", systemImage: "moon.zzz.fill", accent: .purple) {
+                    AccuracyTipsView()
                 }
             } else {
                 chartCard
