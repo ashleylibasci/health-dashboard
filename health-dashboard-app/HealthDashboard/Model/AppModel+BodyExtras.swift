@@ -147,29 +147,6 @@ extension AppModel {
         return out
     }
 
-    // MARK: Trends
-
-    struct TrendPoint: Identifiable, Hashable {
-        var id: Date { date }
-        var date: Date
-        var hrv: Double?
-        var restingHR: Double?
-        var asleep: Int
-    }
-
-    /// The last 14 nights with HRV and resting heart rate rebuilt from the
-    /// differences against her baseline.
-    var bodyTrend: [TrendPoint] {
-        let recent = nights.sorted { $0.wakeDay < $1.wakeDay }.suffix(14)
-        let hrvBase = baselineHRV
-        return recent.map { n in
-            TrendPoint(date: n.wakeDay,
-                       hrv: n.outcome.hrvDeltaPct.map { hrvBase * (1 + $0 / 100) },
-                       restingHR: n.outcome.restingHRDelta.map { baselineRestingHR + $0 },
-                       asleep: n.asleepMinutes)
-        }
-    }
-
     // MARK: Fitness and calories
 
     var vo2MaxPeak: (date: Date, value: Double)? { vo2MaxHistory.max { $0.value < $1.value } }

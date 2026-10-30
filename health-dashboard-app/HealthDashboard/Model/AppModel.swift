@@ -649,7 +649,7 @@ final class AppModel: ObservableObject {
 
     /// Her heart readings by day: HRV from readings taken during each night
     /// when there are enough (5+ nights), else daily averages.
-    private struct HeartData {
+    struct HeartData {
         var hrvByDay: [Date: Double] = [:]
         var dailyHRV: [Date: Double] = [:]
         var rhrByDay: [Date: Double] = [:]
@@ -658,7 +658,8 @@ final class AppModel: ObservableObject {
         var excluded: Set<Date> = []
     }
 
-    private func loadHeart(main: [SleepSession], days: Int) async -> HeartData {
+    /// Also reads the older nights of the six-month trends (`olderTrendNights`).
+    func loadHeart(main: [SleepSession], days: Int) async -> HeartData {
         let daily = (try? await health.dailyAverage(.heartRateVariabilitySDNN, unit: .msUnit, days: days)) ?? [:]
         let rhr = (try? await health.dailyAverage(.restingHeartRate, unit: .bpm, days: days)) ?? [:]
         let overnight = (try? await health.overnightAverages(.heartRateVariabilitySDNN, unit: .msUnit, sessions: main, days: days)) ?? [:]
@@ -684,7 +685,7 @@ final class AppModel: ObservableObject {
         return byDay.filter { $0.key < day && $0.key >= from && !excluding.contains(calendar.startOfDay(for: $0.key)) }.map(\.value)
     }
 
-    private func night(_ s: SleepSession, heart: HeartData) -> NightRecord {
+    func night(_ s: SleepSession, heart: HeartData) -> NightRecord {
         let day = Calendar.current.startOfDay(for: s.wake)
         var outcome = NextDayOutcome()
         if let v = heart.hrvByDay[day], let b = Self.baseline(heart.hrvByDay, before: day, excluding: heart.excluded), b > 0 { outcome.hrvDeltaPct = (v - b) / b * 100 }

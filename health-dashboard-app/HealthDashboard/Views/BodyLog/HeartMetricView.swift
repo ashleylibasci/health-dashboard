@@ -3,15 +3,20 @@ import Charts
 import HealthCore
 
 // HRV and resting heart rate: the detail screen behind the Body tab's
-// vitals and Recovery, the rows that open it, its 14-night trend card and
-// the chart. Moved out of BodyView.swift so the detail screens own them.
+// vitals and Recovery, the rows that open it, its trend card and the chart.
+// Moved out of BodyView.swift so the detail screens own them.
 
-/// HRV, resting heart rate or sleep over the last 14 nights. Drag across it
-/// to read any night against your usual.
+/// HRV, resting heart rate or sleep over the last week, month or six months
+/// (D-G2). Drag across it to read any night (or week) against your usual.
 struct BodyTrendCard: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var metric: Metric
+    /// A month by default: the 30 nights her usual comes from.
+    @AppStorage("bodyTrend.range") private var range: TrendRange = .month
+    /// The nights before the loaded ones, read when she picks 6M.
+    @State private var older: [NightRecord] = []
     @State private var selected: Date? = nil
 
     init(metric: Metric = .hrv) {
@@ -30,14 +35,18 @@ struct BodyTrendCard: View {
         }
     }
 
+    /// Each night, or on 6M each week's average.
     private var points: [NightTrendPoint] {
-        model.bodyTrend.compactMap { t in
+        let nightly = model.bodyTrend(range, older: older).compactMap { t -> NightTrendPoint? in
             switch metric {
             case .hrv: return t.hrv.map { NightTrendPoint(date: t.date, value: $0) }
             case .restingHR: return t.restingHR.map { NightTrendPoint(date: t.date, value: $0) }
             case .sleep: return NightTrendPoint(date: t.date, value: Double(t.asleep) / 60)
             }
         }
+        guard range.isWeekly else { return nightly }
+        return WeeklyAverage.by(nightly, date: \.date, value: \.value)
+            .map { NightTrendPoint(date: $0.week, value: $0.value, nights: $0.nights) }
     }
 
     private var usual: Double {
@@ -66,7 +75,7 @@ struct BodyTrendCard: View {
         }
     }
 
-    private var shown: NightTrendPoint? {
+    private func shown(in points: [NightTrendPoint]) -> NightTrendPoint? {
         guard let s = selected else { return points.last }
         return points.min { abs($0.date.timeIntervalSince(s)) < abs($1.date.timeIntervalSince(s)) }
     }
@@ -147,61 +156,94 @@ struct BodyTrendCard: View {
 
     private var dayFormat: Date.FormatStyle { .dateTime.weekday(.abbreviated).month(.abbreviated).day() }
 
-    /// The readout before she touches the chart: "14-night average · 46 ms",
-    /// "Range 42–49 ms · your usual 46 ms". Nil with fewer than 2 nights.
-    private var atRest: (title: String, value: String, detail: String)? {
+    private var reference: String { metric == .sleep ? "your need" : "your usual" }
+
+    /// The readout before she touches the chart: "30-night average · 46 ms",
+    /// "Range 42–49 ms · your usual 46 ms"; on 6M the average of the weeks'
+    /// nights and the range of the weekly averages. Nil with fewer than 2
+    /// points.
+    private func atRest(_ points: [NightTrendPoint]) -> (title: String, value: String, detail: String)? {
         let values = points.map(\.value)
         guard values.count >= 2, let lo = values.min(), let hi = values.max() else { return nil }
-        let average = values.reduce(0, +) / Double(values.count)
+        let nights = points.map(\.nights).reduce(0, +)
+        let average = points.map { $0.value * Double($0.nights) }.reduce(0, +) / Double(nights)
         // "42–49 ms" (one unit) for HRV and resting HR; durations keep both.
-        let range = metric == .sleep ? "\(format(lo))\u{2013}\(format(hi))" : "\(Int(lo.rounded()))\u{2013}\(format(hi))"
-        let reference = metric == .sleep ? "your need" : "your usual"
-        return ("\(values.count)-night average", format(average), "Range \(range) \u{00B7} \(reference) \(format(usual))")
+        let spread = metric == .sleep ? "\(format(lo))\u{2013}\(format(hi))" : "\(Int(lo.rounded()))\u{2013}\(format(hi))"
+        let title = range.isWeekly ? "6-month average" : "\(values.count)-night average"
+        return (title, format(average), "\(range.isWeekly ? "Weekly averages" : "Range") \(spread) \u{00B7} \(reference) \(format(usual))")
+    }
+
+    /// A week on 6M: how many nights it averages, never a verdict meant for
+    /// one night.
+    private func detail(_ p: NightTrendPoint) -> String {
+        range.isWeekly ? "Average of \(p.nights) nights \u{00B7} \(reference) \(format(usual))" : meaning(p.value)
+    }
+
+    private func title(_ p: NightTrendPoint) -> String {
+        if range.isWeekly { return "Week of " + p.date.formatted(.dateTime.month(.abbreviated).day()) }
+        return selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat)
     }
 
     var body: some View {
+        let points = points
+        let rest = atRest(points)
+        let shown = shown(in: points)
+        let slots = points.map(detail)
         Card {
-            HStack {
-                ExplainedTitle(text: "Last 14 nights", explanation: explanation, size: 17)
-                Spacer()
+            if typeSize.isAccessibilitySize {
+                ExplainedTitle(text: range.title, explanation: explanation, size: 17)
+                TrendRangePicker(range: $range, accent: accent)
+            } else {
+                HStack {
+                    ExplainedTitle(text: range.title, explanation: explanation, size: 17)
+                    Spacer()
+                    TrendRangePicker(range: $range, accent: accent)
+                        .frame(maxWidth: 150)
+                }
             }
             AdaptiveSegmentedPicker("Measure", selection: $metric, options: Array(Metric.allCases)) { m in m.rawValue }
                 .onChange(of: metric) { _, _ in selected = nil }
-            if selected == nil, let rest = atRest {
+            if selected == nil, let rest {
                 // At rest, the period, not last night again: the screen's
                 // summary already says that (F17).
                 ChartReadout(title: rest.title, value: rest.value, detail: rest.detail, accent: accent,
-                             detailSlots: points.map { meaning($0.value) })
+                             detailSlots: slots)
             } else if let p = shown {
-                ChartReadout(title: selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat),
-                             value: format(p.value), detail: meaning(p.value),
-                             accent: isWorse(p.value) ? .coral : accent,
+                ChartReadout(title: title(p), value: format(p.value), detail: detail(p),
+                             accent: !range.isWeekly && isWorse(p.value) ? .coral : accent,
                              onClear: selected == nil ? nil : { selected = nil },
-                             detailSlots: points.map { meaning($0.value) } + [atRest?.detail].compactMap { $0 })
+                             detailSlots: slots + [rest?.detail].compactMap { $0 })
             }
             if points.count >= 2 {
-                NightTrendChart(points: points, usual: usual, band: band, scale: scale, accent: accent,
+                NightTrendChart(points: points, range: range, usual: usual, band: band, scale: scale, accent: accent,
                                 usualLabel: metric == .sleep ? "Your need" : "Your usual",
                                 seriesName: metric.spoken, format: format,
                                 selected: selected == nil ? nil : shown?.date, selection: $selected)
                     .frame(height: 170)
                     .motion(.dataSwap, value: metric)
-                ScrubHint(each: "night")
+                    .motion(.dataSwap, value: range)
+                ScrubHint(each: range.step)
             } else {
-                Text("Not enough nights yet.").font(.bodyText).secondaryText()
+                Text(range.isWeekly ? "Not enough weeks yet." : "Not enough nights yet.").font(.bodyText).secondaryText()
             }
+        }
+        .onChange(of: range) { _, _ in selected = nil }
+        .task(id: range) {
+            if range == .sixMonths { older = await model.olderTrendNights() }
         }
     }
 }
 
-/// One night on a 14-night trend.
+/// One night on a trend, or on 6M one week's average (`nights` is how many
+/// nights it averages).
 struct NightTrendPoint: Identifiable, Hashable {
     var id: Date { date }
     let date: Date
     let value: Double
+    var nights = 1
 }
 
-/// HRV, resting heart rate or sleep over recent nights, honestly scaled
+/// HRV, resting heart rate or sleep over recent nights or weeks, honestly scaled
 /// (Tanaka F8, Valtonen F13): the y-axis spans her usual ±25% (HRV) or
 /// ±8 bpm (resting HR), widened only when a night falls outside, so a
 /// 3 ms wobble no longer looks like a cliff. Her usual band is shaded, each
@@ -216,6 +258,7 @@ struct NightTrendChart: View {
     }
 
     let points: [NightTrendPoint]
+    var range: TrendRange = .month
     let usual: Double
     let band: ClosedRange<Double>?
     let scale: Scale
@@ -244,7 +287,8 @@ struct NightTrendChart: View {
 
     private var summary: String {
         let values = points.map { format($0.value) }.joined(separator: ", ")
-        return "\(seriesName) for the last \(points.count) nights, oldest first: \(values). \(usualLabel) is \(format(usual))."
+        let span = range.isWeekly ? "weekly averages over the last 6 months" : "the last \(points.count) nights"
+        return "\(seriesName), \(span), oldest first: \(values). \(usualLabel) is \(format(usual))."
     }
 
     var body: some View {
@@ -261,28 +305,43 @@ struct NightTrendChart: View {
                 .foregroundStyle(p.tertiary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             ForEach(points) { point in
-                LineMark(x: .value("Night", point.date, unit: .day), y: .value(seriesName, point.value))
+                LineMark(x: .value("Night", point.date, unit: range.unit), y: .value(seriesName, point.value))
                     .foregroundStyle(accent.ink(scheme))
                     .interpolationMethod(.linear)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                PointMark(x: .value("Night", point.date, unit: .day), y: .value(seriesName, point.value))
+                PointMark(x: .value("Night", point.date, unit: range.unit), y: .value(seriesName, point.value))
                     .foregroundStyle(accent.ink(scheme))
                     .symbolSize(20)
             }
             if let selected, let point = points.first(where: { Calendar.current.isDate($0.date, inSameDayAs: selected) }) {
-                RuleMark(x: .value("Night", point.date, unit: .day))
+                RuleMark(x: .value("Night", point.date, unit: range.unit))
                     .foregroundStyle(p.tertiary)
-                PointMark(x: .value("Night", point.date, unit: .day), y: .value(seriesName, point.value))
+                PointMark(x: .value("Night", point.date, unit: range.unit), y: .value(seriesName, point.value))
                     .foregroundStyle(accent.ink(scheme))
                     .symbolSize(90)
             }
         }
         .chartYScale(domain: yDomain)
-        .chartXScale(range: .plotDimension(startPadding: 4, endPadding: 12))
+        // The whole range, so a missing night leaves a gap instead of
+        // stretching the rest.
+        .chartXScale(domain: range.domain(), range: .plotDimension(startPadding: 4, endPadding: 12))
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day, count: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            switch range {
+            case .week:
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                }
+            case .month:
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
+            case .sixMonths:
+                AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
+                }
             }
         }
         .chartYAxis {
@@ -298,13 +357,14 @@ struct NightTrendChart: View {
         .chartScrub($selection, snapped: selected, steps: points.map(\.date))
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(DateChartDescriptor(
-            title: "\(seriesName), last \(points.count) nights", seriesName: seriesName, yTitle: seriesName,
+            title: range.isWeekly ? "\(seriesName), weekly averages, last 6 months" : "\(seriesName), last \(points.count) nights",
+            seriesName: seriesName, yTitle: seriesName,
             points: points.map { ($0.date, $0.value) }, yLabel: format))
     }
 }
 
 /// HRV or resting heart rate on its own: this morning against her usual,
-/// then the last 14 nights. Opened from the Body tab's vitals and Recovery.
+/// then the trend over a week, a month or six months. Opened from the Body tab's vitals and Recovery.
 struct HeartMetricView: View {
     enum Metric { case hrv, restingHR }
     let metric: Metric

@@ -55,15 +55,19 @@ struct AdaptiveSegmentedPicker<Value: Hashable>: View {
     @Binding var selection: Value
     var options: [Value]
     var accent: Accent = .indigo
+    /// What VoiceOver reads for a segment whose label is short ("W" reads
+    /// "Week"); nil reads the label.
+    var spoken: ((Value) -> String)? = nil
     var label: (Value) -> String
     @Environment(\.dynamicTypeSize) private var typeSize
 
     init(_ title: String, selection: Binding<Value>, options: [Value], accent: Accent = .indigo,
-         label: @escaping (Value) -> String) {
+         spoken: ((Value) -> String)? = nil, label: @escaping (Value) -> String) {
         self.title = title
         self._selection = selection
         self.options = options
         self.accent = accent
+        self.spoken = spoken
         self.label = label
     }
 
@@ -84,6 +88,7 @@ struct AdaptiveSegmentedPicker<Value: Hashable>: View {
             Picker(title, selection: $selection) {
                 ForEach(options, id: \.self) { option in
                     Text(label(option)).tag(option)
+                        .accessibilityLabel(spoken?(option) ?? label(option))
                 }
             }
             .pickerStyle(.segmented)
