@@ -6,7 +6,8 @@ import HealthCore
 /// apply), your sleep times, done. Age is asked on the Fitness screen,
 /// health conditions in Settings (and from the last step), and notification
 /// permission on the last step, where it says what the alerts are for.
-/// Finishing marks her onboarded and connects Health.
+/// Finishing connects Health and shows what it found (D-L3), then marks her
+/// onboarded, which drops her on Today.
 struct OnboardingFlow: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -28,7 +29,15 @@ struct OnboardingFlow: View {
         store.data.cycleSetupChosen ? store.data.cycleSetup : nil
     }
 
-    private enum Step: Hashable { case welcome, cycle, birthControl, pack, sleep, done }
+    private enum Step: Hashable { case welcome, cycle, birthControl, pack, sleep, done, reading }
+
+    /// How far the last step has got reading Apple Health (D-L3).
+    @State private var reading = ReadingProgress.started
+
+    private enum ReadingProgress: Int, Comparable {
+        case started, nights, heart, finished
+        static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+    }
 
     var body: some View {
         NavigationStack {
@@ -41,12 +50,13 @@ struct OnboardingFlow: View {
                     case .pack: packStep
                     case .sleep: sleepStep
                     case .done: doneStep
+                    case .reading: readingStep
                     }
                 }
                 .id(step)
                 .transition(pageTransition)
             }
-            .modifier(TopBar(shown: step != .welcome) { topBar })
+            .modifier(TopBar(shown: step != .welcome && step != .reading) { topBar })
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -104,17 +114,32 @@ struct OnboardingFlow: View {
         go(f[i - 1], forward: false)
     }
 
+    /// Connects Health, then shows what it found one line at a time, then
+    /// drops her on Today.
     private func finish() {
-        var d = store.data
         // Alerts she didn't allow stay off, so Settings never shows them on
         // without permission. Turning one on there asks then.
         if alerts != .on {
-            d.sickAlerts = false
-            d.peakDipNudges = false
+            store.data.sickAlerts = false
+            store.data.peakDipNudges = false
         }
-        d.onboarded = true
-        withMotion(.commit) { store.data = d }
-        Task { await model.connectHealth() }
+        reading = .started
+        go(.reading)
+        Task {
+            await model.connectHealth()
+            let pause: Duration = reduceMotion ? .milliseconds(400) : .milliseconds(900)
+            for next in [ReadingProgress.nights, .heart, .finished] {
+                try? await Task.sleep(for: pause)
+                withMotion(.reveal) { reading = next }
+            }
+            try? await Task.sleep(for: .seconds(1.2))
+            openToday()
+        }
+    }
+
+    private func openToday() {
+        guard !store.data.onboarded else { return }
+        withMotion(.commit) { store.data.onboarded = true }
     }
 
     // MARK: Shared pieces
@@ -733,6 +758,78 @@ struct OnboardingFlow: View {
             // "Redo setup": permission she already gave shows as on.
             if alerts == .undecided, await Nudges.isAllowed() { alerts = .on }
         }
+    }
+
+    // MARK: Reading her data
+
+    /// Nights from Apple Health in the last 30 days (`-demoReading`: 27).
+    private var nightsFound: Int {
+        if DemoMode.reading { return 27 }
+        let start = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+        return model.realNightDays.filter { $0 >= start }.count
+    }
+
+    private var heartFound: Bool { DemoMode.reading || model.heartIsReal }
+
+    /// "Reading your last 30 nights… 27 nights found, HRV from your Watch ✓",
+    /// then Today. Only what was really found gets a tick.
+    private var readingStep: some View {
+        Screen(accent: .purple, refreshes: false) {
+            heading("Reading", "your data")
+                .padding(.top, Space.section)
+            intro("Everything stays on your phone.")
+            Card {
+                readingLine(done: reading >= .nights, found: nightsFound > 0,
+                            working: "Reading your last 30 nights\u{2026}",
+                            result: nightsFound > 0 ? "\(nightsFound) night\(nightsFound == 1 ? "" : "s") found"
+                                                    : "No nights yet. Wear your Watch to bed tonight")
+                if reading >= .nights {
+                    readingLine(done: reading >= .heart, found: heartFound,
+                                working: "Looking for HRV\u{2026}",
+                                result: heartFound ? "HRV from your Watch" : "No HRV yet. It comes after a night with your Watch")
+                        .motionTransition(.reveal, edge: .top)
+                }
+                if reading >= .heart {
+                    readingLine(done: reading >= .finished, found: true,
+                                working: "Setting up Today\u{2026}", result: "Today is ready")
+                        .motionTransition(.reveal, edge: .top)
+                }
+            }
+            if nightsFound < AppModel.nightsNeeded && reading >= .nights {
+                intro("Until you have \(AppModel.nightsNeeded) nights, Today shows example numbers, labelled Example data.")
+                    .motionTransition(.reveal, edge: .top)
+            }
+            if reading == .finished {
+                PrimaryButton(title: "See today", action: openToday)
+                    .motionTransition(.reveal, edge: .bottom)
+            }
+        }
+    }
+
+    /// A spinner while it works, then a tick (or a plain dot when nothing
+    /// was found) and what it found.
+    private func readingLine(done: Bool, found: Bool, working: String, result: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.m) {
+            Group {
+                if !done {
+                    ProgressView().controlSize(.small)
+                } else if found {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Accent.mint.ink(scheme))
+                } else {
+                    Image(systemName: "circle.dashed").foregroundStyle(Palette(scheme: scheme).tertiary)
+                }
+            }
+            .font(.scaled(size: 17, weight: .semibold))
+            .frame(width: Font.scaledSize(22))
+            .accessibilityHidden(true)
+            Text(done ? result : working)
+                .font(.bodyEmphasis)
+                .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Sizes.minTap)
+        .accessibilityElement(children: .combine)
     }
 
     /// Notification permission, asked here where it says what it's for,

@@ -29,6 +29,7 @@ import HealthCore
 /// - `-demoBedtimeActivity on|openWatch|off|hidden`: the bedtime Live
 ///   Activity right away, with that Watch alarm state.
 /// - `-demoHelloCard`: the day-3 hello card on Today, whatever day it is.
+/// - `-demoReading`: setup's last step finds a month of nights and HRV.
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -59,6 +60,9 @@ enum DemoMode {
     /// `-demoHelloCard`: Today shows the day-3 hello card (D-T7) today,
     /// with every row, whatever day this is.
     static let helloCard = args.contains("-demoHelloCard")
+    /// `-demoReading`: the last setup step finds 27 nights and HRV from
+    /// the Watch, as on a phone with a month of Apple Health (D-L3).
+    static let reading = args.contains("-demoReading")
     /// `-demoClock 14:30`: Today greets, orders its cards and reads energy
     /// now as if it were that time (screenshots of the morning, afternoon
     /// and evening). Other screens keep the real clock. In app-day
@@ -79,7 +83,7 @@ enum DemoMode {
     static let bedtimeActivity = value(after: "-demoBedtimeActivity")
     #else
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false
-    static let pillHistory = false, helloCard = false
+    static let pillHistory = false, helloCard = false, reading = false
     static let pillEvent: String? = nil
     static let packDay = 18
     static let open: String? = nil
