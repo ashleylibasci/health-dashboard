@@ -2,7 +2,8 @@ import SwiftUI
 import HealthCore
 
 /// Heavy flow logged with tiredness (or a resting heart rate creeping
-/// up): one line suggesting a ferritin test, the rest in a sheet (D3).
+/// up): one line saying iron may be low, the rest in a sheet (D3).
+/// No test or clinician suggestion (Ashley, Oct 29).
 /// About 40% of US females aged 12–21 are iron deficient (Weyand 2023).
 /// Shows nothing otherwise.
 struct IronPromptCallout: View {
@@ -11,13 +12,13 @@ struct IronPromptCallout: View {
 
     var body: some View {
         if let prompt = model.ironPrompt {
-            CalloutBar(text: "Heavy flow and tired? Ask for a ferritin test.", systemImage: "drop.triangle.fill",
+            CalloutBar(text: "Possible low iron", systemImage: "drop.triangle.fill",
                        accent: .pink) { showsMore = true }
                 .bottomSheet(isPresented: $showsMore, title: "Iron and heavy periods") {
                     Text(Self.why(prompt))
                         .font(.bodyText)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Low iron is common and fixable: about 4 in 10 young women in the US are low. A ferritin blood test shows your iron stores, so it\u{2019}s worth asking for one.")
+                    Text("Low iron is common and fixable: about 4 in 10 young women in the US are low.")
                         .font(.bodyText)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("Iron-rich foods (meat, beans, lentils, tofu, fortified cereal) go further with some vitamin C. Coffee and tea cut how much you absorb, so have them an hour away from meals.")
