@@ -7,7 +7,8 @@ import HealthCore
 // Moved out of BodyView.swift so the detail screens own them.
 
 /// HRV, resting heart rate or sleep over the last week, month or six months
-/// (D-G2). Drag across it to read any night (or week) against your usual.
+/// (D-G2), with her break weeks shaded behind (D-G3). Drag across it to read
+/// any night (or week) against your usual.
 struct BodyTrendCard: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
@@ -181,7 +182,8 @@ struct BodyTrendCard: View {
 
     private func title(_ p: NightTrendPoint) -> String {
         if range.isWeekly { return "Week of " + p.date.formatted(.dateTime.month(.abbreviated).day()) }
-        return selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat)
+        let day = selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat)
+        return model.isBreakDay(p.date) ? "\(day) \u{00B7} \(model.packBreakName)" : day
     }
 
     var body: some View {
@@ -189,6 +191,7 @@ struct BodyTrendCard: View {
         let rest = atRest(points)
         let shown = shown(in: points)
         let slots = points.map(detail)
+        let breaks = model.breakSpans(in: range.domain())
         Card {
             if typeSize.isAccessibilitySize {
                 ExplainedTitle(text: range.title, explanation: explanation, size: 17)
@@ -217,11 +220,14 @@ struct BodyTrendCard: View {
             if points.count >= 2 {
                 NightTrendChart(points: points, range: range, usual: usual, band: band, scale: scale, accent: accent,
                                 usualLabel: metric == .sleep ? "Your need" : "Your usual",
-                                seriesName: metric.spoken, format: format,
+                                seriesName: metric.spoken, format: format, breaks: breaks,
                                 selected: selected == nil ? nil : shown?.date, selection: $selected)
                     .frame(height: 170)
                     .motion(.dataSwap, value: metric)
                     .motion(.dataSwap, value: range)
+                if !breaks.isEmpty {
+                    ChartKey(items: [.init(label: model.packBreakName, mark: .band)])
+                }
                 ScrubHint(each: range.step)
             } else {
                 Text(range.isWeekly ? "Not enough weeks yet." : "Not enough nights yet.").font(.bodyText).secondaryText()
@@ -266,6 +272,8 @@ struct NightTrendChart: View {
     var usualLabel = "Your usual"
     var seriesName: String
     var format: (Double) -> String
+    /// Her break weeks, shaded behind the nights (D-G3).
+    var breaks: [ClosedRange<Date>] = []
     let selected: Date?
     @Binding var selection: Date?
     @Environment(\.colorScheme) private var scheme
@@ -288,12 +296,14 @@ struct NightTrendChart: View {
     private var summary: String {
         let values = points.map { format($0.value) }.joined(separator: ", ")
         let span = range.isWeekly ? "weekly averages over the last 6 months" : "the last \(points.count) nights"
-        return "\(seriesName), \(span), oldest first: \(values). \(usualLabel) is \(format(usual))."
+        let shaded = breaks.isEmpty ? "" : " Shaded bands are your break weeks."
+        return "\(seriesName), \(span), oldest first: \(values). \(usualLabel) is \(format(usual)).\(shaded)"
     }
 
     var body: some View {
         let p = Palette(scheme: scheme)
         Chart {
+            BreakWeekMarks(spans: breaks, scheme: scheme)
             if let band {
                 RectangleMark(yStart: .value("Low", band.lowerBound), yEnd: .value("High", band.upperBound))
                     .foregroundStyle(p.track.opacity(scheme == .dark ? 0.8 : 0.7))

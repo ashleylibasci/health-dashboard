@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 /// How far back a nightly trend chart looks (D-G2), like Apple Health's
 /// W / M / 6M: a week or a month of nights, or six months of weekly
@@ -94,5 +95,79 @@ struct TrendRangePicker: View {
         // At accessibility sizes the chips have room for the words.
         AdaptiveSegmentedPicker("Range", selection: $range, options: TrendRange.allCases, accent: accent,
                                 spoken: { $0.spoken }) { typeSize.isAccessibilitySize ? $0.spoken : $0.short }
+    }
+}
+
+/// Her break weeks, shaded behind a trend chart (D-G3). Spans come from
+/// `AppModel.breakSpans(in:)`; none when she isn't on the pill.
+struct BreakWeekMarks: ChartContent {
+    let spans: [ClosedRange<Date>]
+    let scheme: ColorScheme
+    /// The y domain to fill, for bar charts (where a band without one stops
+    /// short of the bars' baseline).
+    var height: ClosedRange<Double>? = nil
+
+    var body: some ChartContent {
+        ForEach(spans, id: \.lowerBound) { span in
+            if let height {
+                RectangleMark(xStart: .value("Break starts", span.lowerBound), xEnd: .value("Break ends", span.upperBound),
+                              yStart: .value("Bottom", height.lowerBound), yEnd: .value("Top", height.upperBound))
+                    .foregroundStyle(ChartKey.breakFill(scheme))
+            } else {
+                RectangleMark(xStart: .value("Break starts", span.lowerBound), xEnd: .value("Break ends", span.upperBound))
+                    .foregroundStyle(ChartKey.breakFill(scheme))
+            }
+        }
+    }
+}
+
+/// The key under a trend chart, for what isn't labelled on the plot:
+/// "Break week" for the shaded bands.
+struct ChartKey: View {
+    struct Item: Hashable {
+        enum Mark: Hashable { case band }
+        var label: String
+        var mark: Mark
+    }
+
+    var items: [Item]
+    @Environment(\.colorScheme) private var scheme
+
+    /// The break-week shading, on the chart and in the key.
+    static func breakFill(_ scheme: ColorScheme) -> Color {
+        Accent.pink.fill(scheme).opacity(scheme == .dark ? 0.13 : 0.11)
+    }
+
+    @ViewBuilder
+    private func swatch(_ item: Item) -> some View {
+        switch item.mark {
+        case .band:
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Self.breakFill(scheme))
+                .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .strokeBorder(Accent.pink.fill(scheme).opacity(0.5)))
+                .frame(width: 14, height: 12)
+        }
+    }
+
+    private func spoken(_ item: Item) -> String {
+        switch item.mark {
+        case .band: "Shaded: \(item.label.lowercased())"
+        }
+    }
+
+    var body: some View {
+        FlowLayout(spacing: Space.m) {
+            ForEach(items, id: \.self) { item in
+                HStack(spacing: Space.s) {
+                    swatch(item)
+                    Text(item.label)
+                }
+            }
+        }
+        .font(.secondary)
+        .foregroundStyle(Palette(scheme: scheme).secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(items.map(spoken).joined(separator: ". "))
     }
 }

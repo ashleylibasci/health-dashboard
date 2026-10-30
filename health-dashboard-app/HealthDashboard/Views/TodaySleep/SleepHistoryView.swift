@@ -3,7 +3,8 @@ import Charts
 import HealthCore
 
 /// Every night of the last week or month, or each week of the last six
-/// months (D-G2), against her sleep need, plus averages.
+/// months (D-G2), against her sleep need, with her break weeks shaded
+/// (D-G3), plus averages.
 struct SleepHistoryView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -77,7 +78,8 @@ struct SleepHistoryView: View {
     private func dateText(_ day: Date) -> String {
         // The night before the wake day.
         let night = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
-        return "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        let text = "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        return model.isBreakDay(day) ? "\(text) \u{00B7} \(model.packBreakName)" : text
     }
 
     private func vsNeed(_ asleep: Int) -> String {
@@ -122,7 +124,8 @@ struct SleepHistoryView: View {
     private var metCount: Int { nights.filter { model.metNeed($0) }.count }
 
     private var chartCard: some View {
-        Card {
+        let breaks = model.breakSpans(in: range.domain())
+        return Card {
             HStack(alignment: .firstTextBaseline) {
                 Text("Time asleep").font(.cardTitle)
                 Spacer()
@@ -139,9 +142,12 @@ struct SleepHistoryView: View {
                                 ? weeks.min { abs($0.week.timeIntervalSince(raw)) < abs($1.week.timeIntervalSince(raw)) }?.week
                                 : nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
                         },
-                        barWidth: range == .week ? 22 : 6, range: range)
+                        barWidth: range == .week ? 22 : 6, range: range, breaks: breaks)
                 .frame(height: 200)
                 .motion(.dataSwap, value: range)
+            if !breaks.isEmpty {
+                ChartKey(items: [.init(label: model.packBreakName, mark: .band)])
+            }
             ScrubHint(each: range.step)
             if mixesExamples && !range.isWeekly {
                 Text("Faded bars are example nights. Solid bars are your own nights from Apple Health.")
@@ -206,6 +212,8 @@ struct HistoryBars: View {
     /// The span the x axis covers, ending today: exactly 7 bars' worth of
     /// labels on a week, never an extra empty day (design flaw 5).
     var range: TrendRange = .week
+    /// Her break weeks, shaded behind the bars (D-G3).
+    var breaks: [ClosedRange<Date>] = []
     @Environment(\.colorScheme) private var scheme
 
     private var domain: ClosedRange<Date> { range.domain() }
@@ -233,6 +241,7 @@ struct HistoryBars: View {
         if range.isWeekly {
             let short = weeks.filter { !SleepNeedEstimator.metNeed(asleep: Int($0.value.rounded()), need: need) }.count
             return "Average time asleep for each of \(weeks.count) weeks. \(short) averaged under your need of \(Clock.duration(need))."
+                + (breaks.isEmpty ? "" : " Shaded bands are your break weeks.")
         }
         let short = nights.filter { !metDays.contains(day($0)) }.count
         var text = "Time asleep for \(nights.count) nights. \(short) were under your need of \(Clock.duration(need))."
@@ -240,6 +249,7 @@ struct HistoryBars: View {
         if examples > 0 {
             text += " \(examples) of the nights are examples, \(nights.count - examples) are yours."
         }
+        if !breaks.isEmpty { text += " Shaded bands are your break weeks." }
         return text
     }
 
@@ -267,6 +277,7 @@ struct HistoryBars: View {
 
     var body: some View {
         Chart {
+            BreakWeekMarks(spans: breaks, scheme: scheme, height: 0...11)
             selectionRule
             if range.isWeekly {
                 ForEach(weeks, id: \.week) { week in
