@@ -281,7 +281,7 @@ extension AppModel {
             out.append(.init(title: "A late night recently", detail: "Bed at \(Clock.format(late.bedtime))\(usual). A late night can take a couple of days to recover from.", weight: 7, topic: .lateNight))
         }
         if isLateLuteal {
-            out.append(.init(title: "Late in your cycle", detail: "A higher resting heart rate and lower HRV are normal now, so feeling a bit flat is too. If it\u{2019}s more than flat (hopeless, panicky, intense anger) and it gets in the way of classes or friends most months, track it and tell a doctor: PMDD affects about 2\u{2013}6% of women and is treatable.", weight: 5, topic: .luteal))
+            out.append(.init(title: "Late in your cycle", detail: "A higher resting heart rate and lower HRV are normal now, so feeling a bit flat is too. If it\u{2019}s more than flat (hopeless, panicky, intense anger) and it gets in the way of classes or friends most months, it\u{2019}s worth tracking: PMDD affects about 2\u{2013}6% of women and is treatable.", weight: 5, topic: .luteal))
         }
         if sickCheckFlagged {
             out.append(.init(title: "Your body may be fighting something", detail: "Several signals are off at once.", weight: 8, topic: .illness))
