@@ -59,6 +59,13 @@ struct WidgetSnapshot: Codable, Equatable {
     /// When she woke today (from last night's sleep), for the Watch's Smart
     /// Stack timing. nil without a fresh night, and from older app builds.
     var wake: Date? = nil
+    /// Today's energy curve, the same one as Today's "Energy now" tile, so
+    /// the Energy widget and complication can move their "now" dot along
+    /// it without the app running. nil from older app builds.
+    var energy: EnergyCurve? = nil
+    /// Sleep debt over the last two weeks, in minutes, as on Today. nil
+    /// from older app builds.
+    var sleepDebt: Int? = nil
 
     struct QuickDrink: Codable, Equatable {
         var id: UUID
@@ -97,6 +104,95 @@ struct WidgetSnapshot: Codable, Equatable {
         }
         /// Today's pill time as a date.
         var pillTime: Date { day.addingTimeInterval(TimeInterval(time * 60)) }
+    }
+
+    /// The day's energy curve from her wake time, and where she is on it.
+    struct EnergyCurve: Codable, Equatable {
+        /// The first sample (her wake time); one every `step` seconds after it.
+        var start: Date
+        var step: TimeInterval
+        /// 0–100, as Today shows them.
+        var levels: [Int]
+        /// Where she is, in order: each holds from `from` until the next starts.
+        var spans: [Span]
+
+        struct Span: Codable, Equatable {
+            var from: Date
+            /// "Afternoon dip", "Climbing out of the dip"
+            var title: String
+            /// Inside a zone: its end ("till 6:07pm") and a short name
+            /// for tight spots ("dip"). nil between zones.
+            var until: Date? = nil
+            var short: String? = nil
+        }
+
+        var end: Date { start.addingTimeInterval(step * Double(max(levels.count - 1, 0))) }
+
+        /// The sample nearest `date` (held at the ends), like Today's tile.
+        func index(at date: Date) -> Int {
+            let i = Int((date.timeIntervalSince(start) / step).rounded())
+            return min(max(i, 0), max(levels.count - 1, 0))
+        }
+
+        func level(at date: Date) -> Int? { levels.isEmpty ? nil : levels[index(at: date)] }
+
+        /// The moments the nearest sample changes (halfway between samples)
+        /// from `now` on: timeline entries that keep the dot where Today has it.
+        func moves(after now: Date) -> [Date] {
+            guard levels.count > 1 else { return [] }
+            return (1..<levels.count).map { start.addingTimeInterval(step * (Double($0) - 0.5) + 1) }.filter { $0 > now }
+        }
+
+        /// The sample time nearest `date`.
+        func sampleDate(at date: Date) -> Date { start.addingTimeInterval(step * Double(index(at: date))) }
+
+        func span(at date: Date) -> Span? {
+            let t = sampleDate(at: date)
+            return spans.last { $0.from <= t } ?? spans.first
+        }
+
+        /// "Afternoon dip till 6:07pm", or "Climbing out of the dip".
+        func line(at date: Date) -> String? {
+            guard let s = span(at: date) else { return nil }
+            return s.until.map { "\(s.title) till\u{00A0}\(Clock.format(Clock.minutesOfDay($0)))" } ?? s.title
+        }
+
+        /// "dip till 6:07pm", or "Climbing out of the dip".
+        func shortLine(at date: Date) -> String? {
+            guard let s = span(at: date) else { return nil }
+            guard let until = s.until, let short = s.short else { return s.title }
+            return "\(short) till\u{00A0}\(Clock.format(Clock.minutesOfDay(until)))"
+        }
+
+        /// A zone's name where there's room for a word or two.
+        static func shortName(_ kind: EnergyDay.Zone.Kind) -> String {
+            switch kind {
+            case .grogginess: return "groggy"
+            case .morningPeak: return "peak"
+            case .afternoonDip: return "dip"
+            case .secondWind: return "second wind"
+            case .windDown: return "wind-down"
+            case .melatonin: return "sleep window"
+            }
+        }
+
+        /// An example day woken at 8am, for widget galleries. Between
+        /// zones it just says "Steady stretch".
+        static func example(day: Date) -> EnergyCurve {
+            let e = EnergyModel.day(.init(wake: 480, asleepMinutes: 440, sleepDebt: 90, habitualMidSleep: 270,
+                                          habitualSleepOnset: 1410, bedtime: 1410))
+            let order: [EnergyDay.Zone.Kind] = [.melatonin, .windDown, .grogginess, .morningPeak, .afternoonDip, .secondWind]
+            func date(_ m: Minutes) -> Date { day.addingTimeInterval(TimeInterval(m * 60)) }
+            var spans: [Span] = []
+            for p in e.curve {
+                let zone = order.lazy.compactMap { e.zone($0) }.first { $0.range.contains(p.time) }
+                let span = Span(from: date(p.time), title: zone?.title ?? "Steady stretch",
+                                until: zone.map { date($0.range.end) }, short: zone.map { shortName($0.kind) })
+                if spans.last?.title != span.title || spans.last?.until != span.until { spans.append(span) }
+            }
+            return EnergyCurve(start: date(e.curve.first?.time ?? 480), step: 600,
+                               levels: e.curve.map { Int($0.level.rounded()) }, spans: spans)
+        }
     }
 
     /// The older Health Dashboard app's group (a free developer team can't
@@ -151,6 +247,8 @@ struct WidgetSnapshot: Codable, Equatable {
     func cycleNumber(at date: Date) -> Int? { isCurrent(at: date) ? cycleNumber : nil }
     func bedtime(at date: Date) -> Date? { isCurrent(at: date) ? bedtime : nil }
     func caffeineCutoff(at date: Date) -> Date? { isCurrent(at: date) ? caffeineCutoff : nil }
+    func energy(at date: Date) -> EnergyCurve? { isCurrent(at: date) ? energy : nil }
+    func sleepDebt(at date: Date) -> Int? { isCurrent(at: date) ? sleepDebt : nil }
 
     /// Today's stress rating: logged since the app day that holds `date`
     /// began (the day rolls over every 24 hours from `appDayStart`).
@@ -185,7 +283,8 @@ struct WidgetSnapshot: Codable, Equatable {
         waterML: 1060, waterGoalML: 1893, bottleML: 710, bedtime: nil, bedtimeStreak: 4,
         quickDrink: QuickDrink(id: UUID(), name: "Latte", mg: 130),
         pill: PillState(day: Calendar.current.startOfDay(for: .now), packDay: 18, activeDays: 21, packLength: 28,
-                        time: 21 * 60, taken: nil))
+                        time: 21 * 60, taken: nil),
+        energy: .example(day: Calendar.current.startOfDay(for: .now)), sleepDebt: 95)
 }
 
 /// The Watch's smart alarm, for the Bedtime complication. Written to the App

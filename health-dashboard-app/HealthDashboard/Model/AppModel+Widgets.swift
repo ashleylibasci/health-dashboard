@@ -42,8 +42,30 @@ extension AppModel {
             },
             stress: AppData.today(store.data.moodLog, date: \.date).last.map { .init(level: $0.stress, date: $0.date) },
             smartAlarmOn: store.data.smartAlarmEnabled,
-            wake: lastNightIsFresh ? AppDay.date(lastNight.wake, relativeTo: appDayDate) : nil
+            wake: lastNightIsFresh ? AppDay.date(lastNight.wake, relativeTo: appDayDate) : nil,
+            energy: widgetEnergyCurve,
+            sleepDebt: sleepDebt
         ).save()
+    }
+
+    /// Today's energy curve with where she is at each point, worded as on
+    /// Today's "Energy now" tile ("Afternoon dip till 6:07pm").
+    private var widgetEnergyCurve: WidgetSnapshot.EnergyCurve? {
+        let e = energyToday
+        guard let first = e.curve.first else { return nil }
+        let day = appDayDate
+        let step = e.curve.count > 1 ? e.curve[1].time - first.time : 10
+        var spans: [WidgetSnapshot.EnergyCurve.Span] = []
+        for p in e.curve {
+            let zone = Self.zone(at: p.time, in: e)
+            let span = WidgetSnapshot.EnergyCurve.Span(
+                from: AppDay.date(p.time, relativeTo: day), title: energyMoment(at: p.time, in: e).title,
+                until: zone.map { AppDay.date($0.range.end, relativeTo: day) },
+                short: zone.map { WidgetSnapshot.EnergyCurve.shortName($0.kind) })
+            if spans.last?.title != span.title || spans.last?.until != span.until { spans.append(span) }
+        }
+        return .init(start: AppDay.date(first.time, relativeTo: day), step: TimeInterval(step * 60),
+                     levels: e.curve.map { Int($0.level.rounded()) }, spans: spans)
     }
 
     /// Water, pills and stress tapped on a widget (and the smart alarm

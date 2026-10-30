@@ -2,7 +2,7 @@ import WidgetKit
 import SwiftUI
 import HealthCore
 
-/// Watch-face complications: recovery, cycle, today's pill, caffeine & water,
+/// Watch-face complications: recovery, energy now, cycle, today's pill, caffeine & water,
 /// and tonight's bedtime with the smart alarm. They show the numbers the iPhone last sent
 /// (`WidgetSnapshot`), say "Example" for example data, never show yesterday's
 /// numbers as today's, and open the matching Watch page when tapped.
@@ -10,6 +10,7 @@ import HealthCore
 struct HealthNextComplications: WidgetBundle {
     var body: some Widget {
         RecoveryComplication()
+        EnergyComplication()
         CycleComplication()
         PillComplication()
         CaffeineComplication()
@@ -30,9 +31,9 @@ struct ComplicationEntry: TimelineEntry {
 /// it's taken (and, as the break-week card, gently through the break and
 /// from the morning of a new pack day), Caffeine & water in the 90 minutes before the cutoff and
 /// whenever water falls a bottle behind pace, Bedtime from 90 minutes
-/// before bed. Cycle has no moment of its own.
+/// before bed. Cycle and Energy have no moment of their own.
 enum ComplicationKind {
-    case recovery, cycle, pill, caffeine, bedtime
+    case recovery, energy, cycle, pill, caffeine, bedtime
 
     /// A stretch of time it's relevant, and how strongly (0–100).
     struct Window {
@@ -46,7 +47,7 @@ enum ComplicationKind {
         case .recovery:
             guard let wake = s.wake, s.recovery(at: now) != nil else { return [] }
             return [Window(from: wake, until: wake.addingTimeInterval(2 * 3600), score: 50)]
-        case .cycle:
+        case .cycle, .energy:
             return []
         case .pill:
             guard let p = s.pill(at: now) else { return [] }
@@ -118,6 +119,10 @@ struct ComplicationProvider: TimelineProvider {
             // The next pill day (12 hours after the pill time): the pill
             // complication moves on to the next pill.
             if let p = s.pill(at: now) { dates.append(p.pillTime.addingTimeInterval(12 * 3600)) }
+            // Energy's "now" dot moves on to each next point of the curve.
+            if kind == .energy, let e = s.energy(at: now) {
+                dates += e.moves(after: now).filter { $0 < s.appDayStart.addingTimeInterval(24 * 3600) }
+            }
             windows = kind.windows(s, now: now)
             dates += windows.flatMap { [$0.from, $0.until] }
         }
@@ -244,6 +249,80 @@ private struct RecoveryComplicationView: View {
                 }
             }
             .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+// MARK: - Energy now
+
+struct EnergyComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "WatchEnergy", provider: ComplicationProvider(kind: .energy)) { entry in
+            EnergyComplicationView(entry: entry)
+                .containerBackground(.clear, for: .widget)
+                .widgetURL(page(1))
+        }
+        .configurationDisplayName("Energy now")
+        .description("Today's energy curve with a dot for now: \"57 \u{00B7} dip till 6pm\".")
+        .supportedFamilies(families)
+    }
+}
+
+/// Today's "Energy now": the curve with a dot for now and where she is on
+/// it. The curve is a prediction from last night, so it isn't greyed as
+/// it ages; a new day clears it.
+private struct EnergyComplicationView: View {
+    let entry: ComplicationEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        let s = entry.snapshot
+        let now = entry.date
+        let curve = s?.energy(at: now)
+        let level = curve?.level(at: now)
+        let short = curve?.shortLine(at: now)
+        let missing = missingLine(s, now: now) ?? "Open on iPhone to update"
+        let spoken = level.map { "Energy now \($0) of 100, \(curve?.line(at: now) ?? "")" } ?? "Energy now: \(missing.lowercased())"
+        let mint = Accent.mint.fill(.dark)
+        switch family {
+        case .accessoryCircular:
+            Gauge(value: Double(level ?? 0), in: 0...100) {
+                Image(systemName: "bolt.fill")
+            } currentValueLabel: {
+                Text(level.map(String.init) ?? dash)
+                    .font(numberFont)
+                    .contentTransition(.numericText(value: Double(level ?? 0)))
+            }
+            .gaugeStyle(.accessoryCircular)
+            .tint(mint)
+            .widgetAccentable()
+            .accessibilityLabel(spoken)
+        case .accessoryCorner:
+            Text(level.map(String.init) ?? dash)
+                .font(numberFont)
+                .widgetAccentable()
+                .widgetLabel(level == nil ? missing : (short ?? "Energy"))
+                .accessibilityLabel(spoken)
+        case .accessoryInline:
+            Text(level.map { "Energy \($0) \u{00B7} \(short ?? "")" } ?? "Energy: \(missing.lowercased())")
+        default:
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title("Energy now", s)).font(.caption2.weight(.semibold))
+                    .foregroundStyle(Accent.mint.ink(.dark))
+                    .widgetAccentable()
+                if let curve, let level {
+                    EnergySpark(levels: curve.levels, now: curve.index(at: now), line: mint, dot: .white,
+                                lineWidth: 1.5, dotSize: 6)
+                        .widgetAccentable()
+                    Text("\(level) \u{00B7} \(short ?? "")")
+                        .font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                } else {
+                    Text(dash).font(.headline)
+                    Text(missing).font(.caption2)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spoken)
         }
     }
 }
