@@ -1,9 +1,9 @@
 import SwiftUI
 import HealthCore
 
-/// The Body tab: where she is in her pack (or cycle) and her energy, then
-/// one card of vitals led by the sick check, then fitness and her body
-/// clock. Each row is a one-line answer that opens its screen; the
+/// The Body tab: a one-line summary (D-S4), where she is in her pack (or
+/// cycle) and her energy, then one card of vitals led by the sick check,
+/// then fitness and her body clock. Each row is a one-line answer that opens its screen; the
 /// explanations live there. Recovery lives on Today, sleep on Sleep and
 /// stress on Today, so nothing here repeats another tab.
 struct BodyView: View {
@@ -15,9 +15,53 @@ struct BodyView: View {
         Screen(accent: .indigo) {
             BodyLogTabHeader("Body")
             SampleDataBanner()
+            summary
             rhythms
             vitals
             activity
+        }
+    }
+
+    // MARK: Summary
+
+    /// The 2-second answer, like every other tab (D-S4): what the sick
+    /// check's signals say, then where she is in her pack and her energy.
+    private var summary: some View {
+        SummaryHeader(eyebrow: "Body today", value: signalsVerdict, line: summaryLine, accent: .indigo)
+    }
+
+    /// "Pill day 18 · 57% energy left now".
+    private var summaryLine: String {
+        let line = [rhythmPhrase, "\(Int(model.energyBankNow.rounded()))% energy left now"]
+            .compactMap { $0 }.joined(separator: " \u{00B7} ")
+        return line.prefix(1).uppercased() + line.dropFirst()
+    }
+
+    /// The sick check's answer in a few words, the same order of trust as
+    /// its row: what she logged, then whether there's a reading at all.
+    private var signalsVerdict: String {
+        if !model.loggedSickSymptoms.isEmpty { return "You feel sick" }
+        guard model.hasHeartData else { return "No Watch reading" }
+        let flagged = model.illness.factors.filter(\.flagged).count
+        switch model.illness.confidence {
+        case .none: return "Signals look usual"
+        case .low: return flagged > 1 ? "\(flagged) signals moved a little" : "A signal moved a little"
+        case .medium, .high: return "\(flagged) signals moved together"
+        }
+    }
+
+    /// "pill day 18", "cycle day 12", "20 days since your period", or nil
+    /// when there's no day to count.
+    private var rhythmPhrase: String? {
+        switch model.cycleDisplay {
+        case let .pack(day, _, packLength):
+            return store.birthControl == .combinedPill ? "pill day \(day)" : "day \(day) of \(packLength)"
+        case let .phases(day, _, _), let .overdue(day, _):
+            return "cycle day \(day)"
+        case let .irregular(days?):
+            return "\(days) day\(days == 1 ? "" : "s") since your period"
+        case .irregular(nil), .suppressed, .notTracking:
+            return nil
         }
     }
 
