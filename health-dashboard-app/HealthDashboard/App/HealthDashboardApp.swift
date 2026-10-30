@@ -106,6 +106,7 @@ struct RootTabView: View {
                         case "restingHR": HeartMetricView(metric: .restingHR)
                         case "sleepHistory": SleepHistoryView()
                         case "appearance": AppearanceSettingsView()
+                        case "energy": EnergyView()
                         default: CycleView()
                         }
                     }

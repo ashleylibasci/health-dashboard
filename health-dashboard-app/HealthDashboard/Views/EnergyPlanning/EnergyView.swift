@@ -513,13 +513,20 @@ private struct EnergyChartCard: View {
                     $0 == .score ? "Score" : "Energy left"
                 }
             }
-            switch shown {
-            case .score:
-                EnergyCurvePanel(energy: energy, isToday: isToday, zone: zone, chartNote: chartNote,
-                                 summary: summary, resetKey: resetKey)
-            case .left:
-                EnergyBankPanel()
+            // The new chart fades in and traces its line (D-M4), rather
+            // than snapping.
+            Group {
+                switch shown {
+                case .score:
+                    EnergyCurvePanel(energy: energy, isToday: isToday, zone: zone, chartNote: chartNote,
+                                     summary: summary, resetKey: resetKey)
+                        .transition(.opacity)
+                case .left:
+                    EnergyBankPanel()
+                        .transition(.opacity)
+                }
             }
+            .motion(.dataSwap, value: shown)
         }
     }
 }
@@ -732,6 +739,7 @@ private struct EnergyCurveChart: View {
             }
         }
         // A tick per half hour, not per 10-minute point (Weber A6).
+        .drawsIn()
         .chartScrub($selection, snapped: selected, steps: energy.curve.map(\.time), feedbackKey: { $0 / 30 })
         // Scrubbing moves the marks with the finger, never animated, so a
         // mark can't lag a frame behind the readout.
@@ -871,6 +879,7 @@ private struct EnergyBankChart: View {
                 }
             }
         }
+        .drawsIn()
         .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 30 })
         .transaction(value: selected) { $0.animation = nil }
         .accessibilityLabel(summary)

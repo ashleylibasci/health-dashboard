@@ -475,6 +475,7 @@ private struct StressHoursChart: View {
         }
         // VoiceOver reads the chart's summary (chartScrub makes it one
         // element); hiding the marks risked dropping the ▲/● labels (Weber A8).
+        .drawsIn()
         .chartScrub($selection, snapped: selected, steps: bars.map(\.hour).sorted())
         .chartXScale(domain: domain)
         .chartYScale(domain: 0...115)  // room above 100 for the labels

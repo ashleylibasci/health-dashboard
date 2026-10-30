@@ -646,6 +646,7 @@ private struct CaffeineFalloffChart: View {
         }
         // VoiceOver reads the chart's summary (chartScrub makes it one
         // element), so no mark-level hiding (Weber A8). A tick per half hour.
+        .drawsIn()
         .chartScrub($selection, snapped: selected?.time, steps: points.map(\.time), feedbackKey: { $0 / 30 })
         .chartXScale(domain: start...end)
         // The last x label ran past the plot's edge (Weber C11).
@@ -779,6 +780,7 @@ private struct EnergyTimingChart: View {
             dots
         }
         // A tick per half hour; the selection is already snapped to 5 minutes.
+        .drawsIn()
         .chartScrub($selection, snapped: selected, feedbackKey: { $0 / 30 })
         .chartXScale(domain: span.lowerBound...span.upperBound)
         .chartYScale(domain: 0.0...1.0)

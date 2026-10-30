@@ -540,6 +540,7 @@ struct NightTrendChart: View {
                 }
             }
         }
+        .drawsIn()
         .chartScrub($selection, snapped: selected, steps: points.map(\.date))
         .accessibilityLabel(summary)
         .accessibilityChartDescriptor(DateChartDescriptor(

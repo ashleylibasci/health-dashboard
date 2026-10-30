@@ -72,7 +72,7 @@ enum DemoMode {
     /// `-demoAway`: with `-demoCycle pill`, her pill time belongs to a time
     /// zone 3 hours from the phone's, as if she'd travelled.
     static let away = args.contains("-demoAway")
-    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory|appearance`:
+    /// `-demoOpen cycle|cycleSettings|visitSummary|recovery|hrv|restingHR|sleepHistory|appearance|energy`:
     /// opens on that screen (Body tab), for screenshots. The pill-visit summary also saves its
     /// PDF in Documents as visit-summary.pdf.
     static let open = value(after: "-demoOpen")

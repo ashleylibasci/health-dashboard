@@ -269,6 +269,7 @@ private struct RecoveryHistoryChart: View {
         }
         // One VoiceOver element with the summary (chartScrub), so no
         // mark-level hiding (Weber A8).
+        .drawsIn()
         .chartScrub($selection, snapped: selected, steps: history.map(\.day).sorted())
         .chartYScale(domain: 0...100)
         .chartXAxis(.hidden)
