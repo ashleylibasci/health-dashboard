@@ -181,7 +181,7 @@ struct LateNightView: View {
 
     private func chartSummary(_ points: [AppModel.BedtimePoint]) -> String {
         let late = points.filter(\.isLate).count
-        return "Bedtimes for the last \(points.count) nights. \(late) late, at \(thresholdText) or later."
+        return "Bedtimes for the last \(points.count) nights: \(late) late, at \(thresholdText) or later."
     }
 
     // MARK: Recent

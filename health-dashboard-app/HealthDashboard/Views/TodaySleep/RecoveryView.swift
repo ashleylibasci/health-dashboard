@@ -237,9 +237,12 @@ private struct RecoveryHistoryChart: View {
     @Binding var selection: Date?
     @Environment(\.colorScheme) private var scheme
 
+    /// One sentence for VoiceOver (D-A2); each day is in the audio graph.
     private var summary: String {
-        let scores = history.map { "\($0.score)" }.joined(separator: ", ")
-        return "Recovery for \(history.count) days, oldest first: \(scores). Usual is \(usual)."
+        let scores = history.map(\.score)
+        guard let lo = scores.min(), let hi = scores.max(), let last = scores.last else { return "Recovery: no days yet." }
+        let reference = usualLabel == "Start" ? "the starting point of \(usual)" : "your usual of \(usual)"
+        return "Recovery for the last \(history.count) days: from \(lo) to \(hi), latest \(last), against \(reference)."
     }
 
     private func color(_ night: AppModel.RecoveryNight) -> Color {

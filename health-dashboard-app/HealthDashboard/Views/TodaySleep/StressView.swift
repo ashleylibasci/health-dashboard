@@ -421,15 +421,17 @@ private struct StressHoursChart: View {
         return selected == bar.hour ? base : base.opacity(0.4)
     }
 
+    /// One sentence for VoiceOver (D-A2); each hour is a step on the chart.
     private var summary: String {
-        let counted = hours.compactMap { h -> String? in
-            guard let l = h.level else { return nil }
-            return "\(StressView.hourText(h.hour)) \(StressView.band(l).name.lowercased())"
+        let counted = hours.filter { $0.level != nil }
+        let names = counted.compactMap { $0.level.map { StressView.band($0).name.lowercased() } }
+        let active = hours.filter(\.active).count
+        let activeText = active == 0 ? "" : "; \(active) active hour\(active == 1 ? "" : "s") not counted"
+        guard let top = counted.max(by: { ($0.level ?? 0) < ($1.level ?? 0) }), let level = top.level,
+              let most = Dictionary(grouping: names, by: { $0 }).max(by: { $0.value.count < $1.value.count })?.key else {
+            return "Stress by hour today: nothing counted yet\(activeText)."
         }
-        let active = hours.filter(\.active).map { StressView.hourText($0.hour) }
-        var text = "Stress by hour today: " + counted.joined(separator: ", ") + "."
-        if !active.isEmpty { text += " Active, not counted: " + active.joined(separator: ", ") + "." }
-        return text
+        return "Stress by hour today: mostly \(most), highest \(StressView.band(level).name.lowercased()) at \(StressView.hourText(top.hour))\(activeText)."
     }
 
     @ChartContentBuilder

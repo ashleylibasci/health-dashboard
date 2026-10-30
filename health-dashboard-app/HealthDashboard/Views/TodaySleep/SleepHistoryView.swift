@@ -237,20 +237,17 @@ struct HistoryBars: View {
 
     private func day(_ night: NightRecord) -> Date { Calendar.current.startOfDay(for: night.wakeDay) }
 
+    /// One sentence for VoiceOver (D-A2); each bar is in the audio graph.
     private var summary: String {
+        let shaded = breaks.isEmpty ? "" : ", break weeks shaded"
         if range.isWeekly {
             let short = weeks.filter { !SleepNeedEstimator.metNeed(asleep: Int($0.value.rounded()), need: need) }.count
-            return "Average time asleep for each of \(weeks.count) weeks. \(short) averaged under your need of \(Clock.duration(need))."
-                + (breaks.isEmpty ? "" : " Shaded bands are your break weeks.")
+            return "Average time asleep for each of \(weeks.count) weeks: \(short) averaged under your need of \(Clock.duration(need))\(shaded)."
         }
         let short = nights.filter { !metDays.contains(day($0)) }.count
-        var text = "Time asleep for \(nights.count) nights. \(short) were under your need of \(Clock.duration(need))."
         let examples = nights.filter { exampleDays.contains(day($0)) }.count
-        if examples > 0 {
-            text += " \(examples) of the nights are examples, \(nights.count - examples) are yours."
-        }
-        if !breaks.isEmpty { text += " Shaded bands are your break weeks." }
-        return text
+        let mix = examples > 0 ? ", \(examples) of them examples and \(nights.count - examples) yours" : ""
+        return "Time asleep for \(nights.count) nights\(mix): \(short) under your need of \(Clock.duration(need))\(shaded)."
     }
 
     private func color(_ night: NightRecord) -> Color {

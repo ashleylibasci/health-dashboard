@@ -127,7 +127,8 @@ struct CutoffTestView: View {
                 CutoffBarChart(groups: test.groups, selected: selectedGroup?.label, selection: $selected)
                     .frame(height: 190)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(test.groups.map { "\($0.label): \(Clock.duration($0.averageAsleep)) over \($0.nights) nights" }.joined(separator: ". "))
+                    .accessibilityLabel("Average sleep by time of last caffeine: "
+                                        + test.groups.map { "\($0.label), \(Clock.duration($0.averageAsleep)) over \($0.nights) nights" }.joined(separator: "; ") + ".")
                     .accessibilityChartDescriptor(CategoryChartDescriptor(
                         title: "Average sleep by time of last caffeine", seriesName: "Last caffeine", yTitle: "Average sleep",
                         points: test.groups.map { ($0.label, Double($0.averageAsleep)) },

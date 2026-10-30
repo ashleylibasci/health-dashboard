@@ -308,7 +308,7 @@ struct DrinksView: View {
             DrinkNightsChart(points: points, selected: selectedPoint?.index, selection: $selected)
                 .frame(height: 170)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Hours asleep over the last \(points.count) nights. \(points.filter(\.afterDrinks).count) followed alcohol.")
+                .accessibilityLabel("Hours asleep over the last \(points.count) nights, \(points.filter(\.afterDrinks).count) of them after alcohol.")
                 .accessibilityChartDescriptor(DateChartDescriptor(
                     title: "Time asleep, last \(points.count) nights", seriesName: "Time asleep", yTitle: "Time asleep",
                     points: points.map { ($0.night.wakeDay, Double($0.asleep)) },

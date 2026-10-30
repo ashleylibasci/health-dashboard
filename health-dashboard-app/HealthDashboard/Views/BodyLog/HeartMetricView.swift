@@ -433,12 +433,15 @@ struct NightTrendChart: View {
     /// "Usual" or "Need", short enough for the axis gutter.
     private var axisUsualLabel: String { usualLabel == "Your need" ? "Need" : "Usual" }
 
+    /// One sentence for VoiceOver (D-A2); each value is in the audio graph.
     private var summary: String {
-        let values = points.map { format($0.value) }.joined(separator: ", ")
+        let values = points.map(\.value)
         let span = range.isWeekly ? "weekly averages over the last 6 months" : "the last \(points.count) nights"
-        let shaded = breaks.isEmpty ? "" : " Shaded bands are your break weeks."
-        let compared = comparison.map { " \($0.name) is the faint line, on the right-hand scale." } ?? ""
-        return "\(seriesName), \(span), oldest first: \(values). \(usualLabel) is \(format(usual)).\(shaded)\(compared)"
+        guard let lo = values.min(), let hi = values.max(), let last = values.last else { return "\(seriesName), \(span): none yet." }
+        var text = "\(seriesName), \(span): from \(format(lo)) to \(format(hi)), latest \(format(last)), against \(usualLabel.lowercased()) of \(format(usual))"
+        if !breaks.isEmpty { text += ", break weeks shaded" }
+        if let comparison { text += ", with \(comparison.name.lowercased()) as a faint line on the right-hand scale" }
+        return text + "."
     }
 
     var body: some View {

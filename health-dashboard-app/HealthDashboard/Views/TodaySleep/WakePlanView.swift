@@ -717,9 +717,8 @@ private struct WakeHistoryChart: View {
     }
 
     private var summary: String {
-        var text = "How you felt by wake time over \(dots.count) mornings."
-        if let bestWindow { text += " Best when waking \(bestWindow.label)." }
-        return text
+        let text = "How you felt by wake time over \(dots.count) mornings"
+        return text + (bestWindow.map { ", best when waking \($0.label)." } ?? ".")
     }
 
     @ChartContentBuilder

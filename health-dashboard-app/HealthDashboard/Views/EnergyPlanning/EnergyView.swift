@@ -167,7 +167,7 @@ struct EnergyView: View {
     private func chartSummary(_ e: EnergyDay) -> String {
         let zones = e.zones.map { "\(AppModel.zoneTitle($0)) \(timeLabel($0))" }.joined(separator: ", ")
         let prefix = day == .today ? "Today" : model.nextWakeDayName
-        return "\(prefix): peak \(Int(e.dayPeak.level.rounded())) at \(Clock.format(e.dayPeak.time)), dip \(Int(e.lowest.level.rounded())) at \(Clock.format(e.lowest.time)). \(zones)."
+        return "\(prefix): peak \(Int(e.dayPeak.level.rounded())) at \(Clock.format(e.dayPeak.time)), dip \(Int(e.lowest.level.rounded())) at \(Clock.format(e.lowest.time)); \(zones)."
     }
 
     private func timeLabel(_ z: EnergyDay.Zone) -> String {

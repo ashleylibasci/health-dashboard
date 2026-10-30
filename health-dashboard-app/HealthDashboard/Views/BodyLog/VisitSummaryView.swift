@@ -198,6 +198,13 @@ struct VisitSummaryPage: View {
         }
     }
 
+    private func moodSummary(_ data: MoodByPackDay) -> String {
+        guard let lo = data.averages.min(by: { $0.value < $1.value }), let hi = data.averages.max(by: { $0.value < $1.value }) else {
+            return "Mood by pack day: no ratings yet."
+        }
+        return "Mood by pack day, 1 to 5, averaged over your packs, \(summary.breakName.lowercased()) shaded: lowest \(String(format: "%.1f", lo.value)) on day \(lo.key), highest \(String(format: "%.1f", hi.value)) on day \(hi.key)."
+    }
+
     /// Mood (1–5) averaged by pack day, the break shaded.
     private func moodChart(_ data: MoodByPackDay) -> some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -231,6 +238,9 @@ struct VisitSummaryPage: View {
                 AxisValueLabel { Text("\(Int(v.as(Double.self) ?? 0))").font(.system(size: 7)) }
             } }
             .frame(width: 250, height: 92)
+            // One sentence for VoiceOver (D-A2) instead of every dot.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(moodSummary(data))
             Text("Shaded: \(summary.breakName). Grey dots: each day rated.").font(.system(size: 7)).foregroundStyle(muted)
         }
     }

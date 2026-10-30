@@ -111,7 +111,7 @@ struct WeekRecapView: View {
             }
             VStack(spacing: 0) {
                 WeekEnergyChart(bars: bars, selection: $chartSelection,
-                                summary: "Energy score by day, estimated from sleep: " + bars.map { "\($0.label) \($0.energy)" }.joined(separator: ", "))
+                                summary: weekChartSummary(bars))
                     .frame(height: 130)
                     .accessibilityChartDescriptor(DateChartDescriptor(
                         title: "Energy score by day, estimated from sleep", seriesName: "Energy score", yTitle: "Energy score",
@@ -410,6 +410,14 @@ private struct RecapDayBar: Identifiable {
     let energy: Int
     let color: Color
     let dimmed: Bool
+}
+
+/// One sentence for VoiceOver (D-A2); each day is in the audio graph.
+private func weekChartSummary(_ bars: [RecapDayBar]) -> String {
+    guard let hi = bars.max(by: { $0.energy < $1.energy }), let lo = bars.min(by: { $0.energy < $1.energy }) else {
+        return "Energy score by day: none yet."
+    }
+    return "Energy score by day, estimated from sleep: highest \(hi.energy) on \(hi.label), lowest \(lo.energy) on \(lo.label)."
 }
 
 private struct WeekEnergyChart: View {

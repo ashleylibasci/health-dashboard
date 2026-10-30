@@ -286,8 +286,11 @@ private struct CheckInHistoryChart: View {
         return Calendar.current.isDate(c.date, inSameDayAs: selected) ? base : base.opacity(0.35)
     }
 
+    /// One sentence for VoiceOver (D-A2); each morning is a step on the chart.
     private var summary: String {
-        "Morning check-ins, oldest first: " + history.map { "\($0.awake)" }.joined(separator: ", ") + " out of 5."
+        guard let last = history.last else { return "Morning check-ins: none yet." }
+        let average = Double(history.map(\.awake).reduce(0, +)) / Double(history.count)
+        return "Your last \(history.count) morning check-ins, out of 5: average \(String(format: "%.1f", average)), latest \(last.awake)."
     }
 
     var body: some View {
