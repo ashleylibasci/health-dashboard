@@ -120,6 +120,11 @@ struct CheckInView: View {
                 tagButton(tag.rawValue, label: tag.label)
             }
         }
+        RowCard {
+            MetricRow(title: "Patterns", note: patternsNote, systemImage: "sparkle.magnifyingglass", accent: .indigo) {
+                PatternsView()
+            }
+        }
         if level > 0 {
             Card(accent: .orange) {
                 HStack(alignment: .top, spacing: 10) {
@@ -155,6 +160,12 @@ struct CheckInView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// "2 found in your nights", or that it's still counting.
+    private var patternsNote: String {
+        let found = model.patternFactors.filter { $0.sentence != nil }.count
+        return found == 0 ? "What your tags show, once there are enough" : "\(found) found in your nights"
     }
 
     // MARK: History
