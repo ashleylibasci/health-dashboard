@@ -77,7 +77,7 @@ struct SleepHistoryView: View {
         // The night before the wake day.
         let night = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
         let text = "Night of " + night.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-        return model.isBreakDay(day) ? "\(text) \u{00B7} \(model.packBreakName)" : text
+        return model.isBandDay(day) ? "\(text) \u{00B7} \(model.bandName)" : text
     }
 
     private func vsNeed(_ asleep: Int) -> String {
@@ -122,7 +122,7 @@ struct SleepHistoryView: View {
     private var metCount: Int { nights.filter { model.metNeed($0) }.count }
 
     private var chartCard: some View {
-        let breaks = model.breakSpans(in: range.domain())
+        let breaks = model.bandSpans(in: range.domain())
         return Card {
             HStack(alignment: .firstTextBaseline) {
                 Text("Time asleep").font(.cardTitle)
@@ -140,11 +140,11 @@ struct SleepHistoryView: View {
                                 ? weeks.min { abs($0.week.timeIntervalSince(raw)) < abs($1.week.timeIntervalSince(raw)) }?.week
                                 : nights.min { abs($0.wakeDay.timeIntervalSince(raw)) < abs($1.wakeDay.timeIntervalSince(raw)) }?.wakeDay
                         },
-                        barWidth: range == .week ? 22 : 6, range: range, breaks: breaks)
+                        barWidth: range == .week ? 22 : 6, range: range, breaks: breaks, shadedSpoken: model.bandsSpoken)
                 .frame(height: 200)
                 .motion(.dataSwap, value: range)
             if !breaks.isEmpty {
-                ChartKey(items: [.init(label: model.packBreakName, mark: .band)])
+                ChartKey(items: [.init(label: model.bandName, mark: .band)])
             }
             ScrubHint(each: range.step)
             if mixesExamples && !range.isWeekly {
@@ -210,8 +210,10 @@ struct HistoryBars: View {
     /// The span the x axis covers, ending today: exactly 7 bars' worth of
     /// labels on a week, never an extra empty day (design flaw 5).
     var range: TrendRange = .week
-    /// Her break weeks, shaded behind the bars (D-G3).
+    /// Her break weeks or logged periods, shaded behind the bars (D-G3).
     var breaks: [ClosedRange<Date>] = []
+    /// How VoiceOver names the bands: "break weeks shaded", "periods shaded".
+    var shadedSpoken = "break weeks shaded"
     @Environment(\.colorScheme) private var scheme
 
     private var domain: ClosedRange<Date> { range.domain() }
@@ -237,7 +239,7 @@ struct HistoryBars: View {
 
     /// One sentence for VoiceOver (D-A2); each bar is in the audio graph.
     private var summary: String {
-        let shaded = breaks.isEmpty ? "" : ", break weeks shaded"
+        let shaded = breaks.isEmpty ? "" : ", \(shadedSpoken)"
         if range.isWeekly {
             let short = weeks.filter { !SleepNeedEstimator.metNeed(asleep: Int($0.value.rounded()), need: need) }.count
             return "Average time asleep for each of \(weeks.count) weeks: \(short) averaged under your need of \(Clock.duration(need))\(shaded)."

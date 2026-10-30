@@ -98,8 +98,8 @@ struct TrendRangePicker: View {
     }
 }
 
-/// Her break weeks, shaded behind a trend chart (D-G3). Spans come from
-/// `AppModel.breakSpans(in:)`; none when she isn't on the pill.
+/// Her break weeks or periods, shaded behind a trend chart (D-G3). Spans come from
+/// `AppModel.bandSpans(in:)`: her logged periods instead on a natural cycle.
 struct BreakWeekMarks: ChartContent {
     let spans: [ClosedRange<Date>]
     let scheme: ColorScheme

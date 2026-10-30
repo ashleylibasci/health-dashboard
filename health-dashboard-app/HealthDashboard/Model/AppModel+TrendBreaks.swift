@@ -31,3 +31,55 @@ extension AppModel {
         return packs.isBreak(day: position.day)
     }
 }
+
+/// What's shaded behind the trends: her break weeks on a pack, else the
+/// periods she logged when she ovulates on her own (Ashley, Oct 30: a
+/// natural cycle had no shading at all). Nothing on methods that stop
+/// ovulation without a break, or when she isn't tracking her cycle.
+extension AppModel {
+    /// The shaded spans inside `domain`.
+    func bandSpans(in domain: ClosedRange<Date>) -> [ClosedRange<Date>] {
+        shadesPeriods ? periodSpans(in: domain) : breakSpans(in: domain)
+    }
+
+    /// Whether `day` (a wake day) falls in a shaded band.
+    func isBandDay(_ day: Date) -> Bool {
+        guard shadesPeriods else { return isBreakDay(day) }
+        return periodDays.contains(Calendar.current.startOfDay(for: day))
+    }
+
+    /// The band's name in the key and the readout: "Break week", "Period".
+    var bandName: String { shadesPeriods ? "Period" : packBreakName }
+
+    /// For VoiceOver: "break weeks shaded", "periods shaded".
+    var bandsSpoken: String { shadesPeriods ? "periods shaded" : "\(breaksPhrase) shaded" }
+
+    private var shadesPeriods: Bool {
+        packCalendar?.hasBreak != true && store.data.cycleSetup != .notTracking && !ovulationStopped
+    }
+
+    /// The days she logged bleeding (spotting doesn't count), as in `periodLength`.
+    private var periodDays: Set<Date> {
+        let cal = Calendar.current
+        return Set(store.data.flowLog.filter { $0.flow != .none && $0.flow != .spotting }.map { cal.startOfDay(for: $0.date) })
+    }
+
+    /// Runs of logged bleeding days, each from its first midnight to the
+    /// midnight after its last, clipped to `domain`.
+    private func periodSpans(in domain: ClosedRange<Date>) -> [ClosedRange<Date>] {
+        let cal = Calendar.current
+        var spans: [ClosedRange<Date>] = []
+        for day in periodDays.sorted() {
+            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { continue }
+            if let last = spans.last, last.upperBound == day {
+                spans[spans.count - 1] = last.lowerBound...next
+            } else {
+                spans.append(day...next)
+            }
+        }
+        return spans.compactMap { span in
+            let start = max(span.lowerBound, domain.lowerBound), end = min(span.upperBound, domain.upperBound)
+            return start < end ? start...end : nil
+        }
+    }
+}

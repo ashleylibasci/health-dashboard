@@ -7,7 +7,7 @@ import HealthCore
 // Moved out of BodyView.swift so the detail screens own them.
 
 /// HRV or resting heart rate over the last week, month or six months
-/// (D-G2), with her break weeks shaded behind (D-G3). The screen's measure
+/// (D-G2), with her break weeks (or, on a natural cycle, her periods) shaded behind (D-G3). The screen's measure
 /// always stays the main line; "Compare with" lays a faint second measure
 /// over it on its own right-hand scale (D-G4). Drag across it to read any
 /// night (or week) against your usual.
@@ -213,7 +213,7 @@ struct BodyTrendCard: View {
             base = "Week of " + p.date.formatted(.dateTime.month(.abbreviated).day())
         } else {
             base = selected == nil ? "Last night \u{00B7} \(p.date.formatted(dayFormat))" : p.date.formatted(dayFormat)
-            if model.isBreakDay(p.date) { return "\(base) \u{00B7} \(model.packBreakName)" }
+            if model.isBandDay(p.date) { return "\(base) \u{00B7} \(model.bandName)" }
         }
         guard let c = compare else { return base }
         return "\(base) \u{00B7} \(metric.rawValue) and \(c.inSentence)"
@@ -283,7 +283,7 @@ struct BodyTrendCard: View {
         let rest = atRest(points)
         let shown = shown(in: points)
         let slots = compare.map { c in points.map { compareDetail($0, match($0, in: others), c) } } ?? points.map(detail)
-        let breaks = model.breakSpans(in: range.domain())
+        let breaks = model.bandSpans(in: range.domain())
         Card {
             if typeSize.isAccessibilitySize {
                 ExplainedTitle(text: range.title, explanation: explanation, size: 17)
@@ -319,7 +319,7 @@ struct BodyTrendCard: View {
             if points.count >= 2 {
                 NightTrendChart(points: points, range: range, usual: usual, band: band(metric), scale: scale(metric), accent: accent,
                                 usualLabel: metric == .sleep ? "Your need" : "Your usual",
-                                seriesName: metric.spoken, format: format, breaks: breaks,
+                                seriesName: metric.spoken, format: format, breaks: breaks, shadedSpoken: model.bandsSpoken,
                                 comparison: compare.map { comparison($0, points: others) },
                                 selected: selected == nil ? nil : shown?.date, selection: $selected)
                     .frame(height: 170)
@@ -328,7 +328,7 @@ struct BodyTrendCard: View {
                 let key = (compare.map { c in
                     [ChartKey.Item(label: "\(metric.rawValue) (left)", mark: .line(accent)),
                      ChartKey.Item(label: "\(c.rawValue) (right)", mark: .faintLine(accent(c)))]
-                } ?? []) + (breaks.isEmpty ? [] : [ChartKey.Item(label: model.packBreakName, mark: .band)])
+                } ?? []) + (breaks.isEmpty ? [] : [ChartKey.Item(label: model.bandName, mark: .band)])
                 if !key.isEmpty {
                     ChartKey(items: key)
                 }
@@ -390,8 +390,10 @@ struct NightTrendChart: View {
     var usualLabel = "Your usual"
     var seriesName: String
     var format: (Double) -> String
-    /// Her break weeks, shaded behind the nights (D-G3).
+    /// Her break weeks or logged periods, shaded behind the nights (D-G3).
     var breaks: [ClosedRange<Date>] = []
+    /// How VoiceOver names the bands: "break weeks shaded", "periods shaded".
+    var shadedSpoken = "break weeks shaded"
     var comparison: Comparison? = nil
     let selected: Date?
     @Binding var selection: Date?
@@ -439,7 +441,7 @@ struct NightTrendChart: View {
         let span = range.isWeekly ? "weekly averages over the last 6 months" : "the last \(points.count) nights"
         guard let lo = values.min(), let hi = values.max(), let last = values.last else { return "\(seriesName), \(span): none yet." }
         var text = "\(seriesName), \(span): from \(format(lo)) to \(format(hi)), latest \(format(last)), against \(usualLabel.lowercased()) of \(format(usual))"
-        if !breaks.isEmpty { text += ", break weeks shaded" }
+        if !breaks.isEmpty { text += ", \(shadedSpoken)" }
         if let comparison { text += ", with \(comparison.name.lowercased()) as a faint line on the right-hand scale" }
         return text + "."
     }
