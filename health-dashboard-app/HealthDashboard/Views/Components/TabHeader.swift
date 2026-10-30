@@ -19,7 +19,8 @@ extension EnvironmentValues {
 }
 
 /// The header at the top of every tab: the date in caps, the screen title,
-/// and the Settings avatar on the title row. It scrolls with the page.
+/// and the Health guide and Settings buttons on the title row. It scrolls
+/// with the page.
 struct TabHeader: View {
     var title: String
     @EnvironmentObject var store: DataStore
@@ -42,10 +43,45 @@ struct TabHeader: View {
                     .accessibilityAddTraits(.isHeader)
             }
             Spacer(minLength: Space.s)
-            SettingsAvatar()
-                .padding(.top, Space.s)
+            HStack(spacing: 0) {
+                GuideButton()
+                SettingsAvatar()
+            }
+            .padding(.top, Space.s)
         }
         .padding(.top, Space.xs)
+    }
+}
+
+/// The Health guide's front door (D-S3): a book beside the Settings
+/// button on every tab, since a library isn't a setting.
+struct GuideButton: View {
+    var body: some View {
+        NavigationLink {
+            HealthGuideView()
+        } label: {
+            Image(systemName: "book.closed.fill")
+                .font(.scaled(size: 16, weight: .semibold))
+                .modifier(HeaderCircle())
+        }
+        .buttonStyle(.pressable)
+        .accessibilityLabel("Health guide")
+    }
+}
+
+/// The 40pt chip circle behind the tab header's buttons, in a 44pt target.
+private struct HeaderCircle: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let p = Palette(scheme: scheme)
+        content
+            .foregroundStyle(Accent.indigo.ink(scheme))
+            .frame(width: 40, height: 40)
+            .background(p.chip, in: Circle())
+            .overlay(Circle().strokeBorder(p.cardBorder))
+            .frame(width: Sizes.minTap, height: Sizes.minTap)
+            .contentShape(Circle())
     }
 }
 
@@ -53,7 +89,6 @@ struct TabHeader: View {
 /// otherwise a gear, so it reads as Settings (F9). The same on all four tabs.
 struct SettingsAvatar: View {
     @EnvironmentObject var store: DataStore
-    @Environment(\.colorScheme) private var scheme
 
     /// "AL" for "Ashley Libasci", "A" for "Ashley"; nil without a name.
     static func initials(_ name: String?) -> String? {
@@ -63,7 +98,6 @@ struct SettingsAvatar: View {
     }
 
     var body: some View {
-        let p = Palette(scheme: scheme)
         NavigationLink {
             SettingsView()
         } label: {
@@ -76,12 +110,7 @@ struct SettingsAvatar: View {
                     Image(systemName: "gearshape.fill").font(.scaled(size: 17, weight: .semibold))
                 }
             }
-            .foregroundStyle(Accent.indigo.ink(scheme))
-            .frame(width: 40, height: 40)
-            .background(p.chip, in: Circle())
-            .overlay(Circle().strokeBorder(p.cardBorder))
-            .frame(width: Sizes.minTap, height: Sizes.minTap)
-            .contentShape(Circle())
+            .modifier(HeaderCircle())
         }
         .buttonStyle(.pressable)
         .accessibilityLabel("Settings and profile")

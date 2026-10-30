@@ -3,7 +3,7 @@ import HealthCore
 
 /// The Health guide's library: Help now pinned first, then every section's
 /// articles as rows, searchable. Birth-control articles show only for her
-/// method. Pushed from Settings.
+/// method. Pushed from the book button on every tab header.
 struct HealthGuideView: View {
     @EnvironmentObject private var store: DataStore
     @State private var query = ""

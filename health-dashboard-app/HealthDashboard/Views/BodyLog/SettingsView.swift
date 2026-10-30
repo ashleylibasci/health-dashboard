@@ -3,8 +3,9 @@ import HealthCore
 
 /// Settings, opened from the avatar on every tab: a short hub of grouped
 /// rows, each showing its current state and pushing its own page
-/// (`SettingsPages.swift`). The Health guide is first, and Calendars sits
-/// near the top so a signed-out Google Calendar is never hidden.
+/// (`SettingsPages.swift`). Calendars sits near the top so a signed-out
+/// Google Calendar is never hidden. The Health guide has its own button
+/// beside this one on every tab (D-S3).
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
@@ -16,10 +17,6 @@ struct SettingsView: View {
     var body: some View {
         Screen(title: "Settings", accent: .indigo) {
             profile
-            RowCard {
-                MetricRow(title: "Health guide", note: "Sleep, sick days, the pill, periods and more",
-                          systemImage: "book.closed.fill", accent: .indigo) { HealthGuideView() }
-            }
             group("Connections") {
                 MetricRow(title: "Calendars", note: importer.stateText, verdict: importer.stateVerdict,
                           systemImage: "calendar", accent: .yellow) { CalendarSettingsView() }
