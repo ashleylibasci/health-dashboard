@@ -85,6 +85,9 @@ struct RootTabView: View {
                         case "cycleSettings": CycleSettingsView()
                         case "visitSummary": VisitSummaryView()
                         case "recovery": RecoveryView()
+                        case "hrv": HeartMetricView(metric: .hrv)
+                        case "restingHR": HeartMetricView(metric: .restingHR)
+                        case "sleepHistory": SleepHistoryView()
                         default: CycleView()
                         }
                     }
