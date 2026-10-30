@@ -18,6 +18,10 @@ struct Screen<Content: View>: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.surfaceLook) private var look
     @EnvironmentObject private var model: AppModel
+    /// The summary's answer while it's scrolled under the bar (D-M5).
+    @State private var pinned: String?
+    /// The bottom of the navigation bar, in global coordinates.
+    @State private var barBottom: CGFloat = 0
 
     var body: some View {
         let p = Palette(scheme: scheme)
@@ -35,6 +39,12 @@ struct Screen<Content: View>: View {
             }
         }
         .modifier(SearchScrollBehavior(enabled: searches))
+        // The scroll view's top edge, or (when it runs under the bar) its
+        // safe area: either way, the bar's bottom.
+        .onGeometryChange(for: CGFloat.self) { max($0.frame(in: .global).minY, $0.safeAreaInsets.top) } action: {
+            barBottom = $0
+        }
+        .environment(\.answerPin, title == nil ? nil : AnswerPin(line: barBottom) { pinned = $0 })
         .background(alignment: .top) {
             ZStack(alignment: .top) {
                 if let look {
@@ -52,6 +62,13 @@ struct Screen<Content: View>: View {
         .modifier(PullToRefresh(enabled: refreshes) { await model.becameActive() })
         .navigationTitle(title ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let title {
+                ToolbarItem(placement: .principal) {
+                    PinnedTitle(title: title, answer: pinned, accent: accent)
+                }
+            }
+        }
     }
 }
 
