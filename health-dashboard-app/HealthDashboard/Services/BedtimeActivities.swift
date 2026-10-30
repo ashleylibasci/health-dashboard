@@ -72,8 +72,9 @@ extension AppModel {
                      alarm: watchAlarmTonight)
     }
 
-    /// The smart alarm for tomorrow morning, as the activity shows it.
-    private var watchAlarmTonight: BedtimeActivityAttributes.WatchAlarm {
+    /// The smart alarm for tomorrow morning, as the activity (and the
+    /// bedtime nudge's button, D-N2) shows it.
+    var watchAlarmTonight: BedtimeActivityAttributes.WatchAlarm {
         if let demo = DemoMode.bedtimeActivity, let alarm = BedtimeActivityAttributes.WatchAlarm(rawValue: demo) { return alarm }
         guard WCSession.isSupported(), WCSession.default.isPaired, WCSession.default.isWatchAppInstalled else { return .hidden }
         // Weekdays only, before a weekend morning: no alarm to talk about.
