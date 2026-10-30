@@ -12,7 +12,7 @@ struct SleepView: View {
     @State private var selectedDay: Date? = nil
 
     var body: some View {
-        Screen(title: "Sleep", accent: .purple) {
+        Screen(title: "Sleep", accent: .purple, searches: true) {
             TabHeader("Sleep")
             SampleDataBanner()
             if model.lastNightIsFresh {

@@ -12,7 +12,7 @@ struct BodyView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        Screen(accent: .indigo) {
+        Screen(accent: .indigo, searches: true) {
             BodyLogTabHeader("Body")
             SampleDataBanner()
             summary

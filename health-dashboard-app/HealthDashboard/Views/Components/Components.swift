@@ -11,6 +11,9 @@ struct Screen<Content: View>: View {
     var accent: Accent = .indigo
     /// Pull down to re-read Apple Health (off for onboarding).
     var refreshes = true
+    /// Tab roots: the search field sits above the header, tucked away
+    /// until she pulls down (D-S1).
+    var searches = false
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var scheme
     @EnvironmentObject private var model: AppModel
@@ -18,10 +21,19 @@ struct Screen<Content: View>: View {
     var body: some View {
         let p = Palette(scheme: scheme)
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.m) { content }
+            if searches {
+                PullDownSearch {
+                    VStack(alignment: .leading, spacing: Space.m) { content }
+                }
                 .padding(.horizontal, Space.xl)
                 .padding(.bottom, Space.scrollEnd)
+            } else {
+                VStack(alignment: .leading, spacing: Space.m) { content }
+                    .padding(.horizontal, Space.xl)
+                    .padding(.bottom, Space.scrollEnd)
+            }
         }
+        .modifier(SearchScrollBehavior(enabled: searches))
         .background(alignment: .top) {
             ZStack(alignment: .top) {
                 p.background

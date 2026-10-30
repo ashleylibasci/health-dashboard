@@ -39,7 +39,7 @@ struct TodayView: View {
     @State private var revealed = 0
 
     var body: some View {
-        Screen(accent: .indigo) {
+        Screen(accent: .indigo, searches: true) {
             TabHeader(greeting)
             SampleDataBanner(prominent: true)
             if showsExamChip {

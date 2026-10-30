@@ -22,7 +22,7 @@ struct LogView: View {
     @State private var selectCount = 0
 
     var body: some View {
-        Screen(accent: .indigo) {
+        Screen(accent: .indigo, searches: true) {
             BodyLogTabHeader("Log today")
             SampleDataBanner(forLog: true)
             caffeineSection
