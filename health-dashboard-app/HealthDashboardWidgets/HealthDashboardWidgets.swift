@@ -3,14 +3,15 @@ import SwiftUI
 import HealthCore
 
 /// Home Screen and Lock Screen widgets. They show the last numbers the app
-/// saved (`WidgetSnapshot`): recovery, cycle, today's caffeine and water, and
-/// the bedtime streak, with buttons to log a latte, a bottle, today's pill
+/// saved (`WidgetSnapshot`): recovery, energy now, cycle, today's caffeine and
+/// water, and the bedtime streak, with buttons to log a latte, a bottle, today's pill
 /// and a stress rating without opening the app. Example data is always
 /// labelled, and yesterday's numbers never show as today's.
 @main
 struct HealthDashboardWidgets: WidgetBundle {
     var body: some Widget {
         RecoveryWidget()
+        EnergyWidget()
         CycleWidget()
         TodayWidget()
         StressWidget()
@@ -632,5 +633,137 @@ private struct StreakWidgetView: View {
         } else {
             OpenAppPrompt()
         }
+    }
+}
+
+// MARK: - Energy now
+
+struct EnergyWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "Energy", provider: EnergyProvider()) { entry in
+            EnergyWidgetView(entry: entry)
+                .containerBackground(for: .widget) { WidgetBackground(accent: .mint) }
+        }
+        .configurationDisplayName("Energy now")
+        .description("Today's energy curve with a dot for now, and where you are on it.")
+        .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+/// The snapshot's times plus each moment the "now" dot moves on to the
+/// next point of the curve, so it keeps moving without the app.
+struct EnergyProvider: TimelineProvider {
+    private let base = SnapshotProvider()
+
+    func placeholder(in context: Context) -> SnapshotEntry { base.placeholder(in: context) }
+
+    func getSnapshot(in context: Context, completion: @escaping (SnapshotEntry) -> Void) {
+        base.getSnapshot(in: context, completion: completion)
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<SnapshotEntry>) -> Void) {
+        let snap = WidgetSnapshot.load()
+        let now = Date.now
+        var dates: [Date] = [now]
+        if let s = snap {
+            let rollover = s.appDayStart.addingTimeInterval(24 * 3600)
+            dates.append(rollover)
+            if let e = s.energy(at: now) { dates += e.moves(after: now).filter { $0 < rollover } }
+        }
+        let entries = Set(dates.filter { $0 >= now }).sorted().map { SnapshotEntry(date: $0, snapshot: snap) }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(3600))))
+    }
+}
+
+/// "57", a small curve with the "now" dot, and "Afternoon dip till 6:07pm",
+/// as on Today's "Energy now" tile. The curve is a prediction from last
+/// night, so it isn't greyed as it ages; a new day clears it.
+private struct EnergyWidgetView: View {
+    let entry: SnapshotEntry
+    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if let s = entry.snapshot {
+            let now = entry.date
+            let curve = s.energy(at: now)
+            let level = curve?.level(at: now)
+            let missing = s.isCurrent(at: now) ? "Open the app to update" : "Not updated today"
+            switch family {
+            case .accessoryCircular:
+                Gauge(value: Double(level ?? 0), in: 0...100) {
+                    Image(systemName: "bolt.fill")
+                } currentValueLabel: {
+                    Text(level.map(String.init) ?? dash)
+                        .font(WidgetType.number)
+                        .contentTransition(.numericText(value: Double(level ?? 0)))
+                }
+                .gaugeStyle(.accessoryCircular)
+                .widgetAccentable()
+                .accessibilityLabel(sentence(s, curve, now: now))
+            case .accessoryRectangular:
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Energy now\(s.isSample ? " \u{00B7} Example" : "")").font(.caption2.weight(.semibold))
+                        .widgetAccentable()
+                    if let curve, let level {
+                        EnergySpark(levels: curve.levels, now: curve.index(at: now), line: .primary, dot: .primary,
+                                    lineWidth: 1.5, dotSize: 6)
+                            .widgetAccentable()
+                        Text("\(level) \u{00B7} \(curve.shortLine(at: now) ?? "")")
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    } else {
+                        Text(missing).font(.headline).lineLimit(2).minimumScaleFactor(0.8)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sentence(s, curve, now: now))
+            case .accessoryInline:
+                if let curve, let level {
+                    Text("Energy \(level) \u{00B7} \(curve.shortLine(at: now) ?? "")")
+                } else {
+                    Text("Energy: \(missing.lowercased())")
+                }
+            default:
+                let p = Palette(scheme: scheme)
+                VStack(alignment: .leading, spacing: 4) {
+                    WidgetHeader(title: "Energy", accent: .mint, snapshot: s)
+                    Text(level.map(String.init) ?? dash)
+                        .font(WidgetType.hero)
+                        .contentTransition(.numericText(value: Double(level ?? 0)))
+                    if let curve {
+                        // Energy is mint everywhere.
+                        EnergySpark(levels: curve.levels, now: curve.index(at: now), line: Accent.mint.fill(scheme),
+                                    dot: p.primary, fill: renderingMode == .fullColor)
+                            .widgetAccentable()
+                            .frame(maxHeight: .infinity)
+                    } else {
+                        Spacer(minLength: 0)
+                    }
+                    Text(curve?.line(at: now) ?? missing)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(p.secondary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(p.primary)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sentence(s, curve, now: now))
+            }
+        } else {
+            OpenAppPrompt()
+        }
+    }
+
+    private func sentence(_ s: WidgetSnapshot, _ curve: WidgetSnapshot.EnergyCurve?, now: Date) -> String {
+        guard let curve, let level = curve.level(at: now) else {
+            return "Energy now: " + (s.isCurrent(at: now) ? "open the app to update" : "not updated today")
+        }
+        var parts = ["Energy now \(level) of 100"]
+        if let line = curve.line(at: now) { parts.append(line) }
+        if s.isSample { parts.append("example data") }
+        return parts.joined(separator: ", ")
     }
 }
