@@ -337,6 +337,7 @@ struct TrackingSettingsView: View {
 
 /// The app's two alerts. Their only switches are here.
 struct NotificationSettingsView: View {
+    @EnvironmentObject var model: AppModel
     @EnvironmentObject var store: DataStore
     @Environment(\.colorScheme) private var scheme
     /// Notifications are switched off for the app in iOS Settings while a
@@ -346,6 +347,9 @@ struct NotificationSettingsView: View {
     var body: some View {
         Screen(title: "Notifications", accent: .coral) {
             Card(density: .compact) {
+                SettingToggleRow(title: "Morning note", detail: "One note about 45 minutes after you wake: your recovery, pill day and tonight's bedtime, with Log latte and +1 bottle buttons.",
+                                 systemImage: "sun.max.fill", accent: .orange, isOn: $store.data.insights.morningNote)
+                Divider().overlay(Palette(scheme: scheme).cardBorder)
                 SettingToggleRow(title: "Sick alerts", detail: "A notification, at most once a day, when several overnight signals say you may be getting sick.",
                                  systemImage: "thermometer.medium", accent: .coral, isOn: $store.data.sickAlerts)
                 Divider().overlay(Palette(scheme: scheme).cardBorder)
@@ -359,6 +363,10 @@ struct NotificationSettingsView: View {
         .task { await checkNotifications() }
         .onChange(of: store.data.peakDipNudges) { _, on in toggleChanged(on) }
         .onChange(of: store.data.sickAlerts) { _, on in toggleChanged(on) }
+        .onChange(of: store.data.insights.morningNote) { _, on in
+            toggleChanged(on)
+            Task { await model.updateMorningNote() }
+        }
     }
 
     private var blockedNote: some View {
@@ -389,7 +397,7 @@ struct NotificationSettingsView: View {
     }
 
     private func checkNotifications() async {
-        let wanted = store.data.peakDipNudges || store.data.sickAlerts
+        let wanted = store.data.peakDipNudges || store.data.sickAlerts || store.data.insights.morningNote
         notificationsBlocked = wanted ? !(await Nudges.isAllowed()) : false
     }
 }

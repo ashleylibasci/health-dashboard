@@ -128,8 +128,8 @@ struct SettingsView: View {
     }
 
     private var notificationsNote: String {
-        let on = [store.data.sickAlerts, store.data.peakDipNudges].filter { $0 }.count
-        return on == 0 ? "Off" : "\(on) of 2 on"
+        let on = [store.data.insights.morningNote, store.data.sickAlerts, store.data.peakDipNudges].filter { $0 }.count
+        return on == 0 ? "Off" : "\(on) of 3 on"
     }
 
     static func setupName(_ setup: AppData.CycleSetup) -> String {

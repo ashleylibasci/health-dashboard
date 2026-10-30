@@ -1292,6 +1292,7 @@ final class AppModel: ObservableObject {
         }
         await updateAlarmNudge()
         await updateBedtimeNudge()
+        await updateMorningNote()
     }
 
     // MARK: Smart alarm on the Watch

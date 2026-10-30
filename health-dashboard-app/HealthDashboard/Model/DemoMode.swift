@@ -35,6 +35,8 @@ import HealthCore
 ///   Today is marked new (D-P1).
 /// - `-demoTiles pill,energy,caffeine,water`: those At a glance tiles
 ///   pinned, in that order (D-P4).
+/// - `-demoMorningNote`: the morning note 10 seconds after launch, from
+///   the example numbers, with its Log latte and +1 bottle buttons (D-N1).
 ///
 /// Add them in Xcode under Product → Scheme → Edit Scheme → Run → Arguments.
 enum DemoMode {
@@ -83,7 +85,9 @@ enum DemoMode {
     static let patterns = args.contains("-demoPatterns")
     static let weekStoryOut = args.contains("-demoWeekStory")
     static let tiles = value(after: "-demoTiles")
+    static let morningNote = args.contains("-demoMorningNote")
     #else
+    static let morningNote = false
     static let patterns = false, weekStoryOut = false
     static let tiles: String? = nil
     static let isOn = false, sick = false, resetData = false, pillNotice = false, away = false, exams = false, fuel = false

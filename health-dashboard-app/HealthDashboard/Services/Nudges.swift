@@ -176,11 +176,20 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     /// Set at launch; iOS starts the app in the background to run it.
     var onPillTaken: ((Date) -> Void)?
 
+    /// The morning note's Log latte and +1 bottle (D-N1) run the same
+    /// intents as the widget buttons, so the drink lands in the log and in
+    /// Apple Health without opening the app.
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let tapped = Date.now
-        DispatchQueue.main.async {
-            if response.actionIdentifier == PillReminders.takenAction { self.onPillTaken?(tapped) }
+        let action = response.actionIdentifier
+        Task { @MainActor in
+            switch action {
+            case PillReminders.takenAction: self.onPillTaken?(tapped)
+            case MorningNote.latteAction: _ = try? await LogLatteIntent().perform()
+            case MorningNote.bottleAction: _ = try? await LogBottleIntent().perform()
+            default: break
+            }
             completionHandler()
         }
     }
