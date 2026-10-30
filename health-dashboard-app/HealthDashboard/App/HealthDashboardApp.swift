@@ -81,7 +81,7 @@ struct RootTabView: View {
     @Environment(\.colorScheme) private var scheme
     /// What a quick log from the Log tab's long-press menu saved (D-S2).
     @State private var quickLogToast: UndoToast?
-    @State private var tab: AppTab = DemoMode.open == nil ? .today : .body
+    @State private var tab: AppTab = DemoMode.open == nil ? DemoMode.tab ?? .today : .body
     /// `-demoOpen` (Debug): the screen pushed on Body at launch.
     @State private var demoOpen = false
 

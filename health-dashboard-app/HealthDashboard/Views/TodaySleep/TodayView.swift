@@ -970,6 +970,8 @@ private struct WaterTile: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var added = 0
+    /// Times today's goal was reached here, for the sparkle (D-M3).
+    @State private var reached = 0
 
     /// The steady pace by now (F7): the bottles line said the amount
     /// again. Nothing once the goal is reached, before waking, or without a
@@ -996,6 +998,9 @@ private struct WaterTile: View {
                         .font(.numberL).minimumScaleFactor(0.6).lineLimit(1)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .motion(.fill, value: amount)
+                        .overlay(alignment: .topTrailing) {
+                            GoalSparkle(trigger: reached, accent: .blue).offset(x: 18, y: -10)
+                        }
                     if let paceNote {
                         Text(paceNote).font(.secondary).foregroundStyle(p.secondary)
                     }
@@ -1030,6 +1035,9 @@ private struct WaterTile: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .tileSurface()
         .zoomSource("water", in: zoom)
+        .onChange(of: todayML) { old, new in
+            if showsGoal, old < goalML, new >= goalML { reached += 1 }
+        }
     }
 }
 

@@ -466,6 +466,11 @@ struct CaffeineQuickLog: View {
                 .environmentObject(model)
                 .environmentObject(store)
         }
+        .onAppear {
+            // `-demoLog` (Debug): her first drink, 3 s in (D-M3 preview).
+            guard DemoMode.logs, !compact, let drink = shownDrinks.first else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { log(drink) }
+        }
     }
 
     private func titleRow(_ p: Palette) -> some View {
@@ -536,9 +541,10 @@ struct CaffeineQuickLog: View {
             done?()
         } label: {
             HStack(spacing: Space.m) {
-                Image(systemName: BodyLogStyle.symbol(for: drink.icon))
+                FillingSymbol(systemName: BodyLogStyle.symbol(for: drink.icon),
+                              color: BodyLogStyle.accent(for: drink.icon).ink(scheme),
+                              trigger: bounces[drink.id, default: 0])
                     .font(.scaled(size: 16, weight: .semibold))
-                    .foregroundStyle(BodyLogStyle.accent(for: drink.icon).ink(scheme))
                     .frame(width: Sizes.icon, height: Sizes.icon)
                     .background(BodyLogStyle.accent(for: drink.icon).fill(scheme).opacity(0.22), in: Circle())
                     .accessibilityHidden(true)
@@ -662,6 +668,15 @@ struct WaterQuickLog: View {
         }
         .sensoryFeedback(.increase, trigger: addCount)
         .sensoryFeedback(.success, trigger: goalCount)
+        .onAppear {
+            // `-demoLog` (Debug): a bottle every 2.5 s from 10 s in, up to the goal (D-M3 preview).
+            guard DemoMode.logs, showsTotal else { return }
+            for i in 0..<8 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10 + 2.5 * Double(i)) {
+                    if model.waterTodayML < model.waterGoalTodayML { addWater(1) }
+                }
+            }
+        }
     }
 
     private var totalRow: some View {
@@ -675,6 +690,9 @@ struct WaterQuickLog: View {
                     .font(.numberM)
                     .contentTransition(reduceMotion ? .opacity : .numericText())
                     .motion(.log, value: model.waterTodayML)
+                    .overlay(alignment: .topLeading) {
+                        GoalSparkle(trigger: goalCount, accent: .blue).offset(x: -20, y: -12)
+                    }
                 if !model.hidesEffortTargets {
                     Text("of \(LogFormat.oz(model.waterGoalTodayML))").font(.secondary).secondaryText()
                 }
@@ -1005,8 +1023,7 @@ struct LogBottle: View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         ZStack(alignment: .bottom) {
             shape.fill(Palette(scheme: scheme).track)
-            shape.fill(Accent.blue.fill(scheme)).frame(height: height * CGFloat(min(max(fill, 0), 1)))
-                .motion(.fill, value: fill)
+            SloshingWater(level: fill, color: Accent.blue.fill(scheme))
         }
         .frame(width: width, height: height)
         .clipShape(shape)

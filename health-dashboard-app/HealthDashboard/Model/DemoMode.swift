@@ -44,6 +44,10 @@ import HealthCore
 /// - `-demoEveningDim`: the evening dim at full, whatever the time (D-M6).
 /// - `-demoSkyPhase sunrise|day|sunset|night`: the Sky theme, held at that
 ///   phase.
+/// - `-demoTab today|sleep|body|log`: opens on that tab.
+/// - `-demoLog`: on the Log tab, her first caffeine drink is logged 3
+///   seconds in, then a bottle of water every 2.5 seconds from 10 seconds
+///   in until the goal (D-M3).
 /// - `-demoZoom recovery|tonight|water|caffeine`: that Today card grows
 ///   into its screen 3 seconds after launch and shrinks back 6 seconds
 ///   later (D-M1). Add `-UIAnimationDragCoefficient 6` to slow it down.
@@ -106,8 +110,18 @@ enum DemoMode {
     static let eveningDim = args.contains("-demoEveningDim")
     static let skyPhase = value(after: "-demoSkyPhase").flatMap(SkyPhase.init(rawValue:))
     static let zoom = value(after: "-demoZoom")
+    static let tab: AppTab? = switch value(after: "-demoTab") {
+    case "sleep": .sleep
+    case "body": .body
+    case "log": .log
+    case "today": .today
+    default: nil
+    }
+    static let logs = args.contains("-demoLog")
     #else
     static let zoom: String? = nil
+    static let tab: AppTab? = nil
+    static let logs = false
     static let skyPhase: SkyPhase? = nil
     static let morningNote = false, bedtimeNudge = false, eveningDim = false
     static let patterns = false, weekStoryOut = false
